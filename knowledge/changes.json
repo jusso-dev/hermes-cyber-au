@@ -1,0 +1,193 @@
+{
+  "schema": "hermes-cyber-au-changes/v1",
+  "runs": [
+    {
+      "date": "2026-10-08",
+      "built_at": "2026-10-08T11:38:09Z",
+      "baseline": true,
+      "material": false,
+      "ism": {
+        "new": [],
+        "changed": [],
+        "withdrawn": []
+      },
+      "sources": [
+        {
+          "id": "asd-ism-oscal",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/ism",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "asd-essential-eight",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/essential-eight",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "asd-strategies",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/publication/strategies-to-mitigate-cyber-security-incidents",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "acsc-advisories",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/alerts-and-advisories",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "acsc-ism-page",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/ism",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "acsc-threat-report",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/about-us/view-all-content/reports-and-statistics/annual-cyber-threat-report-2024-2025",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "acsc-ai-guidance",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/business-government/secure-design/artificial-intelligence/engaging-with-artificial-intelligence",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "home-affairs-pspf",
+          "state": "loaded",
+          "url": "https://www.protectivesecurity.gov.au/publications-library/direction-002-2026-strengthening-commonwealth-cyber-posture-against-ai-enabled-risks",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "home-affairs-soci",
+          "state": "loaded",
+          "url": "https://www.legislation.gov.au/C2018A00029/latest/text",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "home-affairs-cirmprules",
+          "state": "loaded",
+          "url": "https://www.legislation.gov.au/F2023L00112/latest/text",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "home-affairs-cyber-security-act",
+          "state": "loaded",
+          "url": "https://www.legislation.gov.au/C2024A00067/latest/text",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "oaic-privacy",
+          "state": "loaded",
+          "url": "https://www.oaic.gov.au/privacy/notifiable-data-breaches",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "dta-ai-policy",
+          "state": "loaded",
+          "url": "https://www.digital.gov.au/ai/ai-in-government-policy",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "dta-hcf",
+          "state": "loaded",
+          "url": "https://www.hostingcertification.gov.au/",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "asd-irap",
+          "state": "loaded",
+          "url": "https://www.cyber.gov.au/irap",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "nsw-cyber-policy",
+          "state": "loaded",
+          "url": "https://digital.nsw.gov.au/delivery/cyber-security/policies/policy-statement",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "vic-pdsf",
+          "state": "loaded",
+          "url": "https://ovic.vic.gov.au/information-security/information-security-resources/",
+          "material_on_change": true,
+          "changed": false
+        },
+        {
+          "id": "mitre-attack",
+          "state": "loaded",
+          "url": "",
+          "material_on_change": false,
+          "changed": false
+        },
+        {
+          "id": "mitre-atlas",
+          "state": "loaded",
+          "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-latest.yaml",
+          "material_on_change": false,
+          "changed": false
+        },
+        {
+          "id": "owasp-llm",
+          "state": "loaded_with_failures",
+          "url": "https://genai.owasp.org/llm-top-10/",
+          "material_on_change": false,
+          "changed": false
+        },
+        {
+          "id": "owasp-agentic",
+          "state": "failed",
+          "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+          "material_on_change": false,
+          "changed": false
+        }
+      ],
+      "failures": [
+        {
+          "url": "https://genai.owasp.org/llm-top-10/",
+          "error": "http_403",
+          "detail": "https://genai.owasp.org/llm-top-10/",
+          "source_id": "owasp-llm"
+        },
+        {
+          "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+          "error": "http_403",
+          "detail": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+          "source_id": "owasp-agentic"
+        }
+      ],
+      "new_failures": [
+        {
+          "url": "https://genai.owasp.org/llm-top-10/",
+          "error": "http_403",
+          "detail": "https://genai.owasp.org/llm-top-10/",
+          "source_id": "owasp-llm"
+        },
+        {
+          "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+          "error": "http_403",
+          "detail": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+          "source_id": "owasp-agentic"
+        }
+      ]
+    }
+  ]
+}

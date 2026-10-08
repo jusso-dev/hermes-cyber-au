@@ -1,0 +1,230 @@
+{
+  "schema": "hermes-cyber-au-manifest/v1",
+  "built_at": "2026-10-08T11:38:09Z",
+  "baseline": true,
+  "sources": {
+    "asd-ism-oscal": {
+      "content_sha256": "f354b76f97b1dd6403317db83e718c88ab475bcd9a9f7ed2cf11e01ab7235a3d",
+      "versions": [
+        {
+          "source_id": "asd-ism-oscal",
+          "version": "2026.06.18",
+          "published": "2026-06-18",
+          "git_sha": "d3bd1735a992a988d3e4e337b3e41f856a76368e",
+          "control_count": 1150,
+          "applicability_legend": {
+            "NC": {
+              "code": "NC",
+              "label": "Information security manual non-classified Baseline",
+              "profile_file": "ISM_NON_CLASSIFIED-baseline_profile.json",
+              "verified": "exact"
+            },
+            "OS": {
+              "code": "OS",
+              "label": "Information security manual OFFICIAL: Sensitive Baseline",
+              "profile_file": "ISM_OFFICIAL_SENSITIVE-baseline_profile.json",
+              "verified": "exact"
+            },
+            "P": {
+              "code": "P",
+              "label": "Information security manual PROTECTED Baseline",
+              "profile_file": "ISM_PROTECTED-baseline_profile.json",
+              "verified": "exact"
+            },
+            "S": {
+              "code": "S",
+              "label": "Information security manual SECRET Baseline",
+              "profile_file": "ISM_SECRET-baseline_profile.json",
+              "verified": "exact"
+            },
+            "TS": {
+              "code": "TS",
+              "label": "Information security manual TOP SECRET Baseline",
+              "profile_file": "ISM_TOP_SECRET-baseline_profile.json",
+              "verified": "exact"
+            }
+          },
+          "canonical_url": "https://www.cyber.gov.au/ism",
+          "role": "previous",
+          "e8_profiles": [
+            "ISM_E8_ML1-baseline_profile.json",
+            "ISM_E8_ML2-baseline_profile.json",
+            "ISM_E8_ML3-baseline_profile.json"
+          ],
+          "profile_failures": [],
+          "valid_to": "2026-09-02"
+        },
+        {
+          "source_id": "asd-ism-oscal",
+          "version": "2026.09.4",
+          "published": "2026-09-03",
+          "git_sha": "9f77120a7f8671c73da02431cdc299fac264edab",
+          "control_count": 1192,
+          "applicability_legend": {
+            "NC": {
+              "code": "NC",
+              "label": "Information security manual non-classified Baseline",
+              "profile_file": "ISM_NON_CLASSIFIED-baseline_profile.json",
+              "verified": "exact"
+            },
+            "OS": {
+              "code": "OS",
+              "label": "Information security manual OFFICIAL: Sensitive Baseline",
+              "profile_file": "ISM_OFFICIAL_SENSITIVE-baseline_profile.json",
+              "verified": "exact"
+            },
+            "P": {
+              "code": "P",
+              "label": "Information security manual PROTECTED Baseline",
+              "profile_file": "ISM_PROTECTED-baseline_profile.json",
+              "verified": "exact"
+            },
+            "S": {
+              "code": "S",
+              "label": "Information security manual SECRET Baseline",
+              "profile_file": "ISM_SECRET-baseline_profile.json",
+              "verified": "exact"
+            },
+            "TS": {
+              "code": "TS",
+              "label": "Information security manual TOP SECRET Baseline",
+              "profile_file": "ISM_TOP_SECRET-baseline_profile.json",
+              "verified": "exact"
+            }
+          },
+          "canonical_url": "https://www.cyber.gov.au/ism",
+          "role": "current",
+          "e8_profiles": [
+            "ISM_E8_ML1-baseline_profile.json",
+            "ISM_E8_ML2-baseline_profile.json",
+            "ISM_E8_ML3-baseline_profile.json"
+          ],
+          "profile_failures": [],
+          "valid_to": null
+        }
+      ],
+      "chunk_count": 2342
+    },
+    "asd-essential-eight": {
+      "content_sha256": "63b7ea6eb28cee259d08fa55d23a46f3e1a3f407395efb5797ba50c967b3eb08",
+      "versions": [],
+      "chunk_count": 85
+    },
+    "asd-strategies": {
+      "content_sha256": "e564220acef5bb8786706383cd78800c5c5454a97db51bb846c0b7de510616b4",
+      "versions": [],
+      "chunk_count": 44
+    },
+    "acsc-advisories": {
+      "content_sha256": "3e8e2e0c5c1fc86ef79507bd41eb077d3e2a27825c885c1ec09eb69c592af627",
+      "versions": [],
+      "chunk_count": 54
+    },
+    "acsc-ism-page": {
+      "content_sha256": "662199352ead79cd29f724f0252d12c1bc27a69cb7d4ac8a8699be7a6ab69a71",
+      "versions": [],
+      "chunk_count": 2
+    },
+    "acsc-threat-report": {
+      "content_sha256": "b3b6ca2af68c1b4fa8ce243efdb9fa7db75fcf6e418d2278f8985b4e064e98dd",
+      "versions": [],
+      "chunk_count": 32
+    },
+    "acsc-ai-guidance": {
+      "content_sha256": "09ab9f5329fcfe2601557c1c446b769a9485eb033e59fd6f3efdd1a086cd18ae",
+      "versions": [],
+      "chunk_count": 20
+    },
+    "home-affairs-pspf": {
+      "content_sha256": "ea76dc470cdff7b8a1a743442d9f39de9f9b7703790abaeade7649fd2a78ce9a",
+      "versions": [],
+      "chunk_count": 4
+    },
+    "home-affairs-soci": {
+      "content_sha256": "c7cb9e9166c88bbe61821a9b8d2c53cca55964e7cb0c1edb8a9b0c3446669361",
+      "versions": [],
+      "chunk_count": 5
+    },
+    "home-affairs-cirmprules": {
+      "content_sha256": "c36580b7500f8ae9dec6554f9311baec1007a9cdbfd84589401da2e1bdce663b",
+      "versions": [],
+      "chunk_count": 1
+    },
+    "home-affairs-cyber-security-act": {
+      "content_sha256": "bcaf65d2012bae294e8bb471a494792c462c455fd711c9327f220cd17dd02a74",
+      "versions": [],
+      "chunk_count": 2
+    },
+    "oaic-privacy": {
+      "content_sha256": "34e18631b531758434cafddf8c3be3de6843df1da061c1dc8f905bc35828af80",
+      "versions": [],
+      "chunk_count": 7
+    },
+    "dta-ai-policy": {
+      "content_sha256": "7c82d954637a884f849a513fdfb3bff68ca2107ef25271f5cee38e000eb38280",
+      "versions": [],
+      "chunk_count": 8
+    },
+    "dta-hcf": {
+      "content_sha256": "49f81f75ac4f0d2a6b6de9254b8535f059d02623cf0ecd6707689c794e940f2a",
+      "versions": [],
+      "chunk_count": 3
+    },
+    "asd-irap": {
+      "content_sha256": "48fc0b9a8114f7d09213503b5007572f79862f24bb949aa664f7de444042db91",
+      "versions": [],
+      "chunk_count": 6
+    },
+    "nsw-cyber-policy": {
+      "content_sha256": "5aba76eac9f537b1ead2155c4d3180b9de81647a166ff1a826c481e0841dfc53",
+      "versions": [],
+      "chunk_count": 5
+    },
+    "vic-pdsf": {
+      "content_sha256": "1f67a9b4a6db5df25b898a0c6d89366852761da360342780265c2a01c4ca94a4",
+      "versions": [],
+      "chunk_count": 7
+    },
+    "mitre-attack": {
+      "content_sha256": "42b4b10ff561cea7551213718cd5bc3a53a6bbd90282206e123c6e26767cb8c9",
+      "versions": [],
+      "chunk_count": 697
+    },
+    "mitre-atlas": {
+      "content_sha256": "079847b288e9886f65a529964f03bfe1999964fe54098123de3830c53f40fddc",
+      "versions": [],
+      "chunk_count": 264
+    },
+    "owasp-llm": {
+      "content_sha256": "9efc951bdd3e6480bdf6776d28e1e87e959a9627c7be72bff3b66672e2286c10",
+      "versions": [],
+      "chunk_count": 2
+    },
+    "owasp-agentic": {
+      "content_sha256": "",
+      "versions": [],
+      "chunk_count": null
+    }
+  },
+  "failures": [
+    {
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "error": "http_403",
+      "detail": "https://genai.owasp.org/llm-top-10/",
+      "source_id": "owasp-llm"
+    },
+    {
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+      "error": "http_403",
+      "detail": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/",
+      "source_id": "owasp-agentic"
+    }
+  ],
+  "ism": {
+    "new": [],
+    "changed": [],
+    "withdrawn": []
+  },
+  "mitre_attack_sha": "8543c5b05bd9bbcace9fc37f30bba96b675b6f33",
+  "essential_eight_strategies_verified": true
+}

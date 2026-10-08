@@ -1,0 +1,13 @@
+{
+  "source_id": "owasp-llm",
+  "content_sha256": "9efc951bdd3e6480bdf6776d28e1e87e959a9627c7be72bff3b66672e2286c10",
+  "chunk_count": 2,
+  "failures": [
+    {
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "error": "http_403",
+      "detail": "https://genai.owasp.org/llm-top-10/"
+    }
+  ],
+  "retrieved_at": "2026-10-08"
+}

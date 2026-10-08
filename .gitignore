@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+*.pem
+*.key
+credentials.json
+knowledge/index.sqlite
+knowledge/index.sqlite-*
+finetune/
+.DS_Store

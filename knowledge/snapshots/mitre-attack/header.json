@@ -1,0 +1,7 @@
+{
+  "source_id": "mitre-attack",
+  "git_sha": "8543c5b05bd9bbcace9fc37f30bba96b675b6f33",
+  "technique_count": 697,
+  "content_sha256": "42b4b10ff561cea7551213718cd5bc3a53a6bbd90282206e123c6e26767cb8c9",
+  "failures": []
+}

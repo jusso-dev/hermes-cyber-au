@@ -1,0 +1,19 @@
+hermes-cyber-au
+Copyright (c) 2026 Justin Middler
+
+This pack gives guidance. It is not a certification, an audit, or legal advice.
+It is not affiliated with the Australian Signals Directorate, the Australian
+Cyber Security Centre, or any other agency.
+
+ISM text in the snapshots is the ASD catalogue, processed into short chunks
+with the control ID, version, date, and a link back to the public manual.
+The machine-readable mirror is the public ism-oscal repository. That upstream
+repository did not publish a licence file that this pack could record. Do not
+treat these chunks as a substitute for the manual on cyber.gov.au.
+
+MITRE ATT&CK technique IDs and names are MITRE's. This pack stores the ID,
+the name, and the URL. It does not store the STIX bundle.
+
+Other pages are stored as extracts with the URL and the content hash. If a
+fetch fails, the last good extract stays and the failure is recorded in
+knowledge/manifest.json.

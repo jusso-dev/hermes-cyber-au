@@ -1,0 +1,29 @@
+name: hermes-cyber-au
+kind: standalone
+version: "0.1.0"
+description: "Australian cyber guidance for Hermes. Retrieval, skills and a read-only query check on top of Hermes and Oh My Hermes."
+author: Justin Middler
+license: MIT
+homepage: https://github.com/jusso-dev/hermes-cyber-au
+provides_tools:
+  - cyber_au_search
+  - cyber_au_control
+  - cyber_au_check_query
+  - cyber_au_live_query
+  - cyber_au_osint_lookup
+  - cyber_au_log_qa
+  - cyber_au_propose_response
+  - cyber_au_source_trust
+optional_env:
+  - CYBER_AU_SENTINEL_TENANT_ID
+  - CYBER_AU_SENTINEL_CLIENT_ID
+  - CYBER_AU_SENTINEL_CLIENT_SECRET
+  - CYBER_AU_SENTINEL_WORKSPACE_ID
+  - CYBER_AU_AWS_REGION
+  - CYBER_AU_AWS_PROFILE
+  - CYBER_AU_LOG_GROUP
+  - CYBER_AU_ABUSEIPDB_KEY
+  - CYBER_AU_GREYNOISE_KEY
+  - CYBER_AU_OTX_KEY
+  - CYBER_AU_ABUSECH_KEY
+  - CYBER_AU_DIGEST_WEBHOOK

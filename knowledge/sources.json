@@ -1,0 +1,265 @@
+{
+  "schema": "hermes-cyber-au-sources/v1",
+  "notes": "Public pages only. No logins. Fetched text is data, never instructions.",
+  "github_api_host": "api.github.com",
+  "sources": [
+    {
+      "id": "asd-ism-oscal",
+      "publisher": "Australian Signals Directorate",
+      "title": "Information Security Manual (OSCAL catalogue)",
+      "kind": "ism-oscal",
+      "material_on_change": true,
+      "repo": "AustralianCyberSecurityCentre/ism-oscal",
+      "hosts": ["raw.githubusercontent.com", "github.com", "api.github.com"],
+      "path_prefix": "/AustralianCyberSecurityCentre/ism-oscal/",
+      "pins": [
+        {
+          "role": "previous",
+          "git_sha": "d3bd1735a992a988d3e4e337b3e41f856a76368e",
+          "label": "June 2026 ISM"
+        },
+        {
+          "role": "current",
+          "git_sha": "9f77120a7f8671c73da02431cdc299fac264edab",
+          "label": "September 2026 ISM"
+        }
+      ],
+      "files": [
+        "ISM_catalog.json",
+        "ISM_E8_ML1-baseline_profile.json",
+        "ISM_E8_ML2-baseline_profile.json",
+        "ISM_E8_ML3-baseline_profile.json",
+        "ISM_NON_CLASSIFIED-baseline_profile.json",
+        "ISM_OFFICIAL_SENSITIVE-baseline_profile.json",
+        "ISM_PROTECTED-baseline_profile.json",
+        "ISM_SECRET-baseline_profile.json",
+        "ISM_TOP_SECRET-baseline_profile.json"
+      ],
+      "canonical_url": "https://www.cyber.gov.au/ism"
+    },
+    {
+      "id": "asd-essential-eight",
+      "publisher": "Australian Signals Directorate",
+      "title": "Essential Eight",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": [
+        "https://www.cyber.gov.au/essential-eight",
+        "https://www.cyber.gov.au/publication/essential-eight-maturity-model",
+        "https://www.cyber.gov.au/publication/essential-eight-maturity-model-faq",
+        "https://www.cyber.gov.au/publication/essential-eight-assessment-process-guide"
+      ]
+    },
+    {
+      "id": "asd-strategies",
+      "publisher": "Australian Signals Directorate",
+      "title": "Strategies to mitigate cyber security incidents",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": [
+        "https://www.cyber.gov.au/publication/strategies-to-mitigate-cyber-security-incidents",
+        "https://www.cyber.gov.au/publication/strategies-to-mitigate-cyber-security-incidents-mitigation-details"
+      ]
+    },
+    {
+      "id": "acsc-advisories",
+      "publisher": "Australian Cyber Security Centre",
+      "title": "ACSC alerts and advisories",
+      "kind": "html-index",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": ["https://www.cyber.gov.au/alerts-and-advisories"],
+      "follow_same_host": true,
+      "follow_limit": 8
+    },
+    {
+      "id": "acsc-ism-page",
+      "publisher": "Australian Signals Directorate",
+      "title": "ISM landing page",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": ["https://www.cyber.gov.au/ism"]
+    },
+    {
+      "id": "acsc-threat-report",
+      "publisher": "Australian Signals Directorate",
+      "title": "Annual Cyber Threat Report",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": [
+        "https://www.cyber.gov.au/about-us/view-all-content/reports-and-statistics/annual-cyber-threat-report-2024-2025"
+      ]
+    },
+    {
+      "id": "acsc-ai-guidance",
+      "publisher": "Australian Signals Directorate",
+      "title": "AI and agent security guidance",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": [
+        "https://www.cyber.gov.au/business-government/secure-design/artificial-intelligence/engaging-with-artificial-intelligence",
+        "https://www.cyber.gov.au/publication/engaging-with-artificial-intelligence"
+      ]
+    },
+    {
+      "id": "home-affairs-pspf",
+      "publisher": "Department of Home Affairs",
+      "title": "Protective Security Policy Framework",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.protectivesecurity.gov.au"],
+      "urls": [
+        "https://www.protectivesecurity.gov.au/publications-library/direction-002-2026-strengthening-commonwealth-cyber-posture-against-ai-enabled-risks",
+        "https://www.protectivesecurity.gov.au/protective-security-directions-under-pspf",
+        "https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026"
+      ]
+    },
+    {
+      "id": "home-affairs-soci",
+      "publisher": "Department of Home Affairs",
+      "title": "Security of Critical Infrastructure Act 2018",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.legislation.gov.au"],
+      "urls": ["https://www.legislation.gov.au/C2018A00029/latest/text"]
+    },
+    {
+      "id": "home-affairs-cirmprules",
+      "publisher": "Department of Home Affairs",
+      "title": "CIRMP rules",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.legislation.gov.au"],
+      "urls": ["https://www.legislation.gov.au/F2023L00112/latest/text"]
+    },
+    {
+      "id": "home-affairs-cyber-security-act",
+      "publisher": "Australian Government",
+      "title": "Cyber Security Act 2024",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.legislation.gov.au"],
+      "urls": ["https://www.legislation.gov.au/C2024A00067/latest/text"]
+    },
+    {
+      "id": "oaic-privacy",
+      "publisher": "Office of the Australian Information Commissioner",
+      "title": "Privacy Act, APPs, Notifiable Data Breaches, automated decision-making",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.oaic.gov.au"],
+      "urls": [
+        "https://www.oaic.gov.au/privacy/notifiable-data-breaches",
+        "https://www.oaic.gov.au/privacy/australian-privacy-principles",
+        "https://www.oaic.gov.au/news/media-centre/new-resources-on-transparency-for-use-of-ai-and-automated-decision-making",
+        "https://www.oaic.gov.au/privacy/privacy-legislation/the-privacy-act"
+      ]
+    },
+    {
+      "id": "dta-ai-policy",
+      "publisher": "Digital Transformation Agency",
+      "title": "Policy for the responsible use of AI in government",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.digital.gov.au", "architecture.digital.gov.au"],
+      "urls": [
+        "https://www.digital.gov.au/ai/ai-in-government-policy",
+        "https://www.digital.gov.au/policy/ai/policy"
+      ]
+    },
+    {
+      "id": "dta-hcf",
+      "publisher": "Digital Transformation Agency",
+      "title": "Hosting Certification Framework",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.hostingcertification.gov.au", "www.digital.gov.au"],
+      "urls": [
+        "https://www.hostingcertification.gov.au/",
+        "https://www.hostingcertification.gov.au/framework"
+      ]
+    },
+    {
+      "id": "asd-irap",
+      "publisher": "Australian Signals Directorate",
+      "title": "IRAP and cloud security guidance",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.cyber.gov.au"],
+      "urls": [
+        "https://www.cyber.gov.au/irap",
+        "https://www.cyber.gov.au/business-government/protecting-devices-systems/assessment-evaluation-programs/irap/irap-consumer-guide"
+      ]
+    },
+    {
+      "id": "nsw-cyber-policy",
+      "publisher": "NSW Government",
+      "title": "NSW Cyber Security Policy",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["www.digital.nsw.gov.au", "digital.nsw.gov.au"],
+      "urls": ["https://digital.nsw.gov.au/delivery/cyber-security/policies/policy-statement"]
+    },
+    {
+      "id": "vic-pdsf",
+      "publisher": "Office of the Victorian Information Commissioner",
+      "title": "Victorian Protective Data Security Framework",
+      "kind": "html",
+      "material_on_change": true,
+      "hosts": ["ovic.vic.gov.au"],
+      "urls": [
+        "https://ovic.vic.gov.au/information-security/information-security-resources/",
+        "https://ovic.vic.gov.au/wp-content/uploads/2023/10/Victorian-Protective-Data-Security-Framework-V2.1.pdf"
+      ]
+    },
+    {
+      "id": "mitre-attack",
+      "publisher": "MITRE",
+      "title": "MITRE ATT&CK",
+      "kind": "mitre-attack",
+      "material_on_change": false,
+      "repo": "mitre/cti",
+      "ref": "refs/heads/master",
+      "hosts": ["raw.githubusercontent.com", "github.com", "api.github.com"],
+      "path_prefix": "/mitre/cti/",
+      "file": "enterprise-attack/enterprise-attack.json",
+      "attribution": "MITRE ATT&CK is published by MITRE. This pack stores technique identifiers and names only, with a link back to attack.mitre.org."
+    },
+    {
+      "id": "mitre-atlas",
+      "publisher": "MITRE",
+      "title": "MITRE ATLAS",
+      "kind": "atlas-yaml",
+      "material_on_change": false,
+      "hosts": ["raw.githubusercontent.com"],
+      "urls": ["https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-latest.yaml"],
+      "path_prefix": "/mitre-atlas/"
+    },
+    {
+      "id": "owasp-llm",
+      "publisher": "OWASP",
+      "title": "OWASP Top 10 for LLM Applications",
+      "kind": "html",
+      "material_on_change": false,
+      "hosts": ["genai.owasp.org", "owasp.org"],
+      "urls": [
+        "https://genai.owasp.org/llm-top-10/",
+        "https://owasp.org/www-project-top-10-for-large-language-model-applications/"
+      ]
+    },
+    {
+      "id": "owasp-agentic",
+      "publisher": "OWASP",
+      "title": "OWASP Top 10 for Agentic Applications",
+      "kind": "html",
+      "material_on_change": false,
+      "hosts": ["genai.owasp.org"],
+      "urls": ["https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications/"]
+    }
+  ]
+}

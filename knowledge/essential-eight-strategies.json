@@ -1,0 +1,14 @@
+{
+  "source_id": "asd-essential-eight",
+  "strategies": [
+    "patch applications",
+    "patch operating systems",
+    "multi-factor authentication",
+    "restrict administrative privileges",
+    "application control",
+    "restrict microsoft office macros",
+    "user application hardening",
+    "regular backups"
+  ],
+  "note": "Listed only when every phrase was present in the fetched Essential Eight pages."
+}

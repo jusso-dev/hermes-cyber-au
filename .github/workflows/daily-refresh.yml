@@ -1,0 +1,54 @@
+name: knowledge refresh
+
+on:
+  schedule:
+    # 06:00 Australia/Sydney is 20:00 UTC in AEST and 19:00 UTC in AEDT.
+    # The script exits unless the Sydney hour is 6, so only one of these runs does work.
+    - cron: "0 19 * * *"
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e .
+      - name: Refresh allowlisted sources
+        env:
+          CYBER_AU_FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+        run: python scripts/cyber_au_refresh.py
+      - name: Open a pull request when the snapshot changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+            echo "No change. No pull request."
+            exit 0
+          fi
+          branch="knowledge-refresh/$(TZ=Australia/Sydney date +%F)"
+          at=$(printf '\x40')
+          git config user.name "hermes-cyber-au refresh"
+          git config user.email "github-actions[bot]${at}users.noreply.github.com"
+          git fetch origin "$branch" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            git checkout -B "$branch" "origin/$branch"
+          else
+            git checkout -b "$branch"
+          fi
+          git add -A
+          git commit -m "Refresh Australian cyber knowledge snapshot"
+          git push origin "$branch"
+          if gh pr list --head "$branch" --json number --jq '.[0].number' | grep -q .; then
+            echo "Pull request already open."
+            exit 0
+          fi
+          gh pr create --base main --head "$branch" --title "Refresh knowledge snapshot" --body "Scheduled refresh of the allowlisted Australian sources. Review the changelog and the eval before merging. This workflow does not push to main."

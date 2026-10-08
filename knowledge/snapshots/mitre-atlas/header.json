@@ -1,0 +1,8 @@
+{
+  "source_id": "mitre-atlas",
+  "version": "2026.09",
+  "content_sha256": "079847b288e9886f65a529964f03bfe1999964fe54098123de3830c53f40fddc",
+  "chunk_count": 264,
+  "url": "https://raw.githubusercontent.com/mitre-atlas/atlas-data/main/dist/v6/ATLAS-2026.09.yaml",
+  "failures": []
+}
