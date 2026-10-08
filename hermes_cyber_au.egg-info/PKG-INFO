@@ -1,0 +1,117 @@
+Metadata-Version: 2.4
+Name: hermes-cyber-au
+Version: 0.1.0
+Summary: Hermes Agent plugin and skill pack for Australian cyber security guidance.
+Author: Justin Middler
+License-Expression: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE
+Dynamic: license-file
+
+# hermes-cyber-au
+
+A Hermes Agent plugin and skill pack for Australian cyber security guidance.
+It sits on top of Hermes and, when you have it, Oh My Hermes. It does not replace either of them.
+
+This is guidance. It is not a certification, an audit, or legal advice. It is not affiliated with the Australian Signals Directorate or the Australian Cyber Security Centre.
+
+The default framework is the ASD Information Security Manual and the Essential Eight. The pack cites the document version and date it actually ingested. If a control ID is not in the snapshot, the answer is "I don't know." It does not guess a nearby ID, and it does not swap in a NIST ID unless you ask.
+
+Live checks are off until you configure them, and they are read-only. A response idea waits for a person. This pack does not send the response.
+
+## Install
+
+```bash
+hermes plugins install jusso-dev/hermes-cyber-au
+hermes skills tap add jusso-dev/hermes-cyber-au
+hermes skills install jusso-dev/hermes-cyber-au/skills/ism-control-lookup
+```
+
+Repeat the last command for `sentinel-expert`, `aws-cloudwatch-expert`, `essential-eight-assessor`, `incident-response-au`, `threat-intel-check`, and `detection-engineering`.
+
+You can also run the command line without installing the plugin:
+
+```bash
+pip install -e .
+hermes-cyber-au doctor
+```
+
+The persona overlay is `persona/SOUL.md`. `hermes-cyber-au persona` prints it. `hermes-cyber-au persona --apply` splices it into your Hermes `SOUL.md` between the `hermes-cyber-au` markers and leaves the rest of the file alone. Doctor does not do this.
+
+`profiles/cyber-au-soc.json` is shaped like an Oh My Hermes team profile pack. Oh My Hermes only loads pack IDs that it ships itself. Copying this file does not make `omh setup` load it. Doctor reports that plainly.
+
+## What you get
+
+- Skills for Sentinel KQL, AWS logging, Essential Eight scoring from evidence you supply, ISM lookup, Australian incident reporting, OSINT lookups, and detection translation.
+- A local search index over the snapshot (SQLite FTS5 and a small hashing vector). The index is rebuilt from `knowledge/snapshots/` and is not committed.
+- Tools: `cyber_au_search`, `cyber_au_control`, `cyber_au_check_query`, `cyber_au_live_query`, `cyber_au_osint_lookup`, `cyber_au_log_qa`, `cyber_au_propose_response`, `cyber_au_source_trust`.
+- Two ISM releases, so a question about June uses the June snapshot when that date falls inside it.
+
+Where Oh My Hermes is installed, source-trust claims and decision gates are handed to it. If it is not installed, source trust says the ceiling did not run, and the response gate is a local file. Chat text is not approval. Approving a local gate returns the proposal text and does not call a write API.
+
+## Knowledge
+
+`knowledge/sources.json` is the allowlist. Fetch uses HTTPS and checks the certificate. Each kept chunk has the source, a version or "unspecified", a date, a URL, and a SHA-256. Prior chunks stay, with `valid_to` set, so later refreshes do not wipe June when September arrives.
+
+Pages that fail, or that come back too short to use, are recorded in `knowledge/manifest.json`. The last good copy is kept. The pack does not scrape login pages.
+
+ISM controls come from the public OSCAL mirror, not from a private export. MITRE ATT&CK is stored as technique ID, name, and URL only.
+
+## Queries
+
+KQL and SQL are not called ready until `cyber_au_check_query` passes an offline syntax and schema check. The schemas are the column names in `knowledge/schemas/`. YARA-L can be drafted. It is not schema-ready. This pack does not ship a Chronicle schema.
+
+`cyber_au_live_query` does nothing until the environment is set.
+
+Sentinel, all four required:
+
+- `CYBER_AU_SENTINEL_TENANT_ID`
+- `CYBER_AU_SENTINEL_CLIENT_ID`
+- `CYBER_AU_SENTINEL_CLIENT_SECRET`
+- `CYBER_AU_SENTINEL_WORKSPACE_ID`
+
+AWS:
+
+- `CYBER_AU_AWS_REGION`
+- `CYBER_AU_AWS_PROFILE` if you do not want the default profile
+- `CYBER_AU_LOG_GROUP` for Logs Insights
+
+Use a read-only role. The code only calls the query APIs. Every live query is appended under the Hermes home in `cyber-au/audit/queries.jsonl`.
+
+OSINT (abuse.ch, GreyNoise community, AbuseIPDB, OTX) stays off until `CYBER_AU_ABUSECH_KEY`, `CYBER_AU_GREYNOISE_KEY`, `CYBER_AU_ABUSEIPDB_KEY`, or `CYBER_AU_OTX_KEY` is set.
+
+## Daily refresh
+
+The GitHub Action `.github/workflows/daily-refresh.yml` runs at 19:00 and 20:00 UTC. The script continues only when the clock in Australia/Sydney is 06:00, so one of those hours matches AEST and the other matches AEDT. If nothing material changed, it prints nothing and opens no pull request. It never pushes to main.
+
+On this machine, `hermes-cyber-au install-cron` prints the schedule and does not register it. `--apply` only writes a note under your Hermes scripts directory. It does not call `hermes cron create`.
+
+A material change is a new, changed, or withdrawn ISM control, a changed Australian source, or a fetch failure that was not in the previous run. The digest is one short summary. Set `CYBER_AU_DIGEST_WEBHOOK` to an HTTPS endpoint if you want it posted. With no webhook, the run stays in the changelog and `knowledge/changes.json`.
+
+Skill files are not edited by the refresh. If a skill names a control whose text changed, the job writes `drafts/stale-skills.md` for a person to review. Turn on `skills.write_approval` and `memory.write_approval` in Hermes if you want those edits staged rather than applied. This pack does not change that config for you.
+
+Good questions and corrected answers can be logged with `cyber_au_log_qa`. They go to a local jsonl file under the Hermes home and are not committed.
+
+## Eval
+
+`eval/questions.jsonl` is scored by a deterministic retriever, not by a language model. `python -m hermes_cyber_au eval` checks citations and invented control IDs. The target is zero invented IDs. The same command is run on every pull request.
+
+## Doctor
+
+```bash
+hermes cyber-au doctor
+hermes-cyber-au doctor
+```
+
+Doctor reports the snapshot, the eval score, whether live tools and OSINT are off or configured, and whether Oh My Hermes imported. It does not edit your config, your soul file, or your crontab.
+
+## Development
+
+```bash
+python -m unittest discover -s tests -v
+python -m hermes_cyber_au eval
+```
+
+See CONTRIBUTING.md, SECURITY.md, and CODE_OF_CONDUCT.md.
