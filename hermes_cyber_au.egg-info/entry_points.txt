@@ -1,0 +1,2 @@
+[console_scripts]
+hermes-cyber-au = hermes_cyber_au.cli:main
