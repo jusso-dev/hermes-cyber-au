@@ -1,5 +1,8 @@
 # hermes-cyber-au
 
+> [!IMPORTANT]
+> This pack has moved to [jusso-dev/hermes-skills](https://github.com/jusso-dev/hermes-skills/tree/main/plugins/hermes-cyber-au), with its git history. New work happens there. Install it with `hermes plugins install jusso-dev/hermes-skills/plugins/hermes-cyber-au`. This repository is kept for existing installs and will not get updates.
+
 A Hermes Agent plugin and skill pack for Australian cyber security guidance.
 It sits on top of Hermes and, when you have it, Oh My Hermes. It does not replace either of them.
 
