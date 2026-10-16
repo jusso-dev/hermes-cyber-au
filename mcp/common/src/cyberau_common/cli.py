@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 
 from cyberau_common.health import run_health
 from cyberau_common.secrets import RedactFilter
@@ -24,12 +25,22 @@ def main(argv: list[str] | None = None) -> int:
     health.add_argument("--live", action="store_true")
     health.add_argument("--offline", action="store_true")
 
+    new = sub.add_parser("new", help="Create a connector skeleton")
+    new.add_argument("key")
+    new.add_argument("--server", required=True)
+    new.add_argument("--hosts", required=True)
+
     for name in ("refresh", "regen", "parser-check", "store"):
         command = sub.add_parser(name)
         command.add_argument("rest", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
     _configure_logging()
+    if args.command == "new":
+        from cyberau_common.scaffold import generate
+
+        generate(Path.cwd(), args.key, args.server, args.hosts.split(","))
+        return 0
     if args.command == "serve":
         connector = get_connector(args.name)
         build_server(connector).run(transport="stdio")
