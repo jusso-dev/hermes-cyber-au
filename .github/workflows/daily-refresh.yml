@@ -16,20 +16,37 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version: "3.12"
+      - name: Legacy pack still in this tree?
+        id: legacy
+        run: |
+          if [ -f scripts/cyber_au_refresh.py ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "The skill-pack refresh moved with the legacy pack. This tree has no scripts/cyber_au_refresh.py, so there is nothing to refresh."
+          fi
       - name: Install
+        if: steps.legacy.outputs.present == 'true'
         run: pip install -e .
       - name: Refresh allowlisted sources
+        if: steps.legacy.outputs.present == 'true'
         env:
           CYBER_AU_FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: python scripts/cyber_au_refresh.py
       - name: Open a pull request when the snapshot changed
+        if: steps.legacy.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          # pip install -e . writes hermes_cyber_au.egg-info. A previous refresh
+          # committed those files, so checkout aborts while they are untracked.
+          # Remove them before switching branches, and do not add them back.
+          rm -rf hermes_cyber_au.egg-info ./*.egg-info
           if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
             echo "No change. No pull request."
             exit 0
@@ -44,6 +61,7 @@ jobs:
           else
             git checkout -b "$branch"
           fi
+          rm -rf hermes_cyber_au.egg-info ./*.egg-info
           git add -A
           git commit -m "Refresh Australian cyber knowledge snapshot"
           git push origin "$branch"
