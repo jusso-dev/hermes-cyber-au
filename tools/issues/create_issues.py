@@ -39,6 +39,7 @@ LABELS = {
     "area:docs": ("0e8a16", "Docs"),
     "area:ci": ("5319e7", "GitHub Actions and automation"),
     "area:release": ("1d76db", "Packaging and releases"),
+    "area:premium-feeds": ("c2e0c6", "Paid, bring-your-own-licence intel feeds"),
     "priority:p0": ("b60205", "Must have for the milestone"),
     "priority:p1": ("d93f0b", "Should have"),
     "priority:p2": ("fbca04", "Could have"),

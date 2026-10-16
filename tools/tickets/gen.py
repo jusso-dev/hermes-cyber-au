@@ -11,11 +11,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from common import *  # noqa: E402
-import t_install, t_connectors, t_skills, t_store, t_routines, t_security, t_docs_ci  # noqa: E402
+import t_install, t_connectors, t_skills, t_store, t_routines, t_security, t_docs_ci, t_premium  # noqa: E402
 from inventory import CONNECTORS as _BASE  # noqa: E402
 from inventory_added import ADDED  # noqa: E402
 
+from inventory_premium import PREMIUM  # noqa: E402
+
 CONNECTORS = _BASE + ADDED
+TABLE_CONNECTORS = CONNECTORS + PREMIUM
 
 EPICS = [
     ("epic-install", "Epic: Install and bootstrap", ["area:install"], "p0", M_V01, t_install,
@@ -34,6 +37,11 @@ EPICS = [
      "Docs site, quick start, generated connector and skill references, data licensing, contribution and security policy."),
     ("epic-ci", "Epic: GitHub Actions, data automation and releases", ["area:ci", "area:release"], "p0", M_V01, None,
      "CI, nightly intel refresh, skill data regeneration, connector health with auto issues, dependency and Hermes bumps, weekly releases, auto-PRs."),
+]
+# Added after the first filing; written last so earlier ticket files keep their numbers.
+LATE_EPICS = [
+    ("epic-premium", "Epic: Premium and commercial intel feeds", ["area:premium-feeds", "area:connectors"], "p2", M_V02, t_premium,
+     "Paid, bring-your-own-licence feeds on Australian organisations (dark web and leak sites, ransomware victims, infostealer and breach exposure, brand and attack surface) behind one interface with terms flags, budgets and privacy handling, plus a free AU ransomware victim tracker, an AU org exposure skill and alert routine, and wiring into briefings and incident skills."),
 ]
 
 
@@ -73,8 +81,8 @@ It is a profile distribution (`distribution.yaml` at the repo root), installed w
 
 ## Milestones
 - **v0.1 MVP**: install and doctor, shared connector library, the first five connectors (ASD's ACSC feeds; ISM and Essential Eight from ISM OSCAL, plus ASD Essentials; KEV with EPSS and NVD; AusCERT bulletins; abuse.ch), ATT&CK, and the zero-build wraps of Cloudflare's unified MCP for Radar, the HIBP MCP, GitHub security advisories and the VirusTotal MCP (Radar, VirusTotal and abuse.ch off by default under their non-commercial terms), the eleven skills at first quality, intel store with STIX export, daily briefing, core security controls, CI and data workflows.
-- **v0.2**: OTX, GreyNoise, InternetDB, OSV, Sigma, crt.sh, CVE Program records, AbuseIPDB, Spamhaus DROP, NCSC NZ, a TAXII 2.1 reader for ASD CTIS, Cloudflare URL Scanner (approval-gated), AU obligations data, Junction and M365-Secure integrations, watchlists, retention, update path, supply chain, weekly releases.
-- **v1.0**: optional Brolga and ThreatSieve bridges, MISP and OpenCTI for teams with their own instance, AusCERT member feeds, IRAP, PSPF, Blueprint, Scamwatch, data.gov.au, PhishTank and OpenPhish, DuckDB and MISP exports, Windows installer, hardened evals across model providers.
+- **v0.2**: OTX, GreyNoise, InternetDB, OSV, Sigma, crt.sh, CVE Program records, AbuseIPDB, Spamhaus DROP, NCSC NZ, a TAXII 2.1 reader for ASD CTIS, Cloudflare URL Scanner (approval-gated), AU obligations data, the premium feed interface with Hudson Rock, SpyCloud and UpGuard (paid, bring your own licence) and the free ransomware.live tracker, the AU org exposure skill and alert routine, Junction and M365-Secure integrations, watchlists, retention, update path, supply chain, weekly releases.
+- **v1.0**: optional Brolga and ThreatSieve bridges, premium connectors for Recorded Future, Flashpoint, Intel 471, Google TI DTM, CrowdStrike Recon, SOCRadar and DarkOwl, MISP and OpenCTI for teams with their own instance, AusCERT member feeds, IRAP, PSPF, Blueprint, Scamwatch, data.gov.au, PhishTank and OpenPhish, DuckDB and MISP exports, Windows installer, hardened evals across model providers.
 
 ## Epics
 """)]
@@ -94,15 +102,20 @@ It is a profile distribution (`distribution.yaml` at the repo root), installed w
 
 def write_inventory_docs():
     rows = ["| Connector | Server | Group | Auth | Default | Milestone | Status | Docs |", "|---|---|---|---|---|---|---|---|"]
-    for c in CONNECTORS:
+    for c in TABLE_CONNECTORS:
         auth = "none" if not c["env"] else ", ".join(f"`{n}`" + ("" if r else " (optional)") for n, r, _ in c["env"])
-        default = "off: " + ("non-commercial terms, bring your own key" if any(w in c.get("default_off", "") for w in ("non-commercial", "not-for-profit", "CC BY-NC", "commercial use")) else "bring your own access") if c.get("default_off") else "on"
+        if c.get("paid"):
+            default = "off: paid, bring your own licence"
+        elif c.get("terms_flags"):
+            default = "off: free, victim data"
+        else:
+            default = "off: " + ("non-commercial terms, bring your own key" if any(w in c.get("default_off", "") for w in ("non-commercial", "not-for-profit", "CC BY-NC", "commercial use")) else "bring your own access") if c.get("default_off") else "on"
         rows.append(f"| {c['name']} | `{c['server']}` | {c['group']} | {auth} | {default} | {c['milestone']} | planned | {c['docs']} |")
     table = "\n".join(rows)
     doc = ["# Connector inventory\n",
            "Checked on 16 October 2026. The first 21 sources were compiled and verified for this plan. The rest were added from a second, independent inventory checked on the same date, for sources the first list did not cover. Sources with non-commercial terms (Cloudflare Radar, VirusTotal, abuse.ch) ship off by default and users bring their own key. Each connector ticket carries endpoints, auth, limits, terms and what was verified.\n",
            table, "\n## Details\n"]
-    for c in CONNECTORS:
+    for c in TABLE_CONNECTORS:
         doc.append(f"### {c['name']}\n- Endpoints: " + "; ".join(f"`{m}` {u}" for m, u, _ in c["endpoints"]) +
                    f"\n- Auth: {c['auth']}\n- Rate limits: {c['rate']}\n- Terms: {c['terms']}\n- Verified: {c['verified']}\n")
     (ROOT / "docs" / "research" / "connectors.md").write_text("\n".join(doc), encoding="utf-8")
@@ -122,7 +135,7 @@ def main():
     assert len(keys) == len(set(keys)), "duplicate keys"
     order = 0
     write_ticket("roadmap", "Roadmap: hermes-cyber-au, a Hermes Agent distribution for Australian cyber security teams",
-                 ["roadmap", "type:docs", "area:docs", "priority:p0"], None, roadmap_body(EPICS), None, order)
+                 ["roadmap", "type:docs", "area:docs", "priority:p0"], None, roadmap_body(EPICS + LATE_EPICS), None, order)
     for key, title, areas, pr, ms, _mod, summary in EPICS:
         order += 1
         mine = [k for k in kids if k["parent"] == key]
@@ -130,6 +143,13 @@ def main():
     for k in kids:
         order += 1
         write_ticket(k["key"], k["title"], k["labels"], k["milestone"], k["body"], k["parent"], order)
+    for key, title, areas, pr, ms, mod, summary in LATE_EPICS:
+        mine = mod.tickets()
+        order += 1
+        write_ticket(key, title, ["type:epic", *areas, f"priority:{pr}"], ms, epic_body(key, summary, mine), "roadmap", order)
+        for k in mine:
+            order += 1
+            write_ticket(k["key"], k["title"], k["labels"], k["milestone"], k["body"], k["parent"], order)
     write_inventory_docs()
     print(f"wrote {order + 1} tickets")
 

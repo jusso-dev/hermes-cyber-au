@@ -44,6 +44,17 @@ Checked on 16 October 2026. The first 21 sources were compiled and verified for 
 | OpenPhish community feed | `phish` | Global threat intelligence | none | on | v1.0 | planned | https://openphish.com/ |
 | MISP via the official MISP MCP server, for your own instance or AusMISP | `misp` | CTI platforms | `MISP_URL`, `MISP_API_KEY` | off: bring your own access | v1.0 | planned | https://www.misp-project.org/ |
 | OpenCTI (your own instance) | `opencti` | CTI platforms | `OPENCTI_URL`, `OPENCTI_TOKEN` | off: bring your own access | v1.0 | planned | https://docs.opencti.io/ |
+| Hudson Rock Cavalier (infostealer exposure by domain) | `hudsonrock` | Credential and infostealer exposure | `HUDSONROCK_API_KEY` | off: paid, bring your own licence | v0.2 | planned | https://docs.hudsonrock.com/ |
+| SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) | `spycloud` | Credential and infostealer exposure | `SPYCLOUD_API_KEY` | off: paid, bring your own licence | v0.2 | planned | https://docs.spycloud.com/public-sc/docs/api-guidelines |
+| UpGuard CyberRisk (identity breaches, data leaks and typosquats; Australian vendor) | `upguard` | Attack surface and brand monitoring | `UPGUARD_API_KEY` | off: paid, bring your own licence | v0.2 | planned | https://cyber-risk.upguard.com/api/docs |
+| ransomware.live victim tracker (free, filter by country AU) | `ransomlive` | Ransomware victim monitoring (free) | `RANSOMWARE_LIVE_API_KEY` (optional) | off: free, victim data | v0.2 | planned | https://www.ransomware.live/apidocs |
+| Recorded Future (identity exposures and playbook alerts) | `recordedfuture` | Threat intelligence platforms | `RECORDED_FUTURE_API_TOKEN` | off: paid, bring your own licence | v1.0 | planned | https://docs.recordedfuture.com/reference/get-started |
+| Flashpoint Ignite (compromised credentials and indicators) | `flashpoint` | Threat intelligence platforms | `FLASHPOINT_API_TOKEN` | off: paid, bring your own licence | v1.0 | planned | https://docs.flashpoint.io/ |
+| Intel 471 Titan (watchers, alerts, credentials and breach alerts) | `intel471` | Threat intelligence platforms | `INTEL471_EMAIL`, `INTEL471_API_KEY` | off: paid, bring your own licence | v1.0 | planned | https://github.com/intel471/titan-client-python |
+| Google Threat Intelligence Digital Threat Monitoring (formerly Mandiant) | `gtidtm` | Dark web and leak monitoring | `GTI_API_KEY` | off: paid, bring your own licence | v1.0 | planned | https://gtidocs.virustotal.com/ |
+| CrowdStrike Falcon Adversary Intelligence Recon (dark web monitoring notifications) | `csrecon` | Dark web and leak monitoring | `FALCON_CLIENT_ID`, `FALCON_CLIENT_SECRET`, `FALCON_BASE_URL` (optional) | off: paid, bring your own licence | v1.0 | planned | https://developer.crowdstrike.com/api-reference/collections/recon/ |
+| SOCRadar (company incidents: dark web, leaks, brand and attack surface) | `socradar` | Dark web and leak monitoring | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off: paid, bring your own licence | v1.0 | planned | https://socradar.io/socradar-apis/ |
+| DarkOwl Vision (dark web search) | `darkowl` | Dark web and leak monitoring | `DARKOWL_PUBLIC_KEY`, `DARKOWL_PRIVATE_KEY` | off: paid, bring your own licence | v1.0 | planned | https://support.darkowl.com/knowledge-base/search-api-documentation |
 
 ## Details
 
@@ -326,3 +337,80 @@ Checked on 16 October 2026. The first 21 sources were compiled and verified for 
 - Rate limits: Per instance.
 - Terms: Community Edition Apache-2.0; Enterprise Edition has its own licence.
 - Verified: `FiligranHQ/xtm-mcp` is public. Listed by a second inventory on 16 October 2026.
+
+### Hudson Rock Cavalier (infostealer exposure by domain)
+- Endpoints: `POST` https://api.hudsonrock.com/json/v3/search-by-domain; `POST` https://api.hudsonrock.com/json/v3/search-by-domain/overview; `POST` https://api.hudsonrock.com/json/v3/search-by-domain/assessment
+- Auth: `api-key` header with the user's Cavalier key. The key is limited to the domains on the customer's whitelist; other domains need pre-approved `external_domains`.
+- Rate limits: Documented for the assessment endpoint: 50 requests per 10 seconds, up to 2,500 URLs per type, 90 second maximum response time. Treat it as the ceiling for all endpoints.
+- Terms: Commercial licence. Default flags: no on-disk cache of records, store counts and metadata only, no STIX export, no sharing outside the profile. Relax only if the user's contract allows it.
+- Verified: Vendor docs (docs.hudsonrock.com): authentication page names the `api-key` header; Domain Intelligence pages list the endpoints, parameters and the rate limit above. `search-by-domain` returned 401 to a bad key from the build box on 16 October 2026.
+
+### SpyCloud Enterprise Protection (breach and malware exposure on a watchlist)
+- Endpoints: `GET` https://api.spycloud.io/enterprise-v2/watchlist; `GET` https://api.spycloud.io/enterprise-v2/breach/catalog/{id}
+- Auth: `X-API-KEY` header with the user's key from the SpyCloud customer portal.
+- Rate limits: 429 is documented; no number published in the public docs. Read the response headers and back off.
+- Terms: Commercial licence. Default flags: no on-disk cache of records, metadata only in the store, no STIX export. SpyCloud can return hashed values if hashing is enabled on the key; prefer that.
+- Verified: Vendor docs (docs.spycloud.com): API guidelines name the `X-API-KEY` header; reference pages document the watchlist and breach catalogue endpoints and parameters above.
+
+### UpGuard CyberRisk (identity breaches, data leaks and typosquats; Australian vendor)
+- Endpoints: `GET` https://cyber-risk.upguard.com/api/public/breaches; `GET` https://cyber-risk.upguard.com/api/public/breach?id=...; `GET` https://cyber-risk.upguard.com/api/public/dataleaks/disclosures; `GET` https://cyber-risk.upguard.com/api/public/typosquat , /typosquat/details?domain=
+- Auth: `Authorization` header set to the API key itself (no `Bearer` prefix). Each key carries the permissions chosen when it was created.
+- Rate limits: 429 is documented; no number published. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata in the store, no STIX export. Typosquat domains are the user's own monitoring results and may be exported if the user allows it.
+- Verified: Vendor docs (cyber-risk.upguard.com/api/docs, API version 1.12 on the page): base URL, `Authorization` header and the permissions per endpoint. `/api/public/breaches` returned 403 to a bad key from the build box on 16 October 2026.
+
+### ransomware.live victim tracker (free, filter by country AU)
+- Endpoints: `GET` https://api-pro.ransomware.live/victims/?country=AU; `GET` https://api-pro.ransomware.live/victims/recent; `GET` https://api-pro.ransomware.live/victims/search; `GET` https://api-pro.ransomware.live/csirt/AU; `GET` https://api.ransomware.live/v2/recentvictims
+- Auth: Free. The PRO API needs a free key in the `X-API-KEY` header (from ransomware.live/my). The v2 API needs no key.
+- Rate limits: PRO API: 500,000 requests a month per key, 429 beyond. v2: rate limited, no number published. Self-imposed: one poll an hour.
+- Terms: Free community project. Victim entries are claims scraped from criminal leak sites, not confirmed incidents. Check the site's terms before redistributing; default flags: store metadata, no STIX export of victim names.
+- Verified: PRO API OpenAPI spec (api-pro.ransomware.live/swagger.json): `X-API-KEY`, 500,000 requests a month, `country` filter. v2 `/info` and `/recentvictims` returned 200 without a key on 16 October 2026.
+
+### Recorded Future (identity exposures and playbook alerts)
+- Endpoints: `POST` https://api.recordedfuture.com/identity/credentials/search; `POST` https://api.recordedfuture.com/playbook-alert/search; `GET` https://api.recordedfuture.com/playbook-alert/identity_novel_exposures/{id}
+- Auth: `X-RFToken` header. Tokens are created by an Enterprise Administrator; entitlements follow the licensed modules.
+- Rate limits: Not published in the overview. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata only, no STIX export.
+- Verified: Vendor docs (docs.recordedfuture.com): authentication table (`X-RFToken`, base URL) and the identity search and playbook alert reference pages. A bad token got 401 from the build box on 16 October 2026.
+
+### Flashpoint Ignite (compromised credentials and indicators)
+- Endpoints: `GET` https://api.flashpoint.io/technical-intelligence/v2/indicators; `GET` (credential sightings search path: confirm in docs.flashpoint.io)
+- Auth: Bearer token (Ignite API key).
+- Rate limits: Not published publicly. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata only, no STIX export.
+- Verified: `technical-intelligence/v2/indicators` returned 401 without a token from the build box on 16 October 2026. Query syntax and bearer auth from vendor-published integrations (Cortex XSOAR, Splunk SOAR); the portal itself was not readable.
+
+### Intel 471 Titan (watchers, alerts, credentials and breach alerts)
+- Endpoints: `GET` https://api.intel471.com/v1/alerts; `GET` https://api.intel471.com/v1/watcherGroups , /watcherGroups/{uid}/watchers; `GET` https://api.intel471.com/v1/credentials , /credentials/occurrences , /credentialSets; `GET` https://api.intel471.com/v1/breachAlerts
+- Auth: HTTP Basic: the registered Intel 471 email as the username and the API key as the password.
+- Rate limits: Not published in the client README. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata only, no STIX export.
+- Verified: Vendor's public OpenAPI-generated client (intel471/titan-client-python) lists the endpoints above and Basic auth. `api.intel471.com/v1/` returned 401 from the build box on 16 October 2026.
+
+### Google Threat Intelligence Digital Threat Monitoring (formerly Mandiant)
+- Endpoints: `GET` https://www.virustotal.com/api/v3/dtm/alerts; `GET` https://www.virustotal.com/api/v3/dtm/monitors
+- Auth: `x-apikey` header with a Google Threat Intelligence key, plus an `x-tool` header naming the integration (for example `hermes-cyber-au.v0.x`).
+- Rate limits: Per licence. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata only, no STIX export.
+- Verified: Vendor docs (gtidocs.virustotal.com): DTM pagination page, the Mandiant migration guide and the DTM OpenAPI reference. `x-tool` from the vendor's public `VirusTotal/gti-dev-kit`.
+
+### CrowdStrike Falcon Adversary Intelligence Recon (dark web monitoring notifications)
+- Endpoints: `POST` https://api.crowdstrike.com/oauth2/token; `GET` Recon notifications query and entities endpoints (FalconPy `query_notifications`, `get_notifications`); `GET` Recon rules query and entities endpoints (FalconPy `query_rules`, `get_rules`)
+- Auth: OAuth2 client credentials from an API client created in Falcon with read scope for Recon monitoring rules only.
+- Rate limits: Per Falcon API limits, returned in headers. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata only, no STIX export.
+- Verified: Vendor developer centre Recon collection page and FalconPy `recon.py`. The token endpoint returned 401 from the build box on 16 October 2026.
+
+### SOCRadar (company incidents: dark web, leaks, brand and attack surface)
+- Endpoints: `GET` https://platform.socradar.com/api/company/{company_id}/incidents/v4
+- Auth: Company API key in the `Api-Key` header, plus the numeric company id.
+- Rate limits: Not published publicly. Back off on 429.
+- Terms: Commercial licence. Default flags: metadata only, no STIX export.
+- Verified: Vendor API page (socradar.io/socradar-apis) and vendor-published integrations (Elastic, Cortex XSOAR) for the incidents v4 path and `Api-Key` header. Confirm parameters in the customer portal at build time.
+
+### DarkOwl Vision (dark web search)
+- Endpoints: `GET` https://api.darkowl.com/api/v1/search?q=...
+- Auth: HMAC-SHA1 request signing: sign method, path and a UTC `Date` header with the private key and send `Authorization: OWL <public key>:<base64 signature>`.
+- Rate limits: Per licence. Back off on 429.
+- Terms: Commercial licence. Default flags: no snippets stored, counts and links only, no STIX export.
+- Verified: Vendor support knowledge base: search API documentation and the authorisation header calculation page. `api.darkowl.com` answered 403 to an unsigned request from the build box on 16 October 2026.
