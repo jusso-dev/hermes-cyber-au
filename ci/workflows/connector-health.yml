@@ -1,0 +1,46 @@
+# Proposed: .github/workflows/connector-health.yml
+# Live health and schema drift check for every connector. Opens one issue per broken
+# connector, comments on repeats, and closes the issue when the connector recovers.
+# 21:00 UTC is 08:00 AEDT, before the working day.
+name: connector-health
+
+on:
+  schedule:
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "uv<1"
+      - run: uv sync --project mcp --all-packages --frozen
+      - name: Probe every connector and validate live responses against stored schemas
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          ABUSECH_AUTH_KEY: ${{ secrets.ABUSECH_AUTH_KEY }}
+          OTX_API_KEY: ${{ secrets.OTX_API_KEY }}
+          GREYNOISE_API_KEY: ${{ secrets.GREYNOISE_API_KEY }}
+          CLOUDFLARE_RADAR_API_TOKEN: ${{ secrets.CLOUDFLARE_RADAR_API_TOKEN }}
+          CYBERAU_DATA_DIR: ${{ runner.temp }}/cyberau
+        run: |
+          set +e
+          uv run --project mcp cyberau-mcp health --all --live --schema-drift --json health.json
+          echo "exit=$?" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: connector-health
+          path: health.json
+      - name: Open, update or close health issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ci/open_health_issues.py --kind connector --input health.json --close-recovered

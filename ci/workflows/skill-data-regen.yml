@@ -1,0 +1,103 @@
+# Proposed: .github/workflows/skill-data-regen.yml
+# Regenerate bundled skill data from source (ISM OSCAL, Essential Eight and ASD Essentials,
+# AU reporting obligations, ATT&CK, Sigma) and re-check every advisory parser against live pages.
+# 17:00 UTC daily is 04:00 AEDT.
+name: skill-data-regen
+
+on:
+  schedule:
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if upstream versions did not change
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      parser_failures: ${{ steps.parsers.outputs.failures }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "uv<1"
+      - run: uv sync --project mcp --all-packages --frozen
+      - name: ISM from OSCAL (latest release plus the one before)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run --project mcp cyberau-mcp regen ism --keep 2 ${{ inputs.force && '--force' || '' }}
+      - name: Essential Eight maturity data and ASD Essentials chapters
+        run: uv run --project mcp cyberau-mcp regen e8 ${{ inputs.force && '--force' || '' }}
+      - name: AU reporting obligations (weekly, Mondays Sydney time)
+        run: |
+          if [ "$(TZ=Australia/Sydney date +%u)" = "1" ] || [ "${{ inputs.force }}" = "true" ]; then
+            uv run --project mcp cyberau-mcp regen aureg
+          fi
+      - name: ATT&CK and Sigma when a new release exists
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          uv run --project mcp cyberau-mcp regen attack
+          uv run --project mcp cyberau-mcp regen sigma
+      - name: Rebuild skill reference files from data
+        run: uv run --project mcp python tools/build_skill_references.py --write PR_BODY.md
+      - name: Re-check advisory parsers against live pages
+        id: parsers
+        run: |
+          set +e
+          uv run --project mcp cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json
+          echo "failures=$(jq '[.[] | select(.ok == false)] | length' parser-check.json)" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Regression tests on regenerated data
+        run: uv run --project mcp pytest -q tests/skills tests/data --block-network
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skill-data
+          path: |
+            mcp/ism/data/
+            mcp/e8/data/
+            mcp/aureg/data/
+            mcp/attack/data/
+            mcp/sigma/data/
+            skills/
+            PR_BODY.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parser-check
+          path: parser-check.json
+
+  parser-issue:
+    needs: regen
+    if: needs.regen.outputs.parser_failures != '0'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: parser-check
+      - name: Open or update one issue per failing parser
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/ci/open_health_issues.py --kind parser --input parser-check.json
+
+  pr:
+    needs: regen
+    uses: ./.github/workflows/data-update-pr.yml
+    with:
+      artifact: skill-data
+      branch_prefix: data/skill-regen
+      title: "Regenerate skill data from source"
+      body_file: PR_BODY.md
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write

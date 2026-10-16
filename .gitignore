@@ -1,12 +1,13 @@
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.venv/
+# Never commit secrets or Hermes runtime data
 .env
-*.pem
-*.key
-credentials.json
-knowledge/index.sqlite
-knowledge/index.sqlite-*
-finetune/
-.DS_Store
+auth.json
+memories/
+sessions/
+state.db*
+logs/
+plugin-data/
+# Build and tooling
+mcp/.venv/
+**/__pycache__/
+tools/issues/.state.json
+dist/

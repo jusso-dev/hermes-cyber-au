@@ -1,108 +1,101 @@
 # hermes-cyber-au
 
-> [!IMPORTANT]
-> This pack has moved to [jusso-dev/hermes-skills](https://github.com/jusso-dev/hermes-skills/tree/main/plugins/hermes-cyber-au), with its git history. New work happens there. Install it with `hermes plugins install jusso-dev/hermes-skills/plugins/hermes-cyber-au`. This repository is kept for existing installs and will not get updates.
+A planned [Hermes Agent](https://github.com/NousResearch/hermes-agent) distribution for Australian cyber security teams.
 
-A Hermes Agent plugin and skill pack for Australian cyber security guidance.
-It sits on top of Hermes and, when you have it, Oh My Hermes. It does not replace either of them.
+Install it once and you get an analyst assistant that knows the ISM, the Essential Eight and the new ASD Essentials, reads ASD's ACSC and AusCERT as they publish, pulls in global threat intel, keeps a local intel store, and writes you a briefing before you've finished your coffee. It proposes actions. It doesn't take them.
 
-This is guidance. It is not a certification, an audit, or legal advice. It is not affiliated with the Australian Signals Directorate or the Australian Cyber Security Centre.
+> **Status: planned.** Nothing is implemented yet. This repository holds the design and the build plan as GitHub issues. Start with the roadmap issue, then the epics.
 
-The default framework is the ASD Information Security Manual and the Essential Eight. The pack cites the document version and date it actually ingested. If a control ID is not in the snapshot, the answer is "I don't know." It does not guess a nearby ID, and it does not swap in a NIST ID unless you ask.
+## What it will do
 
-Live checks are off until you configure them, and they are read-only. A response idea waits for a person. This pack does not send the response.
+- **Triage incidents** with Australian context: ASD's ACSC categorisation, ATT&CK mapping, containment proposals, and a check for NDB, SOCI and ransomware payment reporting triggers.
+- **Enrich indicators** across abuse.ch, OTX, GreyNoise, Shodan InternetDB, crt.sh and Cloudflare Radar, deduplicated into one verdict with sources.
+- **Assess Essential Eight maturity and ASD Essentials progress** from evidence you supply, including M365-Secure reports. Both frameworks, because ASD is running them side by side during the transition.
+- **Look up ISM controls** by id, keyword or baseline, from the release that was in force on the date you ask about. If a control isn't in the snapshot, it says "I don't know".
+- **Prioritise vulnerabilities** with KEV, EPSS, CVSS, ASD and AusCERT mentions, your asset list, and Essential Eight patching timeframes.
+- **Digest ASD's ACSC advisories** and AusCERT bulletins since the last digest, grouped by what to do today, this week, and what to know.
+- **Analyse phishing**: headers, SPF, DKIM and DMARC, lookalike domains of Australian brands, hash lookups. No detonation.
+- **Hunt with Sigma and KQL** for Microsoft Sentinel and Defender, with offline query checks.
+- **Walk through an OAIC Notifiable Data Breach assessment** and draft the statement. A person submits it.
+- **Decide SOCI Act reportability** and compute the 12 and 72 hour deadlines in Sydney time.
+- **Write executive and board briefings** in plain Australian English.
+- **Run routines**: hourly feed ingest, a 07:30 Sydney briefing, a KEV watch against your assets, and a weekly executive summary. All arrive paused so you choose what runs.
 
-## Install
+## How it fits together
 
-```bash
-hermes plugins install jusso-dev/hermes-cyber-au
-hermes skills tap add jusso-dev/hermes-cyber-au
-hermes skills install jusso-dev/hermes-cyber-au/skills/ism-control-lookup
-```
+| Piece | Where | What it is |
+|---|---|---|
+| Profile distribution | `distribution.yaml`, `SOUL.md`, `config.yaml` | Installed with `hermes profile install`, updated with `hermes profile update` |
+| Skills | `skills/<name>/SKILL.md` | The eleven workflows above |
+| Connectors | `mcp/<source>/` | Read-only stdio MCP servers on a shared HTTP client with an egress allowlist, caching and rate limiting |
+| Plugin | `plugins/cyber-au/` | Intel store tools, audit log hooks, untrusted-content guards, the `cyber-au` command |
+| Intel store | `plugin-data/cyber-au/intel.sqlite` | SQLite with canonical dedupe and STIX 2.1 export |
+| Routines | `cron/jobs.json`, `scripts/` | Scheduled jobs, shipped paused |
+| Automation | `ci/workflows/` | Proposed GitHub Actions: CI, nightly intel refresh, skill data regeneration, connector health, dependency and Hermes bumps, weekly releases |
 
-Repeat the last command for `sentinel-expert`, `aws-cloudwatch-expert`, `essential-eight-assessor`, `incident-response-au`, `threat-intel-check`, and `detection-engineering`.
+The Hermes details behind this design (manifest fields, what an update replaces, MCP config, plugin hooks, cron rules) are written up with sources in [docs/research/hermes-structure.md](docs/research/hermes-structure.md).
 
-You can also run the command line without installing the plugin:
-
-```bash
-pip install -e .
-hermes-cyber-au doctor
-```
-
-The persona overlay is `persona/SOUL.md`. `hermes-cyber-au persona` prints it. `hermes-cyber-au persona --apply` splices it into your Hermes `SOUL.md` between the `hermes-cyber-au` markers and leaves the rest of the file alone. Doctor does not do this.
-
-`profiles/cyber-au-soc.json` is shaped like an Oh My Hermes team profile pack. Oh My Hermes only loads pack IDs that it ships itself. Copying this file does not make `omh setup` load it. Doctor reports that plainly.
-
-## What you get
-
-- Skills for Sentinel KQL, AWS logging, Essential Eight scoring from evidence you supply, ISM lookup, Australian incident reporting, OSINT lookups, and detection translation.
-- A local search index over the snapshot (SQLite FTS5 and a small hashing vector). The index is rebuilt from `knowledge/snapshots/` and is not committed.
-- Tools: `cyber_au_search`, `cyber_au_control`, `cyber_au_check_query`, `cyber_au_live_query`, `cyber_au_osint_lookup`, `cyber_au_log_qa`, `cyber_au_propose_response`, `cyber_au_source_trust`.
-- Two ISM releases, so a question about June uses the June snapshot when that date falls inside it.
-
-Where Oh My Hermes is installed, source-trust claims and decision gates are handed to it. If it is not installed, source trust says the ceiling did not run, and the response gate is a local file. Chat text is not approval. Approving a local gate returns the proposal text and does not call a write API.
-
-## Knowledge
-
-`knowledge/sources.json` is the allowlist. Fetch uses HTTPS and checks the certificate. Each kept chunk has the source, a version or "unspecified", a date, a URL, and a SHA-256. Prior chunks stay, with `valid_to` set, so later refreshes do not wipe June when September arrives.
-
-Pages that fail, or that come back too short to use, are recorded in `knowledge/manifest.json`. The last good copy is kept. The pack does not scrape login pages.
-
-ISM controls come from the public OSCAL mirror, not from a private export. MITRE ATT&CK is stored as technique ID, name, and URL only.
-
-## Queries
-
-KQL and SQL are not called ready until `cyber_au_check_query` passes an offline syntax and schema check. The schemas are the column names in `knowledge/schemas/`. YARA-L can be drafted. It is not schema-ready. This pack does not ship a Chronicle schema.
-
-`cyber_au_live_query` does nothing until the environment is set.
-
-Sentinel, all four required:
-
-- `CYBER_AU_SENTINEL_TENANT_ID`
-- `CYBER_AU_SENTINEL_CLIENT_ID`
-- `CYBER_AU_SENTINEL_CLIENT_SECRET`
-- `CYBER_AU_SENTINEL_WORKSPACE_ID`
-
-AWS:
-
-- `CYBER_AU_AWS_REGION`
-- `CYBER_AU_AWS_PROFILE` if you do not want the default profile
-- `CYBER_AU_LOG_GROUP` for Logs Insights
-
-Use a read-only role. The code only calls the query APIs. Every live query is appended under the Hermes home in `cyber-au/audit/queries.jsonl`.
-
-OSINT (abuse.ch, GreyNoise community, AbuseIPDB, OTX) stays off until `CYBER_AU_ABUSECH_KEY`, `CYBER_AU_GREYNOISE_KEY`, `CYBER_AU_ABUSEIPDB_KEY`, or `CYBER_AU_OTX_KEY` is set.
-
-## Daily refresh
-
-The GitHub Action `.github/workflows/daily-refresh.yml` runs at 19:00 and 20:00 UTC. The script continues only when the clock in Australia/Sydney is 06:00, so one of those hours matches AEST and the other matches AEDT. If nothing material changed, it prints nothing and opens no pull request. It never pushes to main.
-
-On this machine, `hermes-cyber-au install-cron` prints the schedule and does not register it. `--apply` only writes a note under your Hermes scripts directory. It does not call `hermes cron create`.
-
-A material change is a new, changed, or withdrawn ISM control, a changed Australian source, or a fetch failure that was not in the previous run. The digest is one short summary. Set `CYBER_AU_DIGEST_WEBHOOK` to an HTTPS endpoint if you want it posted. With no webhook, the run stays in the changelog and `knowledge/changes.json`.
-
-Skill files are not edited by the refresh. If a skill names a control whose text changed, the job writes `drafts/stale-skills.md` for a person to review. Turn on `skills.write_approval` and `memory.write_approval` in Hermes if you want those edits staged rather than applied. This pack does not change that config for you.
-
-Good questions and corrected answers can be logged with `cyber_au_log_qa`. They go to a local jsonl file under the Hermes home and are not committed.
-
-## Eval
-
-`eval/questions.jsonl` is scored by a deterministic retriever, not by a language model. `python -m hermes_cyber_au eval` checks citations and invented control IDs. The target is zero invented IDs. The same command is run on every pull request.
-
-## Doctor
+## Planned install
 
 ```bash
-hermes cyber-au doctor
-hermes-cyber-au doctor
+# Once v0.1 ships. Not yet.
+hermes profile install github.com/jusso-dev/hermes-cyber-au --alias
+cp ~/.hermes/profiles/cyber-au/.env.EXAMPLE ~/.hermes/profiles/cyber-au/.env
+cyber-au chat
 ```
 
-Doctor reports the snapshot, the eval score, whether live tools and OSINT are off or configured, and whether Oh My Hermes imported. It does not edit your config, your soul file, or your crontab.
+It works with no API keys using public sources. Each free key you add (abuse.ch, NVD, OTX, GreyNoise, a Cloudflare Radar read token) turns on more sources.
 
-## Development
+## Connectors
 
-```bash
-python -m unittest discover -s tests -v
-python -m hermes_cyber_au eval
-```
+<!-- connectors:start -->
+| Connector | Server | Group | Auth | Milestone | Docs |
+|---|---|---|---|---|---|
+| ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | v0.1 MVP | https://www.cyber.gov.au/ |
+| Information Security Manual (ISM) OSCAL catalogue | `ism` | Australian government | `GITHUB_TOKEN` (optional) | v0.1 MVP | https://github.com/AustralianCyberSecurityCentre/ism-oscal |
+| Essential Eight and ASD Essentials | `e8` | Australian government | none | v0.1 MVP | https://www.cyber.gov.au/publication/what-is-the-essentials |
+| CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | v0.1 MVP | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |
+| FIRST EPSS | `epss` | Vulnerability intelligence | none | v0.1 MVP | https://api.first.org/epss/ |
+| NIST National Vulnerability Database | `nvd` | Vulnerability intelligence | `NVD_API_KEY` (optional) | v0.1 MVP | https://nvd.nist.gov/developers/vulnerabilities |
+| OSV.dev open source vulnerabilities | `osv` | Vulnerability intelligence | none | v0.2 | https://google.github.io/osv.dev/api/ |
+| Cloudflare Radar via Cloudflare's unified MCP server | `cloudflare_radar` | Internet and attack telemetry | `CLOUDFLARE_RADAR_API_TOKEN` (optional) | v0.1 MVP | https://developers.cloudflare.com/radar/ |
+| AusCERT public security bulletins | `auscert` | Australian community | none | v0.1 MVP | https://www.auscert.org.au/ |
+| abuse.ch (URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker) | `abusech` | Global threat intelligence | `ABUSECH_AUTH_KEY` | v0.1 MVP | https://abuse.ch/ |
+| AlienVault OTX | `otx` | Global threat intelligence | `OTX_API_KEY` | v0.2 | https://otx.alienvault.com/api |
+| GreyNoise Community | `greynoise` | Global threat intelligence | `GREYNOISE_API_KEY` (optional) | v0.2 | https://docs.greynoise.io/ |
+| Shodan InternetDB | `internetdb` | Global threat intelligence | none | v0.2 | https://internetdb.shodan.io/ |
+| MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | v0.1 MVP | https://github.com/mitre-attack/attack-stix-data |
+| SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | v0.2 | https://github.com/SigmaHQ/sigma |
+| crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | v0.2 | https://crt.sh/ |
+| Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | v0.2 | https://www.oaic.gov.au/privacy/notifiable-data-breaches |
+| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | v0.2 | https://github.com/jusso-dev/junction |
+| Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | v1.0 | https://github.com/jusso-dev/Brolga |
+| ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | v1.0 | https://github.com/jusso-dev/ThreatSieve |
+| M365-Secure assessment reports | `(none)` | Author's public tools | none | v0.2 | https://github.com/jusso-dev/M365-Secure |
+<!-- connectors:end -->
 
-See CONTRIBUTING.md, SECURITY.md, and CODE_OF_CONDUCT.md.
+Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).
+
+## Safety
+
+- Read-only by default. Anything that sends, blocks, posts or submits needs a person to approve it.
+- Content from feeds is treated as data, never as instructions.
+- Secrets live in your profile `.env` and are referenced as `${VAR}`. Nothing secret is shipped, logged or exported.
+- Connectors can only reach the hosts listed for them.
+- Every tool call is written to a hash-chained audit log.
+
+## Not affiliated
+
+This project is independent. It is not affiliated with or endorsed by the Australian Signals Directorate, the Australian Cyber Security Centre, the OAIC, the Cyber and Infrastructure Security Centre, Nous Research or any data provider. Its output is guidance, not legal advice or a formal assessment.
+
+## Related projects
+
+This repository used to hold a smaller Hermes skill and plugin pack for Australian cyber guidance. It is now a full Hermes profile distribution: connectors, a local intel store, scheduled routines and agent security controls, as well as skills. It is not a skill pack any more.
+
+- **The earlier skill pack** is kept unchanged on the [`legacy-skills-pack`](https://github.com/jusso-dev/hermes-cyber-au/tree/legacy-skills-pack) branch and the [`legacy-skills-pack-final`](https://github.com/jusso-dev/hermes-cyber-au/releases/tag/legacy-skills-pack-final) tag (commit `02b500c49ca08f5d558107e58a42a9c68a617566`). If you installed it from this repository, pin to that commit, for example `hermes plugins install jusso-dev/hermes-cyber-au --force --ref 02b500c49ca08f5d558107e58a42a9c68a617566` (Hermes takes a full 40 character commit SHA for `--ref`), or move to the maintained copy below.
+- [jusso-dev/hermes-skills](https://github.com/jusso-dev/hermes-skills): where the skill pack now lives and gets updates. Install it with `hermes plugins install jusso-dev/hermes-skills/plugins/hermes-cyber-au`. How this distribution reuses it is tracked in an issue.
+- [AustralianCyberSecurityCentre/ism-oscal](https://github.com/AustralianCyberSecurityCentre/ism-oscal): ISM in OSCAL, the source for ISM and Essential Eight data.
+
+## Licence
+
+Apache License 2.0. See [LICENSE](LICENSE). Data from each source stays under that source's terms; see the data licensing issue and, once written, `docs/reference/data-sources.md`.

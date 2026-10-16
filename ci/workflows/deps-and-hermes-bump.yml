@@ -1,0 +1,82 @@
+# Proposed: .github/workflows/deps-and-hermes-bump.yml
+# Weekly: upgrade the uv lockfile within declared bounds, check for a new Hermes release,
+# bump the pinned Docker image, CI image and hermes_requires floor, run CI, and open a PR.
+# Monday 22:00 UTC is Tuesday 09:00 AEDT.
+name: deps-and-hermes-bump
+
+on:
+  schedule:
+    - cron: "0 22 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "uv<1"
+      - name: Upgrade Python dependencies within bounds
+        run: uv lock --project mcp --upgrade
+      - name: Check latest Hermes release
+        id: hermes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api repos/NousResearch/hermes-agent/releases/latest --jq .tag_name)
+          current=$(python3 tools/hermes_pin.py get)
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+      - name: Bump Hermes pins and re-verify documented structure
+        if: steps.hermes.outputs.latest != steps.hermes.outputs.current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/hermes_pin.py set "${{ steps.hermes.outputs.latest }}"
+          # Re-check every fact in docs/research/hermes-structure.md against the new tag.
+          uv run --project mcp python tools/ci/verify_hermes_facts.py --tag "${{ steps.hermes.outputs.latest }}" --report hermes-facts.md
+      - name: Write PR body
+        run: |
+          {
+            echo "Weekly dependency and Hermes bump."
+            echo
+            echo "Hermes: ${{ steps.hermes.outputs.current }} -> ${{ steps.hermes.outputs.latest }}"
+            echo
+            echo '```'
+            git diff --stat
+            echo '```'
+            [ -f hermes-facts.md ] && cat hermes-facts.md
+          } > PR_BODY.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deps-bump
+          path: |
+            mcp/uv.lock
+            distribution.yaml
+            docker/Dockerfile
+            tools/hermes_pin.txt
+            PR_BODY.md
+
+  ci:
+    needs: bump
+    uses: ./.github/workflows/ci.yml
+
+  pr:
+    needs: [bump, ci]
+    uses: ./.github/workflows/data-update-pr.yml
+    with:
+      artifact: deps-bump
+      branch_prefix: deps/weekly
+      title: "Weekly dependency and Hermes bump"
+      body_file: PR_BODY.md
+      labels: "type:task,area:ci,area:release"
+      allowed_paths: '^(mcp/uv\.lock|distribution\.yaml|docker/Dockerfile|tools/hermes_pin\.txt|PR_BODY\.md)$'
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write

@@ -1,0 +1,60 @@
+# Proposed: .github/workflows/nightly-intel-refresh.yml
+# Refresh public threat intel snapshots and the feed catalogue, then open a data PR.
+# 16:00 UTC is 03:00 AEDT and 02:00 AEST.
+name: nightly-intel-refresh
+
+on:
+  schedule:
+    - cron: "0 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "uv<1"
+      - run: uv sync --project mcp --all-packages --frozen
+      - name: Refresh snapshots (public sources first, keyed sources only when a secret is set)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          ABUSECH_AUTH_KEY: ${{ secrets.ABUSECH_AUTH_KEY }}
+          OTX_API_KEY: ${{ secrets.OTX_API_KEY }}
+          CLOUDFLARE_RADAR_API_TOKEN: ${{ secrets.CLOUDFLARE_RADAR_API_TOKEN }}
+          CYBERAU_DATA_DIR: ${{ runner.temp }}/cyberau
+        run: |
+          uv run --project mcp cyberau-mcp refresh \
+            --sources asd,kev,epss,auscert,attack,feodo \
+            --optional-sources nvd,abusech,otx,radar \
+            --snapshot-dir intel/snapshots \
+            --catalogue feeds/catalogue.yaml \
+            --summary PR_BODY.md
+      - name: Validate snapshots
+        run: uv run --project mcp pytest -q tests/snapshots --block-network
+      - uses: actions/upload-artifact@v4
+        with:
+          name: intel-refresh
+          path: |
+            intel/snapshots/
+            feeds/catalogue.yaml
+            PR_BODY.md
+
+  pr:
+    needs: refresh
+    uses: ./.github/workflows/data-update-pr.yml
+    with:
+      artifact: intel-refresh
+      branch_prefix: data/intel-refresh
+      title: "Refresh threat intel snapshots"
+      body_file: PR_BODY.md
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
