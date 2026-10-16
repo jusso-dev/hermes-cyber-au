@@ -1,2 +1,8 @@
-interactions: []
-# Stub cassette. No auth header values.
+interactions:
+  - request:
+      uri: https://api.first.org/data/v1/epss?cve=CVE-2024-3400&scope=time-series
+      method: GET
+    response:
+      status: 200
+      body:
+        string: '{"data":[{"cve":"CVE-2024-3400","epss":"0.96000","percentile":"0.99800","date":"2026-10-15","time-series":[{"epss":"0.20000","percentile":"0.80000","date":"2026-09-16"}]}]}'
