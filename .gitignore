@@ -9,5 +9,6 @@ plugin-data/
 # Build and tooling
 mcp/.venv/
 **/__pycache__/
+*.egg-info/
 tools/issues/.state.json
 dist/
