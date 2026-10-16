@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "feeds": {
+      "type": "array",
+      "items": {
+        "enum": ["alerts", "advisories", "publications", "threats", "news"]
+      }
+    }
+  },
+  "required": []
+}

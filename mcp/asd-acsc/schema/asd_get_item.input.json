@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://www\\.cyber\\.gov\\.au/"
+    }
+  },
+  "required": ["url"]
+}

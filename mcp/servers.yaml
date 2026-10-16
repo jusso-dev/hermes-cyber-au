@@ -32,6 +32,17 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  asd:
+    connector: asd-acsc
+    args:
+    - serve
+    - asd-acsc
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   nvd:
     connector: nvd
     args:

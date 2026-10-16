@@ -16,6 +16,11 @@ connectors:
     - epss.empiricalsecurity.com
     allow_ip_literals: false
     allow_http_loopback: false
+  asd-acsc:
+    hosts:
+    - www.cyber.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false
   nvd:
     hosts:
     - services.nvd.nist.gov

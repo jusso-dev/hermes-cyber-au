@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["cyberau-common"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd"]
+members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
@@ -21,7 +21,14 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["common/tests", "../tests"]
+testpaths = [
+  "common/tests",
+  "../tests",
+  "asd-acsc/tests",
+  "cisa-kev/tests",
+  "first-epss/tests",
+  "nvd/tests",
+]
 addopts = "-q"
 
 [tool.ruff]

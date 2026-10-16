@@ -51,7 +51,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 <!-- connectors:start -->
 | Connector | Server | Group | Auth | Default | Milestone | Status | Docs |
 |---|---|---|---|---|---|---|---|
-| ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | on | v0.1 MVP | planned | https://www.cyber.gov.au/ |
+| ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | on | v0.1 MVP | planned | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
 | Information Security Manual (ISM) OSCAL catalogue | `ism` | Australian government | `GITHUB_TOKEN` (optional) | on | v0.1 MVP | planned | https://github.com/AustralianCyberSecurityCentre/ism-oscal |
 | Essential Eight and ASD Essentials | `e8` | Australian government | none | on | v0.1 MVP | planned | https://www.cyber.gov.au/publication/what-is-the-essentials |
 | CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | on | v0.1 MVP | planned | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |

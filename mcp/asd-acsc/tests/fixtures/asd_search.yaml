@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.cyber.gov.au/rss/alerts
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '<rss version="2.0"><channel><item><title>Synthetic alert mentioning CVE-2024-3400</title><link>https://www.cyber.gov.au/about-this-advisory</link></item></channel></rss>'

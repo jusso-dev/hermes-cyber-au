@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.cyber.gov.au/about-this-advisory
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '<html><body><h1>Synthetic advisory</h1><p>This synthetic page mentions CVE-2024-3400 and technique T1566.001.</p></body></html>'
