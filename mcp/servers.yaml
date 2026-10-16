@@ -1,10 +1,23 @@
 servers:
   stub:
     connector: stub
-    args: ["serve", "stub"]
+    args:
+    - serve
+    - stub
     env: []
     trust: untrusted
     lazy: true
     timeout: 30
+    enabled_by_default: true
+    required_env: []
+  kev:
+    connector: cisa-kev
+    args:
+    - serve
+    - cisa-kev
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
     enabled_by_default: true
     required_env: []

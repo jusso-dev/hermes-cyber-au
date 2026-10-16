@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cve_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^CVE-\\d{4}-\\d{4,}$"},
+      "minItems": 1,
+      "maxItems": 100
+    }
+  },
+  "required": ["cve_ids"]
+}

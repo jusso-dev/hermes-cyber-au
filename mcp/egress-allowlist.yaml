@@ -1,6 +1,11 @@
 connectors:
   stub:
     hosts:
-      - example.com
+    - example.com
+    allow_ip_literals: false
+    allow_http_loopback: false
+  cisa-kev:
+    hosts:
+    - www.cisa.gov
     allow_ip_literals: false
     allow_http_loopback: false

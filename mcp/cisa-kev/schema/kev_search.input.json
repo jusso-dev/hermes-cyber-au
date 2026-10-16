@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "query": {"type": "string", "minLength": 2},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 20}
+  },
+  "required": ["query"]
+}
