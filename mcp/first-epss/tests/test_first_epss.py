@@ -55,9 +55,13 @@ def test_bad_payloads_warn():
 
 def test_advertised_schema_and_drift_probe():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    scores = json.dumps(tools["epss_scores"].inputSchema)
-    assert "CVE-" in scores
-    assert "minItems" in scores
+    scores = tools["epss_scores"].inputSchema
+    encoded = json.dumps(scores)
+    assert scores["required"] == ["cve_ids"]
+    assert "CVE-" in encoded
+    assert "minItems" in encoded
+    history = tools["epss_history"].inputSchema
+    assert history["required"] == ["cve_id"]
     assert "maximum" in json.dumps(tools["epss_top"].inputSchema)
     os.environ["CYBERAU_EPSS_SNAPSHOT"] = str(FIXTURES / "epss_drift.json")
     probe = connector().health(live=False, check_schema=True)
@@ -108,3 +112,24 @@ def test_http_retry_redirect_and_persist(tmp_path, monkeypatch):
     finally:
         source._TRANSPORT = None
     assert ranked["data"][0]["cve"] == "CVE-2024-3400"
+
+
+def test_cassettes_replay():
+    import vcr
+    from vcr.serialize import deserialize
+    from vcr.serializers import yamlserializer
+
+    uris = {
+        "epss_scores": "https://api.first.org/data/v1/epss?cve=CVE-2024-3400",
+        "epss_history": "https://api.first.org/data/v1/epss?cve=CVE-2024-3400&scope=time-series",
+        "epss_top": "https://api.first.org/data/v1/epss?epss-gt=0.5&order=%21epss&limit=10",
+    }
+    player = vcr.VCR(record_mode="none")
+    for name, uri in uris.items():
+        path = FIXTURES / f"{name}.yaml"
+        requests, responses = deserialize(path.read_text(encoding="utf-8"), yamlserializer)
+        assert requests and responses[0]["status"]["code"] == 200
+        with player.use_cassette(str(path)):
+            played = httpx.get(uri)
+        assert played.status_code == 200
+        assert played.json()["data"][0]["cve"] == "CVE-2024-3400"

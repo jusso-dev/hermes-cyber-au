@@ -31,7 +31,7 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 
 
 def epss_scores(
-    cve_ids: _CveList | None = None,
+    cve_ids: _CveList,
     date: Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")] | None = None,
 ) -> dict:
     if not cve_ids:
@@ -61,7 +61,7 @@ def epss_scores(
     return _envelope(rows, cache, payload, warnings=tuple(warnings))
 
 
-def epss_history(cve_id: _CveId | None = None) -> dict:
+def epss_history(cve_id: _CveId) -> dict:
     if not cve_id:
         return _envelope([], "snapshot", warnings=("cve_id is required",))
     if not _CVE.match(cve_id):

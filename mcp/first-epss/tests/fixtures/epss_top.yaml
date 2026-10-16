@@ -1,8 +1,14 @@
+version: 1
 interactions:
   - request:
-      uri: https://api.first.org/data/v1/epss?epss-gt=0.5&order=!epss&limit=10
       method: GET
+      uri: https://api.first.org/data/v1/epss?epss-gt=0.5&order=%21epss&limit=10
+      body: ""
+      headers: {}
     response:
-      status: 200
+      status:
+        code: 200
+        message: OK
+      headers: {}
       body:
-        string: '{"data":[{"cve":"CVE-2024-3400","epss":"0.96000","percentile":"0.99800","date":"2026-10-15"}]}'
+        string: '{"status":"OK","version":"v2026.10.15","data":[{"cve":"CVE-2024-3400","epss":"0.96000","percentile":"0.99800","date":"2026-10-15"}]}'
