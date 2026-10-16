@@ -229,6 +229,8 @@ def _fetch(
         message = redact(str(exc))
         if secret:
             message = message.replace(secret, "[REDACTED]")
+        if force_live:
+            return None, "snapshot", message
         cached = cache.get(cache_key)
         if cached:
             return _load(cached.body.decode("utf-8")), "stale", ""

@@ -129,6 +129,20 @@ def test_live_health_ignores_fresh_cache(tmp_path, monkeypatch):
     assert calls["n"] == 1
     assert probe.ok is True
 
+    def fail(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(503, content=b"unavailable")
+
+    calls["n"] = 0
+    nvd_source._TRANSPORT = httpx.MockTransport(fail)
+    try:
+        failed = connector().health(live=True)
+    finally:
+        nvd_source._TRANSPORT = None
+    assert calls["n"] >= 1
+    assert failed.ok is False
+    assert failed.detail != "live ok"
+
 
 def test_v3_severity_is_not_hidden_by_v4(tmp_path, monkeypatch):
     payload = json.loads((FIXTURES / "cve_CVE-2024-3400.json").read_text())
