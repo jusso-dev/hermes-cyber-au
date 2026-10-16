@@ -47,3 +47,6 @@ jobs:
               raise SystemExit("tracked secret-like files: " + ", ".join(bad))
           print(f"planning tree ok: {len(tickets)} tickets, {len(tracked)} tracked files")
           PY
+          if [ -d tests ] && find tests -name 'test_*.py' | grep -q .; then
+            python3 -m unittest discover -s tests -v
+          fi
