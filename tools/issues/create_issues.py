@@ -196,16 +196,18 @@ def main():
         print("dry run: no writes")
         return
 
-    # Sync: resolve {{ref:key}} to #N and bring body, labels and milestone in line with the ticket
+    # Sync: resolve {{ref:key}} to #N and bring title, body, labels and milestone in line with the ticket
     # file. Only issues that differ are patched, so re-running is cheap and never duplicates.
     current = {i["number"]: i for i in json.loads(gh(
         "issue", "list", "-R", repo, "--state", "all", "--limit", "1000",
-        "--json", "number,body,labels,milestone"))}
+        "--json", "number,title,body,labels,milestone"))}
     for t in tickets:
         num = st[t["key"]]["number"]
         body = REF.sub(lambda m: f"#{st[m.group(1)]['number']}", t["body"])
         cur = current.get(num, {})
         fields = []
+        if cur.get("title") != t["title"]:
+            fields += ["-f", f"title={t['title']}"]
         if (cur.get("body") or "").strip() != body.strip():
             fields += ["-f", f"body={body}"]
         if sorted(l["name"] for l in cur.get("labels", [])) != sorted(t["labels"]):
