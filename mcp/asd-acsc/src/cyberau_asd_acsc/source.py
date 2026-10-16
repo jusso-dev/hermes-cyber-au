@@ -467,7 +467,7 @@ def _page(url: str) -> tuple[dict | None, str, str]:
 
 def _parse_feed(text: str, feed: str) -> list[dict]:
     root = ET.fromstring(text)
-    items = []
+    by_id: dict[str, dict] = {}
     for node in root.iter():
         if _local(node.tag) != "item":
             continue
@@ -479,20 +479,19 @@ def _parse_feed(text: str, feed: str) -> list[dict]:
         summary = fields.get("description") or ""
         published = _published(fields.get("pubDate") or fields.get("date") or "")
         plain = f"{title}\n{summary}"
-        items.append(
-            {
-                "id": _item_id(feed, link),
-                "feed": feed,
-                "link": link,
-                "title": title,
-                "summary": summary,
-                "published": published,
-                "body": "",
-                "cves": _ids(_CVE, plain),
-                "attack_ids": _ids(_ATTACK, plain),
-            }
-        )
-    return items
+        item_id = _item_id(feed, link)
+        by_id[item_id] = {
+            "id": item_id,
+            "feed": feed,
+            "link": link,
+            "title": title,
+            "summary": summary,
+            "published": published,
+            "body": "",
+            "cves": _ids(_CVE, plain),
+            "attack_ids": _ids(_ATTACK, plain),
+        }
+    return list(by_id.values())
 
 
 def _parse_html(text: str, url: str) -> dict:
@@ -627,9 +626,13 @@ def _persist(
         if not touch_status:
             return
         conn.execute("DELETE FROM feed_poll WHERE feed = ?", (feed,))
+        seen: set[str] = set()
         for item in items:
+            if item["id"] in seen:
+                continue
+            seen.add(item["id"])
             conn.execute(
-                "INSERT INTO feed_poll (feed, item_id) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO feed_poll (feed, item_id) VALUES (?, ?)",
                 (feed, item["id"]),
             )
         conn.execute(
@@ -643,7 +646,7 @@ def _persist(
                 warning=excluded.warning,
                 data_as_of=COALESCE(excluded.data_as_of, feed_status.data_as_of)
             """,
-            (feed, success, method, len(items), warning, newest or None),
+            (feed, success, method, len(seen), warning, newest or None),
         )
 
 

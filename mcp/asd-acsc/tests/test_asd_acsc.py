@@ -410,6 +410,18 @@ def test_offline_list_is_latest_poll_and_marks_status(monkeypatch):
     assert asd_search("Old alert")["data"][0]["link"] == old
 
 
+def test_duplicate_feed_links_do_not_crash(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    link = "https://www.cyber.gov.au/same-link"
+    body = _rss([("First title", link), ("Second title", link)])
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(200, content=body))
+    listed = asd_list_items(feeds=["alerts"])
+    assert [row["link"] for row in listed["data"]] == [link]
+    assert "Second title" in listed["data"][0]["title"]
+    assert asd_feed_status(feeds=["alerts"])["data"][0]["item_count"] == 1
+
+
 def test_cassettes_replay():
     import vcr
     from vcr.serialize import deserialize
