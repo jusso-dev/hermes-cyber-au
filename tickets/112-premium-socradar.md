@@ -44,7 +44,9 @@ Paid or free: **paid, bring your own licence**. Implements {{ref:premium-interfa
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/socradar/src/cyberau_socradar/source.py`
 - `mcp/socradar/schema/*.json`
 - `mcp/socradar/tests/test_socradar.py`

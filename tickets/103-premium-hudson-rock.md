@@ -1,15 +1,15 @@
 ---
 key: "premium-hudson-rock"
 title: "Premium connector: Hudson Rock Cavalier (infostealer exposure by domain) (`hudsonrock`)"
-labels: ["type:feature", "area:connectors", "area:premium-feeds", "priority:p2"]
-milestone: "v0.2"
+labels: ["type:feature", "area:connectors", "area:premium-feeds", "priority:p3"]
+milestone: "v1.0"
 parent: "epic-premium"
 ---
 ## Outcome
 A read-only `hudsonrock` connector for Hudson Rock Cavalier (infostealer exposure by domain) that the skills and routines can call, with caching, rate limiting, recorded-fixture tests and a live health probe.
 
 ## Context
-Top pick for v0.2: infostealer data is the most direct signal that an Australian organisation's staff or customers are exposed, and the domain search maps cleanly onto the org-exposure watchlist. Hudson Rock also publishes a free preview key for its older Cavalier v2 base (`cavalier.hudsonrock.com/api/json/v2`); do not ship or use that key in tests.
+Infostealer data is the most direct signal that an Australian organisation's staff or customers are exposed, and the domain search maps cleanly onto the org-exposure watchlist. Hudson Rock also publishes a free preview key for its older Cavalier v2 base (`cavalier.hudsonrock.com/api/json/v2`); do not ship or use that key in tests.
 
 Docs: https://docs.hudsonrock.com/
 
@@ -46,7 +46,9 @@ Paid or free: **paid, bring your own licence**. Implements {{ref:premium-interfa
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/hudson-rock/src/cyberau_hudson_rock/source.py`
 - `mcp/hudson-rock/schema/*.json`
 - `mcp/hudson-rock/tests/test_hudson_rock.py`

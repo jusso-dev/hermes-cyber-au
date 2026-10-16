@@ -45,7 +45,9 @@ Paid or free: **paid, bring your own licence**. Implements {{ref:premium-interfa
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/flashpoint/src/cyberau_flashpoint/source.py`
 - `mcp/flashpoint/schema/*.json`
 - `mcp/flashpoint/tests/test_flashpoint.py`

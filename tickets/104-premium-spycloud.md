@@ -1,15 +1,15 @@
 ---
 key: "premium-spycloud"
 title: "Premium connector: SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) (`spycloud`)"
-labels: ["type:feature", "area:connectors", "area:premium-feeds", "priority:p2"]
-milestone: "v0.2"
+labels: ["type:feature", "area:connectors", "area:premium-feeds", "priority:p3"]
+milestone: "v1.0"
 parent: "epic-premium"
 ---
 ## Outcome
 A read-only `spycloud` connector for SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) that the skills and routines can call, with caching, rate limiting, recorded-fixture tests and a live health probe.
 
 ## Context
-Top pick for v0.2. The watchlist lives on SpyCloud's side; `doctor` compares it with the local org-exposure watchlist and reports domains missing from either.
+The watchlist lives on SpyCloud's side; `doctor` compares it with the local org-exposure watchlist and reports domains missing from either.
 
 Docs: https://docs.spycloud.com/public-sc/docs/api-guidelines
 
@@ -45,7 +45,9 @@ Paid or free: **paid, bring your own licence**. Implements {{ref:premium-interfa
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/spycloud/src/cyberau_spycloud/source.py`
 - `mcp/spycloud/schema/*.json`
 - `mcp/spycloud/tests/test_spycloud.py`

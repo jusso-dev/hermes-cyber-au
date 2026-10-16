@@ -48,7 +48,9 @@ Paid or free: **free**. Implements {{ref:premium-interface}}; results feed {{ref
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/ransomware-live/src/cyberau_ransomware_live/source.py`
 - `mcp/ransomware-live/schema/*.json`
 - `mcp/ransomware-live/tests/test_ransomware_live.py`

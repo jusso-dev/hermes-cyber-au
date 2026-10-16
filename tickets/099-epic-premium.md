@@ -15,13 +15,14 @@ Linked as GitHub sub-issues. Checklist mirrors them by milestone.
 - [ ] {{ref:premium-interface}} Design: common premium-connector interface (licence keys, terms flags, quota guardrails, exposure records, privacy) (p1)
 - [ ] {{ref:premium-org-exposure}} Skill and routine: AU org exposure query and alert watch for the user's own domains, ABNs and brands (p1)
 - [ ] {{ref:premium-wiring}} Wire premium exposure findings into the daily briefing, incident triage and breach notification skills (p2)
-- [ ] {{ref:premium-hudson-rock}} Premium connector: Hudson Rock Cavalier (infostealer exposure by domain) (`hudsonrock`) (p2)
-- [ ] {{ref:premium-spycloud}} Premium connector: SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) (`spycloud`) (p2)
 - [ ] {{ref:premium-upguard}} Premium connector: UpGuard CyberRisk (identity breaches, data leaks and typosquats; Australian vendor) (`upguard`) (p2)
 - [ ] {{ref:premium-ransomware-live}} Connector (free): ransomware.live victim tracker (free, filter by country AU) (`ransomlive`) (p2)
+- [ ] {{ref:premium-recorded-future}} Premium connector: Recorded Future (identity exposure, dark web and ransomware brand alerts, domain abuse, risk lists, official MCP) (`recordedfuture`) (p1)
+- [ ] {{ref:premium-flare}} Premium connector: Flare threat exposure management (leaked credentials, stealer logs, leak and ransomware sites, dark web, official MCP) (`flare`) (p1)
 
 ### v1.0
-- [ ] {{ref:premium-recorded-future}} Premium connector: Recorded Future (identity exposures and playbook alerts) (`recordedfuture`) (p3)
+- [ ] {{ref:premium-hudson-rock}} Premium connector: Hudson Rock Cavalier (infostealer exposure by domain) (`hudsonrock`) (p3)
+- [ ] {{ref:premium-spycloud}} Premium connector: SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) (`spycloud`) (p3)
 - [ ] {{ref:premium-flashpoint}} Premium connector: Flashpoint Ignite (compromised credentials and indicators) (`flashpoint`) (p3)
 - [ ] {{ref:premium-intel471}} Premium connector: Intel 471 Titan (watchers, alerts, credentials and breach alerts) (`intel471`) (p3)
 - [ ] {{ref:premium-google-ti-dtm}} Premium connector: Google Threat Intelligence Digital Threat Monitoring (formerly Mandiant) (`gtidtm`) (p3)

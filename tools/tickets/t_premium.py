@@ -290,7 +290,7 @@ Paid or free: **{'paid, bring your own licence' if paid else 'free'}**. Implemen
 Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
 
 """)
-    t["body"] = t["body"].replace("\n## Files\n", "\n" + flags + "## Files\n", 1)
+    t["body"] = t["body"].replace("\n## Files\n", "\n" + flags.rstrip() + "\n\n## Files\n", 1)
     t["parent"] = E
     t["labels"] = ["type:feature", "area:connectors", AREA, f"priority:{c['priority']}"]
     prefix = "Premium connector" if paid else "Connector (free)"

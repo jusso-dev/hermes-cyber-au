@@ -46,7 +46,9 @@ Paid or free: **paid, bring your own licence**. Implements {{ref:premium-interfa
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/crowdstrike-recon/src/cyberau_crowdstrike_recon/source.py`
 - `mcp/crowdstrike-recon/schema/*.json`
 - `mcp/crowdstrike-recon/tests/test_crowdstrike_recon.py`

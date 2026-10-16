@@ -9,7 +9,7 @@ parent: "epic-premium"
 A read-only `upguard` connector for UpGuard CyberRisk (identity breaches, data leaks and typosquats; Australian vendor) that the skills and routines can call, with caching, rate limiting, recorded-fixture tests and a live health probe.
 
 ## Context
-Top pick for v0.2 and an Australian vendor (headquartered in Hobart). Covers brand and attack surface signals the other exposure feeds do not: lookalike domains and leaked data disclosures. Create the key with only the read permissions these tools need; `doctor` warns if a write endpoint answers.
+One of the three v0.2 vendors, and an Australian vendor (headquartered in Hobart). Covers brand and attack surface signals the other exposure feeds do not: lookalike domains and leaked data disclosures. Create the key with only the read permissions these tools need; `doctor` warns if a write endpoint answers.
 
 Docs: https://cyber-risk.upguard.com/api/docs
 
@@ -47,7 +47,9 @@ Paid or free: **paid, bring your own licence**. Implements {{ref:premium-interfa
 | `share_outside_profile` | `false` |
 | `redistribution` | `forbidden` |
 
-Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.## Files
+Quota defaults go in `mcp/premium/vendors.yaml` from the rate limits above; the user sets `monthly_budget_units`.
+
+## Files
 - `mcp/upguard/src/cyberau_upguard/source.py`
 - `mcp/upguard/schema/*.json`
 - `mcp/upguard/tests/test_upguard.py`
