@@ -48,6 +48,31 @@ def _repo_connectors() -> list[Path]:
     return found
 
 
+def _sample_arguments(schema: dict) -> dict:
+    properties = schema.get("properties") or {}
+    arguments = {}
+    for name in schema.get("required") or []:
+        arguments[name] = _sample_value(properties.get(name) or {})
+    return arguments
+
+
+def _sample_value(prop: dict):
+    if prop.get("type") == "array":
+        return [_sample_value(prop.get("items") or {"type": "string"})]
+    if "enum" in prop:
+        return prop["enum"][0]
+    pattern = str(prop.get("pattern") or "")
+    if "CVE" in pattern:
+        return "CVE-2024-3400"
+    if prop.get("type") == "integer":
+        return int(prop.get("minimum", 1))
+    if prop.get("type") == "number":
+        return float(prop.get("minimum", 0))
+    if prop.get("type") == "boolean":
+        return False
+    return "example"
+
+
 def check_connector(package: Path) -> None:
     module_name = "cyberau_" + package.name.replace("-", "_")
     init = package / "src" / module_name / "__init__.py"
@@ -81,7 +106,7 @@ def check_connector(package: Path) -> None:
         for cassette in cassettes:
             text = cassette.read_text(encoding="utf-8")
             assert not _SECRET_HEADER.search(text)
-        result = asyncio.run(server.call_tool(name, {}))
+        result = asyncio.run(server.call_tool(name, _sample_arguments(schema)))
         payload = _payload(result)
         jsonschema.validate(payload, ENVELOPE)
         assert payload["cache"] in {"snapshot", "stale", "hit", "miss"}

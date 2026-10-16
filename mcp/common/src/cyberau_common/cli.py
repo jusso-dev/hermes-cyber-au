@@ -24,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     health.add_argument("name")
     health.add_argument("--live", action="store_true")
     health.add_argument("--offline", action="store_true")
+    health.add_argument("--schema-drift", action="store_true")
 
     new = sub.add_parser("new", help="Create a connector skeleton")
     new.add_argument("key")
@@ -47,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "health":
         live = bool(args.live) and not args.offline
-        probe = run_health(args.name, live=live)
+        probe = run_health(args.name, live=live, check_schema=bool(args.schema_drift))
         print(f"{probe.name} {'ok' if probe.ok else 'fail'} {probe.detail}")
         return 0 if probe.ok else 1
     print(
