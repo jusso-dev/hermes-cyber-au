@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["cyberau-common"]
 
 [tool.uv.workspace]
-members = ["common"]
+members = ["common", "cisa-kev"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
