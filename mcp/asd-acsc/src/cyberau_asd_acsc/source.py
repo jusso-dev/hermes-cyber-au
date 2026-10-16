@@ -100,11 +100,15 @@ def asd_get_item(url: _Url) -> dict:
             warnings=("url must be an https://www.cyber.gov.au/ page",),
         )
     page, cache, warning = _page(url)
-    if warning:
-        return _envelope(None, cache, [url], warnings=(warning,))
     if page is None:
-        return _envelope(None, cache, [url], warnings=("ASD item page was not usable",))
-    return _envelope(_public_page(url, page), cache, [url])
+        return _envelope(
+            None,
+            cache,
+            [url],
+            warnings=(warning or "ASD item page was not usable",),
+        )
+    warnings = (warning,) if warning else ()
+    return _envelope(_public_page(url, page), cache, [url], warnings=warnings)
 
 
 def asd_search(
@@ -237,6 +241,26 @@ class _AsdConnector(Connector):
         return Probe(self.key, True, "live ok")
 
 
+def _feed_problem(text: str) -> str | None:
+    drift = schema_drift(text)
+    if drift:
+        return drift
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return "ASD feed is not XML"
+    for node in root.iter():
+        if _local(node.tag) != "item":
+            continue
+        for child in list(node):
+            if _local(child.tag) not in {"pubDate", "date"}:
+                continue
+            raw = (child.text or "").strip()
+            if raw and _parse_pubdate(raw) is None:
+                return f"unusable pubDate {raw!r}"
+    return None
+
+
 def schema_drift(text: str) -> str | None:
     if not text or not text.strip():
         return "ASD feed is empty"
@@ -255,47 +279,76 @@ def _items_for_feed(feed: str) -> tuple[list[dict], str, str, str]:
     text, cache, warning, method = _fetch_xml(feed, force_live=False)
     if text is None:
         stored = _stored(feed)
-        if stored:
+        if stored and method == "stored":
+            return stored, "stale", warning, "stored"
+        if stored and method == "stale":
             note = warning or f"{feed} served from the last stored poll"
-            _persist(feed, stored, method="stale", warning=note, cache="stale", replace=False)
+            _persist(
+                feed,
+                stored,
+                method="stale",
+                warning=note,
+                cache="stale",
+                replace=False,
+            )
             return stored, "stale", note, "stale"
         return [], cache, warning or f"{feed} is unavailable", method
-    drift = schema_drift(text)
-    if drift:
-        return [], "snapshot", drift, method
+    problem = _feed_problem(text)
+    if problem:
+        stored = _stored(feed)
+        if stored:
+            note = f"{feed} fetch failed: {problem}"
+            _persist(feed, stored, method="stale", warning=note, cache="stale", replace=False)
+            return stored, "stale", note, "stale"
+        shipped = _read_snapshot(feed)
+        if shipped and shipped != text and not _feed_problem(shipped):
+            items = _parse_feed(shipped, feed)
+            note = f"{feed} fetch failed: {problem}; served shipped snapshot"
+            _persist(feed, items, method="snapshot", warning=note, cache="snapshot", replace=False)
+            return items, "snapshot", note, "snapshot"
+        return [], "snapshot", problem, method
     items = _parse_feed(text, feed)
     note = warning
     if not items and not note:
         note = f"{feed} feed contained no items"
-    _persist(feed, items, method=method, warning=note, cache=cache)
+    _persist(
+        feed,
+        items,
+        method=method,
+        warning=note,
+        cache=cache,
+        replace=method in {"direct", "http11"},
+    )
     return items, cache, note, method
 
 
 def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, str]:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    if offline or (os.environ.get("CYBERAU_ASD_SNAPSHOT") and not force_live):
-        text = _read_snapshot(feed)
-        if text is None:
-            return None, "snapshot", f"{feed} snapshot is missing", "snapshot"
-        return text, "snapshot", "", "snapshot"
+    pinned = bool(os.environ.get("CYBERAU_ASD_SNAPSHOT")) and not force_live
+    if pinned:
+        return _pinned_snapshot(feed)
+    if offline:
+        return _offline_feed(feed)
     try:
         _limit(f"asd:feed:{feed}", rate=2 / 600, burst=2)
     except Exception as exc:
         return None, "snapshot", redact(str(exc)), "direct"
     direct = _http(_feed_url(feed), _DIRECT, ttl=15 * 60, skip_cache=force_live)
-    if direct[0] is not None and not direct[1]:
-        return direct[0], direct[2], "", "direct"
+    accepted = _accept_feed(direct)
+    if accepted is not None:
+        return accepted[0], accepted[1], accepted[2], "direct"
     if force_live:
-        return None, "snapshot", direct[1] or f"{feed} live fetch failed", "direct"
+        message = _feed_failure(direct) or f"{feed} live fetch failed"
+        return None, "snapshot", message, "direct"
     fallback = _http(_feed_url(feed), _BROWSER, ttl=15 * 60, skip_cache=True)
-    if fallback[0] is not None and not fallback[1]:
-        return fallback[0], fallback[2], "", "http11"
-    message = fallback[1] or direct[1] or "fetch failed"
-    stored = _stored(feed)
-    if stored:
+    accepted = _accept_feed(fallback)
+    if accepted is not None:
+        return accepted[0], accepted[1], accepted[2], "http11"
+    message = _feed_failure(fallback) or _feed_failure(direct) or "fetch failed"
+    if _stored(feed):
         return None, "stale", f"{feed} fetch failed: {message}", "stale"
     shipped = _read_snapshot(feed)
-    if shipped:
+    if shipped and not _feed_problem(shipped):
         return (
             shipped,
             "snapshot",
@@ -303,6 +356,47 @@ def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, st
             "snapshot",
         )
     return None, "snapshot", f"{feed} fetch failed: {message}", "direct"
+
+
+def _pinned_snapshot(feed: str) -> tuple[str | None, str, str, str]:
+    text = _read_snapshot(feed)
+    if text is None:
+        return None, "snapshot", f"{feed} snapshot is missing", "snapshot"
+    problem = _feed_problem(text)
+    if problem:
+        return None, "snapshot", problem, "snapshot"
+    return text, "snapshot", "", "snapshot"
+
+
+def _offline_feed(feed: str) -> tuple[str | None, str, str, str]:
+    if _stored(feed):
+        return None, "stale", f"{feed} served from the last stored poll", "stored"
+    cached = _cached_feed(feed)
+    if cached is not None and not _feed_problem(cached[0]):
+        return cached[0], cached[1], f"{feed} served from the HTTP cache", "stale"
+    text = _read_snapshot(feed)
+    if text is None:
+        return None, "snapshot", f"{feed} snapshot is missing", "snapshot"
+    problem = _feed_problem(text)
+    if problem:
+        return None, "snapshot", problem, "snapshot"
+    return text, "snapshot", "", "snapshot"
+
+
+def _accept_feed(result: tuple[str | None, str, str]) -> tuple[str, str, str] | None:
+    text, warning, cache = result
+    if not text or _feed_problem(text):
+        return None
+    if warning:
+        return text, "stale", warning
+    return text, cache, ""
+
+
+def _feed_failure(result: tuple[str | None, str, str]) -> str:
+    text, warning, _cache = result
+    if text:
+        return _feed_problem(text) or warning
+    return warning
 
 
 def _http(url: str, headers: dict, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
@@ -360,9 +454,13 @@ def _page(url: str) -> tuple[dict | None, str, str]:
         return None, "snapshot", redact(str(exc))
     text, warning, cache = _http(url, _DIRECT, ttl=7 * 86400, skip_cache=False)
     if text is None:
+        note = warning or "item fetch failed"
         if mapped is not None:
-            return _parse_html(mapped, url), "stale", warning or "item fetch failed"
-        return None, "snapshot", warning or "item fetch failed"
+            return _parse_html(mapped, url), "stale", note
+        saved = _stored_by_link(url)
+        if saved and saved.get("body"):
+            return _page_from_row(saved), "stale", note
+        return None, "snapshot", note
     parsed = _parse_html(text, url)
     _save_page(url, parsed)
     if warning and cache != "stale":
@@ -466,6 +564,7 @@ def _persist(
     warning: str,
     cache: str,
     replace: bool = True,
+    touch_status: bool = True,
 ) -> None:
     now = datetime.now(_SYDNEY).strftime("%Y-%m-%dT%H:%M:%S%z")
     newest = ""
@@ -486,7 +585,8 @@ def _persist(
                     ON CONFLICT(id) DO UPDATE SET
                         title=excluded.title,
                         summary=excluded.summary,
-                        published=excluded.published,
+                        published=CASE WHEN excluded.published = '' THEN advisories.published
+                             ELSE excluded.published END,
                         body=CASE WHEN excluded.body = '' THEN advisories.body
                              ELSE excluded.body END,
                         cves=excluded.cves,
@@ -506,6 +606,29 @@ def _persist(
                         now,
                     ),
                 )
+            else:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO advisories (
+                        id, feed, link, title, summary, published, body, cves,
+                        attack_ids, fetched_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        item["id"],
+                        item["feed"],
+                        item["link"],
+                        item.get("title") or "",
+                        item.get("summary") or "",
+                        item.get("published") or "",
+                        item.get("body") or "",
+                        json.dumps(item.get("cves") or []),
+                        json.dumps(item.get("attack_ids") or []),
+                        now,
+                    ),
+                )
+        if not touch_status:
+            return
         conn.execute(
             """
             INSERT INTO feed_status (feed, last_success, method, item_count, warning, data_as_of)
@@ -522,19 +645,72 @@ def _persist(
 
 
 def _save_page(url: str, page: dict) -> None:
-    feed = "advisories"
-    item = {
-        "id": _item_id(feed, url),
-        "feed": feed,
-        "link": url,
-        "title": page["title"],
-        "summary": page["summary"],
-        "published": page["published"],
-        "body": page["body"],
-        "cves": page["cves"],
-        "attack_ids": page["attack_ids"],
+    existing = _stored_by_link(url)
+    if existing:
+        item = dict(existing)
+        if page.get("body"):
+            item["body"] = page["body"]
+        if page.get("cves"):
+            item["cves"] = page["cves"]
+        if page.get("attack_ids"):
+            item["attack_ids"] = page["attack_ids"]
+        if not item.get("title"):
+            item["title"] = page.get("title") or ""
+        if not item.get("summary"):
+            item["summary"] = page.get("summary") or ""
+        _persist(
+            existing["feed"],
+            [item],
+            method="direct",
+            warning="",
+            cache="miss",
+            touch_status=False,
+        )
+        return
+    _persist(
+        "pages",
+        [
+            {
+                "id": _item_id("pages", url),
+                "feed": "pages",
+                "link": url,
+                "title": page.get("title") or "",
+                "summary": page.get("summary") or "",
+                "published": page.get("published") or "",
+                "body": page.get("body") or "",
+                "cves": page.get("cves") or [],
+                "attack_ids": page.get("attack_ids") or [],
+            }
+        ],
+        method="direct",
+        warning="",
+        cache="miss",
+        touch_status=False,
+    )
+
+
+def _stored_by_link(url: str) -> dict | None:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT * FROM advisories WHERE link = ? ORDER BY coalesce(published, '') DESC",
+            (url,),
+        ).fetchone()
+    if row is None:
+        return None
+    return _row_item(row)
+
+
+def _page_from_row(item: dict) -> dict:
+    return {
+        "title": item.get("title") or "",
+        "summary": item.get("summary") or "",
+        "body": item.get("body") or "",
+        "headings": [],
+        "links": [],
+        "cves": item.get("cves") or [],
+        "attack_ids": item.get("attack_ids") or [],
+        "published": item.get("published") or "",
     }
-    _persist(feed, [item], method="direct", warning="", cache="miss", replace=True)
 
 
 def _stored(feed: str) -> list[dict]:
@@ -640,15 +816,36 @@ def _item_id(feed: str, link: str) -> str:
     return f"asd:{feed}:{digest}"
 
 
+def _parse_pubdate(value: str):
+    if not value or not value.strip():
+        return None
+    try:
+        return email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError, IndexError):
+        return None
+
+
 def _published(value: str) -> str:
-    if not value:
-        return ""
-    parsed = email.utils.parsedate_to_datetime(value)
+    parsed = _parse_pubdate(value)
     if parsed is None:
         return ""
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=_SYDNEY)
     return parsed.astimezone(_SYDNEY).date().isoformat()
+
+
+def _cached_feed(feed: str) -> tuple[str, str] | None:
+    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    key = cache.key("GET", _feed_url(feed), None, b"", "anonymous")
+    item = cache.get(key)
+    if item is None:
+        return None
+    try:
+        text = item.body.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    state = "hit" if cache.fresh(item) else "stale"
+    return text, state
 
 
 def _ids(pattern: re.Pattern[str], text: str) -> list[str]:

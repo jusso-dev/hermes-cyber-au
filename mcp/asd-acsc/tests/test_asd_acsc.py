@@ -230,6 +230,106 @@ def test_import_and_status():
     assert main(["import", "nope", "missing.xml"]) == 2
 
 
+def test_offline_prefers_stored_poll_over_shipped_snapshot(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    unique = """<?xml version="1.0"?>
+<rss version="2.0"><channel><item>
+<title>Unique live alert</title>
+<link>https://www.cyber.gov.au/unique-live-alert</link>
+<pubDate>Thu, 15 Oct 2026 09:00:00 +1100</pubDate>
+<description>Only on the live feed.</description>
+</item></channel></rss>"""
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=unique.encode())
+    )
+    live = asd_list_items(feeds=["alerts"])
+    assert live["data"][0]["link"].endswith("/unique-live-alert")
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    source._TRANSPORT = None
+    offline = asd_list_items(feeds=["alerts"])
+    assert [row["link"] for row in offline["data"]] == [
+        "https://www.cyber.gov.au/unique-live-alert"
+    ]
+
+
+def test_offline_uses_http_cache_before_shipped_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    body = """<?xml version="1.0"?>
+<rss version="2.0"><channel><item>
+<title>Cached live alert</title>
+<link>https://www.cyber.gov.au/cached-live-alert</link>
+<pubDate>Thu, 15 Oct 2026 09:00:00 +1100</pubDate>
+<description>Served from the HTTP cache.</description>
+</item></channel></rss>"""
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    key = cache.key("GET", "https://www.cyber.gov.au/rss/alerts", None, b"", "anonymous")
+    cache.put(key, status=200, headers={}, body=body.encode(), ttl=900)
+    listed = asd_list_items(feeds=["alerts"])
+    assert listed["data"][0]["link"].endswith("/cached-live-alert")
+
+
+def test_malformed_live_feed_uses_stored_poll(monkeypatch):
+    asd_list_items(feeds=["alerts"])
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    html = b"<html><body>cdn error</body></html>"
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(200, content=html))
+    listed = asd_list_items(feeds=["alerts"])
+    assert listed["cache"] == "stale"
+    assert any(row["link"] == ITEM for row in listed["data"])
+    assert "alerts" in listed["warnings"][0]
+
+
+def test_get_item_keeps_fallback_page(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: (_ for _ in ()).throw(httpx.ConnectError("timed out"))
+    )
+    page = asd_get_item(ITEM)
+    assert page["data"]["cves"] == ["CVE-2024-3400"]
+    assert page["warnings"]
+    assert page["data"] is not None
+
+
+def test_page_fetch_does_not_drop_dated_advisory(monkeypatch):
+    listed = asd_list_items(feeds=["advisories"])
+    link = listed["data"][0]["link"]
+    published = listed["data"][0]["published"]
+    assert asd_search("vendor", since=published)["data"]
+    method = asd_feed_status(feeds=["advisories"])["data"][0]["method"]
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    html = (FIXTURES / "item_advisory.html").read_bytes()
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(200, content=html))
+    fetched = asd_get_item(link)
+    assert fetched["data"]["body"]
+    assert asd_search("vendor", since=published)["data"][0]["link"] == link
+    assert asd_feed_status(feeds=["advisories"])["data"][0]["method"] == method
+
+
+def test_bad_pubdate_falls_back(monkeypatch):
+    asd_list_items(feeds=["alerts"])
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    bad = """<?xml version="1.0"?>
+<rss version="2.0"><channel><item>
+<title>Broken date</title>
+<link>https://www.cyber.gov.au/broken-date</link>
+<pubDate>not-a-date</pubDate>
+<description>Broken.</description>
+</item></channel></rss>"""
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=bad.encode())
+    )
+    listed = asd_list_items(feeds=["alerts"])
+    assert "pubDate" in listed["warnings"][0]
+    assert any(row["link"] == ITEM for row in listed["data"])
+    assert source._published("not-a-date") == ""
+
+
 def test_cassettes_replay():
     import vcr
     from vcr.serialize import deserialize
