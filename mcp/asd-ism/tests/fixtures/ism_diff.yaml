@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.github.com/repos/AustralianCyberSecurityCentre/ism-oscal/releases
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '[{"tag_name":"v2026.09.4","published_at":"2026-09-03T00:00:00Z"}]'

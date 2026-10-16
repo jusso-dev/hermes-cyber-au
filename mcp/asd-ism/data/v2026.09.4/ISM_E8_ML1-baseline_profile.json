@@ -1,0 +1,21 @@
+{
+  "profile": {
+    "metadata": {
+      "title": "Essential Eight ML1 excerpt",
+      "version": "2026.09.4"
+    },
+    "imports": [
+      {
+        "href": "#catalog",
+        "include-controls": [
+          {
+            "with-ids": [
+              "ism-1173",
+              "ism-0009"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

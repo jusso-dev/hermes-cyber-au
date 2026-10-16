@@ -16,6 +16,12 @@ connectors:
     - epss.empiricalsecurity.com
     allow_ip_literals: false
     allow_http_loopback: false
+  asd-ism:
+    hosts:
+    - api.github.com
+    - raw.githubusercontent.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   asd-acsc:
     hosts:
     - www.cyber.gov.au

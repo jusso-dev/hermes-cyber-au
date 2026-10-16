@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "query": {
+      "type": "string",
+      "minLength": 2
+    },
+    "baseline": {
+      "enum": [
+        "NON_CLASSIFIED",
+        "OFFICIAL_SENSITIVE",
+        "PROTECTED",
+        "SECRET",
+        "TOP_SECRET",
+        "E8_ML1",
+        "E8_ML2",
+        "E8_ML3"
+      ]
+    },
+    "release": {"type": "string"},
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 10
+    }
+  },
+  "required": ["query"]
+}

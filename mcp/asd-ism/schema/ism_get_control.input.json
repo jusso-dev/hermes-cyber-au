@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "control_id": {
+      "type": "string",
+      "pattern": "^(ISM-)?\\d{3,4}$|^ism-"
+    },
+    "release": {
+      "type": "string",
+      "description": "Release tag. Default: latest in snapshot"
+    }
+  },
+  "required": ["control_id"]
+}

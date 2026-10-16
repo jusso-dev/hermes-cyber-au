@@ -32,6 +32,18 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  ism:
+    connector: asd-ism
+    args:
+    - serve
+    - asd-ism
+    env:
+    - GITHUB_TOKEN=${GITHUB_TOKEN}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   asd:
     connector: asd-acsc
     args:

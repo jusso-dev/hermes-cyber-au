@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "baseline": {
+      "enum": [
+        "NON_CLASSIFIED",
+        "OFFICIAL_SENSITIVE",
+        "PROTECTED",
+        "SECRET",
+        "TOP_SECRET",
+        "E8_ML1",
+        "E8_ML2",
+        "E8_ML3"
+      ]
+    },
+    "release": {"type": "string"}
+  },
+  "required": ["baseline"]
+}

@@ -1,0 +1,1168 @@
+{
+  "catalog": {
+    "uuid": "3de3ba7d-99df-47e9-bb1c-366caed7b5ac",
+    "metadata": {
+      "title": "Information security manual",
+      "published": "2026-09-03T23:10:47.63884244Z",
+      "last-modified": "2026-09-03T23:10:47.63884244Z",
+      "version": "2026.09.4",
+      "oscal-version": "1.1.2"
+    },
+    "groups": [
+      {
+        "title": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+        "controls": [
+          {
+            "id": "ism-1173",
+            "class": "ISM-control",
+            "title": "Control: ism-1173",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[16].group[1].group[17].control[08]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "5"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Sep-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              },
+              {
+                "name": "essential-eight-applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "ML2"
+              },
+              {
+                "name": "essential-eight-applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "ML3"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-1173_smt",
+                "name": "statement",
+                "prose": "Multi-factor authentication is used to authenticate privileged human users of systems."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security roles / System owners / Protecting systems and their resources",
+        "controls": [
+          {
+            "id": "ism-0009",
+            "class": "ISM-control",
+            "title": "Control: ism-0009",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[03].group[3].group[2].control[04]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "5"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Sep-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0009_smt",
+                "name": "statement",
+                "prose": "System owners, in consultation with each system\u2019s authorising officer, identify any supplementary security controls required based upon the unique nature of each system, its operating environment and the organisation\u2019s risk tolerances."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security roles / Chief information security officer / Providing cyber security leadership and guidance",
+        "controls": [
+          {
+            "id": "ism-0714",
+            "class": "ISM-control",
+            "title": "Control: ism-0714",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[03].group[2].group[01].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Jun-24"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0714_smt",
+                "name": "statement",
+                "prose": "A CISO is appointed to provide cyber security leadership and guidance for their organisation (covering IT and OT)."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security roles / System owners / System ownership and oversight",
+        "controls": [
+          {
+            "id": "ism-1071",
+            "class": "ISM-control",
+            "title": "Control: ism-1071",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[03].group[3].group[1].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "1"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Sep-18"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-1071_smt",
+                "name": "statement",
+                "prose": "Each system has a designated system owner."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security roles / Board of directors and executive committee / Embedding cyber security",
+        "controls": [
+          {
+            "id": "ism-1997",
+            "class": "ISM-control",
+            "title": "Control: ism-1997",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[03].group[1].group[1].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "1"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Dec-25"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-1997_smt",
+                "name": "statement",
+                "prose": "The board of directors or executive committee defines clear roles and responsibilities for cyber security both within the board of directors or executive committee and broadly within their organisation."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Cyber security principles / The cyber security principles / Govern cyber security principles",
+        "controls": [
+          {
+            "id": "ism-principle-gov-01",
+            "class": "ISM-principle",
+            "title": "Executive cyber security accountability",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[02].group[1].group[1].control[01]"
+              },
+              {
+                "name": "label",
+                "value": "GOV-01"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-principle-gov-01_smt",
+                "name": "statement",
+                "prose": "The board of directors or executive committee is accountable for cyber security."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security roles / System owners / Protecting systems and their resources",
+        "controls": [
+          {
+            "id": "ism-0027",
+            "class": "ISM-control",
+            "title": "Control: ism-0027",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[03].group[3].group[2].control[08]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Mar-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0027_smt",
+                "name": "statement",
+                "prose": "System owners obtain an authorisation to operate for each non-classified, OFFICIAL: Sensitive, PROTECTED and SECRET system from its authorising officer."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security documentation / Development and maintenance of cyber security documentation / Cyber security strategy",
+        "controls": [
+          {
+            "id": "ism-0039",
+            "class": "ISM-control",
+            "title": "Control: ism-0039",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[06].group[1].group[1].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Dec-22"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0039_smt",
+                "name": "statement",
+                "prose": "A cyber security strategy is developed, implemented and maintained."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security documentation / System-specific cyber security documentation / System security plan",
+        "controls": [
+          {
+            "id": "ism-0041",
+            "class": "ISM-control",
+            "title": "Control: ism-0041",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[06].group[2].group[1].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "7"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Sep-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0041_smt",
+                "name": "statement",
+                "prose": "Systems have a system security plan that includes an overview of the system (covering the system\u2019s purpose, the system boundary and how the system is managed) as well as an annex that covers applicable security controls from this document and any additional security controls that have been identified and implemented."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for system management / System administration / System administration processes and procedures",
+        "controls": [
+          {
+            "id": "ism-0042",
+            "class": "ISM-control",
+            "title": "Control: ism-0042",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[17].group[1].group[1].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Dec-22"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0042_smt",
+                "name": "statement",
+                "prose": "System administration processes, and supporting system administration procedures, are developed, implemented and maintained."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security documentation / System-specific cyber security documentation / Cyber security incident response plan",
+        "controls": [
+          {
+            "id": "ism-0043",
+            "class": "ISM-control",
+            "title": "Control: ism-0043",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[06].group[2].group[2].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Jun-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0043_smt",
+                "name": "statement",
+                "prose": "Systems have a cyber security incident response plan that covers the following:\n\n- guidelines on what constitutes a cyber security incident\n- the types of cyber security incidents likely to be encountered and the expected response to each type\n- how to report cyber security incidents, internally to an organisation and externally to relevant authorities\n- other parties that need to be informed in the event of a cyber security incident\n- the authority, or authorities, responsible for investigating and responding to cyber security incidents\n- the criteria by which an investigation of a cyber security incident would be requested from a law enforcement agency, the Australian Signals Directorate or other relevant authority\n- the steps necessary to ensure the integrity of evidence relating to a cyber security incident\n- system contingency measures or a reference to such details if they are in a separate document."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security documentation / Development and maintenance of cyber security documentation / Approval of cyber security documentation",
+        "controls": [
+          {
+            "id": "ism-0047",
+            "class": "ISM-control",
+            "title": "Control: ism-0047",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[06].group[1].group[2].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Dec-25"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0047_smt",
+                "name": "statement",
+                "prose": "Organisational-level cyber security documentation is approved by the chief information security officer while system-specific cyber security documentation is approved by the system\u2019s authorising officer."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for procurement and outsourcing / Managed services and cloud services / Contractual security requirements with service providers",
+        "controls": [
+          {
+            "id": "ism-0072",
+            "class": "ISM-control",
+            "title": "Control: ism-0072",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[05].group[2].group[5].control[02]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "10"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Jun-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0072_smt",
+                "name": "statement",
+                "prose": "Security requirements associated with the confidentiality, integrity and availability of data are documented in contractual arrangements with service providers and regularly reviewed to ensure they remain fit for purpose."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for system access / Identity and access management / Control of Australian systems",
+        "controls": [
+          {
+            "id": "ism-0078",
+            "class": "ISM-control",
+            "title": "Control: ism-0078",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[16].group[1].group[14].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "5"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Jun-21"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0078_smt",
+                "name": "statement",
+                "prose": "Systems processing, storing or communicating AUSTEO or AGAO data remain at all times under the control of an Australian national working for or on behalf of the Australian Government."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for gateways / Gateways / Assessment of gateways",
+        "controls": [
+          {
+            "id": "ism-0100",
+            "class": "ISM-control",
+            "title": "Control: ism-0100",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[24].group[1].group[7].control[2]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "12"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Mar-25"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0100_smt",
+                "name": "statement",
+                "prose": "Non-classified, OFFICIAL: Sensitive, PROTECTED and SECRET gateways undergo an IRAP assessment, using the latest release of the ISM available prior to the beginning of the IRAP assessment (or a subsequent release), at least every 24 months."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for security assurance / Security monitoring / Event log monitoring",
+        "controls": [
+          {
+            "id": "ism-0109",
+            "class": "ISM-control",
+            "title": "Control: ism-0109",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[18].group[1].group[4].control[07]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "9"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Dec-23"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              },
+              {
+                "name": "essential-eight-applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "ML3"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0109_smt",
+                "name": "statement",
+                "prose": "Event logs from workstations are analysed in a timely manner to detect cyber security events."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for security assurance / Security monitoring / Event log monitoring",
+        "controls": [
+          {
+            "id": "ism-0120",
+            "class": "ISM-control",
+            "title": "Control: ism-0120",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[18].group[1].group[4].control[01]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "6"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Jun-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0120_smt",
+                "name": "statement",
+                "prose": "Cyber security personnel have access to sufficient tools to facilitate the detection of cyber security events and the identification of cyber security incidents."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security incidents / Managing cyber security incidents / Reporting cyber security incidents",
+        "controls": [
+          {
+            "id": "ism-0123",
+            "class": "ISM-control",
+            "title": "Control: ism-0123",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[04].group[1].group[4].control[1]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "4"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Jun-23"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              },
+              {
+                "name": "essential-eight-applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "ML2"
+              },
+              {
+                "name": "essential-eight-applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "ML3"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-0123_smt",
+                "name": "statement",
+                "prose": "Cyber security incidents are reported to the chief information security officer, or one of their delegates, as soon as possible after they occur or are discovered."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for procurement and outsourcing / Managed services and cloud services / Access to systems by service providers",
+        "controls": [
+          {
+            "id": "ism-2124",
+            "class": "ISM-control",
+            "title": "Control: ism-2124",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[05].group[2].group[6].control[2]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "0"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Sep-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-2124_smt",
+                "name": "statement",
+                "prose": "Access by a service provider to an organisation\u2019s systems is restricted to remote management tools, source network addresses and time windows explicitly approved by the organisation."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for procurement and outsourcing / Managed services and cloud services / Access to systems by service providers",
+        "controls": [
+          {
+            "id": "ism-2125",
+            "class": "ISM-control",
+            "title": "Control: ism-2125",
+            "props": [
+              {
+                "name": "sort-id",
+                "value": "catalog[1].group[05].group[2].group[6].control[4]"
+              },
+              {
+                "name": "revision",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "0"
+              },
+              {
+                "name": "updated",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "Sep-26"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "NC"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "OS"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "P"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "S"
+              },
+              {
+                "name": "applicability",
+                "ns": "https://cyber.gov.au/ns/ism/oscal/3.0",
+                "value": "TS"
+              }
+            ],
+            "parts": [
+              {
+                "id": "ism-2125_smt",
+                "name": "statement",
+                "prose": "All access to an organisation\u2019s systems by a service provider is independently logged by the organisation in a manner that the service provider cannot modify or delete, and analysed in a timely manner to detect any anomalous, unexpected or unauthorised activity."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

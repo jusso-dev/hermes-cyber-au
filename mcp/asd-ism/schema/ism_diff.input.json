@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "from_release": {"type": "string"},
+    "to_release": {"type": "string"}
+  },
+  "required": ["from_release", "to_release"]
+}

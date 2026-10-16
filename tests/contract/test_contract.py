@@ -64,6 +64,8 @@ def _sample_value(prop: dict):
     pattern = str(prop.get("pattern") or "")
     if "CVE" in pattern:
         return "CVE-2024-3400"
+    if "ism-" in pattern:
+        return "ism-1173"
     if pattern.startswith("^") and not pattern.endswith("$"):
         body = pattern[1:]
         if re.fullmatch(r"(?:\\.|[A-Za-z0-9:/.])+", body):
