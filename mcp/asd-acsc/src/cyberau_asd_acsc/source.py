@@ -277,26 +277,17 @@ def schema_drift(text: str) -> str | None:
 
 def _items_for_feed(feed: str) -> tuple[list[dict], str, str, str]:
     text, cache, warning, method = _fetch_xml(feed, force_live=False)
+    if text is None and method in {"stored", "stale"} and _has_poll(feed):
+        items = _latest_poll(feed)
+        note = warning or f"{feed} served from the last stored poll"
+        _persist(feed, items, method="stale", warning=note, cache="stale", replace=False)
+        return items, "stale", note, "stale"
     if text is None:
-        stored = _stored(feed)
-        if stored and method == "stored":
-            return stored, "stale", warning, "stored"
-        if stored and method == "stale":
-            note = warning or f"{feed} served from the last stored poll"
-            _persist(
-                feed,
-                stored,
-                method="stale",
-                warning=note,
-                cache="stale",
-                replace=False,
-            )
-            return stored, "stale", note, "stale"
         return [], cache, warning or f"{feed} is unavailable", method
     problem = _feed_problem(text)
     if problem:
-        stored = _stored(feed)
-        if stored:
+        stored = _latest_poll(feed) if _has_poll(feed) else []
+        if _has_poll(feed):
             note = f"{feed} fetch failed: {problem}"
             _persist(feed, stored, method="stale", warning=note, cache="stale", replace=False)
             return stored, "stale", note, "stale"
@@ -345,7 +336,7 @@ def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, st
     if accepted is not None:
         return accepted[0], accepted[1], accepted[2], "http11"
     message = _feed_failure(fallback) or _feed_failure(direct) or "fetch failed"
-    if _stored(feed):
+    if _has_poll(feed):
         return None, "stale", f"{feed} fetch failed: {message}", "stale"
     shipped = _read_snapshot(feed)
     if shipped and not _feed_problem(shipped):
@@ -369,7 +360,7 @@ def _pinned_snapshot(feed: str) -> tuple[str | None, str, str, str]:
 
 
 def _offline_feed(feed: str) -> tuple[str | None, str, str, str]:
-    if _stored(feed):
+    if _has_poll(feed):
         return None, "stale", f"{feed} served from the last stored poll", "stored"
     cached = _cached_feed(feed)
     if cached is not None and not _feed_problem(cached[0]):
@@ -443,6 +434,12 @@ def _page(url: str) -> tuple[dict | None, str, str]:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1"
     mapped = _mapped_html(url)
     if offline or os.environ.get("CYBERAU_ASD_SNAPSHOT"):
+        cached = _cached_page(url)
+        if cached:
+            return _parse_html(cached, url), "stale", "served from the HTTP cache"
+        saved = _stored_by_link(url)
+        if saved and saved.get("body"):
+            return _page_from_row(saved), "stale", "served from the stored page"
         if mapped is None:
             return None, "snapshot", "no stored page for this URL"
         return _parse_html(mapped, url), "snapshot", ""
@@ -629,6 +626,12 @@ def _persist(
                 )
         if not touch_status:
             return
+        conn.execute("DELETE FROM feed_poll WHERE feed = ?", (feed,))
+        for item in items:
+            conn.execute(
+                "INSERT INTO feed_poll (feed, item_id) VALUES (?, ?)",
+                (feed, item["id"]),
+            )
         conn.execute(
             """
             INSERT INTO feed_status (feed, last_success, method, item_count, warning, data_as_of)
@@ -713,10 +716,22 @@ def _page_from_row(item: dict) -> dict:
     }
 
 
-def _stored(feed: str) -> list[dict]:
+def _has_poll(feed: str) -> bool:
+    with _db() as conn:
+        row = conn.execute("SELECT 1 FROM feed_status WHERE feed = ?", (feed,)).fetchone()
+    return row is not None
+
+
+def _latest_poll(feed: str) -> list[dict]:
     with _db() as conn:
         rows = conn.execute(
-            "SELECT * FROM advisories WHERE feed = ? ORDER BY coalesce(published, '') DESC",
+            """
+            SELECT advisories.* FROM advisories
+            JOIN feed_poll ON feed_poll.item_id = advisories.id
+             AND feed_poll.feed = advisories.feed
+            WHERE advisories.feed = ?
+            ORDER BY coalesce(advisories.published, '') DESC
+            """,
             (feed,),
         ).fetchall()
     return [_row_item(row) for row in rows]
@@ -834,18 +849,33 @@ def _published(value: str) -> str:
     return parsed.astimezone(_SYDNEY).date().isoformat()
 
 
+def _cached_body(url: str) -> str | None:
+    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    key = cache.key("GET", url, None, b"", "anonymous")
+    item = cache.get(key)
+    if item is None:
+        return None
+    try:
+        return item.body.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
 def _cached_feed(feed: str) -> tuple[str, str] | None:
+    text = _cached_body(_feed_url(feed))
+    if text is None:
+        return None
     cache = HttpCache(_data_dir() / "http_cache.sqlite")
     key = cache.key("GET", _feed_url(feed), None, b"", "anonymous")
     item = cache.get(key)
     if item is None:
         return None
-    try:
-        text = item.body.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
     state = "hit" if cache.fresh(item) else "stale"
     return text, state
+
+
+def _cached_page(url: str) -> str | None:
+    return _cached_body(url)
 
 
 def _ids(pattern: re.Pattern[str], text: str) -> list[str]:
@@ -925,6 +955,15 @@ def _db():
             cves TEXT NOT NULL,
             attack_ids TEXT NOT NULL,
             fetched_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feed_poll (
+            feed TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            PRIMARY KEY (feed, item_id)
         )
         """
     )

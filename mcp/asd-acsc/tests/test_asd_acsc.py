@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import time
 from pathlib import Path
@@ -328,6 +329,85 @@ def test_bad_pubdate_falls_back(monkeypatch):
     assert "pubDate" in listed["warnings"][0]
     assert any(row["link"] == ITEM for row in listed["data"])
     assert source._published("not-a-date") == ""
+
+
+def _rss(items: list[tuple[str, str]]) -> bytes:
+    body = "".join(
+        "<item>"
+        f"<title>{title}</title>"
+        f"<link>{link}</link>"
+        "<pubDate>Thu, 15 Oct 2026 09:00:00 +1100</pubDate>"
+        f"<description>{title}</description>"
+        "</item>"
+        for title, link in items
+    )
+    return f'<?xml version="1.0"?><rss version="2.0"><channel>{body}</channel></rss>'.encode()
+
+
+def test_offline_page_uses_cache_and_saved_body(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    cached_url = "https://www.cyber.gov.au/cached-only-page"
+    html = b"<html><body><h1>Cached page</h1><p>CVE-2024-3400</p></body></html>"
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    key = cache.key("GET", cached_url, None, b"", "anonymous")
+    cache.put(key, status=200, headers={}, body=html, ttl=7 * 86400)
+    cached = asd_get_item(cached_url)
+    assert "Cached page" in cached["data"]["body"]
+    assert cached["warnings"]
+
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    saved_url = "https://www.cyber.gov.au/saved-only-page"
+    saved_html = b"<html><body><h1>Saved page</h1><p>CVE-2024-3400</p></body></html>"
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=saved_html)
+    )
+    assert "Saved page" in asd_get_item(saved_url)["data"]["body"]
+    for name in ("http_cache.sqlite", "http_cache.sqlite-wal", "http_cache.sqlite-shm"):
+        path = tmp_path / name
+        if path.exists():
+            path.unlink()
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    source._TRANSPORT = None
+    saved = asd_get_item(saved_url)
+    assert saved["data"] is not None
+    assert "Saved page" in saved["data"]["body"]
+
+
+def test_offline_list_is_latest_poll_and_marks_status(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    old = "https://www.cyber.gov.au/old-alert"
+    current = "https://www.cyber.gov.au/current-alert"
+    polls = iter(
+        [
+            _rss([("Old alert", old), ("Current alert", current)]),
+            _rss([("Current alert", current)]),
+        ]
+    )
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=next(polls))
+    )
+    asd_list_items(feeds=["alerts"])
+    data = Path(os.environ["CYBERAU_DATA_DIR"])
+    for name in ("http_cache.sqlite", "http_cache.sqlite-wal", "http_cache.sqlite-shm"):
+        path = data / name
+        if path.exists():
+            path.unlink()
+    asd_list_items(feeds=["alerts"])
+    status = asd_feed_status(feeds=["alerts"])["data"][0]
+    assert status["method"] == "direct"
+    assert status["stale"] is False
+    assert status["item_count"] == 1
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    source._TRANSPORT = None
+    listed = asd_list_items(feeds=["alerts"])
+    assert [row["link"] for row in listed["data"]] == [current]
+    offline = asd_feed_status(feeds=["alerts"])["data"][0]
+    assert offline["method"] == "stale"
+    assert offline["stale"] is True
+    assert offline["warning"]
+    assert asd_search("Old alert")["data"][0]["link"] == old
 
 
 def test_cassettes_replay():
