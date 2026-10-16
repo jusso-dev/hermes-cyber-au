@@ -1,30 +1,49 @@
 # Connector inventory
 
-Checked on 16 October 2026. This list was compiled and verified independently for this plan. Each connector ticket carries endpoints, auth, limits, terms and what was verified.
+Checked on 16 October 2026. The first 21 sources were compiled and verified for this plan. The rest were added from a second, independent inventory checked on the same date, for sources the first list did not cover. Sources with non-commercial terms (Cloudflare Radar, VirusTotal, abuse.ch) ship off by default and users bring their own key. Each connector ticket carries endpoints, auth, limits, terms and what was verified.
 
-| Connector | Server | Group | Auth | Milestone | Docs |
-|---|---|---|---|---|---|
-| ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | v0.1 MVP | https://www.cyber.gov.au/ |
-| Information Security Manual (ISM) OSCAL catalogue | `ism` | Australian government | `GITHUB_TOKEN` (optional) | v0.1 MVP | https://github.com/AustralianCyberSecurityCentre/ism-oscal |
-| Essential Eight and ASD Essentials | `e8` | Australian government | none | v0.1 MVP | https://www.cyber.gov.au/publication/what-is-the-essentials |
-| CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | v0.1 MVP | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |
-| FIRST EPSS | `epss` | Vulnerability intelligence | none | v0.1 MVP | https://api.first.org/epss/ |
-| NIST National Vulnerability Database | `nvd` | Vulnerability intelligence | `NVD_API_KEY` (optional) | v0.1 MVP | https://nvd.nist.gov/developers/vulnerabilities |
-| OSV.dev open source vulnerabilities | `osv` | Vulnerability intelligence | none | v0.2 | https://google.github.io/osv.dev/api/ |
-| Cloudflare Radar via Cloudflare's unified MCP server | `cloudflare_radar` | Internet and attack telemetry | `CLOUDFLARE_RADAR_API_TOKEN` (optional) | v0.1 MVP | https://developers.cloudflare.com/radar/ |
-| AusCERT public security bulletins | `auscert` | Australian community | none | v0.1 MVP | https://www.auscert.org.au/ |
-| abuse.ch (URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker) | `abusech` | Global threat intelligence | `ABUSECH_AUTH_KEY` | v0.1 MVP | https://abuse.ch/ |
-| AlienVault OTX | `otx` | Global threat intelligence | `OTX_API_KEY` | v0.2 | https://otx.alienvault.com/api |
-| GreyNoise Community | `greynoise` | Global threat intelligence | `GREYNOISE_API_KEY` (optional) | v0.2 | https://docs.greynoise.io/ |
-| Shodan InternetDB | `internetdb` | Global threat intelligence | none | v0.2 | https://internetdb.shodan.io/ |
-| MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | v0.1 MVP | https://github.com/mitre-attack/attack-stix-data |
-| SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | v0.2 | https://github.com/SigmaHQ/sigma |
-| crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | v0.2 | https://crt.sh/ |
-| Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | v0.2 | https://www.oaic.gov.au/privacy/notifiable-data-breaches |
-| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | v0.2 | https://github.com/jusso-dev/junction |
-| Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | v1.0 | https://github.com/jusso-dev/Brolga |
-| ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | v1.0 | https://github.com/jusso-dev/ThreatSieve |
-| M365-Secure assessment reports | `(none)` | Author's public tools | none | v0.2 | https://github.com/jusso-dev/M365-Secure |
+| Connector | Server | Group | Auth | Default | Milestone | Status | Docs |
+|---|---|---|---|---|---|---|---|
+| ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | on | v0.1 MVP | planned | https://www.cyber.gov.au/ |
+| Information Security Manual (ISM) OSCAL catalogue | `ism` | Australian government | `GITHUB_TOKEN` (optional) | on | v0.1 MVP | planned | https://github.com/AustralianCyberSecurityCentre/ism-oscal |
+| Essential Eight and ASD Essentials | `e8` | Australian government | none | on | v0.1 MVP | planned | https://www.cyber.gov.au/publication/what-is-the-essentials |
+| CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | on | v0.1 MVP | planned | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |
+| FIRST EPSS | `epss` | Vulnerability intelligence | none | on | v0.1 MVP | planned | https://api.first.org/epss/ |
+| NIST National Vulnerability Database | `nvd` | Vulnerability intelligence | `NVD_API_KEY` (optional) | on | v0.1 MVP | planned | https://nvd.nist.gov/developers/vulnerabilities |
+| OSV.dev open source vulnerabilities | `osv` | Vulnerability intelligence | none | on | v0.2 | planned | https://google.github.io/osv.dev/api/ |
+| Cloudflare Radar via Cloudflare's unified MCP server | `cloudflare_radar` | Internet and attack telemetry | `CLOUDFLARE_RADAR_API_TOKEN` (optional) | off: non-commercial terms, bring your own key | v0.1 MVP | planned | https://developers.cloudflare.com/radar/ |
+| AusCERT public security bulletins | `auscert` | Australian community | none | on | v0.1 MVP | planned | https://www.auscert.org.au/ |
+| abuse.ch (URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker) | `abusech` | Global threat intelligence | `ABUSECH_AUTH_KEY` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | https://abuse.ch/ |
+| AlienVault OTX | `otx` | Global threat intelligence | `OTX_API_KEY` | on | v0.2 | planned | https://otx.alienvault.com/api |
+| GreyNoise Community | `greynoise` | Global threat intelligence | `GREYNOISE_API_KEY` (optional) | on | v0.2 | planned | https://docs.greynoise.io/ |
+| Shodan InternetDB | `internetdb` | Global threat intelligence | none | on | v0.2 | planned | https://internetdb.shodan.io/ |
+| MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | on | v0.1 MVP | planned | https://github.com/mitre-attack/attack-stix-data |
+| SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | https://github.com/SigmaHQ/sigma |
+| crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | https://crt.sh/ |
+| Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | on | v0.2 | planned | https://www.oaic.gov.au/privacy/notifiable-data-breaches |
+| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | on | v0.2 | planned | https://github.com/jusso-dev/junction |
+| Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | on | v1.0 | planned | https://github.com/jusso-dev/Brolga |
+| ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | on | v1.0 | planned | https://github.com/jusso-dev/ThreatSieve |
+| M365-Secure assessment reports | `(none)` | Author's public tools | none | on | v0.2 | planned | https://github.com/jusso-dev/M365-Secure |
+| VirusTotal via the official VirusTotal MCP server | `virustotal` | Global threat intelligence | `VIRUSTOTAL_API_KEY` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | https://docs.virustotal.com/reference/overview |
+| Have I Been Pwned via the official HIBP MCP server | `hibp` | Global threat intelligence | `HIBP_API_KEY` (optional) | on | v0.1 MVP | planned | https://haveibeenpwned.com/API/v3 |
+| GitHub Advisory Database via the GitHub MCP server | `ghsa` | Vulnerability intelligence | `GITHUB_ADVISORY_TOKEN` (optional) | on | v0.1 MVP | planned | https://github.com/advisories |
+| Generic TAXII 2.1 reader for ASD CTIS and other TAXII sources | `taxii` | Australian government | `TAXII_API_ROOT`, `TAXII_COLLECTION_ID`, `TAXII_USERNAME`, `TAXII_PASSWORD` | off: bring your own access | v0.2 | planned | https://www.cyber.gov.au/become-a-partner |
+| NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | Regional government | none | on | v0.2 | planned | https://www.ncsc.govt.nz/alerts/ |
+| Cloudflare URL Scanner (unlisted scans, approval-gated) | `cfscan` | Internet and attack telemetry | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: bring your own access | v0.2 | planned | https://developers.cloudflare.com/radar/investigate/url-scanner/ |
+| CVE Program records (CVE Services API and cvelistV5) | `cve` | Vulnerability intelligence | none | on | v0.2 | planned | https://www.cve.org/ |
+| AbuseIPDB IP reputation | `abuseipdb` | Global threat intelligence | `ABUSEIPDB_API_KEY` | on | v0.2 | planned | https://docs.abuseipdb.com/ |
+| Spamhaus DROP, DROPv6 and ASN-DROP | `drop` | Global threat intelligence | none | on | v0.2 | planned | https://www.spamhaus.org/blocklists/do-not-route-or-peer/ |
+| IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | https://www.cyber.gov.au/irap |
+| Protective Security Policy Framework (PSPF) | `pspf` | Australian government | none | on | v1.0 | planned | https://www.protectivesecurity.gov.au/ |
+| Scamwatch alerts | `scamwatch` | Australian government | none | on | v1.0 | planned | https://www.scamwatch.gov.au/ |
+| data.gov.au (CKAN) | `datagov` | Australian government | none | on | v1.0 | planned | https://data.gov.au/ |
+| AusCERT member URL feed (AusMISP goes through the MISP connector) | `auscertm` | Australian community | `AUSCERT_URL_FEED`, `AUSCERT_FEED_TOKEN` (optional) | off: bring your own access | v1.0 | planned | https://auscert.org.au/services/threat-intelligence/ |
+| ASD Blueprint for Secure Cloud | `blueprint` | Australian government | none | on | v1.0 | planned | https://blueprint.asd.gov.au/ |
+| PhishTank verified phishing URLs | `phish` | Global threat intelligence | `PHISHTANK_APP_KEY` (optional) | on | v1.0 | planned | https://phishtank.org/developer_info.php |
+| OpenPhish community feed | `phish` | Global threat intelligence | none | on | v1.0 | planned | https://openphish.com/ |
+| MISP via the official MISP MCP server, for your own instance or AusMISP | `misp` | CTI platforms | `MISP_URL`, `MISP_API_KEY` | off: bring your own access | v1.0 | planned | https://www.misp-project.org/ |
+| OpenCTI (your own instance) | `opencti` | CTI platforms | `OPENCTI_URL`, `OPENCTI_TOKEN` | off: bring your own access | v1.0 | planned | https://docs.opencti.io/ |
 
 ## Details
 
@@ -174,3 +193,136 @@ Checked on 16 October 2026. This list was compiled and verified independently fo
 - Rate limits: Not applicable.
 - Terms: M365-Secure's own licence.
 - Verified: jusso-dev/M365-Secure is public; README documents HTML, CSV and JSON reports.
+
+### VirusTotal via the official VirusTotal MCP server
+- Endpoints: `MCP` https://github.com/VirusTotal/virustotal-mcp; `GET` https://www.virustotal.com/api/v3/files/{hash} , /urls/{id} , /domains/{domain} , /ip_addresses/{ip}
+- Auth: `x-apikey` header with the user's own VirusTotal key.
+- Rate limits: Public API: 4 requests a minute and 500 a day. Premium keys have their own quota.
+- Terms: The VirusTotal Public API must not be used in commercial products or services, or in business workflows that do not contribute new files. Premium API is paid. Show this in the skill text and docs.
+- Verified: `/api/v3/ip_addresses/8.8.8.8` returned 401 without a key from the build box on 16 October 2026. Repository `VirusTotal/virustotal-mcp` is public. Listed by a second inventory on 16 October 2026, which also read the Public API limits and terms.
+
+### Have I Been Pwned via the official HIBP MCP server
+- Endpoints: `MCP` https://haveibeenpwned.com/mcp; `GET` https://haveibeenpwned.com/api/v3/breaches; `GET` https://api.pwnedpasswords.com/range/{first 5 SHA-1 hex}; `GET` https://haveibeenpwned.com/api/v3/breachedaccount/{account}
+- Auth: None for breach metadata and Pwned Passwords. Email and domain searches, pastes and stealer logs need a paid key or OAuth to an HIBP account with the right subscription.
+- Rate limits: Depends on the key. A 429 carries `retry-after`; honour it.
+- Terms: Breach data is CC BY 4.0 with attribution to Have I Been Pwned. No licence or attribution requirement on Pwned Passwords. Do not misrepresent the data source.
+- Verified: `/api/v3/breaches` returned 200 and `https://haveibeenpwned.com/mcp` returned 406 to a plain GET (exists) from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026.
+
+### GitHub Advisory Database via the GitHub MCP server
+- Endpoints: `MCP` https://github.com/github/github-mcp-server; `GET` https://api.github.com/advisories
+- Auth: Works unauthenticated at low volume. A fine-grained token with no repository access raises limits.
+- Rate limits: GitHub REST limits: 60 requests an hour unauthenticated, 5,000 with a token.
+- Terms: Advisory data is CC BY 4.0. Attribute the GitHub Advisory Database.
+- Verified: `/advisories?per_page=1` returned 200 unauthenticated from the build box on 16 October 2026. `github/github-mcp-server` is public. Listed by a second inventory on 16 October 2026, which read the toolset names in the server README.
+
+### Generic TAXII 2.1 reader for ASD CTIS and other TAXII sources
+- Endpoints: `GET` <api root>/collections/; `GET` <api root>/collections/{id}/objects/?added_after=...
+- Auth: HTTP Basic credentials issued to an ASD Network Partner during CTIS onboarding (membership-gated, under a confidentiality deed).
+- Rate limits: Not published. Microsoft's onboarding guide for Sentinel suggests polling hourly for indicators at most a month old; use that as the ceiling.
+- Terms: CTIS content is covered by the Network Partner deed. It must never appear in this public repository, fixtures, logs that are shared, or exports without a TLP check.
+- Verified: cyber.gov.au partner pages could not be fetched by either inventory (site blocks automated clients); content seen through a search index and Microsoft's public `MSFT-AU-Security/SentinelCTIS` guide.
+
+### NCSC NZ alerts (formerly CERT NZ)
+- Endpoints: `GET` https://www.ncsc.govt.nz/alerts/?start=N
+- Auth: None.
+- Rate limits: One list page per hour, item pages at most 1 every 5 seconds.
+- Terms: Licence not confirmed. Return title, date, link and extracted CVEs; quote short passages only.
+- Verified: `/alerts/` returned 200 from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026, which found no RSS (several guessed feed paths returned 404).
+
+### Cloudflare URL Scanner (unlisted scans, approval-gated)
+- Endpoints: `POST` https://api.cloudflare.com/client/v4/accounts/{account_id}/urlscanner/v2/scan; `GET` https://api.cloudflare.com/client/v4/accounts/{account_id}/urlscanner/v2/result/{scan_id}
+- Auth: Cloudflare API token with Account > URL Scanner > Edit.
+- Rate limits: Cloudflare client API limits apply. Bulk submit up to 100 URLs; this connector submits one at a time.
+- Terms: Scans default to Public on Cloudflare's side and appear in the recent scans list, so an internal URL could be published. This connector always sends Unlisted.
+- Verified: Listed by a second inventory on 16 October 2026: docs, token permission, retention and visibility default read from Cloudflare's URL Scanner documentation.
+
+### CVE Program records (CVE Services API and cvelistV5)
+- Endpoints: `GET` https://cveawg.mitre.org/api/cve/{CVE-ID}; `GIT` https://github.com/CVEProject/cvelistV5
+- Auth: None for reading.
+- Rate limits: Not published. Self-imposed 1 request a second; bulk work uses the Git repository.
+- Terms: Reproduction is allowed if copies keep MITRE's copyright designation and the licence. Keep the notice in `mcp/cve/SOURCE.md` and envelopes.
+- Verified: `/api/cve/CVE-2021-44228` returned 200 from the build box on 16 October 2026. `CVEProject/cvelistV5` is public. Listed by a second inventory on 16 October 2026.
+
+### AbuseIPDB IP reputation
+- Endpoints: `GET` https://api.abuseipdb.com/api/v2/check; `GET` https://api.abuseipdb.com/api/v2/check-block
+- Auth: `Key` header with a free or paid AbuseIPDB key.
+- Rate limits: Free Individual plan: 1,000 checks a day and 100 block checks a day.
+- Terms: Terms not confirmed by either inventory. Check before release.
+- Verified: `/api/v2/check` returned 401 without a key from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026.
+
+### Spamhaus DROP, DROPv6 and ASN-DROP
+- Endpoints: `GET` https://www.spamhaus.org/drop/drop_v4.json; `GET` https://www.spamhaus.org/drop/drop_v6.json; `GET` https://www.spamhaus.org/drop/asndrop.json
+- Auth: None.
+- Rate limits: Update once a day and never auto-fetch more than once an hour.
+- Terms: Provided free of charge; formal licence text not confirmed. Attribute Spamhaus.
+- Verified: `drop_v4.json` returned 200 from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026.
+
+### IRAP guidance
+- Endpoints: `GET` https://www.cyber.gov.au/irap; `GET` https://www.cyber.gov.au/business-government/protecting-devices-systems/assessment-evaluation-programs/irap/irap-consumer-guide
+- Auth: None.
+- Rate limits: Fetched only by the regeneration workflow, weekly, 1 request every 5 seconds.
+- Terms: Government content. Quote short passages with attribution.
+- Verified: Neither inventory could fetch cyber.gov.au directly on 16 October 2026; pages were seen through a search index and an earlier snapshot.
+
+### Protective Security Policy Framework (PSPF)
+- Endpoints: `GET` https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026; `GET` https://www.protectivesecurity.gov.au/
+- Auth: None.
+- Rate limits: Regeneration workflow only, weekly.
+- Terms: Licence not confirmed. Quote short passages with attribution.
+- Verified: Could not fetch on 16 October 2026 (dropped connection, HTTP 500 to a fetch service); paths from an earlier snapshot.
+
+### Scamwatch alerts
+- Endpoints: `GET` https://www.scamwatch.gov.au/
+- Auth: None.
+- Rate limits: One request per 6 hours.
+- Terms: Licence not confirmed.
+- Verified: Listed by a second inventory on 16 October 2026: a fetch service returned the page, curl got 403.
+
+### data.gov.au (CKAN)
+- Endpoints: `GET` https://data.gov.au/data/api/3/action/package_search; `GET` https://data.gov.au/data/api/3/action/package_show
+- Auth: None.
+- Rate limits: One request a second.
+- Terms: Per dataset, in each record's `license_id`. Datasets with no licence are flagged.
+- Verified: `status_show` returned 200 from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026.
+
+### AusCERT member URL feed (AusMISP goes through the MISP connector)
+- Endpoints: `GET` (member URL feed, format to confirm with a member); `MISP` AusMISP
+- Auth: Paid AusCERT membership.
+- Rate limits: Per member terms; default hourly.
+- Terms: Member terms. Member data never enters this repository or fixtures.
+- Verified: Listed by a second inventory on 16 October 2026: membership and service pages read; feed format not public.
+
+### ASD Blueprint for Secure Cloud
+- Endpoints: `GET` https://blueprint.asd.gov.au/<page>
+- Auth: None.
+- Rate limits: Regeneration workflow only, weekly, 1 request every 5 seconds.
+- Terms: Licence not confirmed.
+- Verified: Homepage returned 200 from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026.
+
+### PhishTank verified phishing URLs
+- Endpoints: `GET` https://data.phishtank.com/data/<app key>/online-valid.json
+- Auth: Free application key for automated downloads; a descriptive `User-Agent` is required.
+- Rate limits: Hourly at most.
+- Terms: Licence not confirmed.
+- Verified: Developer page returned 200 from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026.
+
+### OpenPhish community feed
+- Endpoints: `GET` https://openphish.com/feed.txt
+- Auth: None.
+- Rate limits: Hourly at most.
+- Terms: Licence not confirmed. The community feed is a small sample.
+- Verified: `feed.txt` returned a 302 from the build box on 16 October 2026. Listed by a second inventory on 16 October 2026, which read 200 with a short feed.
+
+### MISP via the official MISP MCP server, for your own instance or AusMISP
+- Endpoints: `MCP` https://github.com/MISP/misp-mcp; `REST` <your MISP instance>
+- Auth: The instance's API key, ideally a read-only key.
+- Rate limits: Per instance.
+- Terms: MISP software is AGPL-3.0; feed terms vary per feed. Respect TLP and sharing groups.
+- Verified: `MISP/misp-mcp` is public. Listed by a second inventory on 16 October 2026.
+
+### OpenCTI (your own instance)
+- Endpoints: `GRAPHQL` <your OpenCTI instance>/graphql; `MCP` https://github.com/FiligranHQ/xtm-mcp
+- Auth: The instance's API token.
+- Rate limits: Per instance.
+- Terms: Community Edition Apache-2.0; Enterprise Edition has its own licence.
+- Verified: `FiligranHQ/xtm-mcp` is public. Listed by a second inventory on 16 October 2026.

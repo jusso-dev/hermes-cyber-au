@@ -14,9 +14,9 @@ Status: planned. This repository holds the plan as issues. No code has shipped y
 It is a profile distribution (`distribution.yaml` at the repo root), installed with `hermes profile install github.com/jusso-dev/hermes-cyber-au --alias` and updated with `hermes profile update`. It ships a native plugin (`plugins/cyber-au`), stdio MCP connectors (`mcp/`), skills, paused cron jobs and scripts. Verified structure notes: `docs/research/hermes-structure.md`, checked against NousResearch/hermes-agent `43faacf` (v0.22.2).
 
 ## Milestones
-- **v0.1 MVP**: install and doctor, shared connector library, ASD, ISM, Essential Eight and Essentials, KEV, EPSS, NVD, abuse.ch, ATT&CK connectors, the eleven skills at first quality, intel store with STIX export, daily briefing, core security controls, CI and data workflows.
-- **v0.2**: Cloudflare Radar, AusCERT, OTX, GreyNoise, InternetDB, OSV, Sigma, crt.sh, AU obligations data, Junction and M365-Secure integrations, watchlists, retention, update path, supply chain, weekly releases.
-- **v1.0**: optional Brolga and ThreatSieve bridges, DuckDB and MISP exports, Windows installer, hardened evals across model providers.
+- **v0.1 MVP**: install and doctor, shared connector library, the first five connectors (ASD's ACSC feeds; ISM and Essential Eight from ISM OSCAL, plus ASD Essentials; KEV with EPSS and NVD; AusCERT bulletins; abuse.ch), ATT&CK, and the zero-build wraps of Cloudflare's unified MCP for Radar, the HIBP MCP, GitHub security advisories and the VirusTotal MCP (Radar, VirusTotal and abuse.ch off by default under their non-commercial terms), the eleven skills at first quality, intel store with STIX export, daily briefing, core security controls, CI and data workflows.
+- **v0.2**: OTX, GreyNoise, InternetDB, OSV, Sigma, crt.sh, CVE Program records, AbuseIPDB, Spamhaus DROP, NCSC NZ, a TAXII 2.1 reader for ASD CTIS, Cloudflare URL Scanner (approval-gated), AU obligations data, Junction and M365-Secure integrations, watchlists, retention, update path, supply chain, weekly releases.
+- **v1.0**: optional Brolga and ThreatSieve bridges, MISP and OpenCTI for teams with their own instance, AusCERT member feeds, IRAP, PSPF, Blueprint, Scamwatch, data.gov.au, PhishTank and OpenPhish, DuckDB and MISP exports, Windows installer, hardened evals across model providers.
 
 ## Epics
 - [ ] {{ref:epic-install}} Epic: Install and bootstrap

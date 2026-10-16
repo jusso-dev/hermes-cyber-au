@@ -223,7 +223,7 @@ Placeholders resolve from the profile `.env` ({hsrc('website/docs/reference/mcp-
         f"docs/connectors/{c['key']}.md (generated)",
     ]
     files_md = "\n".join(code_item(f) for f in files)
-    hosts = ", ".join(f"`{h}`" for h in c["hosts"]) or "none"
+    hosts = ", ".join(h if h.startswith("(") else f"`{h}`" for h in c["hosts"]) or "none"
     if c.get("wrap"):
         outcome = f"A pinned, read-only `{server}` entry that wraps an existing MCP server for {c['name']}, filtered to the tools listed below, with a skill that tells the agent how to use it, recorded-fixture tests and a live health probe."
     else:
@@ -318,3 +318,8 @@ Any write call to the upstream service (submissions, uploads, sample downloads).
 
 def tickets():
     return shared() + [connector_ticket(c) for c in CONNECTORS]
+
+
+def added_tickets():
+    from inventory_added import ADDED
+    return [connector_ticket(c) for c in ADDED]

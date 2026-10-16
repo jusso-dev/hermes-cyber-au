@@ -397,7 +397,7 @@ Field names from """ + hsrc('website/docs/reference/mcp-config-reference.md') + 
     ),
     dict(
         key="crtsh", server="crtsh", name="crt.sh certificate transparency",
-        group="Global threat intelligence", milestone=M_V02, priority="p3",
+        group="Global threat intelligence", milestone=M_V02, priority="p2",
         docs="https://crt.sh/",
         endpoints=[("GET", "https://crt.sh/?q=<domain>&output=json", "Certificates logged for a domain (use `%.` prefix for subdomains)")],
         auth="None.", env=[],

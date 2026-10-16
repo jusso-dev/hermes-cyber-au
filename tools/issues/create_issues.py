@@ -195,11 +195,27 @@ def main():
         print("dry run: no writes")
         return
 
-    # Resolve {{ref:key}} to #N.
+    # Sync: resolve {{ref:key}} to #N and bring body, labels and milestone in line with the ticket
+    # file. Only issues that differ are patched, so re-running is cheap and never duplicates.
+    current = {i["number"]: i for i in json.loads(gh(
+        "issue", "list", "-R", repo, "--state", "all", "--limit", "1000",
+        "--json", "number,body,labels,milestone"))}
     for t in tickets:
-        if REF.search(t["body"]):
-            body = REF.sub(lambda m: f"#{st[m.group(1)]['number']}", t["body"])
-            gh("api", "-X", "PATCH", f"repos/{repo}/issues/{st[t['key']]['number']}", "-f", f"body={body}")
+        num = st[t["key"]]["number"]
+        body = REF.sub(lambda m: f"#{st[m.group(1)]['number']}", t["body"])
+        cur = current.get(num, {})
+        fields = []
+        if (cur.get("body") or "").strip() != body.strip():
+            fields += ["-f", f"body={body}"]
+        if sorted(l["name"] for l in cur.get("labels", [])) != sorted(t["labels"]):
+            fields += ["-f", "labels[]=" + t["labels"][0]] + sum((["-f", f"labels[]={l}"] for l in t["labels"][1:]), [])
+        want_ms = t["milestone"]
+        have_ms = (cur.get("milestone") or {}).get("title")
+        if want_ms != have_ms:
+            fields += ["-F", f"milestone={ms[want_ms]}"] if want_ms else ["-F", "milestone=null"]
+        if fields:
+            print(f"sync #{num} {t['key']}")
+            gh("api", "-X", "PATCH", f"repos/{repo}/issues/{num}", *fields)
             time.sleep(args.sleep)
 
     # Link sub-issues: POST /repos/{owner}/{repo}/issues/{parent_number}/sub_issues with the child's numeric id.

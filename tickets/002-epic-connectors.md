@@ -25,6 +25,9 @@ Linked as GitHub sub-issues. Checklist mirrors them by milestone.
 - [ ] {{ref:conn-auscert}} Connector: AusCERT public security bulletins (`auscert`) (p1)
 - [ ] {{ref:conn-abusech}} Connector: abuse.ch (URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker) (`abusech`) (p1)
 - [ ] {{ref:conn-mitre-attack}} Connector: MITRE ATT&CK (STIX 2.1) (`attack`) (p1)
+- [ ] {{ref:conn-virustotal}} Connector: VirusTotal via the official VirusTotal MCP server (`virustotal`) (p1)
+- [ ] {{ref:conn-hibp}} Connector: Have I Been Pwned via the official HIBP MCP server (`hibp`) (p1)
+- [ ] {{ref:conn-github-advisories}} Connector: GitHub Advisory Database via the GitHub MCP server (`ghsa`) (p1)
 
 ### v0.2
 - [ ] {{ref:conn-osv}} Connector: OSV.dev open source vulnerabilities (`osv`) (p2)
@@ -32,14 +35,30 @@ Linked as GitHub sub-issues. Checklist mirrors them by milestone.
 - [ ] {{ref:conn-greynoise}} Connector: GreyNoise Community (`greynoise`) (p2)
 - [ ] {{ref:conn-shodan-internetdb}} Connector: Shodan InternetDB (`internetdb`) (p2)
 - [ ] {{ref:conn-sigma}} Connector: SigmaHQ detection rules (`sigma`) (p1)
-- [ ] {{ref:conn-crtsh}} Connector: crt.sh certificate transparency (`crtsh`) (p3)
+- [ ] {{ref:conn-crtsh}} Connector: crt.sh certificate transparency (`crtsh`) (p2)
 - [ ] {{ref:conn-au-regulatory}} Connector: Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) (`aureg`) (p1)
 - [ ] {{ref:conn-junction}} Connector: Junction (Microsoft Graph, Defender, Sentinel) (`junction`) (p2)
 - [ ] {{ref:conn-m365-secure}} Integration: M365-Secure assessment reports (p2)
+- [ ] {{ref:conn-taxii-ctis}} Connector: Generic TAXII 2.1 reader for ASD CTIS and other TAXII sources (`taxii`) (p2)
+- [ ] {{ref:conn-ncsc-nz}} Connector: NCSC NZ alerts (formerly CERT NZ) (`ncscnz`) (p2)
+- [ ] {{ref:conn-cloudflare-urlscanner}} Connector: Cloudflare URL Scanner (unlisted scans, approval-gated) (`cfscan`) (p2)
+- [ ] {{ref:conn-cve-program}} Connector: CVE Program records (CVE Services API and cvelistV5) (`cve`) (p2)
+- [ ] {{ref:conn-abuseipdb}} Connector: AbuseIPDB IP reputation (`abuseipdb`) (p2)
+- [ ] {{ref:conn-spamhaus-drop}} Connector: Spamhaus DROP, DROPv6 and ASN-DROP (`drop`) (p2)
 
 ### v1.0
 - [ ] {{ref:conn-brolga}} Connector: Brolga threat intel context engine (`brolga`) (p3)
 - [ ] {{ref:conn-threatsieve}} Connector: ThreatSieve (`threatsieve`) (p3)
+- [ ] {{ref:conn-irap}} Connector: IRAP guidance (`irap`) (p3)
+- [ ] {{ref:conn-pspf}} Connector: Protective Security Policy Framework (PSPF) (`pspf`) (p3)
+- [ ] {{ref:conn-scamwatch}} Connector: Scamwatch alerts (`scamwatch`) (p3)
+- [ ] {{ref:conn-datagov-au}} Connector: data.gov.au (CKAN) (`datagov`) (p3)
+- [ ] {{ref:conn-auscert-member}} Connector: AusCERT member URL feed (AusMISP goes through the MISP connector) (`auscertm`) (p3)
+- [ ] {{ref:conn-asd-blueprint}} Connector: ASD Blueprint for Secure Cloud (`blueprint`) (p3)
+- [ ] {{ref:conn-phishtank}} Connector: PhishTank verified phishing URLs (`phish`) (p3)
+- [ ] {{ref:conn-openphish}} Connector: OpenPhish community feed (`phish`) (p3)
+- [ ] {{ref:conn-misp}} Connector: MISP via the official MISP MCP server, for your own instance or AusMISP (`misp`) (p3)
+- [ ] {{ref:conn-opencti}} Connector: OpenCTI (your own instance) (`opencti`) (p3)
 
 ## Definition of done
 - [ ] Every sub-issue closed or moved to a later milestone with a reason.

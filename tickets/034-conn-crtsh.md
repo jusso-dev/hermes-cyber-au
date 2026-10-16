@@ -1,7 +1,7 @@
 ---
 key: "conn-crtsh"
 title: "Connector: crt.sh certificate transparency (`crtsh`)"
-labels: ["type:feature", "area:connectors", "priority:p3"]
+labels: ["type:feature", "area:connectors", "priority:p2"]
 milestone: "v0.2"
 parent: "epic-connectors"
 ---
