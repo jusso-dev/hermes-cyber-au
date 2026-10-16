@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://services.nvd.nist.gov/rest/json/cvehistory/2.0?cveId=CVE-2024-3400
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"cveChanges":[{"change":{"cveId":"CVE-2024-3400","eventName":"Initial Analysis","created":"2024-04-12T00:00:00"}}]}'

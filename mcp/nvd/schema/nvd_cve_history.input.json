@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cve_id": {"type": "string", "pattern": "^CVE-\\d{4}-\\d{4,}$"}
+  },
+  "required": ["cve_id"]
+}
