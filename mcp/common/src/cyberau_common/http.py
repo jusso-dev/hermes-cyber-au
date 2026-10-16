@@ -75,7 +75,14 @@ class HttpClient:
         self._client.close()
 
     def get(
-        self, url: str, *, params=None, headers=None, ttl: int, stale_if_error: int = 86400
+        self,
+        url: str,
+        *,
+        params=None,
+        headers=None,
+        ttl: int,
+        stale_if_error: int = 86400,
+        skip_cache: bool = False,
     ) -> Response:
         return self._fetch(
             "GET",
@@ -85,6 +92,7 @@ class HttpClient:
             content=None,
             ttl=ttl,
             stale_if_error=stale_if_error,
+            skip_cache=skip_cache,
         )
 
     def post_json(
@@ -122,12 +130,13 @@ class HttpClient:
         ttl: int,
         stale_if_error: int,
         key_body: bytes | None = None,
+        skip_cache: bool = False,
     ) -> Response:
         self.policy.check(url)
         key_material = key_body if key_body is not None else (content or b"")
         cache_key = self.cache.key(method, url, params, key_material, self.auth_scope)
-        cached = self.cache.get(cache_key)
-        if self.offline or (cached and self.cache.fresh(cached)):
+        cached = None if skip_cache else self.cache.get(cache_key)
+        if not skip_cache and (self.offline or (cached and self.cache.fresh(cached))):
             if cached is None:
                 raise HttpError(redact(f"offline and no cache for {url}"))
             state = "hit" if self.cache.fresh(cached) else "stale"

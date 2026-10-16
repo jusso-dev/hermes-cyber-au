@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2024-3400
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"vulnerabilities":[{"cve":{"id":"CVE-2024-3400","descriptions":[{"lang":"en","value":"A command injection flaw in a trimmed fixture."}]}}]}'

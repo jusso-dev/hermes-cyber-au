@@ -11,12 +11,13 @@ _SECRET_HEADERS = {
     "x-otx-api-key",
     "x-api-key",
     "api-key",
+    "apikey",
 }
 
 _QUERY_RE = re.compile(r"(?i)([?&](?:api[_-]?key|token|auth|key|access_token)=)[^&\s]+")
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+\S+")
 _HEADER_RE = re.compile(
-    r"(?i)\b(authorization|auth-key|x-otx-api-key|x-api-key|api-key)\s*[:=]\s*\S+"
+    r"(?i)\b(authorization|auth-key|x-otx-api-key|x-api-key|api[_-]?key)\s*[:=]\s*\S+"
 )
 
 
