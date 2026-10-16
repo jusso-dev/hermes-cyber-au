@@ -39,8 +39,12 @@ class Connector:
     attribution: str
     tools: list[ToolSpec] = field(default_factory=list)
 
-    def health(self, *, live: bool) -> Probe:
-        return Probe(self.key, True, "offline ok" if not live else "live not checked")
+    def health(self, *, live: bool, check_schema: bool = False) -> Probe:
+        if check_schema:
+            return Probe(self.key, True, "no schema check for this connector")
+        if live:
+            return Probe(self.key, True, "live not checked")
+        return Probe(self.key, True, "offline ok")
 
 
 def register_connector(key: str, factory: Callable[[], Connector]) -> None:

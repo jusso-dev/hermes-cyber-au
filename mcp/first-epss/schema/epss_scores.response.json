@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["cve", "epss", "percentile", "date"],
+  "properties": {
+    "cve": {"type": "string"},
+    "epss": {"type": "number"},
+    "percentile": {"type": "number"},
+    "date": {"type": "string"},
+    "model": {"type": "string"}
+  }
+}

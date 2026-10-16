@@ -9,3 +9,10 @@ connectors:
     - www.cisa.gov
     allow_ip_literals: false
     allow_http_loopback: false
+  first-epss:
+    hosts:
+    - api.first.org
+    - www.first.org
+    - epss.empiricalsecurity.com
+    allow_ip_literals: false
+    allow_http_loopback: false

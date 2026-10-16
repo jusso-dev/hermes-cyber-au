@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.first.org/data/v1/epss?cve=CVE-2024-3400&scope=time-series
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"status":"OK","version":"v2026.10.15","data":[{"cve":"CVE-2024-3400","epss":"0.96000","percentile":"0.99800","date":"2026-10-15","time-series":[{"epss":"0.20000","percentile":"0.80000","date":"2026-09-16"}]}]}'
