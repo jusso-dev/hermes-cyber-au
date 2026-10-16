@@ -1,0 +1,6 @@
+# Model and provider stay unset. The person who installs this profile chooses them.
+timezone: Australia/Sydney
+security:
+  allow_private_urls: false
+  redact_secrets: true
+mcp_servers: {}

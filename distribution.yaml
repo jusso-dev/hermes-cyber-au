@@ -1,0 +1,34 @@
+name: cyber-au
+version: 0.1.0
+description: "Hermes Agent distribution for Australian cyber security teams: ASD guidance, AU and global threat intel, triage and reporting skills."
+hermes_requires: ">=0.22.2"
+author: "Justin Middler"
+license: "Apache-2.0"
+distribution_owned:
+  - distribution.yaml
+  - SOUL.md
+  - config.yaml
+  - .env.template
+  - skills
+  - cron/jobs.json
+  - scripts
+  - plugins/cyber-au
+  - mcp
+  - feeds
+  - playbooks
+env_requires:
+  - name: ABUSECH_AUTH_KEY
+    description: "abuse.ch Auth-Key (free at https://auth.abuse.ch/). Needed for URLhaus, ThreatFox, MalwareBazaar."
+    required: false
+  - name: NVD_API_KEY
+    description: "Optional NVD API key. Raises NVD limits from 5 to 50 requests per 30 seconds."
+    required: false
+  - name: OTX_API_KEY
+    description: "AlienVault OTX API key."
+    required: false
+  - name: CLOUDFLARE_RADAR_API_TOKEN
+    description: "Cloudflare custom token with Account > Radar > Read only."
+    required: false
+  - name: GREYNOISE_API_KEY
+    description: "Optional GreyNoise community key."
+    required: false
