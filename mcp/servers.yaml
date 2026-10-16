@@ -21,3 +21,14 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  epss:
+    connector: first-epss
+    args:
+    - serve
+    - first-epss
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
