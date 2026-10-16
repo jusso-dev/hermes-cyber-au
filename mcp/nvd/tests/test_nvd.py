@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 
+import cyberau_nvd.source as nvd_source
+import httpx
 from cyberau_common.cache import HttpCache
 from cyberau_common.secrets import redact, redact_headers
 from cyberau_common.server import build_server
@@ -102,3 +104,48 @@ def test_offline_prefers_cache_and_redacts_api_key(tmp_path, monkeypatch):
     secret = "super-secret-value"
     assert secret not in redact(f"apiKey: {secret}")
     assert redact_headers({"apiKey": secret})["apiKey"] == "[REDACTED]"
+
+
+def test_live_health_ignores_fresh_cache(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_NVD_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    params = {"cveId": "CVE-2024-3400"}
+    body = (FIXTURES / "cve_CVE-2024-3400.json").read_bytes()
+    key = cache.key("GET", CVE_API, params, b"", "anonymous")
+    cache.put(key, status=200, headers={}, body=body, ttl=86400)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, content=body)
+
+    nvd_source._TRANSPORT = httpx.MockTransport(handler)
+    try:
+        probe = connector().health(live=True)
+    finally:
+        nvd_source._TRANSPORT = None
+    assert calls["n"] == 1
+    assert probe.ok is True
+
+
+def test_v3_severity_is_not_hidden_by_v4(tmp_path, monkeypatch):
+    payload = json.loads((FIXTURES / "cve_CVE-2024-3400.json").read_text())
+    cve = payload["vulnerabilities"][0]["cve"]
+    cve["metrics"]["cvssMetricV31"] = [
+        {"cvssData": {"baseScore": 7.5, "baseSeverity": "HIGH"}}
+    ]
+    cve["metrics"]["cvssMetricV40"] = [
+        {"cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}
+    ]
+    path = tmp_path / "both.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_NVD_SNAPSHOT", str(path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    assert nvd_search(cvss_v3_severity="HIGH")["data"][0]["cve_id"] == "CVE-2024-3400"
+    assert nvd_search(cvss_v3_severity="LOW")["data"] == []
+
+
+def test_nvd_vcr_config_filters_api_key(vcr_config):
+    assert "apiKey" in vcr_config["filter_headers"]

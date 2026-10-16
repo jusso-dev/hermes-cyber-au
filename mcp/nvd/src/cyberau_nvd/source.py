@@ -24,6 +24,7 @@ ATTRIBUTION = (
 _PACKAGE = Path(__file__).resolve().parents[2]
 _CVE = re.compile(r"^CVE-\d{4}-\d{4,}$")
 _CveId = Annotated[str, Field(pattern=r"^CVE-\d{4}-\d{4,}$")]
+_TRANSPORT = None
 _Date = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
 _Limit = Annotated[int, Field(ge=1, le=200)]
 _Severity = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
@@ -214,9 +215,16 @@ def _fetch(
         burst=burst,
         window="rolling",
         timeout=60,
+        transport=_TRANSPORT,
     )
     try:
-        response = client.get(url, params=params, headers=headers, ttl=ttl)
+        response = client.get(
+            url,
+            params=params,
+            headers=headers,
+            ttl=ttl,
+            skip_cache=force_live,
+        )
     except Exception as exc:
         message = redact(str(exc))
         if secret:
@@ -243,7 +251,7 @@ def _matches(
     row = _cve(cve)
     if keyword and keyword.lower() not in row["description"].lower():
         return False
-    if severity and (row.get("cvss") or {}).get("severity") != severity:
+    if severity and _v3_severity(cve) != severity:
         return False
     if cpe_name and cpe_name not in json.dumps(cve.get("configurations") or []):
         return False
@@ -255,6 +263,15 @@ def _matches(
     if kev_only and not cve.get("cisaExploitAdd"):
         return False
     return True
+
+
+def _v3_severity(cve: dict) -> str | None:
+    entries = (cve.get("metrics") or {}).get("cvssMetricV31") or []
+    if not entries:
+        return None
+    data = entries[0].get("cvssData") or {}
+    severity = data.get("baseSeverity")
+    return str(severity) if severity else None
 
 
 def _validate_search(start: str | None, end: str | None, severity: str | None, limit: int) -> str:
