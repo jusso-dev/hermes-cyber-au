@@ -31,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
     new.add_argument("--server", required=True)
     new.add_argument("--hosts", required=True)
 
+    imported = sub.add_parser("import", help="Import a feed file downloaded in a browser")
+    imported.add_argument("name")
+    imported.add_argument("path")
+    imported.add_argument("--feed", default="alerts")
+
     for name in ("refresh", "regen", "parser-check", "store"):
         command = sub.add_parser(name)
         command.add_argument("rest", nargs=argparse.REMAINDER)
@@ -51,11 +56,30 @@ def main(argv: list[str] | None = None) -> int:
         probe = run_health(args.name, live=live, check_schema=bool(args.schema_drift))
         print(f"{probe.name} {'ok' if probe.ok else 'fail'} {probe.detail}")
         return 0 if probe.ok else 1
+    if args.command == "import":
+        return _import_feed(args.name, args.path, args.feed)
     print(
         f"{args.command} is not part of the shared library yet",
         file=sys.stderr,
     )
     return 2
+
+
+def _import_feed(name: str, path: str, feed: str) -> int:
+    if name != "asd":
+        print(f"import does not support {name}", file=sys.stderr)
+        return 2
+    try:
+        from cyberau_asd_acsc.source import import_feed
+    except ModuleNotFoundError:
+        print("asd connector is not installed", file=sys.stderr)
+        return 2
+    try:
+        print(import_feed(path, feed))
+    except (OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
 
 
 def _configure_logging() -> None:

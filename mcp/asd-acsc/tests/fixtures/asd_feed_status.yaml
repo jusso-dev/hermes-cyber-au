@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.cyber.gov.au/rss/alerts
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '<rss version="2.0"><channel><title>Synthetic ACSC alerts</title></channel></rss>'

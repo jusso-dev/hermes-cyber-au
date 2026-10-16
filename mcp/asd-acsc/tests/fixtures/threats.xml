@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Synthetic ACSC threats</title>
+    <link>https://www.cyber.gov.au/rss/threats</link>
+    <description>Synthetic fixture. Not an ASD publication.</description>
+    <item>
+      <title>Synthetic threat note</title>
+      <link>https://www.cyber.gov.au/about-threat</link>
+      <pubDate>Mon, 01 Jun 2026 09:00:00 +1000</pubDate>
+      <description>Synthetic threat text.</description>
+    </item>
+  </channel>
+</rss>

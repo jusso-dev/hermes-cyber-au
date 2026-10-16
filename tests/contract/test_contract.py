@@ -64,6 +64,10 @@ def _sample_value(prop: dict):
     pattern = str(prop.get("pattern") or "")
     if "CVE" in pattern:
         return "CVE-2024-3400"
+    if pattern.startswith("^") and not pattern.endswith("$"):
+        body = pattern[1:]
+        if re.fullmatch(r"(?:\\.|[A-Za-z0-9:/.])+", body):
+            return body.replace("\\.", ".") + "example"
     if prop.get("type") == "integer":
         return int(prop.get("minimum", 1))
     if prop.get("type") == "number":
