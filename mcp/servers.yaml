@@ -1,0 +1,10 @@
+servers:
+  stub:
+    connector: stub
+    args: ["serve", "stub"]
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 30
+    enabled_by_default: true
+    required_env: []

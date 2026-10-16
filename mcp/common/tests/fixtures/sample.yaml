@@ -1,0 +1,6 @@
+interactions:
+  - request:
+      headers:
+        Authorization: "[REDACTED]"
+        Auth-Key: "[REDACTED]"
+        X-OTX-API-KEY: "[REDACTED]"

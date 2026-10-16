@@ -1,0 +1,6 @@
+connectors:
+  stub:
+    hosts:
+      - example.com
+    allow_ip_literals: false
+    allow_http_loopback: false
