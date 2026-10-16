@@ -4,6 +4,10 @@
     {
       "cve": {
         "id": "CVE-2024-3400",
+        "published": "2024-04-12T00:00:00.000",
+        "configurations": [
+          {"nodes": [{"cpeMatch": [{"criteria": "cpe:2.3:a:palo_alto_networks:pan-os:*:*:*:*:*:*:*:*"}]}]}
+        ],
         "descriptions": [
           {"lang": "en", "value": "A command injection flaw in a trimmed fixture."}
         ],

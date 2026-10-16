@@ -10,5 +10,7 @@ def vcr_config():
             "x-otx-api-key",
             "x-api-key",
             "api-key",
+            "apiKey",
+            "apikey",
         ]
     }
