@@ -1,0 +1,26 @@
+{
+  "as_of": "2026-10-17",
+  "framework": "essential-eight",
+  "target_maturity": 1,
+  "strategies": ["multi_factor_authentication"],
+  "nist_requested": true,
+  "include_transition": false,
+  "import_requested": false,
+  "evidence": [
+    {
+      "ref": "E-1",
+      "text": "MFA is enabled for administrator accounts only. Ordinary accounts use a password.",
+      "strategy": "multi_factor_authentication",
+      "status": "partial"
+    }
+  ],
+  "e8": {"available": false},
+  "essentials_chapter": {"available": false},
+  "essentials_transition": {"available": false},
+  "ism": {"available": false},
+  "evidence_import": {"available": false},
+  "nist": {
+    "available": true,
+    "mappings": [{"id": "IA-2", "text": ""}]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "as_of": "2026-10-17",
+  "framework": "essential-eight",
+  "target_maturity": 2,
+  "strategies": ["restrict_office_macros"],
+  "nist_requested": false,
+  "include_transition": false,
+  "import_requested": false,
+  "evidence": [
+    {
+      "ref": "E-2",
+      "text": "Microsoft Office macros are blocked when the file comes from the internet. Macros from trusted locations are allowed.",
+      "strategy": "restrict_office_macros",
+      "status": "met"
+    }
+  ],
+  "e8": {"available": false},
+  "essentials_chapter": {"available": false},
+  "essentials_transition": {"available": false},
+  "ism": {"available": false},
+  "evidence_import": {"available": false}
+}

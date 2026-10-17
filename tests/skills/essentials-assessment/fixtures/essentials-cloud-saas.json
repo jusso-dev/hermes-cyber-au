@@ -1,0 +1,20 @@
+{
+  "as_of": "2026-10-17",
+  "framework": "essentials",
+  "chapter": "cloud",
+  "nist_requested": false,
+  "include_transition": false,
+  "import_requested": false,
+  "evidence": [
+    {
+      "ref": "E-4",
+      "text": "The organisation uses SaaS only. There is no enterprise IT estate and no OT estate.",
+      "chapter": "cloud"
+    }
+  ],
+  "e8": {"available": false},
+  "essentials_chapter": {"available": false},
+  "essentials_transition": {"available": false},
+  "ism": {"available": false},
+  "evidence_import": {"available": false}
+}
