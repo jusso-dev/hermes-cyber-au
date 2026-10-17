@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "retrieved_at", "cache", "data", "untrusted", "attribution", "warnings"],
+  "properties": {
+    "source": {"const": "crowdstrike-recon"},
+    "source_urls": {"type": "array", "items": {"type": "string"}},
+    "retrieved_at": {"type": "string"},
+    "data_as_of": {"type": ["string", "null"]},
+    "cache": {"enum": ["hit", "miss", "stale", "snapshot"]},
+    "attribution": {"type": "string", "minLength": 1},
+    "untrusted": {"const": true},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "topic", "priority", "filter"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "topic": {"type": "string"},
+          "priority": {"type": "string"},
+          "filter": {"type": "string"}
+        }
+      }
+    }
+  }
+}
