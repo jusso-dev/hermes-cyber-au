@@ -34,7 +34,8 @@ _SearchLimit = Annotated[int, Field(ge=1, le=50)]
 _Query = Annotated[str, Field(min_length=2)]
 _Url = Annotated[str, Field(pattern=r"^https://www\.cyber\.gov\.au/")]
 ATTRIBUTION = (
-    "Commonwealth of Australia material from ASD's ACSC (cyber.gov.au). "
+    "© Commonwealth of Australia 2026. Material from ASD's ACSC (cyber.gov.au), "
+    "Creative Commons Attribution 4.0 International. "
     "Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. "
     "This connector is not endorsed by ASD."
 )

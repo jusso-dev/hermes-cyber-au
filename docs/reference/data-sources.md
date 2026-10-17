@@ -83,7 +83,7 @@ CC BY 4.0 allows commercial use when the attribution is kept and the excluded ma
 
 The attribution string is:
 
-> Commonwealth of Australia material from ASD's ACSC (cyber.gov.au). Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. This connector is not endorsed by ASD.
+> © Commonwealth of Australia 2026. Material from ASD's ACSC (cyber.gov.au), Creative Commons Attribution 4.0 International. Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. This connector is not endorsed by ASD.
 
 Compliance: the attribution string is returned with each result. The offline test snapshot is synthetic. Live items, when a fetch succeeds, remain Commonwealth material under the copyright page.
 
@@ -96,11 +96,11 @@ Connector: [`mcp/asd-ism`](../../mcp/asd-ism/SOURCE.md).
 
 GitHub's licence API reported no licence file for `AustralianCyberSecurityCentre/ism-oscal` on that date. The README copyright notice says © Commonwealth of Australia 2024, and that material in that publication is under CC BY 4.0 except the Coat of Arms, the Australian Signals Directorate logo, and where otherwise stated.
 
-The cyber.gov.au copyright page, checked the same day, says website material is attributed as © Commonwealth of Australia 2026. Both notices are recorded. The distribution does not choose between them.
+The cyber.gov.au copyright page, checked the same day, says website material is attributed as © Commonwealth of Australia 2026. Both notices are recorded. The connector's attribution string carries the README notice, because the shipped data comes from that publication.
 
 The attribution string is:
 
-> Information Security Manual content is published by the Australian Signals Directorate. This connector is not endorsed by ASD.
+> © Commonwealth of Australia 2024. Information Security Manual content is published by the Australian Signals Directorate under Creative Commons Attribution 4.0 International. This connector is not endorsed by ASD.
 
 Commercial use of the CC BY 4.0 material is allowed with attribution. The Coat of Arms and the ASD logo are not included. Shipped catalogues are 20-control excerpts of releases `v2026.06.18` and `v2026.09.4`, not the full manual.
 
