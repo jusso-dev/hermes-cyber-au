@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from datetime import UTC, date, datetime, time
 from email.utils import formatdate
 from pathlib import Path
@@ -53,6 +54,11 @@ _NOT_CONFIGURED = (
     "DarkOwl is not configured. Set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY."
 )
 _UNAVAILABLE = "unavailable: offline and no cached DarkOwl result"
+_SNAPSHOT_WARNING = (
+    "Served from a local snapshot file, not a live DarkOwl result. "
+    "It is not stored and does not feed exposure findings."
+)
+_MISSING_KEYS = "not configured: set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY"
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _ALLOWLIST = _PACKAGE.parent / "egress-allowlist.yaml"
@@ -64,7 +70,18 @@ _DOMAIN = re.compile(
 _UNSAFE = re.compile(r"[&=\r\n?#]|[\x00-\x1f\x7f]")
 _TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,40}$")
 _REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
-_LINK = re.compile(r"(?i)\b(?:https?://|www\.)\S+|\b(?:[a-z0-9-]+\.)+onion\b(?:/\S*)?")
+_LINK = re.compile(
+    r"(?i)\b[a-z][a-z0-9+.-]{1,15}://\S+"
+    r"|\b(?:magnet|mailto|data|javascript):\S+"
+    r"|\bwww\.\S+"
+    r"|\b(?:[a-z0-9-]+\.)+onion\b(?:/\S*)?"
+)
+_INVISIBLE = re.compile(
+    "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5"
+    "\u180b-\u180f\u200b-\u200f\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]"
+)
+_FENCE = re.compile(r"<<|>>")
+_OWL_AUTH = re.compile(r"(?i)\bOWL\s+\S+")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _TRANSPORT = None
@@ -160,7 +177,7 @@ class _DarkOwlConnector(PremiumConnector):
             return Probe(self.key, result.ok, result.detail)
         logger.info("darkowl health")
         if not self.health_result(live=False).configured:
-            return Probe(self.key, True, "not configured")
+            return Probe(self.key, False, _MISSING_KEYS)
         payload, _state, warning = _fetch_test()
         if warning:
             return Probe(self.key, False, warning)
@@ -180,7 +197,11 @@ def _collect(
         payload, problem = _read_snapshot()
         if problem or payload is None:
             return [], "snapshot", [problem or "DarkOwl snapshot was not usable"]
-        return _records(terms, payload, None, watchlist), "snapshot", []
+        return (
+            _records(terms, payload, None, watchlist, store=False),
+            "snapshot",
+            [_SNAPSHOT_WARNING],
+        )
     if lookup("DARKOWL_PUBLIC_KEY") is None or lookup("DARKOWL_PRIVATE_KEY") is None:
         return [], "snapshot", [_NOT_CONFIGURED]
     records: list[dict] = []
@@ -217,11 +238,13 @@ def _records(
     payload: dict,
     oldest: dict | None,
     watchlist: Watchlist,
+    *,
+    store: bool = True,
 ) -> list[dict]:
     records = []
     for term in terms:
         public, finding = _normalise(term, payload, oldest, watchlist)
-        if finding is not None:
+        if finding is not None and store:
             _store(finding, watchlist)
             public["finding_id"] = finding.finding_id
             public["finding"] = finding
@@ -466,7 +489,7 @@ def _target(pairs: list[tuple[str, str]]) -> tuple[str, str]:
 
 
 def _query_text(term: str) -> str:
-    return '"' + term.replace('"', " ").strip() + '"'
+    return '"' + term.replace('"', " ").replace("\\", " ").strip() + '"'
 
 
 def _from_zulu(since: str) -> str:
@@ -567,7 +590,9 @@ def _tokens(values) -> list[str]:
 def _hostile(value) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    cleaned = redact_text(_LINK.sub("[link removed]", value))
+    flat = _INVISIBLE.sub("", unicodedata.normalize("NFKC", value))
+    cleaned = redact_text(_LINK.sub("[link removed]", flat))
+    cleaned = _FENCE.sub(" ", cleaned)
     return untrusted_text(cleaned, "darkowl", max_len=_SNIPPET_MAX)
 
 
@@ -603,6 +628,7 @@ def _safe(text: str) -> str:
 
 
 def _redact_keys(text: str) -> str:
+    text = _OWL_AUTH.sub("OWL [REDACTED]", text)
     for name in ("DARKOWL_PUBLIC_KEY", "DARKOWL_PRIVATE_KEY"):
         value = lookup(name)
         if value:

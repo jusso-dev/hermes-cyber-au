@@ -30,6 +30,8 @@ Nothing in this connector is shared outside the profile, and nothing is exported
 
 Search text is hostile. Snippets and titles are wrapped as untrusted text and capped. They are not written to the intel store. Links in that text are removed. URLs found in a result are never requested.
 
+When `CYBERAU_DARKOWL_SNAPSHOT` points at a local file, the answer comes from that file, carries `cache: snapshot` and a warning, and is neither stored nor turned into exposure findings. A live health check fails when either key is missing.
+
 ## Licence
 
 Names only. Put the values in the profile `.env`. Do not commit them.
