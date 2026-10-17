@@ -262,3 +262,34 @@ def test_cassettes_replay():
             played = httpx.get(uri)
         assert played.status_code == 200
         assert "hours" in played.text
+
+
+def test_snapshot_answers_warn_they_are_not_live():
+    listed = aureg_obligation("soci", "critical_incident")
+    assert any("shipped snapshot, not a live fetch" in note for note in listed["warnings"])
+    due = aureg_deadline("soci", "critical_incident", "2026-10-16T10:00:00+11:00")
+    assert any("shipped snapshot, not a live fetch" in note for note in due["warnings"])
+
+
+def test_hour_deadlines_are_elapsed_hours_across_sydney_daylight_saving():
+    # DST starts 2026-10-04 (clocks forward): 72 elapsed hours is 13:00 local.
+    start = aureg_deadline("soci", "other_incident", "2026-10-03T12:00:00+10:00")
+    assert _due(start["data"][0], "notification")["due_at"] == "2026-10-06T13:00:00+11:00"
+    # DST ends 2026-04-05 (clocks back): 72 elapsed hours is 11:00 local.
+    end = aureg_deadline("soci", "other_incident", "2026-04-04T12:00:00+11:00")
+    assert _due(end["data"][0], "notification")["due_at"] == "2026-04-07T11:00:00+10:00"
+
+
+def test_deadline_basis_and_citation_are_untrusted_wrapped():
+    due = aureg_deadline("soci", "critical_incident", "2026-10-16T10:00:00+11:00")
+    record = due["data"][0]
+    assert record["citation"].startswith("<<untrusted source=aureg>>")
+    for item in record["deadlines"]:
+        assert item["basis"].startswith("<<untrusted source=aureg>>")
+
+
+def test_schema_drift_checks_every_record():
+    good = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    assert schema_drift(good) is None
+    del good["obligations"][-1]["quote"]
+    assert "quote" in schema_drift(good)

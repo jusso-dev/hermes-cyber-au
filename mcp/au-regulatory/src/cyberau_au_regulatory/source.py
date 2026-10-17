@@ -5,7 +5,7 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -56,6 +56,16 @@ _SOURCES = (
     {"url": CISC_PDF, "markers": ("84 hours", "48 hours")},
     {"url": CSA_TEXT, "markers": ("72 hours", "ransomware")},
 )
+_NOT_LIVE = {
+    "snapshot": (
+        "answered from the shipped snapshot, not a live fetch; "
+        "check the source URL for amendments made since the snapshot date"
+    ),
+    "stale": (
+        "answered from a locally stored copy of the snapshot, not a live fetch; "
+        "check the source URL for amendments made since the snapshot date"
+    ),
+}
 _TRANSPORT = None
 _RESOLVER = None
 _CLOCK = None
@@ -88,6 +98,7 @@ def aureg_obligation(
     stored = _persist(public)
     if stored:
         warnings.append(stored)
+    warnings.append(_NOT_LIVE[cache])
     return _envelope(public, cache, _urls(rows), _as_of(payload), tuple(warnings))
 
 
@@ -119,6 +130,7 @@ def aureg_deadline(regime: _Regime, trigger: str, aware_at: str) -> dict:
     stored = _persist(public)
     if stored:
         warnings.append(stored)
+    warnings.append(_NOT_LIVE[cache])
     return _envelope(public, cache, _urls(rows), _as_of(payload), tuple(warnings))
 
 
@@ -222,14 +234,12 @@ def schema_drift(payload: dict) -> str | None:
     rows = payload.get("obligations")
     if not isinstance(rows, list):
         return "obligations schema drift, missing obligations"
-    if not rows:
-        return None
-    row = rows[0]
-    if not isinstance(row, dict):
-        return "obligations schema drift, record is not an object"
-    missing = [name for name in _FIELDS if name not in row]
-    if missing:
-        return "obligations schema drift, missing " + ", ".join(missing)
+    for row in rows:
+        if not isinstance(row, dict):
+            return "obligations schema drift, record is not an object"
+        missing = [name for name in _FIELDS if name not in row]
+        if missing:
+            return "obligations schema drift, missing " + ", ".join(missing)
     return None
 
 
@@ -305,7 +315,7 @@ def _public_obligation(row: dict) -> dict:
         "regime": row.get("regime") or "",
         "trigger": row.get("trigger") or "",
         "rule": untrusted_text(str(row.get("rule") or ""), "aureg"),
-        "citation": row.get("citation") or "",
+        "citation": untrusted_text(str(row.get("citation") or ""), "aureg"),
         "quote": untrusted_text(quote, "aureg"),
         "source_url": row.get("source_url") or "",
         "guidance_url": row.get("guidance_url") or "",
@@ -329,7 +339,7 @@ def _clock_view(item: dict) -> dict:
         "from": item.get("from") or "",
         "hours": item.get("hours"),
         "days": item.get("days"),
-        "basis": item.get("basis") or "",
+        "basis": untrusted_text(str(item.get("basis") or ""), "aureg"),
     }
 
 
@@ -340,8 +350,13 @@ def _due(item: dict, aware: datetime) -> dict:
         if item.get("days"):
             due_at = (aware + timedelta(days=int(item["days"]))).isoformat(timespec="seconds")
         elif item.get("hours"):
-            due_at = (aware + timedelta(hours=int(item["hours"]))).isoformat(timespec="seconds")
-    return {"name": item.get("name") or "", "due_at": due_at, "basis": item.get("basis") or ""}
+            elapsed = aware.astimezone(UTC) + timedelta(hours=int(item["hours"]))
+            due_at = elapsed.astimezone(_SYDNEY).isoformat(timespec="seconds")
+    return {
+        "name": item.get("name") or "",
+        "due_at": due_at,
+        "basis": untrusted_text(str(item.get("basis") or ""), "aureg"),
+    }
 
 
 def _parse_aware(value: str) -> tuple[datetime | None, str]:
