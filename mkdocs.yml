@@ -3,6 +3,11 @@ site_description: Documentation for the hermes-cyber-au Hermes profile distribut
 repo_url: https://github.com/jusso-dev/hermes-cyber-au
 repo_name: jusso-dev/hermes-cyber-au
 docs_dir: docs
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
 theme:
   name: material
   language: en
@@ -24,6 +29,7 @@ nav:
       - Overview: connectors/index.md
       - ASD ACSC: connectors/asd-acsc.md
       - ISM: connectors/asd-ism.md
+      - CISA KEV: connectors/cisa-kev.md
       - FIRST EPSS: connectors/first-epss.md
       - NVD: connectors/nvd.md
   - Routines: routines/index.md
