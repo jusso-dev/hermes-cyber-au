@@ -28,6 +28,7 @@ ENV_NAMES = [
     "OTX_API_KEY",
     "CLOUDFLARE_RADAR_API_TOKEN",
     "GREYNOISE_API_KEY",
+    "ABR_GUID",
 ]
 
 # Phrases the Hermes context-file scanner treats as injection or secret access.
@@ -55,9 +56,9 @@ class DistributionSkeletonTest(unittest.TestCase):
     def test_manifest_declares_name_version_and_optional_keys(self):
         text = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
         self.assertIn("name: cyber-au\n", text)
-        self.assertIn('version: 0.1.0\n', text)
+        self.assertIn("version: 0.1.0\n", text)
         self.assertIn('hermes_requires: ">=0.22.2"\n', text)
-        self.assertIn("license: \"Apache-2.0\"\n", text)
+        self.assertIn('license: "Apache-2.0"\n', text)
         for rel in OWNED:
             self.assertIn(f"  - {rel}\n", text)
         for name in ENV_NAMES:
@@ -94,15 +95,17 @@ class DistributionSkeletonTest(unittest.TestCase):
         self.assertNotIn("\u2014", text)
         self.assertNotIn("\u200b", text)
 
-    def test_jobs_file_is_an_empty_list(self):
+    def test_exposure_watch_job_has_no_runtime_pause_fields(self):
         text = (ROOT / "cron/jobs.json").read_text(encoding="utf-8")
         self.assertIn('"jobs"', text)
-        self.assertIn("[]", text)
+        self.assertIn('"id": "premium-exposure-watch"', text)
+        self.assertNotIn('"enabled"', text)
+        self.assertNotIn('"state"', text)
+        self.assertNotIn('"paused_at"', text)
+        self.assertNotIn("\u2014", text)
 
     def test_git_index_has_no_secret_files(self):
-        tracked = subprocess.check_output(
-            ["git", "ls-files"], cwd=ROOT, text=True
-        ).splitlines()
+        tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
         banned_names = {".env", "auth.json", "credentials.json", ".env.EXAMPLE"}
         bad = [
             path

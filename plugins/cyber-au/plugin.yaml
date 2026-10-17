@@ -1,0 +1,7 @@
+name: cyber-au
+version: 0.1.0
+description: In-process AU org exposure query for the user's own watchlist.
+author: Justin Middler
+license: Apache-2.0
+provides_tools:
+  - cyber_au_org_exposure
