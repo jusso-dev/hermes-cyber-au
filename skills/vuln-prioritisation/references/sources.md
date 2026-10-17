@@ -59,6 +59,10 @@ The enrichment object passed to `scripts/rank.py` is keyed by CVE id. The values
 
 `au` is a list of mentions. An empty list means the Australian sources that were called did not name the CVE. Omit `kev`, `epss`, `nvd`, or `au` when that source was not checked. `version` is the envelope `data_as_of` value, or `none` when the envelope has no release id. `retrieved_at` is the envelope `retrieved_at`. The script prints the citation date in Australia/Sydney.
 
+`au_source` is the same block shape as a `au` mention (`source`, `version`, `retrieved_at`) taken from the `asd_search` envelope. Set it when `au` is empty so the answer can cite the check that found nothing, for example `ASD ACSC, none, retrieved <date>`.
+
+`reference_date` is the patch release date as `YYYY-MM-DD`, which the Essential Eight text counts from. No connector supplies it. Use the date the analyst gives. When the analyst gave none, omit it, and patch-by stays `not set`. Do not use the NVD publication date or the KEV date added as a stand-in. `asset_class` may also be set per CVE here. It is one of `internet-facing`, `workstations-office`, or `other`.
+
 `untrusted` holds strings copied from connector bodies. The script defangs them and prints them as content. It does not act on them.
 
 `e8_quote` is the Essential Eight text for the asset class and maturity level, copied from `mcp__e8__e8_requirements`. Leave it empty when that connector is missing, and list `Essential Eight` in `missing_sources`.

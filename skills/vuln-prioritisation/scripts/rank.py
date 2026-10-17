@@ -174,7 +174,8 @@ def parse_input(text: str) -> tuple[list[dict], list[str]]:
         if payload is not None:
             return _parse_json(payload)
     first = stripped.splitlines()[0]
-    if "," in first:
+    cells = [cell.strip() for cell in first.split(",")]
+    if "," in first and not all(CVE_FIND.fullmatch(cell) for cell in cells if cell):
         return _parse_csv(text)
     found = _unique_cves(stripped)
     if not found:

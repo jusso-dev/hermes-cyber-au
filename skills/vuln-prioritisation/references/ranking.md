@@ -13,6 +13,8 @@ The first matching rule at the best tier wins. Tier 1 is ahead of tier 2. If two
 | `cvss-critical-exposed` | 2 | CVSS is 9 or higher and the asset class is internet-facing, and no tier 1 rule fired |
 | `residual` | 3 | A real finding remains and no earlier rule fired |
 
+Rows are ordered by tier, then by EPSS score (highest first), then by CVSS (highest first), then by CVE id. A row with no EPSS score sorts after a row with one in the same tier, so a KEV member with no EPSS score yet sits behind a tier 1 row that has one. Read the rule column and the KEV column, not the position alone.
+
 EPSS of 0.1 on any asset class can fire `epss-elevated`. CVSS of 9 or higher fires `cvss-critical-exposed` only for asset class `internet-facing`. A high CVSS score on an internal-only asset stays on `residual` unless KEV, an Australian mention, or EPSS lifts it.
 
 Asset class is one of:

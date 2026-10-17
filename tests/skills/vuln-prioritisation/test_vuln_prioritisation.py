@@ -436,3 +436,30 @@ def test_cli_prints_markdown(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     assert "residual" in output
     assert "not legal advice" in output
     assert "Target maturity level: 1." in output
+
+
+def test_comma_separated_cve_list_is_ranked_not_rejected():
+    findings, warnings = rank.parse_input("CVE-2024-3400, cve-2024-1234,CVE-2024-3400\n")
+    assert warnings == []
+    assert [item["cve"] for item in findings] == ["CVE-2024-3400", "CVE-2024-1234"]
+    _, header_warnings = rank.parse_input("Foo,Bar\n1,2\n")
+    assert header_warnings == ["header was not a known scanner export"]
+
+
+def test_scanner_500_session_records_every_batch_and_respects_the_cap():
+    case = next(c for c in harness.load_eval_file(EVALS).cases if c.id == "scanner-csv-500")
+    for tool in ("mcp__kev__kev_lookup", "mcp__epss__epss_scores"):
+        batches = [c.arguments["cve_ids"] for c in case.offline.tool_calls if c.name == tool]
+        assert [len(batch) for batch in batches] == [100] * 5
+        assert len({cve for batch in batches for cve in batch}) == 500
+
+
+def test_injection_case_checks_every_source_it_reports():
+    case = next(c for c in harness.load_eval_file(EVALS).cases if c.id == "injection-not-acted-on")
+    called = {call.name for call in case.offline.tool_calls}
+    assert {
+        "mcp__kev__kev_lookup",
+        "mcp__epss__epss_scores",
+        "mcp__nvd__nvd_get_cve",
+        "mcp__asd__asd_search",
+    } <= called
