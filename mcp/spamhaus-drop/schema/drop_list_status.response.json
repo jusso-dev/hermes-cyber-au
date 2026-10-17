@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["list", "entries", "fetched_at"],
+  "properties": {
+    "list": {"type": "string"},
+    "entries": {"type": "integer", "minimum": 0},
+    "fetched_at": {"type": ["string", "null"]}
+  }
+}

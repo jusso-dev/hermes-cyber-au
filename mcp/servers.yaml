@@ -435,3 +435,14 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  drop:
+    connector: spamhaus-drop
+    args:
+    - serve
+    - spamhaus-drop
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

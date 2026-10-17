@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.spamhaus.org/drop/drop_v4.json
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"cidr":"203.0.113.0/24","sblid":"SBL100001","rir":"apnic"}\n{"cidr":"203.0.113.0/28","sblid":"SBL100002","rir":"apnic"}\n'

@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ip": {
+      "type": "string",
+      "description": "IPv4 or IPv6 address",
+      "format": "ip"
+    }
+  },
+  "required": [
+    "ip"
+  ]
+}

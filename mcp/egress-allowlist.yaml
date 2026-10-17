@@ -293,3 +293,8 @@ connectors:
     - release-assets.githubusercontent.com
     allow_ip_literals: false
     allow_http_loopback: false
+  spamhaus-drop:
+    hosts:
+    - www.spamhaus.org
+    allow_ip_literals: false
+    allow_http_loopback: false
