@@ -42,7 +42,7 @@ _Limit = Annotated[int, Field(ge=1, le=100)]
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SECTION = re.compile(r"^[A-Za-z0-9_]{1,40}$")
 _DOMAIN = re.compile(
-    r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$"
+    r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})$"
 )
 _HASH = re.compile(r"^(?:[A-Fa-f0-9]{32}|[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64})$")
 _SECTION_MARKERS = {
@@ -57,6 +57,7 @@ _SYDNEY = ZoneInfo("Australia/Sydney")
 _UTC = ZoneInfo("UTC")
 _TRANSPORT = None
 _MAX_PAGES = 5
+_TLP = {"", "white", "clear", "green", "amber", "amber+strict", "red"}
 
 
 def otx_indicator(
@@ -78,15 +79,15 @@ def otx_indicator(
     if problem:
         return _envelope(None, cache, [url], warnings=(problem,))
     found = payload.get("indicator")
-    if section == "general" and found != value:
-        note = (
-            "no matching indicator in the offline snapshot or cache"
-            if cache == "snapshot"
-            else "OTX returned a different indicator"
-        )
-        return _envelope(None, cache, [url], warnings=(note,))
+    if cache == "snapshot":
+        if section != "general" or not _same_indicator(kind, found, value):
+            note = "no matching indicator in the offline snapshot or cache"
+            return _envelope(None, cache, [url], warnings=(note,))
+    elif (section == "general" or found is not None) and not _same_indicator(kind, found, value):
+        return _envelope(None, cache, [url], warnings=("OTX returned a different indicator",))
     record = _indicator_record(payload, kind, value, section)
-    _persist([_indicator_observation(record)])
+    if cache != "snapshot":
+        _persist([_indicator_observation(record)])
     return _envelope(record, cache, [url], _latest([item["modified"] for item in record["pulses"]]))
 
 
@@ -104,7 +105,8 @@ def otx_pulses(modified_since: _Date | None = None, limit: _Limit = 20) -> dict:
     if warning and not rows:
         return _envelope([], cache, [PULSES_URL], warnings=(warning,))
     warnings = (warning,) if warning else ()
-    _persist([_pulse_observation(row) for row in rows])
+    if cache != "snapshot":
+        _persist([_pulse_observation(row) for row in rows])
     return _envelope(
         rows, cache, [PULSES_URL], _latest([row["modified"] for row in rows]), warnings
     )
@@ -182,6 +184,21 @@ def schema_drift(payload: dict) -> str | None:
     return "OTX schema drift, missing indicator"
 
 
+def _same_indicator(kind: str, found, value: str) -> bool:
+    if not isinstance(found, str):
+        return False
+    if found == value:
+        return True
+    if kind == "IPv6":
+        try:
+            return ipaddress.IPv6Address(found) == ipaddress.IPv6Address(value)
+        except ValueError:
+            return False
+    if kind in {"domain", "hostname", "file"}:
+        return found.casefold().rstrip(".") == value.casefold().rstrip(".")
+    return False
+
+
 def _indicator_url(kind: str, value: str, section: str) -> str:
     return (
         f"{API_ROOT}/indicators/{quote(kind, safe='')}/"
@@ -235,8 +252,8 @@ def _validate_pulses(modified_since: str | None, limit: int) -> str:
         if not isinstance(modified_since, str) or _DATE.fullmatch(modified_since) is None:
             return "modified_since must be YYYY-MM-DD"
         try:
-            datetime.fromisoformat(modified_since)
-        except ValueError:
+            _sydney_param(modified_since)
+        except (ValueError, OverflowError):
             return "modified_since must be YYYY-MM-DD"
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         return "limit must be between 1 and 100"
@@ -379,6 +396,9 @@ def _fetch(
     if response.status in (401, 403):
         return None, "snapshot", f"OTX returned {response.status}. Check OTX_API_KEY."
     if response.status == 429:
+        stale = None if force_live else cache.get(cache_key)
+        if stale:
+            return _load(stale.body.decode("utf-8")), "stale", ""
         return None, "snapshot", "OTX returned 429 after backing off"
     if response.status >= 400:
         return None, "snapshot", f"OTX returned {response.status}"
@@ -461,7 +481,8 @@ def _pulse(item: dict) -> dict | None:
     if not isinstance(item, dict) or "id" not in item:
         return None
     tlp = item.get("tlp") or item.get("TLP") or ""
-    if not isinstance(tlp, str):
+    tlp = tlp.strip().lower() if isinstance(tlp, str) else ""
+    if tlp not in _TLP:
         tlp = ""
     return {
         "id": str(item["id"]),
@@ -470,7 +491,7 @@ def _pulse(item: dict) -> dict | None:
         "author": _author(item),
         "modified": str(item.get("modified") or ""),
         "created": str(item.get("created") or ""),
-        "tlp": tlp.strip()[:32],
+        "tlp": tlp,
         "tags": _tags(item.get("tags")),
         "references": _refs(item.get("references")),
         "adversary": _text(item.get("adversary")),
@@ -507,7 +528,7 @@ def _tags(items) -> list[str]:
             continue
         cleaned = re.sub(r"\s+", " ", item).strip()
         if cleaned and len(cleaned) <= 64:
-            tags.append(cleaned)
+            tags.append(untrusted_text(cleaned, "otx"))
         if len(tags) >= 20:
             break
     return tags

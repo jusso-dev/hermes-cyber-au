@@ -288,6 +288,31 @@ class TestHttp:
         assert any(item > 0 for item in delays)
         client.close()
 
+    def test_retry_after_seconds_date_and_garbage(self, tmp_path: Path):
+        import email.utils
+        import time as _time
+
+        soon = email.utils.formatdate(_time.time() + 30, usegmt=True)
+        for header, check in (
+            ("7", lambda d: d == 7.0),
+            ("999", lambda d: d == 60.0),
+            (soon, lambda d: 25.0 <= d <= 30.0),
+            ("not a date", lambda d: 0.0 <= d <= 1.0),
+        ):
+            delays: list[float] = []
+            calls = {"n": 0}
+
+            def handler(request: httpx.Request, header=header) -> httpx.Response:
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    return httpx.Response(429, headers={"retry-after": header})
+                return httpx.Response(200, content=b"ok")
+
+            client = _client(tmp_path, handler, sleeper=delays.append, rng=lambda: 0.25)
+            assert client.get(f"https://example.com/{len(header)}", ttl=5).body == b"ok"
+            assert len(delays) == 1 and check(delays[0]), (header, delays)
+            client.close()
+
     def test_redirect_to_denied_host(self, tmp_path: Path):
         def handler(request: httpx.Request) -> httpx.Response:
             if request.url.host == "example.com":
