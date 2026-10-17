@@ -28,7 +28,11 @@ def data_dir() -> Path:
 
 
 def register(ctx) -> None:
-    """Register tools, hooks, middleware, and commands. Must not raise."""
+    """Register tools, hooks, middleware, and commands.
+
+    A failure is not swallowed. Hermes then marks the plugin as failed to load, which
+    is louder than a plugin with half its tools.
+    """
     from .cli import register_commands
     from .hooks.audit import register_hooks
     from .middleware.untrusted import register_middleware

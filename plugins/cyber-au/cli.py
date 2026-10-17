@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import argparse
+
 COMMANDS = ("doctor", "bootstrap", "store", "export")
 
 _MESSAGES = {
@@ -36,10 +38,19 @@ def handle_slash(raw_args: str = "", **kwargs) -> str:
 def install_subcommands(subparser) -> None:
     """Attach doctor, bootstrap, store and export to the cyber-au CLI parser."""
     commands = subparser.add_subparsers(dest="cyber_au_command", required=False)
-    commands.add_parser("doctor", help="Check the cyber-au profile")
-    commands.add_parser("bootstrap", help="Prepare the cyber-au profile")
-    commands.add_parser("store", help="Inspect the local intel store")
-    commands.add_parser("export", help="Export intel from the local store")
+    helps = {
+        "doctor": "Check the cyber-au profile",
+        "bootstrap": "Prepare the cyber-au profile",
+        "store": "Inspect the local intel store",
+        "export": "Export intel from the local store",
+    }
+    for name in COMMANDS:
+        # The real flags (for example doctor --offline --json) are not defined yet. A
+        # prefix character that never appears in an argument makes argparse pass them
+        # through, so the stub answers "not installed yet" instead of exiting with
+        # a usage error.
+        command = commands.add_parser(name, help=helps[name], add_help=False, prefix_chars="\0")
+        command.add_argument("ignored", nargs="*", help=argparse.SUPPRESS)
     subparser.set_defaults(func=handle_cli)
 
 

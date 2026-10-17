@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 import importlib.util
 import inspect
 import json
 import os
 import sys
+import tempfile
 import time
 import unittest
 from collections.abc import Callable
 from pathlib import Path
+from unittest import mock
 
 import yaml
 
@@ -297,6 +300,46 @@ class PluginSkeletonTest(unittest.TestCase):
         self.assertIn("not installed yet", usage)
         self.assertNotIn(SECRET, usage)
         self.assertNotIn("audit", usage)
+
+    def test_cli_stubs_answer_for_flags_that_ship_later(self) -> None:
+        cli = sys.modules[f"{MODULE}.cli"]
+        entry = self.ctx.cli["cyber-au"]
+        parser = argparse.ArgumentParser(prog="hermes")
+        plugin = parser.add_subparsers(dest="plugin_command").add_parser("cyber-au")
+        entry["setup_fn"](plugin)
+        for argv, message in (
+            (["doctor", "--offline", "--json", "--fix"], "cyber-au doctor is not installed yet."),
+            (["bootstrap", "--non-interactive"], "cyber-au bootstrap is not installed yet."),
+            (["store", "stats"], "The intel store is not installed yet."),
+            (["export", "--since", "2026-01-01"], "STIX export is not installed yet."),
+        ):
+            args = parser.parse_args(["cyber-au", *argv])
+            self.assertEqual(entry["handler_fn"](args), message)
+            self.assertEqual(cli.command_message(argv[0]), message)
+
+    def test_stubs_do_not_open_or_write_any_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "report.docx"
+            report.write_bytes(b"fixture")
+            data = Path(tmp) / "data"
+            args = {"path": str(report), "note": SECRET}
+
+            def refuse(*_args, **_kwargs):
+                raise AssertionError("a stub touched the filesystem")
+
+            with (
+                mock.patch.dict(os.environ, {"CYBERAU_DATA_DIR": str(data)}),
+                mock.patch.object(builtins, "open", refuse),
+                mock.patch.object(os, "open", refuse),
+                mock.patch.object(Path, "open", refuse),
+            ):
+                for name, registered in self.ctx.tools.items():
+                    registered["handler"](args, task_id="t")
+                for callbacks in self.ctx.hooks.values():
+                    self.assertIsNone(callbacks[0](tool_name="evidence_import", args=args))
+            self.assertFalse(data.exists())
+            self.assertEqual(report.read_bytes(), b"fixture")
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["report.docx"])
 
     def test_data_dir_uses_the_environment_and_does_not_create_it(self) -> None:
         override = ROOT / "plugin-data-should-not-exist"
