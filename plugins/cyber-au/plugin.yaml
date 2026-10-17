@@ -2,10 +2,12 @@ name: cyber-au
 version: 0.1.0
 manifest_version: 2
 api_version: 1
-description: "Guards feed content so it can inform an answer and cannot steer the agent. Also answers AU org exposure from the user's own watchlist."
+description: "Guards feed content, answers AU org exposure from the user's own watchlist, and reports what works, what is missing and how to fix it."
 author: "Justin Middler"
 license: Apache-2.0
 homepage: https://github.com/jusso-dev/hermes-cyber-au
+python_dependencies:
+  - "pyyaml>=6,<7"
 provides_tools:
   - cyber_au_org_exposure
 provides_hooks:

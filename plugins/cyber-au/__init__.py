@@ -6,6 +6,10 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from .cli import main, register as register_doctor
+
+__all__ = ["main", "register"]
+
 
 def _middleware():
     name = "cyberau_untrusted_middleware"
@@ -23,7 +27,7 @@ def _middleware():
 
 
 def register(ctx) -> None:
-    """Register the untrusted-feed middleware, the write guard, and org exposure."""
+    """Register feed guards, org exposure, and the doctor command."""
     _middleware().register(ctx)
     from cyberau_org_exposure.tool import SCHEMA, handle
 
@@ -33,3 +37,4 @@ def register(ctx) -> None:
         schema=SCHEMA,
         handler=handle,
     )
+    register_doctor(ctx)
