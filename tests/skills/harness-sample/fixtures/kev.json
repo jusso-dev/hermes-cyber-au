@@ -1,0 +1,21 @@
+{
+  "title": "Harness fixture for the skill eval",
+  "catalogVersion": "harness-0",
+  "dateReleased": "2026-10-17",
+  "count": 1,
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2099-0140",
+      "vendorProject": "Example",
+      "product": "HarnessWidget",
+      "vulnerabilityName": "Harness fixture vulnerability",
+      "dateAdded": "2026-10-17",
+      "shortDescription": "Synthetic harness fixture, not a real vulnerability.",
+      "requiredAction": "No action. This entry is a test fixture.",
+      "dueDate": "2026-11-07",
+      "knownRansomwareCampaignUse": "Unknown",
+      "notes": "",
+      "cwes": []
+    }
+  ]
+}

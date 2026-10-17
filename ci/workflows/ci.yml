@@ -30,6 +30,8 @@ jobs:
       - run: uv sync --project mcp --all-packages --frozen
       - run: uv run --project mcp ruff check .
       - run: uv run --project mcp ruff format --check .
+      - name: Skill structural check (no model key)
+        run: uv run --project mcp python tests/skills/harness.py --structural
       - name: Validate skills, manifests and catalogue
         run: uv run --project mcp python tools/ci/validate_repo.py
       - name: House style (Australian English, no em dashes, no emojis, no private names)
@@ -49,6 +51,8 @@ jobs:
         run: uv run --project mcp python tools/ci/check_allowlist.py
       - name: Unit and fixture tests (network blocked)
         run: uv run --project mcp pytest -q --block-network --record-mode=none --cov=cyberau_common --cov-report=xml
+      - name: Offline skill eval sample (no model key)
+        run: uv run --project mcp python tests/skills/harness.py --evals tests/skills/harness-sample/evals.yaml
       - name: STIX export validates
         run: uv run --project mcp pytest -q tests/intel/test_stix_export.py --block-network
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
