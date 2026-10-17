@@ -14,6 +14,7 @@ members = [
     "cyberau-asd-ism",
     "cyberau-cisa-kev",
     "cyberau-common",
+    "cyberau-cve-program",
     "cyberau-first-epss",
     "cyberau-nvd",
     "cyberau-workspace",
@@ -418,6 +419,17 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "zstandard", specifier = ">=0.23,<1" },
 ]
+
+[[package]]
+name = "cyberau-cve-program"
+version = "0.1.0"
+source = { editable = "cve-program" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
 
 [[package]]
 name = "cyberau-first-epss"
