@@ -24,6 +24,14 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install "uv<1"
       - run: uv sync --project mcp --all-packages --frozen
+      # Keep only the last-good dates between runs. The HTTP cache stays out of it, so a
+      # stale response is never mistaken for a live one.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/cyberau/connector-health-state.json
+          key: connector-health-state-${{ github.run_id }}
+          restore-keys: |
+            connector-health-state-
       - name: Probe every connector and validate live responses against stored schemas
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}

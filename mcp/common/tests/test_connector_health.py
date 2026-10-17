@@ -212,5 +212,31 @@ def test_workflow_pins_actions_and_does_not_embed_a_secret():
     for line in text.splitlines():
         if "secrets." in line:
             assert "${{ secrets." in line
+    assert "connector-health-state.json" in text
+    assert "http_cache" not in text
     assert SECRET not in text
     assert "\u2014" not in text
+
+
+def test_map_schema_keys_are_not_drift_and_are_not_reported():
+    payload = {"CVE-2024-0001": {"epss": 0.1}, "CVE-2024-0002": {"epss": 0.2}}
+    assert diff_response({"type": "object"}, payload) == []
+    assert diff_response({"type": "object", "properties": {}}, payload) == []
+    permissive = {
+        "type": "object",
+        "properties": {"a": {"type": "string"}},
+        "additionalProperties": True,
+    }
+    assert diff_response(permissive, {"a": "x", "CVE-2024-0003": 1}) == []
+
+
+def test_detail_is_redacted_before_it_reaches_the_report(tmp_path: Path):
+    leak = "upstream failed https://example.invalid/x?api_key=hunter2"
+
+    def fetcher(key: str) -> dict:
+        return {"ok": False, "status_code": 500, "error_class": None, "body": None, "detail": leak}
+
+    report = collect_connector_health(
+        ROOT, live=True, check_schema=True, fetcher=fetcher, today=date(2026, 10, 17)
+    )
+    assert "hunter2" not in json.dumps(report)

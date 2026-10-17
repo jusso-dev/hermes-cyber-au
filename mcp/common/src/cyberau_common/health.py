@@ -181,7 +181,7 @@ def _assess(
     saved: dict,
     today: date,
 ) -> dict:
-    detail = _short(str(fetched.get("detail") or ""), "")
+    detail = _short(redact(str(fetched.get("detail") or "")), "")
     code = fetched.get("status_code")
     if code is None:
         code = status_code_from_text(detail)
@@ -426,10 +426,14 @@ def _walk(schema: dict, instance: object, prefix: str, out: list[dict]) -> None:
                 continue
             if isinstance(sub, dict):
                 _walk(sub, instance[name], field, out)
-        for name in instance:
-            if name not in props:
-                field = f"{prefix}.{name}" if prefix else str(name)
-                out.append({"change": "added", "field": field})
+        # A schema with no properties, or one that allows extra keys, describes a map.
+        # Its keys are data, so they are neither drift nor safe to copy into an issue.
+        open_map = not props or schema.get("additionalProperties") not in (None, False)
+        if not open_map:
+            for name in instance:
+                if name not in props:
+                    field = f"{prefix}.{name}" if prefix else str(name)
+                    out.append({"change": "added", "field": field})
         return
     if isinstance(instance, list) and expected == "array" and isinstance(schema.get("items"), dict):
         for index, item in enumerate(instance[:5]):

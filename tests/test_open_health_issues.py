@@ -254,3 +254,31 @@ def test_main_never_calls_gh(tmp_path: Path, monkeypatch):
         module.main(["--kind", "connector", "--input", str(tmp_path / "missing.json")])
         == 2
     )
+
+
+def test_a_github_error_on_one_connector_does_not_skip_the_rest(tmp_path: Path, capsys):
+    module = load()
+
+    class Flaky(FakeGitHub):
+        def find(self, title: str) -> list[dict]:
+            if "first-epss" in title:
+                raise RuntimeError("gh failed")
+            return super().find(title)
+
+    report = _report()
+    report["connectors"].append(
+        {
+            "key": "cisa-kev",
+            "status": "fail",
+            "status_code": 503,
+            "error_class": "http_error",
+            "last_good": None,
+            "schema_diff": [],
+        }
+    )
+    github = Flaky()
+    path = tmp_path / "health.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    assert module.main(["--kind", "connector", "--input", str(path)], client=github) == 1
+    assert [call[1] for call in github.calls] == ["Connector health: cisa-kev failing"]
+    assert "first-epss: gh failed" in capsys.readouterr().err

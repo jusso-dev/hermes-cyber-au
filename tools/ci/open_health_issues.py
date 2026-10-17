@@ -48,42 +48,51 @@ def main(argv: list[str] | None = None, *, client=None) -> int:
         print("health report is missing connectors", file=sys.stderr)
         return 2
     github = client or GhCli()
-    try:
-        sync(report, github, close_recovered=args.close_recovered)
-    except RuntimeError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-    return 0
+    failures = sync(report, github, close_recovered=args.close_recovered)
+    for message in failures:
+        print(message, file=sys.stderr)
+    return 1 if failures else 0
 
 
-def sync(report: dict, github, *, close_recovered: bool) -> None:
+def sync(report: dict, github, *, close_recovered: bool) -> list[str]:
+    """Update issues for every connector. Returns one message per connector that failed.
+
+    A GitHub error on one connector must not stop the rest from being reported.
+    """
+    failures = []
     for row in report["connectors"]:
         if not isinstance(row, dict) or not isinstance(row.get("key"), str):
             continue
         if not _KEY.fullmatch(row["key"]):
             continue
-        status = row.get("status")
-        if status == "not_checked":
-            continue
-        title = f"Connector health: {row['key']} failing"
-        matches = github.find(title)
-        open_issue = _preferred(matches, "open")
-        if status == "fail":
-            last = _known_date(row.get("last_good"))
-            last = (
-                last
-                or _last_good(open_issue)
-                or _last_good(_preferred(matches, "closed"))
-            )
-            body = render_failure(row, last)
-            if open_issue:
-                github.comment(int(open_issue["number"]), body)
-            elif (closed := _preferred(matches, "closed")) is not None:
-                github.reopen(int(closed["number"]), body)
-            else:
-                github.create(title, body, LABELS)
-        elif status == "ok" and close_recovered and open_issue:
-            github.close(int(open_issue["number"]), render_recovered(row))
+        try:
+            _sync_one(row, github, close_recovered=close_recovered)
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            failures.append(f"{row['key']}: {exc}")
+    return failures
+
+
+def _sync_one(row: dict, github, *, close_recovered: bool) -> None:
+    status = row.get("status")
+    if status == "not_checked":
+        return
+    title = f"Connector health: {row['key']} failing"
+    matches = github.find(title)
+    open_issue = _preferred(matches, "open")
+    if status == "fail":
+        last = _known_date(row.get("last_good"))
+        last = (
+            last or _last_good(open_issue) or _last_good(_preferred(matches, "closed"))
+        )
+        body = render_failure(row, last)
+        if open_issue:
+            github.comment(int(open_issue["number"]), body)
+        elif (closed := _preferred(matches, "closed")) is not None:
+            github.reopen(int(closed["number"]), body)
+        else:
+            github.create(title, body, LABELS)
+    elif status == "ok" and close_recovered and open_issue:
+        github.close(int(open_issue["number"]), render_recovered(row))
 
 
 def render_failure(row: dict, last_good: str | None) -> str:
