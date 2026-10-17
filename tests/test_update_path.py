@@ -554,3 +554,88 @@ def _git_distribution(repo: Path) -> Path:
     _git(repo, "commit", "-m", "v0.1.1")
     _git(repo, "tag", "v0.1.1")
     return repo
+
+
+def test_migration_splitter_keeps_triggers_and_comment_semicolons() -> None:
+    mod = _load()
+    script = (
+        "/* note; with a semicolon */\n"
+        "CREATE TABLE audit (id INTEGER);\n"
+        "CREATE TRIGGER audit_row AFTER INSERT ON audit BEGIN\n"
+        "  INSERT INTO audit VALUES (1);\n"
+        "END;\n"
+        "INSERT INTO audit VALUES ('a;b'); -- trailing; note\n"
+    )
+    statements = mod._split_sql(script)
+    assert len(statements) == 3
+    assert statements[1].rstrip().endswith("END;")
+    conn = sqlite3.connect(":memory:")
+    for statement in statements:
+        conn.execute(statement)
+    conn.close()
+
+
+def test_migration_splitter_rejects_transactions_behind_comments() -> None:
+    mod = _load()
+    with pytest.raises(mod.UpdateError, match="must not manage transactions"):
+        mod._split_sql("-- start\nBEGIN;\nCREATE TABLE t (a);")
+
+
+def test_unreadable_migration_restores_the_store(tmp_path: Path, capsys) -> None:
+    mod = _load()
+    profile = tmp_path / "profile"
+    _prepare_profile(profile)
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    shutil.copy(
+        ROOT / "plugins" / "cyber-au" / "store" / "migrations" / "0001_schema.sql", migrations
+    )
+    (migrations / "0002_bytes.sql").write_bytes(b"CREATE TABLE t (a); -- \xff\xfe\n")
+
+    with pytest.raises(mod.MigrationFailure) as caught:
+        mod.migrate(profile, migrations)
+    assert "0002_bytes.sql" in str(caught.value)
+    assert f"Backup: {caught.value.backup}" in capsys.readouterr().out
+    assert _stats(profile) == (1000, 499500)
+    conn = sqlite3.connect(profile / "plugin-data" / "cyber-au" / "intel.sqlite")
+    tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+    conn.close()
+    assert "schema_migrations" not in tables
+
+
+def test_source_older_than_the_store_is_refused(tmp_path: Path) -> None:
+    mod = _load()
+    repo = _git_distribution(tmp_path / "repo")
+    profile = tmp_path / "profile"
+    _prepare_profile(profile)
+    newer = tmp_path / "exported-new"
+    mod.export_git_tag(repo, "v0.1.1", newer)
+    assert _update(mod, profile, newer) == 0
+    older = tmp_path / "exported-old"
+    mod.export_git_tag(repo, "v0.1.0", older)
+    soul = (profile / "SOUL.md").read_text(encoding="utf-8")
+
+    with pytest.raises(mod.UpdateError, match="Refusing to downgrade"):
+        _update(mod, profile, older)
+    assert (profile / "SOUL.md").read_text(encoding="utf-8") == soul
+    assert "0002_note.sql" in _versions(profile)
+
+
+def test_bootstrap_refuses_python_older_than_3_11(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "python3"
+    fake.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    fake.chmod(0o755)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    result = subprocess.run(
+        ["/bin/sh", str(ROOT / "install" / "bootstrap.sh"), "--profile-home", str(profile)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={"PATH": str(bin_dir)},
+    )
+    assert result.returncode == 1
+    assert "Python 3.11 or newer" in result.stderr
+    assert not (profile / "plugin-data").exists()

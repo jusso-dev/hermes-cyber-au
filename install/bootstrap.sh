@@ -12,6 +12,20 @@ usage() {
 PROFILE="${CYBERAU_PROFILE:-cyber-au}"
 PROFILE_HOME=""
 
+# The updater needs Python 3.11 or newer. A bare python3 can be older, as on macOS.
+PYTHON=""
+for candidate in python3 python3.13 python3.12 python3.11; do
+  if command -v "$candidate" >/dev/null 2>&1 &&
+    "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+    PYTHON="$candidate"
+    break
+  fi
+done
+if [ -z "$PYTHON" ]; then
+  echo "bootstrap.sh needs Python 3.11 or newer on PATH" >&2
+  exit 1
+fi
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --profile)
@@ -49,7 +63,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 if [ -f "$ROOT/install/render_config.py" ]; then
-  python3 "$ROOT/install/render_config.py" --profile "$PROFILE" --profile-home "$PROFILE_HOME"
+  "$PYTHON" "$ROOT/install/render_config.py" --profile "$PROFILE" --profile-home "$PROFILE_HOME"
 fi
 
-exec python3 "$ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME"
+exec "$PYTHON" "$ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME"

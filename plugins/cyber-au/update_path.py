@@ -72,6 +72,7 @@ JOB_DEFINITION_FIELDS = frozenset(
 PAUSED_REASON = "Installed from a profile distribution; review it, then resume."
 _MIGRATION_RE = re.compile(r"^(\d{4})_.*\.sql$")
 _TRANSACTION_WORDS = frozenset({"BEGIN", "COMMIT", "ROLLBACK", "END"})
+_LEADING_COMMENTS_RE = re.compile(r"\A(?:\s+|--[^\n]*(?:\n|\Z)|/\*.*?\*/)+", re.DOTALL)
 
 
 class UpdateError(Exception):
@@ -230,7 +231,7 @@ def migrate(profile: Path, migrations: Path | None = None) -> None:
     try:
         backup = _backup_store(profile, store)
         _apply_pending(store, pending)
-    except (sqlite3.Error, UpdateError) as exc:
+    except Exception as exc:
         if backup is None and not existed and store.exists() and not store.is_symlink():
             store.unlink()
         elif backup is not None:
@@ -289,11 +290,10 @@ def run_update(
                 raise UpdateError("Pass --source as the git checkout that contains the tag.")
             staging = Path(tempfile.mkdtemp(prefix="cyber-au-update-"))
             export_git_tag(repo, to_tag, staging)
-            assert_store_can_move_to(
-                profile_home, staging / "plugins" / "cyber-au" / "store" / "migrations"
-            )
+            assert_store_can_move_to(profile_home, _shipped_migrations(staging))
             apply_distribution(staging, profile_home, force_config=force_config)
         elif source is not None:
+            assert_store_can_move_to(profile_home, _shipped_migrations(source))
             apply_distribution(source, profile_home, force_config=force_config)
         else:
             args = ["profile", "update", profile, "--yes"]
@@ -376,6 +376,10 @@ def find_bootstrap() -> Path:
     if candidate.is_file():
         return candidate
     raise UpdateError("install/bootstrap.sh was not found next to the cyber-au plugin")
+
+
+def _shipped_migrations(root: Path) -> Path:
+    return root / "plugins" / "cyber-au" / "store" / "migrations"
 
 
 def _git_root(start: Path) -> Path | None:
@@ -637,12 +641,7 @@ def _apply_pending(store: Path, pending: list[Path]) -> None:
         for path in pending:
             try:
                 statements = _split_sql(path.read_text(encoding="utf-8"))
-            except UpdateError as exc:
-                labelled = UpdateError(str(exc))
-                labelled.migration_name = path.name  # type: ignore[attr-defined]
-                raise labelled from exc
-            stamp = datetime.now(UTC).isoformat()
-            try:
+                stamp = datetime.now(UTC).isoformat()
                 conn.execute("BEGIN")
                 for statement in statements:
                     conn.execute(statement)
@@ -651,7 +650,7 @@ def _apply_pending(store: Path, pending: list[Path]) -> None:
                     (path.name, stamp),
                 )
                 conn.execute("COMMIT")
-            except sqlite3.Error as exc:
+            except Exception as exc:
                 _rollback_quietly(conn)
                 exc.migration_name = path.name  # type: ignore[attr-defined]
                 raise
@@ -667,50 +666,28 @@ def _rollback_quietly(conn: sqlite3.Connection) -> None:
 
 
 def _split_sql(script: str) -> list[str]:
+    """Split a migration into statements. SQLite decides where a statement ends.
+
+    That keeps semicolons inside strings, comments and trigger bodies intact.
+    """
     statements: list[str] = []
-    buf: list[str] = []
-    in_string = False
-    index = 0
-    length = len(script)
-    while index < length:
-        char = script[index]
-        if in_string:
-            buf.append(char)
-            if char == "'":
-                if index + 1 < length and script[index + 1] == "'":
-                    buf.append("'")
-                    index += 2
-                    continue
-                in_string = False
-            index += 1
-            continue
-        if script.startswith("--", index):
-            index = script.find("\n", index)
-            if index < 0:
-                break
-            continue
-        if char == "'":
-            in_string = True
-            buf.append(char)
-            index += 1
-            continue
-        if char == ";":
-            _push_statement(statements, "".join(buf))
-            buf = []
-            index += 1
-            continue
-        buf.append(char)
-        index += 1
-    _push_statement(statements, "".join(buf))
+    pieces = script.split(";")
+    buf = ""
+    for piece in pieces[:-1]:
+        buf += piece + ";"
+        if sqlite3.complete_statement(buf):
+            _push_statement(statements, buf)
+            buf = ""
+    _push_statement(statements, buf + pieces[-1])
     return statements
 
 
 def _push_statement(statements: list[str], raw: str) -> None:
     statement = raw.strip()
-    if not statement:
+    code = _LEADING_COMMENTS_RE.sub("", statement).rstrip(";").strip()
+    if not code:
         return
-    first = statement.split(None, 1)[0].rstrip(";").upper()
-    if first in _TRANSACTION_WORDS:
+    if code.split(None, 1)[0].upper() in _TRANSACTION_WORDS:
         raise UpdateError("Migration files must not manage transactions")
     statements.append(statement)
 
