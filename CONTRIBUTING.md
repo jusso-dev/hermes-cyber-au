@@ -16,7 +16,7 @@ uv run --project mcp pytest -q --block-network
 uv run --project mcp ruff check mcp
 ```
 
-`uv sync` installs the workspace in `mcp/`, including the dev group: pytest, pytest-recording, Hypothesis, coverage, and Ruff. `--frozen` uses `mcp/uv.lock`. If you change dependencies, update the lockfile (see below) and commit it.
+`uv sync` installs the workspace in `mcp/`, including the dev group: pytest, pytest-recording, pytest-cov, Hypothesis, and Ruff. `--frozen` uses `mcp/uv.lock`. If you change dependencies, update the lockfile (see below) and commit it.
 
 The `cyberau-mcp` command is the console script for `cyberau-common`:
 
@@ -38,8 +38,8 @@ Arguments:
 
 | Argument | Rule |
 |---|---|
-| `key` | Lowercase package name. A letter, then letters, digits, or hyphens. Length 2 to 31. Example: `first-epss`. |
-| `--server` | Short MCP server token. A letter, then letters, digits, or underscores. Length 2 to 21. Example: `epss`. |
+| `key` | Lowercase package name. A lowercase letter, then lowercase letters, digits, or hyphens. Length 2 to 31. Example: `first-epss`. |
+| `--server` | Short MCP server token. A lowercase letter, then lowercase letters, digits, or underscores. Length 2 to 21. Example: `epss`. |
 | `--hosts` | Comma-separated public hostnames the connector may call. At least one. No IP literals. |
 
 The generator:
@@ -51,9 +51,9 @@ The generator:
 
 Then replace the stub before you rely on it:
 
-1. Implement the tools in `mcp/<key>/src/cyberau_<module>/source.py`. The module name is `cyberau_` plus the key, with hyphens turned into underscores.
+1. Implement the tools in `mcp/<key>/src/<module>/source.py`. The module name is `cyberau_` plus the key, with hyphens turned into underscores (`first-epss` becomes `cyberau_first_epss`).
 2. Rewrite `SOURCE.md`. Keep these labels, which the contract test requires: `Upstream:`, `Auth:`, `Rate limit:`, `Terms:`, `Verified:`. Point `Upstream` at the real documentation. Replace the generator's `https://example.com` placeholder. Set `Verified` to the date you checked the upstream docs.
-3. Add one JSON Schema file per tool at `mcp/<key>/schema/<tool>.input.json`. A tool name is a letter, then 2 to 40 letters, digits, or underscores. The rendered name `mcp__<server>__<tool>` must be 64 characters or fewer.
+3. Add one JSON Schema file per tool at `mcp/<key>/schema/<tool>.input.json`. A tool name is a lowercase letter, then 2 to 40 lowercase letters, digits, or underscores. The rendered name `mcp__<server>__<tool>` must be 64 characters or fewer.
 4. Keep every tool read-only. The contract suite requires `readOnlyHint`. A connector fetches and returns data. It does not submit, block, delete, or post. Anything that would change an external system stays out of this tree until a person has an explicit approval step.
 5. Return the shared result envelope (`source`, `retrieved_at`, `cache`, `data`, `untrusted: true`). Feed content is untrusted data. Put it in the envelope. Do not treat it as instructions.
 6. Add a cassette under `mcp/<key>/tests/fixtures/` whose name starts with the tool name. Record it using the rules below.
@@ -75,13 +75,15 @@ Fixtures are pytest-recording cassettes (VCR YAML) or small trimmed JSON bodies.
 
 `mcp/conftest.py` asks pytest-recording to filter these request headers: `authorization`, `auth-key`, `x-otx-api-key`, `x-api-key`, `api-key`, `apiKey`, `apikey`.
 
-To record a live call, put the key in your shell only. Read it from your profile `.env`. Do not echo it, and do not write it into the cassette, the test, or the command line of a committed script.
+The existing connector tests replay trimmed fixtures offline and do not use `@pytest.mark.vcr`, so `--record-mode` does nothing for them. To record a live call, write a test marked `@pytest.mark.vcr` that makes the request. pytest-recording then saves a cassette to `mcp/<key>/tests/cassettes/<test module>/<test name>.yaml`. Trim it, and move it to `mcp/<key>/tests/fixtures/` under a name that starts with the tool name.
+
+Put the key in your shell only. Read it from your profile `.env`. Do not echo it, and do not write it into the cassette, the test, or the command line of a committed script.
 
 ```bash
 uv run --project mcp pytest mcp/<key>/tests --record-mode=once
 ```
 
-Use `--record-mode=rewrite` only when you mean to replace an existing cassette. Before you commit, open the file and check all of the following:
+Use `--record-mode=rewrite` only when you mean to replace an existing cassette. Do not commit the `cassettes/` directory. Before you commit, open the fixture file and check all of the following:
 
 - Request and response headers are empty, or the value is the placeholder `[REDACTED]`.
 - The URL has no live `api_key`, `token`, `auth`, or `key` query value.
@@ -89,7 +91,7 @@ Use `--record-mode=rewrite` only when you mean to replace an existing cassette. 
 - Prefer a short body that still exercises the parser, as the NVD fixtures do.
 - A negative test that needs a secret-shaped string uses `[REDACTED]`, which is what `cyberau_common.secrets.redact` writes. It does not use a real token.
 
-Replay must pass with the network blocked. CI runs `uv run --project mcp pytest -q --block-network`. Locally, add `--record-mode=none` so a missing cassette cannot open a connection:
+Replay must pass with the network blocked. CI runs `uv run --project mcp pytest -q --block-network`. pytest-recording defaults to `--record-mode=none`, and the commands in this guide pass it explicitly so a missing cassette cannot open a connection:
 
 ```bash
 uv run --project mcp pytest -q --block-network --record-mode=none
@@ -106,7 +108,7 @@ env:
   - NVD_API_KEY=${NVD_API_KEY}
 ```
 
-The same rule applies to `config.yaml`, `mcp.json`, skills, tests, and fixtures. Names already used by the profile are listed in [`.env.template`](.env.template) and in `distribution.yaml` under `env_requires`. Add a new name there when operators should see it, with `required: false` unless the connector cannot start without it. Document the variable name in `SOURCE.md`. Do not document a sample value.
+The same rule applies to `config.yaml`, `mcp.json`, skills, tests, and fixtures. Names the profile asks operators for are listed in [`.env.template`](.env.template) and in `distribution.yaml` under `env_requires`. Add a new name to both when operators should see it, with `required: false` unless the connector cannot start without it. Document the variable name in `SOURCE.md`. Do not document a sample value.
 
 ## House style
 
