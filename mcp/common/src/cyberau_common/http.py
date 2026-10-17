@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import email.utils
 import random
 import time
@@ -281,14 +282,17 @@ class HttpClient:
         header = response.headers.get("retry-after")
         if header:
             try:
-                return max(0.0, float(header))
+                return max(0.0, min(60.0, float(header)))
             except ValueError:
                 try:
                     parsed = email.utils.parsedate_to_datetime(header)
                 except (TypeError, ValueError):
                     parsed = None
-                if parsed is not None and parsed.tzinfo is not None:
-                    return max(0.0, parsed.timestamp() - time.time())
+                if parsed is not None:
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=datetime.UTC)
+                    wait = (parsed - datetime.datetime.now(datetime.UTC)).total_seconds()
+                    return max(0.0, min(60.0, wait))
         return self._backoff(attempt)
 
 

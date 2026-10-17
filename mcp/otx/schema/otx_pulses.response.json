@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "description",
+    "author",
+    "modified",
+    "created",
+    "tlp",
+    "tags",
+    "references",
+    "adversary",
+    "indicators"
+  ],
+  "properties": {
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "description": {"type": "string"},
+    "author": {"type": "string"},
+    "modified": {"type": "string"},
+    "created": {"type": "string"},
+    "tlp": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "references": {"type": "array", "items": {"type": "string"}},
+    "adversary": {"type": "string"},
+    "indicators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "value", "title", "description"],
+        "properties": {
+          "type": {"type": "string"},
+          "value": {"type": "string"},
+          "title": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      }
+    }
+  }
+}

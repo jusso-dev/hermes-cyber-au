@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "modified_since": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD, interpreted in Australia/Sydney"
+    },
+    "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}
+  },
+  "required": []
+}

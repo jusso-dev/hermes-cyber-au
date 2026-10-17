@@ -226,3 +226,8 @@ connectors:
     - api.abuseipdb.com
     allow_ip_literals: false
     allow_http_loopback: false
+  otx:
+    hosts:
+    - otx.alienvault.com
+    allow_ip_literals: false
+    allow_http_loopback: false

@@ -108,3 +108,16 @@ servers:
     enabled_by_default: true
     required_env:
     - ABUSEIPDB_API_KEY
+  otx:
+    connector: otx
+    args:
+    - serve
+    - otx
+    env:
+    - OTX_API_KEY=${OTX_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env:
+    - OTX_API_KEY
