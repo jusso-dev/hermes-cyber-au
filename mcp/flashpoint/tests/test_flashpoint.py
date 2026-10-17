@@ -229,9 +229,10 @@ def test_schema_drift_and_live_health(tmp_path, monkeypatch):
         raise AssertionError("live health must not call upstream without a token")
 
     source._TRANSPORT = httpx.MockTransport(explode)
+    assert connector().health(live=False).detail == "not configured"
     missing = connector().health(live=True)
-    assert missing.ok is True
-    assert missing.detail == "not configured"
+    assert missing.ok is False
+    assert "FLASHPOINT_API_TOKEN" in missing.detail
 
     monkeypatch.setenv("FLASHPOINT_API_TOKEN", TOKEN)
     calls = {"n": 0}
@@ -348,3 +349,80 @@ def test_tool_annotations_are_read_only():
     annotations = tools["flashpoint_indicator"].annotations
     assert annotations.readOnlyHint is True
     assert annotations.openWorldHint is True
+
+
+def test_snapshot_is_never_served_as_live_without_a_warning(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_FLASHPOINT_SNAPSHOT", str(FIXTURES / "indicator_synthetic.json"))
+    pinned = flashpoint_indicator("example.com.au")
+    assert pinned["cache"] == "snapshot"
+    assert pinned["data"]
+    assert any("snapshot" in item.lower() for item in pinned["warnings"])
+
+    monkeypatch.delenv("CYBERAU_FLASHPOINT_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    shipped = flashpoint_indicator("example.com.au")
+    assert shipped["cache"] == "snapshot"
+    assert any("synthetic" in item.lower() for item in shipped["warnings"])
+
+
+def test_stale_copy_carries_a_warning_and_the_matched_date(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_FLASHPOINT_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("FLASHPOINT_API_TOKEN", TOKEN)
+    _quiet_clock()
+    payload = json.loads(_body())
+    payload["items"][1]["last_seen"] = "2026-07-01T00:00:00Z"
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=json.dumps(payload).encode())
+    )
+    fresh = flashpoint_indicator("other.example.com")
+    assert fresh["data_as_of"] == "2026-07-01T00:00:00Z"
+    for item in source._cache()._memory.values():
+        item.fetched_at -= 10_000
+
+    def timeout(_request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("timed out")
+
+    source._TRANSPORT = httpx.MockTransport(timeout)
+    stale = flashpoint_indicator("other.example.com")
+    assert stale["cache"] == "stale"
+    assert any("stale" in item.lower() for item in stale["warnings"])
+
+
+def test_live_health_fails_without_a_token_and_on_a_cached_copy(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_FLASHPOINT_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("FLASHPOINT_API_TOKEN", raising=False)
+
+    def explode(_request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no upstream call without a token")
+
+    source._TRANSPORT = httpx.MockTransport(explode)
+    missing = connector().health(live=True)
+    assert missing.ok is False
+    assert "FLASHPOINT_API_TOKEN" in missing.detail
+    assert connector().health(live=False).ok is True
+
+    monkeypatch.setenv("FLASHPOINT_API_TOKEN", TOKEN)
+    _quiet_clock()
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(200, content=_body()))
+    assert connector().health(live=True).ok is True
+    assert flashpoint_indicator("example.com.au")["cache"] == "hit"
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    failed = connector().health(live=True)
+    assert failed.ok is False
+    assert TOKEN not in failed.detail
+
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(500))
+    assert connector().health(live=True).ok is False
+
+    monkeypatch.setenv("CYBERAU_FLASHPOINT_SNAPSHOT", str(FIXTURES / "indicator_synthetic.json"))
+    source._TRANSPORT = httpx.MockTransport(down)
+    assert connector().health(live=True).ok is False

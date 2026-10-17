@@ -71,7 +71,10 @@ def flashpoint_indicator(value: Annotated[str, Field(min_length=3)]) -> dict:
             "The docs portal did not confirm a value filter, so none is sent."
         )
     _persist(rows)
-    return _envelope(rows, cache, payload, warnings=tuple(warnings))
+    notice = _notice(cache)
+    if notice:
+        warnings.insert(0, notice)
+    return _envelope(rows, cache, warnings=tuple(warnings))
 
 
 def schema_drift(payload: dict) -> str | None:
@@ -111,15 +114,19 @@ class FlashpointConnector(PremiumConnector):
             return Probe(self.key, True, "schema ok")
         result = self.health_result(live=False)
         if not result.configured:
+            if live:
+                return Probe(self.key, False, "FLASHPOINT_API_TOKEN is not set")
             return Probe(self.key, result.ok, result.detail)
         if not live:
             return Probe(self.key, True, "offline ok")
         try:
-            payload, _cache, warning = _fetch(force_live=True)
+            payload, cache, warning = _fetch(force_live=True)
         except HttpError as exc:
             return Probe(self.key, False, str(exc))
         if warning:
             return Probe(self.key, False, warning)
+        if cache != "miss":
+            return Probe(self.key, False, f"live check was answered from a {cache} copy")
         problem = schema_drift(payload or {})
         if problem:
             return Probe(self.key, False, problem)
@@ -177,7 +184,7 @@ def _fetch(*, force_live: bool = False) -> tuple[dict | None, str, str]:
             skip_cache=force_live,
         )
     except (HttpError, EgressDenied, TimeoutError) as exc:
-        cached = cache.get(key)
+        cached = None if force_live else cache.get(key)
         if cached:
             return _decode(cached.body), "stale", ""
         return None, "snapshot", redact(str(exc))
@@ -328,17 +335,31 @@ def _load(text: str) -> dict | None:
     return payload
 
 
+def _notice(cache: str) -> str:
+    """Say so when the rows did not come from a fresh live response."""
+    if cache == "snapshot":
+        if os.environ.get("CYBERAU_FLASHPOINT_SNAPSHOT"):
+            return "Served from a local snapshot file. This is not a live Flashpoint result."
+        return (
+            "Served from the synthetic snapshot shipped with the connector. "
+            "This is not a live Flashpoint result."
+        )
+    if cache == "stale":
+        return "Stale result: an expired session copy, because Flashpoint could not be reached."
+    return ""
+
+
 def _envelope(
     data,
     cache: str,
-    payload: dict | None = None,
     warnings: tuple[str, ...] = (),
 ) -> dict:
-    as_of = None
-    if payload and isinstance(payload.get("items"), list) and payload["items"]:
-        first = payload["items"][0]
-        if isinstance(first, dict) and isinstance(first.get("last_seen"), str):
-            as_of = first["last_seen"]
+    stamps = [
+        row["last_seen"]
+        for row in data
+        if isinstance(row, dict) and isinstance(row.get("last_seen"), str)
+    ]
+    as_of = max(stamps) if stamps else None
     return envelope(
         "flashpoint",
         data,
