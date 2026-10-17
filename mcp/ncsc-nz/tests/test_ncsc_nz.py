@@ -374,3 +374,85 @@ def _clear_rate_db() -> None:
         path = source._data_dir() / name
         if path.exists():
             path.unlink()
+
+
+def test_card_without_a_link_does_not_borrow_the_previous_link():
+    parser = source._ListParser()
+    parser.feed(
+        """
+        <div class="explore--alert">
+        <a class="card__link" href="/alerts/first/"><article class="card--alert">
+        <h3 class="card__title">First</h3><p class="card__date">1 January 2026</p>
+        </article></a>
+        <article class="card--alert">
+        <h3 class="card__title">Linkless</h3><p class="card__date">2 January 2026</p>
+        </article>
+        <article class="card--alert"><a class="card__link" href="/alerts/inside/">
+        <h3 class="card__title">Inside</h3></a><p class="card__date">3 January 2026</p>
+        </article></div>
+        """
+    )
+    assert [item["link"] for item in parser.items] == [
+        "https://www.ncsc.govt.nz/alerts/first/",
+        "https://www.ncsc.govt.nz/alerts/inside/",
+    ]
+
+
+def _serve_live(monkeypatch) -> None:
+    _live(monkeypatch)
+    listed = (FIXTURES / "alerts_page.html").read_bytes()
+    item = (FIXTURES / "alert_item.html").read_bytes()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = item if "synthetic-edge-device" in request.url.path else listed
+        return httpx.Response(200, content=body)
+
+    source._TRANSPORT = httpx.MockTransport(handler)
+
+
+def test_alert_url_without_a_trailing_slash_is_stored_once(tmp_path, monkeypatch):
+    _serve_live(monkeypatch)
+    source.ncscnz_list_alerts()
+    page = source.ncscnz_get_alert(EDGE.rstrip("/"))
+    assert page["data"]["url"] == EDGE
+    with sqlite3.connect(tmp_path / "ncsc_alerts.sqlite") as conn:
+        links = [row[0] for row in conn.execute("SELECT link FROM alerts")]
+    assert links.count(EDGE) == 1
+    assert EDGE.rstrip("/") not in links
+
+
+def test_relisting_keeps_cves_found_on_the_alert_page(tmp_path, monkeypatch):
+    _serve_live(monkeypatch)
+    source.ncscnz_list_alerts()
+    source.ncscnz_get_alert(EDGE)
+    _clear_rate_db()
+    (tmp_path / "http_cache.sqlite").unlink()
+    source.ncscnz_list_alerts()
+    with sqlite3.connect(tmp_path / "ncsc_alerts.sqlite") as conn:
+        row = conn.execute("SELECT cves FROM alerts WHERE link = ?", (EDGE,)).fetchone()
+    assert json.loads(row[0]) == ["CVE-2024-3400", "CVE-2025-0001"]
+
+
+def test_requests_stay_on_http_1_1(monkeypatch):
+    _serve_live(monkeypatch)
+    seen = []
+    real = httpx.Client
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "Client", spy)
+    source.ncscnz_list_alerts()
+    assert seen
+    assert not any(kwargs.get("http2") for kwargs in seen)
+
+
+def test_live_health_fails_when_the_rate_limit_message_is_blank(monkeypatch):
+    _serve_live(monkeypatch)
+
+    def refuse(*_args, **_kwargs):
+        raise RuntimeError("")
+
+    monkeypatch.setattr(source, "_limit", refuse)
+    assert source.connector().health(live=True).ok is False

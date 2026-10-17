@@ -234,7 +234,7 @@ def _fetch_list(*, force_live: bool) -> tuple[str | None, str, str]:
     try:
         _limit("ncscnz:list", rate=1 / 3600, burst=1)
     except Exception as exc:
-        return _fallback_list(redact(str(exc)))
+        return _fallback_list(redact(str(exc)) or "list rate limit not available")
     text, warning, cache = _http(LIST_URL, ttl=_LIST_TTL, skip_cache=force_live)
     if text is None:
         if _is_auth(warning):
@@ -425,6 +425,8 @@ class _ListParser(HTMLParser):
         classes = _class_set(attrs)
         if tag == "a" and "card__link" in classes:
             self._href = _attr(attrs, "href")
+            if self._in_card:
+                self._card_href = self._href
         if tag in _VOID:
             return
         if tag == "article" and "card--alert" in classes and self._in_card == 0:
@@ -470,6 +472,8 @@ class _ListParser(HTMLParser):
 
     def _finish(self) -> None:
         link = _canonical(self._card_href)
+        self._href = ""
+        self._card_href = ""
         title = _collapse(" ".join(self._title_parts))
         if not link or not title:
             return
@@ -596,6 +600,12 @@ def _persist_alerts(items: list[dict]) -> None:
     now = datetime.now(_SYDNEY).strftime("%Y-%m-%dT%H:%M:%S%z")
     with _db() as conn:
         for item in items:
+            known = conn.execute(
+                "SELECT cves FROM alerts WHERE link = ?", (item["link"],)
+            ).fetchone()
+            cves = set(item["cves"])
+            if known is not None:
+                cves |= set(json.loads(known["cves"] or "[]"))
             conn.execute(
                 """
                 INSERT INTO alerts (id, link, title, published, cves, passage, fetched_at)
@@ -612,7 +622,7 @@ def _persist_alerts(items: list[dict]) -> None:
                     item["link"],
                     item["title"],
                     item["published"],
-                    json.dumps(item["cves"]),
+                    json.dumps(sorted(cves)),
                     now,
                 ),
             )
@@ -744,6 +754,8 @@ def _allowed_page(url: str) -> str:
     path = parts.path or "/"
     if not path.startswith("/"):
         return ""
+    if _ALERT_PATH.match(path) and not path.endswith("/"):
+        path += "/"
     return f"https://www.ncsc.govt.nz{path}"
 
 
