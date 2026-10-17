@@ -1,0 +1,51 @@
+{
+  "alertTotalCount": 2,
+  "alerts": [
+    {
+      "uid": "alert-synthetic-1",
+      "foundTime": 1719792000000,
+      "status": "unread",
+      "watcherGroupUid": "group-example",
+      "watcherUid": "watcher-example",
+      "post": {
+        "uid": "post-synthetic-1"
+      }
+    },
+    {
+      "uid": "alert-synthetic-2",
+      "foundTime": 1719792000000,
+      "status": "unread",
+      "watcherGroupUid": "group-other",
+      "watcherUid": "watcher-other",
+      "post": {
+        "uid": "post-synthetic-2"
+      }
+    }
+  ],
+  "watcherGroups": [
+    {
+      "uid": "group-example",
+      "name": "Example",
+      "type": "keyword",
+      "watchers": [
+        {
+          "uid": "watcher-example",
+          "type": "keyword",
+          "description": "example.com.au"
+        }
+      ]
+    },
+    {
+      "uid": "group-other",
+      "name": "Other Corp",
+      "type": "keyword",
+      "watchers": [
+        {
+          "uid": "watcher-other",
+          "type": "keyword",
+          "description": "other.example"
+        }
+      ]
+    }
+  ]
+}

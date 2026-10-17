@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "since": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD, Australia/Sydney"
+    },
+    "watcher_group": {
+      "type": "string"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 100
+    }
+  },
+  "required": []
+}

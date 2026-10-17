@@ -15,6 +15,7 @@ members = [
     "cyberau-cisa-kev",
     "cyberau-common",
     "cyberau-first-epss",
+    "cyberau-intel471",
     "cyberau-nvd",
     "cyberau-premium",
     "cyberau-workspace",
@@ -430,6 +431,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-intel471"
+version = "0.1.0"
+source = { editable = "intel471" }
+dependencies = [
+    { name = "cyberau-common" },
+    { name = "cyberau-premium" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
+]
 
 [[package]]
 name = "cyberau-nvd"

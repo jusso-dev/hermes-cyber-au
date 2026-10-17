@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["uid", "observed_at", "title", "stays_in_profile", "finding"],
+  "properties": {
+    "uid": {"type": "string"},
+    "observed_at": {"type": "string"},
+    "title": {"type": "string"},
+    "victim": {"type": "string"},
+    "stays_in_profile": {"const": true},
+    "finding": {"type": "object"}
+  }
+}

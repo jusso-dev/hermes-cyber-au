@@ -32,3 +32,8 @@ connectors:
     - services.nvd.nist.gov
     allow_ip_literals: false
     allow_http_loopback: false
+  intel471:
+    hosts:
+    - api.intel471.com
+    allow_ip_literals: false
+    allow_http_loopback: false
