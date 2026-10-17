@@ -1,0 +1,16 @@
+{
+  "_note": "Synthetic stand-in shaped like the Radar API. Not recorded from the live server.",
+  "status": 429,
+  "headers": {
+    "retry-after": "300"
+  },
+  "body": {
+    "success": false,
+    "errors": [
+      {
+        "code": 971,
+        "message": "Rate limited"
+      }
+    ]
+  }
+}

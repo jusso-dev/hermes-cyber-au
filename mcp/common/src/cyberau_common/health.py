@@ -17,6 +17,7 @@ from pathlib import Path
 
 from cyberau_common.secrets import redact
 from cyberau_common.server import Probe, get_connector
+from cyberau_common.wrap import find_wrap, run_wrap_health
 
 KEYED_CONNECTORS = frozenset({"nvd", "abusech", "otx", "greynoise", "cloudflare-radar"})
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -34,6 +35,12 @@ _JSON_TYPES = {
 
 
 def run_health(name: str, *, live: bool, check_schema: bool = False) -> Probe:
+    try:
+        find_wrap(name)
+    except KeyError:
+        pass
+    else:
+        return run_wrap_health(name, live=live, check_schema=check_schema)
     try:
         connector = get_connector(name)
     except KeyError:

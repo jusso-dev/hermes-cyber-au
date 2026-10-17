@@ -26,6 +26,7 @@ testpaths = [
   "../tests",
   "asd-acsc/tests",
   "asd-ism/tests",
+  "cloudflare-radar/tests",
   "cisa-kev/tests",
   "first-epss/tests",
   "nvd/tests",

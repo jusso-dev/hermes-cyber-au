@@ -154,3 +154,18 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  cloudflare_radar:
+    connector: cloudflare-radar
+    kind: wrap
+    url: https://mcp.cloudflare.com/mcp?codemode=false
+    auth: oauth
+    token_env: CLOUDFLARE_RADAR_API_TOKEN
+    tools:
+      include:
+      - '*_radar_*'
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    required_env: []
+    docs: docs/connectors/cloudflare-radar.md
