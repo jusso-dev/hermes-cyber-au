@@ -1,0 +1,31 @@
+{
+  "as_of": "2026-10-17",
+  "requirements": [
+    {
+      "id": "pspf-page-2026",
+      "kind": "publication",
+      "title": "PSPF on a page 2026",
+      "url": "https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026",
+      "published": "2026-07-01",
+      "text": "The PSPF on a page provides an overview of the Protective Security Policy Framework."
+    }
+  ],
+  "directions": [
+    {
+      "id": "002-2026",
+      "kind": "direction",
+      "title": "Direction 002-2026 on Strengthening Commonwealth Cyber Posture Against AI-Enabled Risks",
+      "url": "https://www.protectivesecurity.gov.au/publications-library/direction-002-2026-strengthening-commonwealth-cyber-posture-against-ai-enabled-risks",
+      "published": "2026-09-29",
+      "text": "PSPF Direction 002-2026 requires Australian Government entities to reduce cyber security risks arising from vulnerable legacy technology systems and to strengthen cyber posture across Australian Government systems."
+    },
+    {
+      "id": "001-2026",
+      "kind": "direction",
+      "title": "Direction 001-2026 on Mitigate Vulnerabilities in Cisco SD-WAN Systems",
+      "url": "https://www.protectivesecurity.gov.au/protective-security-directions-under-pspf",
+      "published": "2026-02-26",
+      "text": "PSPF Direction 001-2026 requires Australian Government entities to inventory Cisco Software-Defined Wide-Area Networking (SD-WAN) systems, apply updates, assess and report potential compromise and prevent the installation of unpatched versions from all Australian Government systems and devices."
+    }
+  ]
+}

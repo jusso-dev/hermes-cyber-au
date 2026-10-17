@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "title", "url", "published", "text"],
+  "properties": {
+    "id": {"type": "string"},
+    "kind": {"const": "direction"},
+    "title": {"type": "string"},
+    "url": {"type": "string"},
+    "published": {"type": ["string", "null"]},
+    "text": {"type": "string"}
+  }
+}

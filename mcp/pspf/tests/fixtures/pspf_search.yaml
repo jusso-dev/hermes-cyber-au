@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "<h1>PSPF on a page 2026</h1><p>The PSPF on a page provides an overview of the Protective Security Policy Framework.</p>"

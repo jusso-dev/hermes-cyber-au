@@ -68,3 +68,14 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  pspf:
+    connector: pspf
+    args:
+    - serve
+    - pspf
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
