@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bank": {"type": "string", "enum": ["org", "intel", "lessons"]},
+    "content": {"type": "string"},
+    "context": {"type": "string"},
+    "document_id": {"type": "string"},
+    "confirmed": {"type": "boolean"}
+  },
+  "required": ["bank", "content"]
+}

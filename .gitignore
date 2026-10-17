@@ -44,7 +44,11 @@ backups/
 # Infrastructure that should not live in this repo
 hermes-agent/
 .worktrees/
-profiles/
+# Local Hermes homes dropped in the repo. The shipped role overlays stay tracked.
+profiles/*
+!profiles/README.md
+!profiles/overlays/
+!profiles/overlays/**
 bin/
 node_modules/
 

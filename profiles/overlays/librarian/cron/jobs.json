@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "org-librarian-file",
+      "name": "File shared memory",
+      "schedule": "every 1d at 18:00",
+      "prompt": "Retain confirmed organisation facts in the org bank and lessons in the lessons bank. Recall stays wrapped as untrusted unless the bank is org and the record is marked confirmed. Do not deliver to the owner. Do not edit SOUL.md or skills. Do not send mail or Slack. Do not contact a regulator. Do not use reflect.",
+      "deliver": "local",
+      "paused": true,
+      "enabled": false
+    }
+  ]
+}

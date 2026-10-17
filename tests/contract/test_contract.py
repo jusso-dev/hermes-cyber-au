@@ -112,7 +112,14 @@ def check_connector(package: Path) -> None:
         assert _TOOL_NAME.match(name), name
         model_name = f"mcp__{connector.server_name}__{name}"
         assert len(model_name) <= 64, model_name
-        assert tool.annotations.readOnlyHint is True
+        write_tool = name == "hindsight_retain" or (
+            name.startswith("handoff_") and name != "handoff_list"
+        )
+        if write_tool:
+            assert tool.annotations.readOnlyHint is False, name
+        else:
+            assert tool.annotations.readOnlyHint is True, name
+        assert tool.annotations.destructiveHint is False
         schema_path = package / "schema" / f"{name}.input.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator.check_schema(schema)

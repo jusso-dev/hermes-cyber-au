@@ -1,0 +1,4 @@
+role: watcher
+holds_connector_keys: true
+hindsight_read_only: false
+may_deliver_to_owner: false

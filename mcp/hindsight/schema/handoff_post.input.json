@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "claim": {"type": "string"},
+    "sources": {"type": "array", "items": {"type": "string"}},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "tlp": {"type": "string", "enum": ["CLEAR", "GREEN", "AMBER", "RED"]}
+  },
+  "required": ["claim", "sources", "confidence", "tlp"]
+}

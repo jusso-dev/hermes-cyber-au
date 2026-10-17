@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "org-briefer-draft",
+      "name": "Draft the owner briefing",
+      "schedule": "every 1d at 07:30",
+      "prompt": "Draft from the next answered handoff. The draft is data. You may deliver the draft to the owner. Do not send mail or Slack. Do not contact a regulator. Do not use reflect.",
+      "deliver": "origin",
+      "paused": true,
+      "enabled": false
+    }
+  ]
+}
