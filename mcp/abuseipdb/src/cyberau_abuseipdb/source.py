@@ -1,9 +1,11 @@
 """Read-only AbuseIPDB IP reputation. Reporting an address is not implemented."""
 
+import email.utils
 import ipaddress
 import json
 import os
 import random
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +34,14 @@ _DAY = 86_400
 _CHECK_RATE = 900 / _DAY
 _BLOCK_RATE = 80 / _DAY
 _BURST = 4
+# One call must finish well inside the 120 s tool timeout: 3 attempts of 10 s each, at most
+# 10 s waiting on the local limiter per attempt, and at most 15 s sleeping on Retry-After.
+_HTTP_TIMEOUT = 10
+_HTTP_RETRIES = 2
+_MAX_RETRY_WAIT = 15
+_LIMITER_WAIT = 10
+_KEY_SHAPE = re.compile(r"[\x21-\x7e]+")
+_COUNTRY = re.compile(r"[A-Za-z]{2}")
 _CACHE_TTL = 6 * 3600
 _CHECK_FIELDS = ("ipAddress", "abuseConfidenceScore", "totalReports")
 _PACKAGE = Path(__file__).resolve().parents[2]
@@ -79,16 +89,17 @@ def abuseipdb_check_ip(ip: _Ip, max_age_days: _Age = 90) -> dict:
             warnings=("no matching address in the offline snapshot or cache",),
             urls=(CHECK_URL,),
         )
-    _persist(
-        [
-            _history(
-                record["ip"],
-                record["abuse_confidence_score"],
-                record["total_reports"],
-                record["country_code"],
-            )
-        ]
-    )
+    if cache == "miss":
+        _persist(
+            [
+                _history(
+                    record["ip"],
+                    record["abuse_confidence_score"],
+                    record["total_reports"],
+                    record["country_code"],
+                )
+            ]
+        )
     return _envelope(record, cache, payload, urls=(CHECK_URL,))
 
 
@@ -131,17 +142,18 @@ def abuseipdb_check_block(network: str) -> dict:
             warnings=("no matching network in the offline snapshot or cache",),
             urls=(BLOCK_URL,),
         )
-    _persist(
-        [
-            _history(
-                row["ip"],
-                row["abuse_confidence_score"],
-                row["num_reports"],
-                row["country_code"],
-            )
-            for row in record["reported"]
-        ]
-    )
+    if cache == "miss":
+        _persist(
+            [
+                _history(
+                    row["ip"],
+                    row["abuse_confidence_score"],
+                    row["num_reports"],
+                    row["country_code"],
+                )
+                for row in record["reported"]
+            ]
+        )
     return _envelope(record, cache, payload, urls=(BLOCK_URL,))
 
 
@@ -246,7 +258,7 @@ class _EndpointLimiter:
             rate=rate,
             burst=burst,
             window=window,
-            timeout=timeout,
+            timeout=min(timeout, _LIMITER_WAIT),
         )
 
 
@@ -273,15 +285,17 @@ def _fetch(
     if not force_live and snapshot_env:
         return _offline_snapshot(endpoint)
 
-    secret = lookup(_ENV_KEY)
+    secret = (lookup(_ENV_KEY) or "").strip()
     if not secret:
         return None, "snapshot", f"{_ENV_KEY} is not set"
+    if not _KEY_SHAPE.fullmatch(secret):
+        return None, "snapshot", f"{_ENV_KEY} is not a valid header value. Check the profile .env."
     client = _client(data_dir, cache, endpoint, rate)
     try:
         response = client.get(
             url,
             params=params,
-            headers={"Accept": "application/json", "Key": secret},
+            headers={"accept": "application/json", "Key": secret},
             ttl=_CACHE_TTL,
             skip_cache=force_live,
         )
@@ -294,13 +308,13 @@ def _fetch(
         return None, "snapshot", _safe(str(exc), secret)
     finally:
         client.close()
-    payload = _load(response.body.decode("utf-8"))
-    if response.status >= 400:
-        if response.status == 429:
+    payload = _load(response.body.decode("utf-8", errors="replace"))
+    if response.status >= 300:
+        if response.status == 429 and not force_live:
             cached = cache.get(key)
             if cached:
                 return _load(cached.body.decode("utf-8")), "stale", ""
-        return None, "snapshot", _status_warning(response.status, payload, secret)
+        return None, "snapshot", _status_warning(response, payload, secret)
     return payload, response.cache, ""
 
 
@@ -326,14 +340,18 @@ def _client(data_dir: Path, cache: HttpCache, endpoint: str, rate: float) -> Htt
         transport=_TRANSPORT,
         sleeper=_SLEEP,
         rng=_RNG,
+        timeout=_HTTP_TIMEOUT,
+        retries=_HTTP_RETRIES,
+        max_retry_wait=_MAX_RETRY_WAIT,
     )
 
 
 def _check_record(data: dict) -> dict | None:
     score = _as_int(data.get("abuseConfidenceScore"))
     reports = _as_int(data.get("totalReports"))
-    address = data.get("ipAddress")
-    if score is None or reports is None or not isinstance(address, str):
+    address = _address(data.get("ipAddress"))
+    names = data.get("hostnames") or []
+    if score is None or reports is None or address is None or not isinstance(names, list):
         return None
     distinct = data.get("numDistinctUsers")
     return {
@@ -346,11 +364,11 @@ def _check_record(data: dict) -> dict | None:
         "country_code": _code(data.get("countryCode")),
         "country_name": _text(data.get("countryName")),
         "domain": _text(data.get("domain")),
-        "hostnames": [_text(item) for item in data.get("hostnames") or [] if item],
+        "hostnames": [_text(item) for item in names if item],
         "is_whitelisted": bool(data.get("isWhitelisted")),
         "is_tor": bool(data.get("isTor")),
         "is_public": bool(data.get("isPublic", True)),
-        "last_reported_at": _optional_str(data.get("lastReportedAt")),
+        "last_reported_at": _timestamp(data.get("lastReportedAt")),
     }
 
 
@@ -361,25 +379,25 @@ def _block_record(network: ipaddress._BaseNetwork, data: dict) -> dict | None:
             return None
         score = _as_int(item.get("abuseConfidenceScore"))
         count = _as_int(item.get("numReports"))
-        address = item.get("ipAddress")
-        if score is None or count is None or not isinstance(address, str):
+        address = _address(item.get("ipAddress"))
+        if score is None or count is None or address is None:
             return None
         reported.append(
             {
                 "ip": address,
                 "abuse_confidence_score": score,
                 "num_reports": count,
-                "most_recent_report": _optional_str(item.get("mostRecentReport")),
+                "most_recent_report": _timestamp(item.get("mostRecentReport")),
                 "country_code": _code(item.get("countryCode")),
             }
         )
     hosts = data.get("numPossibleHosts")
     return {
         "network": str(network),
-        "network_address": str(data.get("networkAddress") or network.network_address),
-        "netmask": str(data.get("netmask") or ""),
-        "min_address": str(data.get("minAddress") or ""),
-        "max_address": str(data.get("maxAddress") or ""),
+        "network_address": _address(data.get("networkAddress")) or str(network.network_address),
+        "netmask": _address(data.get("netmask")) or "",
+        "min_address": _address(data.get("minAddress")) or "",
+        "max_address": _address(data.get("maxAddress")) or "",
         "num_possible_hosts": hosts if _as_int(hosts) is not None else None,
         "address_space": _text(data.get("addressSpaceDesc")),
         "reported": reported,
@@ -427,6 +445,10 @@ def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | str
         parsed = ipaddress.ip_address(value.strip())
     except ValueError:
         return "ip must be an IPv4 or IPv6 address"
+    if getattr(parsed, "scope_id", None):
+        return "ip must not carry an IPv6 zone id"
+    if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped is not None:
+        parsed = parsed.ipv4_mapped
     if not _routable_ip(parsed):
         return "private and reserved addresses are not looked up"
     return parsed
@@ -472,23 +494,37 @@ def _validate_age(value: int) -> str:
     return ""
 
 
-def _status_warning(status: int, payload: dict | None, secret: str) -> str:
+def _status_warning(response, payload: dict | None, secret: str) -> str:
+    status = response.status
     detail = ""
     if isinstance(payload, dict) and isinstance(payload.get("errors"), list) and payload["errors"]:
         first = payload["errors"][0]
         if isinstance(first, dict) and first.get("detail"):
             detail = _text(first.get("detail"))
     if status in (401, 403):
-        message = (
-            f"AbuseIPDB rejected the API key (HTTP {status}). Set {_ENV_KEY} to a valid key."
-        )
+        message = f"AbuseIPDB rejected the API key (HTTP {status}). Set {_ENV_KEY} to a valid key."
     elif status == 429:
-        message = "AbuseIPDB daily limit reached (HTTP 429). Retry-After was honoured."
+        wait = _retry_after(response.headers.get("retry-after"))
+        message = f"AbuseIPDB rate limit reached (HTTP 429). Retry-After: {wait}."
     else:
         message = f"AbuseIPDB returned HTTP {status}"
     if detail:
         message = f"{message} {detail}"
     return _safe(message, secret)
+
+
+def _retry_after(value: str | None) -> str:
+    """Echo Retry-After only when it is a number or an HTTP date, never raw upstream text."""
+    if value is None:
+        return "not given"
+    value = value.strip()
+    if re.fullmatch(r"\d{1,9}", value):
+        return f"{value} seconds"
+    try:
+        email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return "not given"
+    return value
 
 
 def _response_problem(name: str, record: dict) -> str | None:
@@ -508,15 +544,30 @@ def _text(value) -> str:
 
 
 def _code(value) -> str | None:
-    if value is None or value == "":
-        return None
-    return str(value)
+    if isinstance(value, str) and _COUNTRY.fullmatch(value):
+        return value.upper()
+    return None
 
 
-def _optional_str(value) -> str | None:
-    if value is None or value == "":
+def _address(value) -> str | None:
+    """An address string from upstream, or None. Only a parsed address leaves unwrapped."""
+    if not isinstance(value, str):
         return None
-    return str(value)
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        return None
+
+
+def _timestamp(value) -> str | None:
+    """An ISO 8601 timestamp from upstream, or None. Anything else is dropped, not echoed."""
+    if not isinstance(value, str):
+        return None
+    try:
+        datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return value
 
 
 def _as_int(value) -> int | None:
@@ -566,12 +617,14 @@ def _envelope(
     as_of = None
     if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
         body = payload["data"]
-        as_of = body.get("lastReportedAt")
+        as_of = _timestamp(body.get("lastReportedAt"))
         if not as_of:
             recent = [
-                item.get("mostRecentReport")
+                stamp
                 for item in body.get("reportedAddress") or []
-                if isinstance(item, dict) and item.get("mostRecentReport")
+                if isinstance(item, dict)
+                for stamp in (_timestamp(item.get("mostRecentReport")),)
+                if stamp
             ]
             as_of = max(recent) if recent else None
     return envelope(
