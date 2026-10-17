@@ -68,3 +68,30 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  misp:
+    connector: misp
+    args:
+    - serve
+    - misp
+    env:
+    - MISP_URL=${MISP_URL}
+    - MISP_API_KEY=${MISP_API_KEY}
+    tools:
+      include:
+      - search_attributes
+      - get_event
+      - search_events
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    required_env:
+    - MISP_URL
+    - MISP_API_KEY
+    wrap: true
+    upstream:
+      repository: https://github.com/MISP/misp-mcp
+      commit: 3d033828a78b6b3cb2292b255c8d2ad093c1bee5
+      launcher: misp-mcp
+      vendored: false

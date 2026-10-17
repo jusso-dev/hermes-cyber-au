@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["type", "value"],
+  "properties": {
+    "id": {"type": "string"},
+    "event_id": {"type": "string"},
+    "type": {"type": "string"},
+    "category": {"type": "string"},
+    "value": {"type": "string"},
+    "comment": {"type": "string"},
+    "to_ids": {"type": "boolean"}
+  }
+}

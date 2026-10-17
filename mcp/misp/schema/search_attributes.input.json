@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "value": {"type": "string"},
+    "attribute_type": {"type": "string"},
+    "category": {"type": "string"},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}
+  }
+}

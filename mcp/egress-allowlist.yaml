@@ -32,3 +32,7 @@ connectors:
     - services.nvd.nist.gov
     allow_ip_literals: false
     allow_http_loopback: false
+  misp:
+    hosts: []
+    allow_ip_literals: false
+    allow_http_loopback: false
