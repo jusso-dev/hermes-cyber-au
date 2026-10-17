@@ -298,7 +298,15 @@ def check_venv(ctx: Context) -> Check:
             "mcp/.venv is not present",
             "Run install/bootstrap.sh to create mcp/.venv from mcp/uv.lock.",
         )
-    expected = _file_sha256(lock)
+    try:
+        expected = _file_sha256(lock)
+    except OSError:
+        return _item(
+            "mcp.venv",
+            "fail",
+            "mcp/uv.lock could not be read",
+            "Restore mcp/uv.lock, then run install/bootstrap.sh.",
+        )
     stamp_path = venv / ".cyberau-lock-sha256"
     if not stamp_path.is_file():
         return _item(
@@ -307,8 +315,7 @@ def check_venv(ctx: Context) -> Check:
             "lockfile hash is not recorded",
             "Re-run install/bootstrap.sh so mcp/.venv records the uv.lock hash.",
         )
-    recorded = stamp_path.read_text(encoding="utf-8").strip()
-    if recorded != expected:
+    if _recorded_hash(stamp_path) != expected:
         return _item(
             "mcp.venv",
             "fail",
@@ -554,6 +561,7 @@ def default_health(root: Path, environ: Mapping[str, str]) -> Health:
         if binary is None:
             return 127, "cyberau-mcp is not installed"
         flag = "--live" if live else "--offline"
+        declared = _server_env(root, _environ_home(root, environ), environ, name) if live else {}
         try:
             proc = subprocess.run(
                 [str(binary), "health", name, flag],
@@ -561,7 +569,7 @@ def default_health(root: Path, environ: Mapping[str, str]) -> Health:
                 capture_output=True,
                 text=True,
                 timeout=60 if live else 20,
-                env=_probe_env(environ, live=live),
+                env=_probe_env(environ, declared),
             )
         except subprocess.TimeoutExpired:
             return 1, "health probe timed out"
@@ -576,7 +584,11 @@ def default_health(root: Path, environ: Mapping[str, str]) -> Health:
 def redact(text: str, environ: Mapping[str, str]) -> str:
     cleaned = text
     values = sorted(
-        {value for value in environ.values() if isinstance(value, str) and len(value) >= 8},
+        {
+            value
+            for key, value in environ.items()
+            if isinstance(value, str) and len(value) >= 8 and not _plain_setting(key)
+        },
         key=len,
         reverse=True,
     )
@@ -1118,7 +1130,10 @@ def _venv_needs_bootstrap(ctx: Context) -> bool:
     stamp = venv / ".cyberau-lock-sha256"
     if not stamp.is_file():
         return True
-    return stamp.read_text(encoding="utf-8").strip() != _file_sha256(lock)
+    try:
+        return _recorded_hash(stamp) != _file_sha256(lock)
+    except OSError:
+        return True
 
 
 def _installed_servers(ctx: Context) -> list[tuple[str, dict]]:
@@ -1363,6 +1378,13 @@ def _load_mapping(path: Path) -> tuple[dict | None, str]:
     return data, ""
 
 
+def _recorded_hash(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return ""
+
+
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -1385,7 +1407,8 @@ def _health_binary(root: Path) -> Path | None:
     return None
 
 
-def _probe_env(environ: Mapping[str, str], *, live: bool) -> dict[str, str]:
+def _probe_env(environ: Mapping[str, str], declared: Mapping[str, str]) -> dict[str, str]:
+    """Environment for a health probe: plain settings plus the connector's own variables."""
     base: dict[str, str] = {}
     for key in _SAFE_ENV:
         value = os.environ.get(key)
@@ -1394,13 +1417,72 @@ def _probe_env(environ: Mapping[str, str], *, live: bool) -> dict[str, str]:
     for key, value in environ.items():
         if key in _SAFE_ENV or key.startswith("CYBERAU_") or key == "HERMES_HOME":
             base[key] = value
-        elif live and _credential_name(key):
-            base[key] = value
+    base.update(declared)
     return base
 
 
-def _credential_name(key: str) -> bool:
-    return key.endswith(("_API_KEY", "_TOKEN", "_AUTH_KEY", "_PASSWORD"))
+def _plain_setting(key: str) -> bool:
+    return key in _SAFE_ENV or key.startswith(("CYBERAU_", "HERMES_"))
+
+
+def _environ_home(root: Path, environ: Mapping[str, str]) -> Path:
+    home = environ.get("HERMES_HOME")
+    return Path(home).expanduser() if home else root
+
+
+def _server_env(
+    root: Path, home: Path, environ: Mapping[str, str], target: str
+) -> dict[str, str]:
+    """Variables a connector declares, resolved from the profile environment."""
+    catalogue, problem = _server_catalogue(root)
+    if problem:
+        catalogue = {}
+    config_path = home / "config.yaml"
+    if not config_path.is_file():
+        config_path = root / "config.yaml"
+    config, config_problem = _load_mapping(config_path)
+    rendered = {}
+    if not config_problem and isinstance(config, dict):
+        candidate = config.get("mcp_servers") or {}
+        if isinstance(candidate, dict):
+            rendered = candidate
+    resolved: dict[str, str] = {}
+    for name in list(rendered) or list(catalogue):
+        if not isinstance(name, str):
+            continue
+        spec = dict(catalogue.get(name) or {})
+        overlay = rendered.get(name) or {}
+        if isinstance(overlay, dict):
+            spec.update(overlay)
+        if _health_target(spec, _connector_key(spec, name)) != target:
+            continue
+        for key, source in _env_pairs(spec):
+            if _env_present(source, environ):
+                resolved[key] = environ[source]
+    return resolved
+
+
+def _env_pairs(spec: dict) -> list[tuple[str, str]]:
+    """Pairs of (variable the connector reads, variable that supplies it)."""
+    pairs: list[tuple[str, str]] = []
+    env_field = spec.get("env")
+    items: list[tuple[str, str]] = []
+    if isinstance(env_field, dict):
+        items = [(k, v) for k, v in env_field.items() if isinstance(k, str) and isinstance(v, str)]
+    elif isinstance(env_field, list):
+        for item in env_field:
+            if not isinstance(item, str):
+                continue
+            key, sep, value = item.partition("=")
+            items.append((key.strip(), value) if sep else (key.strip(), "${" + key.strip() + "}"))
+    for key, value in items:
+        match = _PLACEHOLDER.fullmatch(value.strip())
+        if match is not None:
+            pairs.append((key, match.group(1)))
+    for name in spec.get("required_env") or []:
+        if isinstance(name, str):
+            pairs.append((name, name))
+    return pairs
 
 
 def _child_env(ctx: Context) -> dict[str, str]:

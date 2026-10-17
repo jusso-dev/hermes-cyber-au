@@ -592,3 +592,68 @@ def test_cli_and_slash_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, 
     assert body["version"] == "0.1.0"
     assert "not installed" in text
     assert capture.slash("help") == "Usage: /cyber-au doctor [--offline] [--json] [--fix]"
+
+
+def test_redaction_keeps_plain_settings_readable():
+    environ = {
+        "HERMES_PROFILE": "cyber-au",
+        "CYBERAU_DATA_DIR": "plugin-data",
+        "NVD_API_KEY": SECRET,
+    }
+    text = doctor.redact(f"plugin cyber-au in plugin-data saw {SECRET}", environ)
+    assert text == "plugin cyber-au in plugin-data saw [redacted]"
+
+
+def test_live_probe_gets_only_the_connectors_declared_variables(tmp_path: Path):
+    root = healthy(tmp_path)
+    _write(
+        root / "mcp" / "servers.yaml",
+        "servers:\n"
+        "  kev:\n"
+        "    connector: cisa-kev\n"
+        "    args: [serve, cisa-kev]\n"
+        "    env:\n"
+        "      - FEED_TOKEN=${KEV_FEED_TOKEN}\n"
+        "    enabled_by_default: true\n"
+        "    required_env: []\n"
+        "  other:\n"
+        "    connector: other\n"
+        "    args: [serve, other]\n"
+        "    env:\n"
+        "      - OTHER_API_KEY=${OTHER_API_KEY}\n"
+        "    required_env: []\n",
+    )
+    environ = {
+        "KEV_FEED_TOKEN": SECRET,
+        "OTHER_API_KEY": "other-seed-secret-1b2c3d",
+        "AWS_SESSION_TOKEN": "unrelated-seed-secret-4e5f6a",
+        "CYBERAU_DATA_DIR": str(tmp_path),
+    }
+    declared = doctor._server_env(root, root, environ, "cisa-kev")
+    assert declared == {"FEED_TOKEN": SECRET}
+    child = doctor._probe_env(environ, declared)
+    assert child["FEED_TOKEN"] == SECRET
+    assert child["CYBERAU_DATA_DIR"] == str(tmp_path)
+    assert "OTHER_API_KEY" not in child
+    assert "AWS_SESSION_TOKEN" not in child
+    assert "KEV_FEED_TOKEN" not in child
+    assert "OTHER_API_KEY" not in doctor._probe_env(environ, {})
+
+
+def test_unreadable_lock_stamp_is_reported_not_raised(tmp_path: Path):
+    root = healthy(tmp_path)
+    (root / "mcp" / ".venv" / ".cyberau-lock-sha256").write_bytes(b"\xff\xfe\x00bad")
+    report = run(root)
+    assert ids(report)["mcp.venv"].status == "fail"
+    assert "does not match" in ids(report)["mcp.venv"].detail
+    assert doctor._venv_needs_bootstrap(
+        doctor.Context(
+            root=root,
+            home=root,
+            environ={},
+            offline=True,
+            today=TODAY,
+            hermes_version=lambda: "hermes 0.22.2",
+            health=lambda _name, _live: (0, "ok"),
+        )
+    )
