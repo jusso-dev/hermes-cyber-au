@@ -1,0 +1,18 @@
+{
+  "breaches": [
+    {
+      "Name": "Adobe"
+    },
+    {
+      "Name": "Gawker"
+    },
+    {
+      "Name": "Stratfor"
+    }
+  ],
+  "totalCount": 3,
+  "returnedCount": 3,
+  "offset": 0,
+  "limit": 25,
+  "hasMore": false
+}

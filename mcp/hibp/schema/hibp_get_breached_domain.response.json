@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["domain_sha256", "aliases"],
+  "properties": {
+    "domain_sha256": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+    "alias_count": {"type": "integer"},
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["alias", "breaches"],
+        "properties": {
+          "alias": {"type": "string"},
+          "breaches": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

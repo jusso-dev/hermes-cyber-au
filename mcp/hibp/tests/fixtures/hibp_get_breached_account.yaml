@@ -1,0 +1,21 @@
+version: 1
+interactions:
+- request:
+    method: POST
+    uri: https://haveibeenpwned.com/mcp
+    body: '{"id":1,"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"account":"account-exists@hibp-integration-tests.com","includeUnverified":true,"limit":25,"offset":0,"responseMode":"names","response_format":"json"},"name":"hibp_get_breached_account"}}'
+    headers: {}
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      content-type:
+      - text/event-stream
+    body:
+      string: 'event: message
+
+        data: {"result":{"content":[{"type":"text","text":"{\"breaches\":[{\"Name\":\"Adobe\"}],\"totalCount\":1,\"returnedCount\":1,\"offset\":0,\"limit\":25,\"hasMore\":false}"}],"structuredContent":{"breaches":[{"Name":"Adobe"}],"totalCount":1,"returnedCount":1,"offset":0,"limit":25,"hasMore":false},"isError":false},"jsonrpc":"2.0","id":1}
+
+
+        '

@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "domain": {"type": "string", "maxLength": 253},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 25},
+    "offset": {"type": "integer", "minimum": 0, "default": 0},
+    "approval_token": {"type": "string", "maxLength": 128}
+  },
+  "required": ["domain"]
+}

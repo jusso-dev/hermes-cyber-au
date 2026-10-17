@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["breaches", "total_count"],
+  "properties": {
+    "breaches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "title", "breach_date", "pwn_count", "data_classes", "description"],
+        "properties": {
+          "name": {"type": "string"},
+          "title": {"type": "string"},
+          "domain": {"type": ["string", "null"]},
+          "breach_date": {"type": "string"},
+          "pwn_count": {"type": "integer"},
+          "data_classes": {"type": "array", "items": {"type": "string"}},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "total_count": {"type": "integer"}
+  }
+}

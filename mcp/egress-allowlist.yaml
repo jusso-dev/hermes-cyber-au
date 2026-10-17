@@ -269,3 +269,9 @@ connectors:
     - api.greynoise.io
     allow_ip_literals: false
     allow_http_loopback: false
+  hibp:
+    hosts:
+    - haveibeenpwned.com
+    - api.pwnedpasswords.com
+    allow_ip_literals: false
+    allow_http_loopback: false

@@ -1,0 +1,4 @@
+{
+  "error": "invalid_token",
+  "error_description": "Authenticated HIBP MCP tools require an OAuth bearer token."
+}
