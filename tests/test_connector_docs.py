@@ -109,9 +109,11 @@ class ConnectorDocsTest(unittest.TestCase):
         for key in CHECKOUT_KEYS:
             page = self.files[f"docs/connectors/{key}.md"]
             self.assertIn(
-                "No feeds for this connector are listed in `feeds/catalogue.yaml`.",
+                "`feeds/catalogue.yaml` is not in this checkout, so no feeds are listed.",
                 page,
             )
+            banner = page.split("Do not edit by hand.", 1)[0]
+            self.assertNotIn("feeds/catalogue.yaml", banner)
 
     def test_unknown_catalogue_connector_is_not_a_row(self):
         feeds = [
@@ -169,3 +171,39 @@ class ConnectorDocsTest(unittest.TestCase):
         self.assertIn("${NVD_API_KEY}", section)
         self.assertIn("header `apiKey`", section)
         self.assertNotIn("apiKey=", section)
+
+    def test_secret_guard_catches_prefixed_names(self):
+        for text in (
+            "NVD_API_KEY=abcdefghijklmnop1234",
+            "access_token=abcdefghijklmnop1234",
+            "GITHUB_TOKEN: ghp_abcdefghijklmnop1234",
+            '"client_secret": "abcdefghijklmnop1234"',
+        ):
+            with self.assertRaises(SystemExit, msg=text):
+                self.docs.assert_house_style(text, "page")
+        self.docs.assert_house_style("`NVD_API_KEY=${NVD_API_KEY}`", "page")
+
+    def test_manifest_env_must_be_a_placeholder(self):
+        specs = [("nvd", {"env": ["NVD_API_KEY=abcdefghijklmnop1234"]})]
+        with self.assertRaises(SystemExit):
+            self.docs._apply_manifest({}, specs)
+        specs = [("nvd", {"env": ["NVD_API_KEY=${NVD_API_KEY}"]})]
+        uses: dict = {}
+        self.assertEqual(
+            self.docs._apply_manifest(uses, specs), (["NVD_API_KEY=${NVD_API_KEY}"], [])
+        )
+
+    def test_auth_cell_ignores_plain_capitals(self):
+        self.assertEqual(
+            self.docs.auth_cell("none. Served over TLS, JSON only."), "none"
+        )
+        self.assertEqual(
+            self.docs.auth_cell("none. Optional GITHUB_TOKEN for releases."),
+            "`GITHUB_TOKEN` (optional)",
+        )
+
+    def test_prose_ends_with_a_full_stop(self):
+        self.assertEqual(
+            self.docs.prose("one download a day", "x"), "One download a day."
+        )
+        self.assertEqual(self.docs.prose("Already done.", "x"), "Already done.")
