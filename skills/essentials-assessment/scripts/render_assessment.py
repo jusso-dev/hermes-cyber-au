@@ -45,11 +45,16 @@ _URL = re.compile(r"\b(https?)://([^\s/]+)(\S*)", re.IGNORECASE)
 _EMAIL = re.compile(r"\b([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b")
 _IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _HOST = re.compile(r"(?i)^((?:[a-z0-9-]+\.)+[a-z]{2,})((?::\d+)?(?:[/?#].*)?)$")
-_NO_RECORD = re.compile(r"(?i)\bno (?:backup )?evidence\b|\bno record\b")
-_INSTRUCTION = re.compile(
-    r"(?i)(ignore previous|essentials_publish|mark every control met|"
-    r"post the workbook|email the workbook)"
+_NO_RECORD = re.compile(
+    r"(?i)\bno\s+(?:\w+\s+)?(?:evidence|records?)\b|\bnone recorded\b|\bnot recorded\b"
 )
+_INSTRUCTION = re.compile(
+    r"(?i)(?:ignore|disregard|forget)\s+(?:all\s+|any\s+|the\s+|your\s+)*"
+    r"(?:previous|prior|above|earlier)"
+    r"|essentials_publish|mark\s+(?:every|all|each)\s+(?:control|requirement)s?\s+(?:as\s+)?met"
+    r"|\b(?:post|send|email|upload|publish)\s+the\s+(?:workbook|assessment)\b"
+)
+_FORMULA = ("=", "+", "-", "@", "\t", "\r")
 
 
 @dataclass(frozen=True)
@@ -239,6 +244,7 @@ def _add_e8(document: dict, as_of: str, built: Built) -> None:
             scored.append(f"{strategy} missing")
             continue
         level_status: dict[int, list[str]] = {}
+        unrated = False
         for level, requirement in requirements:
             requirement_id = str(requirement.get("id") or "missing")
             raw_text = requirement.get("text")
@@ -260,7 +266,9 @@ def _add_e8(document: dict, as_of: str, built: Built) -> None:
             if not text:
                 note = "No requirement text was returned. " + note
             note = _with_instruction(note, instructions)
-            if level is not None:
+            if level is None:
+                unrated = True
+            else:
                 level_status.setdefault(level, []).append(status)
             citations = tuple(item for item in (citation, *ism_cites) if item)
             if texts or instructions:
@@ -285,7 +293,14 @@ def _add_e8(document: dict, as_of: str, built: Built) -> None:
             built.extras.append(
                 f"{strategy}: level 1 was not retrieved, so no lower level was awarded."
             )
-        scored.append(f"{strategy} {_award(level_status)}")
+        if unrated:
+            built.extras.append(
+                f"{strategy}: a requirement had no maturity level of 1, 2 or 3, "
+                "so no maturity was awarded."
+            )
+            scored.append(f"{strategy} missing")
+        else:
+            scored.append(f"{strategy} {_award(level_status)}")
     built.maturity = "Essential Eight maturity: " + "; ".join(scored)
 
 
@@ -683,7 +698,11 @@ def _requirements(blocks: list[dict]) -> list[tuple[int | None, dict]]:
     for block in blocks:
         level = block.get("maturity_level")
         parsed = (
-            level if isinstance(level, int) and not isinstance(level, bool) else None
+            level
+            if isinstance(level, int)
+            and not isinstance(level, bool)
+            and level in (1, 2, 3)
+            else None
         )
         requirements = block.get("requirements")
         if not isinstance(requirements, list):
@@ -752,7 +771,7 @@ def _pack(items: list[dict]) -> tuple[str, str, list[str]]:
     for item in items:
         ref = item.get("ref")
         if isinstance(ref, str) and ref.strip():
-            refs.append(ref.strip())
+            refs.append(_defang_ref(ref.strip()))
         raw = item.get("text")
         if not isinstance(raw, str) or not raw.strip():
             continue
@@ -762,6 +781,13 @@ def _pack(items: list[dict]) -> tuple[str, str, list[str]]:
         else:
             texts.append(shown)
     return ";".join(refs), " ".join(texts), instructions
+
+
+def _defang_ref(ref: str) -> str:
+    """Defang a reference only when it is a URL, an email address or an IPv4 address."""
+    if "://" in ref or "@" in ref or _IPV4.search(ref):
+        return defang_observable(ref)
+    return ref
 
 
 def _with_instruction(note: str, instructions: list[str]) -> str:
@@ -850,6 +876,11 @@ def _row(
     )
 
 
+def _safe_cell(value: str) -> str:
+    """Stop a spreadsheet reading an untrusted cell as a formula."""
+    return f"'{value}" if value.startswith(_FORMULA) else value
+
+
 def _csv(rows: list[Row]) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
@@ -861,7 +892,8 @@ def _csv(rows: list[Row]) -> str:
         if row.citations:
             notes = f"{notes} {' '.join(row.citations)}".strip()
         writer.writerow(
-            [
+            _safe_cell(cell)
+            for cell in (
                 row.strategy_or_domain,
                 row.requirement_id,
                 row.requirement_text,
@@ -869,7 +901,7 @@ def _csv(rows: list[Row]) -> str:
                 row.status,
                 row.ism_ids,
                 notes,
-            ]
+            )
         )
     return buffer.getvalue()
 
