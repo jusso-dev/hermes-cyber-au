@@ -247,3 +247,9 @@ connectors:
     hosts: []
     allow_ip_literals: false
     allow_http_loopback: false
+  openphish:
+    hosts:
+    - openphish.com
+    - raw.githubusercontent.com
+    allow_ip_literals: false
+    allow_http_loopback: false

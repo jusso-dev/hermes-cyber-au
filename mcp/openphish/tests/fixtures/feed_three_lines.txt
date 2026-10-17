@@ -1,0 +1,3 @@
+https://phish.example/login
+https://phish.example/reset
+http://phish.example/pay

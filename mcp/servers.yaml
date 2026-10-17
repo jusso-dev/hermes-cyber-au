@@ -356,3 +356,14 @@ servers:
     required_env:
     - OPENCTI_URL
     - OPENCTI_TOKEN
+  phish:
+    connector: openphish
+    args:
+    - serve
+    - openphish
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
