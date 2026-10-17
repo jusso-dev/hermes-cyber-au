@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "estimated_created_at": "2026-06-02T02:00:00Z",
+        "type": "stealer_log",
+        "uid": "stealer_log/synthetic/identifier",
+        "severity": "high"
+      },
+      "identifiers": [{"id": 101, "name": "example.com.au"}],
+      "highlights": {"title": ["Synthetic identifier drill-down for example.com.au"]}
+    }
+  ],
+  "next": null
+}

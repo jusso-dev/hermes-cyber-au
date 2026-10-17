@@ -1,0 +1,21 @@
+{
+  "tools": [
+    {"name": "search_tenant"},
+    {"name": "search_global"},
+    {"name": "search_validate_search_query"},
+    {"name": "events_get_event"},
+    {"name": "events_expand_event"},
+    {"name": "events_get_event_type"},
+    {"name": "identifiers_list"},
+    {"name": "identifiers_explain_event"},
+    {"name": "identifier_groups_list"},
+    {"name": "matching_policies_list"},
+    {"name": "severity_rules_list"},
+    {"name": "entities_search"},
+    {"name": "profile_get"},
+    {"name": "identifiers_create"},
+    {"name": "identifier_groups_create"},
+    {"name": "matching_policies_create"},
+    {"name": "severity_rules_create"}
+  ]
+}

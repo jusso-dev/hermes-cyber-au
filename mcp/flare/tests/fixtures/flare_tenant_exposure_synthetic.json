@@ -1,0 +1,67 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "estimated_created_at": "2026-06-02T02:00:00Z",
+        "type": "stealer_log",
+        "uid": "stealer_log/synthetic/1",
+        "severity": "high"
+      },
+      "identifiers": [{"id": 101, "name": "example.com.au"}],
+      "highlights": {"title": ["Synthetic stealer log for example.com.au"]}
+    },
+    {
+      "metadata": {
+        "estimated_created_at": "2026-06-03T02:00:00Z",
+        "type": "ransomleak",
+        "uid": "ransomleak/synthetic/1",
+        "severity": "critical"
+      },
+      "identifiers": [{"id": 101, "name": "example.com.au"}],
+      "highlights": {
+        "title": ["Synthetic ransomware leak site claim for example.com.au"]
+      }
+    },
+    {
+      "metadata": {
+        "estimated_created_at": "2026-06-01T04:00:00Z",
+        "type": "leak",
+        "uid": "leak/synthetic/1",
+        "severity": "medium"
+      },
+      "identifiers": [{"id": 101, "name": "example.com.au"}],
+      "highlights": {"title": ["Synthetic leak site item for example.com.au"]}
+    },
+    {
+      "metadata": {
+        "estimated_created_at": "2026-01-15T02:00:00Z",
+        "type": "listing",
+        "uid": "listing/synthetic/old",
+        "severity": "high"
+      },
+      "identifiers": [{"id": 101, "name": "example.com.au"}],
+      "highlights": {"title": ["Older listing outside the window"]}
+    },
+    {
+      "metadata": {
+        "estimated_created_at": "2026-06-02T02:00:00Z",
+        "type": "chat_message",
+        "uid": "chat_message/synthetic/1",
+        "severity": "low"
+      },
+      "identifiers": [{"id": 101, "name": "example.com.au"}],
+      "highlights": {"title": ["Chat message excluded from the default filter"]}
+    },
+    {
+      "metadata": {
+        "estimated_created_at": "2026-06-02T02:00:00Z",
+        "type": "listing",
+        "uid": "listing/synthetic/other",
+        "severity": "info"
+      },
+      "identifiers": [{"id": 202, "name": "not-on-list.example.com.au"}],
+      "highlights": {"title": ["Listing for a domain outside the watchlist"]}
+    }
+  ],
+  "next": null
+}

@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "since": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD, Australia/Sydney"
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "stealer_log",
+          "ransomleak",
+          "leak",
+          "illicit_networks",
+          "listing",
+          "forum_content",
+          "chat_message",
+          "paste",
+          "source_code",
+          "buckets",
+          "infected_devices",
+          "valid_credential"
+        ]
+      }
+    },
+    "min_severity": {
+      "enum": ["info", "low", "medium", "high", "critical"]
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 100
+    }
+  },
+  "required": []
+}

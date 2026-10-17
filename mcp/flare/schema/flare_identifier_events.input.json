@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "identifier_id": {
+      "type": "integer"
+    },
+    "since": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD, Australia/Sydney"
+    },
+    "include_remediated": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": ["identifier_id"]
+}

@@ -258,3 +258,8 @@ connectors:
     - api.darkowl.com
     allow_ip_literals: false
     allow_http_loopback: false
+  flare:
+    hosts:
+    - api.flare.io
+    allow_ip_literals: false
+    allow_http_loopback: false
