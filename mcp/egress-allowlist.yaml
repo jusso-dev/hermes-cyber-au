@@ -299,3 +299,8 @@ connectors:
     - api.spycloud.io
     allow_ip_literals: false
     allow_http_loopback: false
+  upguard:
+    hosts:
+    - cyber-risk.upguard.com
+    allow_ip_literals: false
+    allow_http_loopback: false

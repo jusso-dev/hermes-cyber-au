@@ -1,0 +1,26 @@
+{
+  "ignored": [],
+  "registered": [
+    {
+      "a_records": ["203.0.113.10"],
+      "date_detected": "2026-06-02T15:04:05Z",
+      "hostname": "examp1e.example.com.au",
+      "mx_records": ["mx.examp1e.example.com.au"],
+      "ns_records": ["ns.example.com.au"],
+      "permutation_type": "homoglyph"
+    },
+    {
+      "date_detected": "2020-01-02T15:04:05Z",
+      "hostname": "old.example.com.au",
+      "mx_records": [],
+      "permutation_type": "addition"
+    }
+  ],
+  "unregistered": [
+    {
+      "date_detected": "2026-06-02T15:04:05Z",
+      "hostname": "example-login.example.com.au",
+      "permutation_type": "hyphenation"
+    }
+  ]
+}

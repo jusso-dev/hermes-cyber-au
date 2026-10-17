@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://cyber-risk.upguard.com/api/public/typosquat/details?domain=example.com.au
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"ignored":[],"registered":[],"unregistered":[]}'
