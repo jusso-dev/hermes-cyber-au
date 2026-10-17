@@ -10,6 +10,7 @@ _SECRET_HEADERS = {
     "auth-key",
     "x-otx-api-key",
     "x-api-key",
+    "x-apikey",
     "api-key",
     "apikey",
 }

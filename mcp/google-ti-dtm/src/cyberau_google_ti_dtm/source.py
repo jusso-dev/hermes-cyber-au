@@ -52,6 +52,7 @@ _DOMAIN = re.compile(
 )
 _LINK = re.compile(r"<([^>]+)>\s*;\s*([^,]+)")
 _STATUS = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_PLAIN = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 _SEVERITY = {"low", "medium", "high"}
 _CREDENTIAL_KINDS = {"infostealer_credential", "breach_credential"}
 _PACKAGE = Path(__file__).resolve().parents[2]
@@ -69,6 +70,10 @@ _MISSING_KEY = "GTI_API_KEY is not set"
 _NOT_USABLE = "Google Threat Intelligence DTM response was not usable"
 _UNAVAILABLE = (
     "unavailable: offline and no cached Google Threat Intelligence DTM response"
+)
+_SNAPSHOT_NOTE = (
+    "Served from a snapshot, not live Google Threat Intelligence DTM data. "
+    "Do not treat it as current."
 )
 _RATE_LIMITED = (
     "Google Threat Intelligence DTM returned HTTP 429 after Retry-After was honoured"
@@ -91,7 +96,7 @@ def gti_dtm_alerts(
         limit=limit,
     )
     watch = _load_watchlist()
-    if watch is not None:
+    if watch is not None and cache != "snapshot":
         _remember(findings, watch)
     stamps = [row["created_at"] for row in records if row.get("created_at")]
     return _envelope(
@@ -138,12 +143,15 @@ def connector() -> PremiumConnector:
 
 class GoogleTiDtmConnector(PremiumConnector):
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
-        _records, findings, _cache, _warnings = _collect_alerts(
+        _records, findings, cache, _warnings = _collect_alerts(
             since=since.isoformat(),
             severity=None,
             status=None,
             limit=500,
         )
+        if cache == "snapshot":
+            # A snapshot or synthetic copy is not exposure evidence.
+            return []
         matched = [
             finding
             for finding in findings
@@ -160,6 +168,8 @@ class GoogleTiDtmConnector(PremiumConnector):
             return Probe(self.key, True, "schema ok")
         result = self.health_result(live=False)
         if not result.configured:
+            if live:
+                return Probe(self.key, False, _MISSING_KEY)
             return Probe(self.key, result.ok, result.detail)
         if not live:
             return Probe(self.key, True, "offline ok")
@@ -260,6 +270,8 @@ def _collect(
     rows: list[dict] = []
     warnings: list[str] = []
     cache = "snapshot"
+    labels: list[str] = []
+    snapshot_served = False
     current = url
     query: dict[str, str] | None = params
     seen: set[str] = set()
@@ -282,6 +294,8 @@ def _collect(
         if not isinstance(batch, list):
             warnings.append(_NOT_USABLE)
             break
+        labels.append(cache)
+        snapshot_served = snapshot_served or cache == "snapshot"
         rows.extend(item for item in batch if isinstance(item, dict))
         if len(rows) >= limit:
             break
@@ -290,6 +304,12 @@ def _collect(
             break
         current = str(httpx.URL(current).join(nxt))
         query = None
+    if snapshot_served:
+        warnings.append(_SNAPSHOT_NOTE)
+    for label in ("snapshot", "stale", "miss", "hit"):
+        if label in labels:
+            cache = label
+            break
     return rows[:limit], cache, warnings
 
 
@@ -307,9 +327,9 @@ def _fetch_one(
     if not force_live and not pinned:
         cached = cache.get(key)
         if cached and cache.fresh(cached):
-            return _load_body(cached.body), "hit", "", {}, 200
+            return _load_body(cached.body), "hit", "", dict(cached.headers), 200
     if not force_live and (offline or pinned):
-        return _from_snapshot(kind, cache, key)
+        return _from_snapshot(kind, cache, key, pinned=pinned)
     headers = _auth_headers()
     if headers is None:
         return None, "snapshot", _MISSING_KEY, {}, 0
@@ -345,7 +365,7 @@ def _fetch_one(
         if not force_live:
             cached = cache.get(key)
             if cached:
-                return _load_body(cached.body), "stale", "", {}, 200
+                return _load_body(cached.body), "stale", "", dict(cached.headers), 200
         return None, "snapshot", _safe(str(exc)) or _UNAVAILABLE, {}, 0
     finally:
         client.close()
@@ -354,7 +374,7 @@ def _fetch_one(
     if response.status == 429:
         cached = None if force_live else cache.get(key)
         if cached:
-            return _load_body(cached.body), "stale", "", {}, 200
+            return _load_body(cached.body), "stale", "", dict(cached.headers), 200
         return None, "snapshot", _RATE_LIMITED, {}, 429
     if response.status >= 400:
         return None, response.cache, f"upstream status {response.status}", {}, response.status
@@ -364,16 +384,20 @@ def _fetch_one(
     return payload, response.cache, "", response.headers, response.status
 
 
-def _from_snapshot(kind: str, cache, key: str) -> tuple[dict | None, str, str, dict, int]:
+def _from_snapshot(
+    kind: str, cache, key: str, *, pinned: bool
+) -> tuple[dict | None, str, str, dict, int]:
+    if not pinned:
+        # A real response kept for this session beats the shipped synthetic copy.
+        cached = cache.get(key)
+        if cached:
+            return _load_body(cached.body), "stale", "", dict(cached.headers), 200
     path = _snapshot_path(kind)
     if path.is_file():
         payload = _read_json(path)
         if payload is None:
             return None, "snapshot", _NOT_USABLE, {}, 0
         return payload, "snapshot", "", {}, 200
-    cached = cache.get(key)
-    if cached:
-        return _load_body(cached.body), "stale", "", {}, 200
     return None, "snapshot", _UNAVAILABLE, {}, 0
 
 
@@ -412,17 +436,18 @@ def _schema_problem() -> str | None:
 
 def _alert_record(alert: dict) -> tuple[dict, ExposureFinding | None]:
     created = str(alert.get("created_at") or "")
+    _parse_time(created)
     matched = _matched_values(alert)
     subject_text = matched[0] if matched else ""
     finding = None
     if subject_text and created:
         finding = _finding(alert, subject_text, created)
     record = {
-        "id": str(alert.get("id") or ""),
-        "monitor_id": str(alert.get("monitor_id") or ""),
-        "severity": str(alert.get("severity") or "").casefold(),
-        "status": str(alert.get("status") or ""),
-        "alert_type": str(alert.get("alert_type") or ""),
+        "id": _token(alert.get("id")),
+        "monitor_id": _token(alert.get("monitor_id")),
+        "severity": _token(str(alert.get("severity") or "").casefold()),
+        "status": _token(alert.get("status")),
+        "alert_type": _token(alert.get("alert_type")),
         "created_at": created,
         "title": _wrap(alert.get("title")),
         "summary": _wrap(alert.get("alert_summary")),
@@ -463,7 +488,7 @@ def _finding(alert: dict, subject_text: str, created: str) -> ExposureFinding:
 def _monitor_record(monitor: dict) -> dict:
     watches = [_wrap(value) for value in _watch_values(monitor)]
     return {
-        "id": str(monitor.get("id") or ""),
+        "id": _token(monitor.get("id")),
         "name": _wrap(monitor.get("name")),
         "description": _wrap(monitor.get("description")),
         "enabled": bool(monitor.get("enabled")),
@@ -621,6 +646,16 @@ def _wrap(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
         return ""
     return untrusted_text(redact_text(value), SOURCE)
+
+
+def _token(value: object) -> str:
+    """Return a plain identifier as is. Anything else is feed text, so wrap it."""
+    if value is None or value == "":
+        return ""
+    text = str(value)
+    if _PLAIN.fullmatch(text):
+        return text
+    return _wrap(text)
 
 
 def _envelope(

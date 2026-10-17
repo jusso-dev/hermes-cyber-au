@@ -264,7 +264,8 @@ def _drop_secret_headers(headers: dict) -> dict:
     return {
         key: value
         for key, value in headers.items()
-        if key.lower() not in {"authorization", "auth-key", "x-otx-api-key", "x-api-key", "api-key"}
+        if key.lower()
+        not in {"authorization", "auth-key", "x-otx-api-key", "x-api-key", "x-apikey", "api-key"}
     }
 
 

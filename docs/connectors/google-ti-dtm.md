@@ -37,7 +37,9 @@ Set `GTI_API_KEY` in the profile `.env`. The process sends it as `x-apikey` and 
 
 Requests stay at 1 per second with a burst of 5, and back off when the vendor returns HTTP 429 with `Retry-After`. Responses are kept for the session only. Metadata for watchlist matches is stored. Raw matched text is not.
 
-Egress is limited to `www.virustotal.com`.
+Egress is limited to `www.virustotal.com`. A redirect or `Link` header that points elsewhere is refused before any request is sent, and the key is dropped on any redirect.
+
+Offline mode and pinned snapshots answer with `cache: snapshot` and a warning that the data is not live. The copy shipped in the package is synthetic. Findings from a snapshot are never stored and never feed org exposure. `health --live` fails when the key is missing or the live fetch fails, and never counts a cached or snapshot copy as ok.
 
 Checked on 16 October 2026 against the DTM list-alerts OpenAPI reference, the DTM pagination guide, and the `x-tool` header format in VirusTotal/gti-dev-kit.
 
