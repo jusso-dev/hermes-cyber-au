@@ -1,0 +1,176 @@
+{
+  "_note": "Synthetic stand-in for a recorded tools/list. Replace with a recording made with a real token.",
+  "tools": [
+    {
+      "name": "get_radar_annotations_outages",
+      "description": "Get Radar internet outage annotations.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 location code"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_radar_attacks_layer7_summary",
+      "description": "Get a summary of application layer attacks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 location code"
+          },
+          "dateRange": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_radar_bgp_hijacks_events",
+      "description": "Get BGP hijack events.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer"
+          },
+          "involvedAsn": {
+            "type": "integer"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_radar_bgp_leaks_events",
+      "description": "Get BGP route leak events.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer"
+          },
+          "involvedAsn": {
+            "type": "integer"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_radar_ranking_top",
+      "description": "Get the top ranked domains.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "docs",
+      "description": "Search Cloudflare documentation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "whoami",
+      "description": "Return the authenticated identity.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "get_zones",
+      "description": "List zones in the account.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "post_zones_purge_cache",
+      "description": "Purge the cache for a zone.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "delete_zones_dns_records",
+      "description": "Delete a DNS record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "post_accounts_urlscanner_scan",
+      "description": "Submit a URL for scanning.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    }
+  ]
+}

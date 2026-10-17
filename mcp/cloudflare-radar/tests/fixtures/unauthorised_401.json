@@ -1,0 +1,15 @@
+{
+  "status": 401,
+  "headers": {
+    "www-authenticate": "Bearer"
+  },
+  "body": {
+    "success": false,
+    "errors": [
+      {
+        "code": 9109,
+        "message": "Unauthorized"
+      }
+    ]
+  }
+}

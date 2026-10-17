@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": {
+    "top_0": [
+      {
+        "rank": 1,
+        "domain": "example.com",
+        "categories": [
+          {
+            "id": 1,
+            "name": "Example"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "lastUpdated": "2026-10-10T00:00:00Z"
+    }
+  }
+}

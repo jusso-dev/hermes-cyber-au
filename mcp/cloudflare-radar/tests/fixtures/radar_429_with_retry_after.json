@@ -1,0 +1,15 @@
+{
+  "status": 429,
+  "headers": {
+    "retry-after": "300"
+  },
+  "body": {
+    "success": false,
+    "errors": [
+      {
+        "code": 971,
+        "message": "Rate limited"
+      }
+    ]
+  }
+}
