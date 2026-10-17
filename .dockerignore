@@ -1,0 +1,32 @@
+# Build context is the repository root (`docker build -f docker/Dockerfile .`).
+# Credential files must never enter a layer. `.env.template` is the empty
+# placeholder the distribution ships; a real `.env` is not.
+
+.git
+.github
+**/.venv
+**/__pycache__
+**/*.egg-info
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+dist
+node_modules
+
+.env
+**/.env
+.env.*
+**/.env.*
+!.env.template
+!**/.env.template
+auth.json
+**/auth.json
+credentials.json
+**/credentials.json
+**/*.pem
+**/*.key
+
+# Removed after install. Keep them out of the context so they are not left
+# behind in an earlier image layer.
+tickets
+docs
