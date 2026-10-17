@@ -15,6 +15,7 @@ members = [
     "cyberau-cisa-kev",
     "cyberau-common",
     "cyberau-first-epss",
+    "cyberau-ncsc-nz",
     "cyberau-nvd",
     "cyberau-workspace",
 ]
@@ -423,6 +424,17 @@ requires-dist = [
 name = "cyberau-first-epss"
 version = "0.1.0"
 source = { editable = "first-epss" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-ncsc-nz"
+version = "0.1.0"
+source = { editable = "ncsc-nz" }
 dependencies = [
     { name = "cyberau-common" },
 ]

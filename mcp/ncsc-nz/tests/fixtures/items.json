@@ -1,0 +1,4 @@
+{
+  "https://www.ncsc.govt.nz/alerts/synthetic-dated/": "alert_item.html",
+  "https://www.ncsc.govt.nz/alerts/synthetic-undated/": "alert_no_date.html"
+}
