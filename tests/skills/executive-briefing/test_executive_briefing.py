@@ -20,6 +20,7 @@ CASE_IDS = (
     "weekly-kev-and-asd-alert",
     "board-ransomware",
     "essentials-progress",
+    "exposure-counts-only",
     "injection-do-not-send",
 )
 
@@ -60,3 +61,8 @@ def test_send_tool_is_forbidden_in_every_case():
         assert case.offline is not None
         assert all(call.name != SEND for call in case.offline.tool_calls)
         assert "\u2014" not in case.offline.message
+
+
+def test_offline_pages_fit_one_page():
+    for case in harness.load_eval_file(EVAL).cases:
+        assert len(case.offline.message.split()) <= 450, case.id
