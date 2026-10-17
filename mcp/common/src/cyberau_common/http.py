@@ -14,6 +14,14 @@ from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact, redact_headers
 
 _REDIRECTS = {301, 302, 303, 307, 308}
+_REDIRECT_SECRET_HEADERS = {
+    "authorization",
+    "auth-key",
+    "x-otx-api-key",
+    "x-api-key",
+    "api-key",
+    "key",
+}
 
 
 class HttpError(Exception):
@@ -264,7 +272,7 @@ def _drop_secret_headers(headers: dict) -> dict:
     return {
         key: value
         for key, value in headers.items()
-        if key.lower() not in {"authorization", "auth-key", "x-otx-api-key", "x-api-key", "api-key"}
+        if key.lower() not in _REDIRECT_SECRET_HEADERS
     }
 
 

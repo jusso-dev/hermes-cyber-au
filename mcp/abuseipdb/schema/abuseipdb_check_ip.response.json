@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ip", "abuse_confidence_score", "total_reports", "isp", "usage_type", "country_code"],
+  "properties": {
+    "ip": {"type": "string"},
+    "abuse_confidence_score": {"type": "integer"},
+    "total_reports": {"type": "integer"},
+    "num_distinct_users": {"type": ["integer", "null"]},
+    "isp": {"type": "string"},
+    "usage_type": {"type": "string"},
+    "country_code": {"type": ["string", "null"]},
+    "country_name": {"type": "string"},
+    "domain": {"type": "string"},
+    "hostnames": {"type": "array", "items": {"type": "string"}},
+    "is_whitelisted": {"type": "boolean"},
+    "is_tor": {"type": "boolean"},
+    "is_public": {"type": "boolean"},
+    "last_reported_at": {"type": ["string", "null"]}
+  }
+}

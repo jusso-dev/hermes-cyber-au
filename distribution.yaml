@@ -32,3 +32,6 @@ env_requires:
   - name: GREYNOISE_API_KEY
     description: "Optional GreyNoise community key."
     required: false
+  - name: ABUSEIPDB_API_KEY
+    description: "AbuseIPDB API key. Needed for IP and network reputation checks."
+    required: false

@@ -79,7 +79,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | Regional government | none | on | v0.2 | planned | https://www.ncsc.govt.nz/alerts/ |
 | Cloudflare URL Scanner (unlisted scans, approval-gated) | `cfscan` | Internet and attack telemetry | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: bring your own access | v0.2 | planned | https://developers.cloudflare.com/radar/investigate/url-scanner/ |
 | CVE Program records (CVE Services API and cvelistV5) | `cve` | Vulnerability intelligence | none | on | v0.2 | planned | https://www.cve.org/ |
-| AbuseIPDB IP reputation | `abuseipdb` | Global threat intelligence | `ABUSEIPDB_API_KEY` | on | v0.2 | planned | https://docs.abuseipdb.com/ |
+| AbuseIPDB IP reputation | `abuseipdb` | Global threat intelligence | `ABUSEIPDB_API_KEY` | on | v0.2 | planned | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
 | Spamhaus DROP, DROPv6 and ASN-DROP | `drop` | Global threat intelligence | none | on | v0.2 | planned | https://www.spamhaus.org/blocklists/do-not-route-or-peer/ |
 | IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | https://www.cyber.gov.au/irap |
 | Protective Security Policy Framework (PSPF) | `pspf` | Australian government | none | on | v1.0 | planned | https://www.protectivesecurity.gov.au/ |

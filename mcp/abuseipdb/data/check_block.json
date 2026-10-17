@@ -1,0 +1,19 @@
+{
+  "data": {
+    "networkAddress": "1.1.1.0",
+    "netmask": "255.255.255.0",
+    "minAddress": "1.1.1.1",
+    "maxAddress": "1.1.1.254",
+    "numPossibleHosts": 254,
+    "addressSpaceDesc": "Public DNS allocation",
+    "reportedAddress": [
+      {
+        "ipAddress": "1.1.1.1",
+        "numReports": 3,
+        "mostRecentReport": "2026-10-01T00:00:00+00:00",
+        "abuseConfidenceScore": 12,
+        "countryCode": "AU"
+      }
+    ]
+  }
+}
