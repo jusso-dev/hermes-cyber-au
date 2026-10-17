@@ -41,8 +41,8 @@ If both the KEV pair and a CPE match, the recorded rule is `kev-vendor-product`.
 
 A vulnerability is listed in Act today only when it matches at least one asset and one of these is inside the briefing window:
 
-- the KEV `dateAdded` (midnight Australia/Sydney), or
+- the KEV `dateAdded` (a date, so the whole Australia/Sydney day counts), or
 - an ASD ACSC alert names the CVE, or
 - the EPSS score is at least 0.7 and the previous score was below 0.7 (or there was no previous score).
 
-That third test is the Tier 1 EPSS cut this briefing uses until `vuln-prioritisation` ships. A KEV row outside the window is not "new", even when the product matches. A KEV row inside the window that matches no asset is left out. ASD ACSC alerts are still listed on their own.
+That third test is the Tier 1 EPSS cut this briefing uses until `vuln-prioritisation` ships. A KEV row whose date ends before the window opens is not "new", even when the product matches. A KEV row inside the window that matches no asset is left out. ASD ACSC alerts are still listed on their own.

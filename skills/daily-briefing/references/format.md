@@ -4,11 +4,11 @@ The morning job follows this file. The renderer in `../scripts/briefing.py` is t
 
 ## Window
 
-The briefing time is Australia/Sydney. Monday uses the 72 hours ending at that time, so Friday, Saturday, and Sunday are covered on Monday. Every other day uses 24 hours. The window is half-open: the start is included and the briefing time is not. A date-only value is midnight in Australia/Sydney.
+The briefing time is Australia/Sydney. Monday uses the 72 hours ending at that time, so Friday, Saturday, and Sunday are covered on Monday. Every other day uses 24 hours. The window is half-open: the start is included and the briefing time is not. A date-only value, such as a KEV `dateAdded` or an EPSS date, covers that whole day in Australia/Sydney and is in the window when the day overlaps it. Those dates are stamped in US time, so an entry dated yesterday can arrive after yesterday's briefing. It can show in two consecutive briefings. A repeat is cheaper than a miss. A date-only `--as-of` is midnight in Australia/Sydney.
 
 ## Detail
 
-`brief` is the default and stays under 600 words. Long descriptions are left out, and each list stops after a short cap with a line that says how many items the full briefing still holds.
+`brief` is the default and stays under 600 words. Long descriptions are left out, and each list stops after a short cap with a line that says how many items the full briefing still holds. A busy window lowers the caps and the text length step by step until the briefing is under 600 words. The owner rendering names at most three matching assets per vulnerability and counts the rest.
 
 `full` is for analysts who ask for `detail: full`. It adds summaries, EPSS, CVSS, and the KEV required action, and it does not apply the word cap.
 

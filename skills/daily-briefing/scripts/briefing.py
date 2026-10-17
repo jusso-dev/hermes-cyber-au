@@ -22,12 +22,19 @@ SYDNEY = ZoneInfo("Australia/Sydney")
 EPSS_TIER1 = 0.7
 EPSS_MOVER = 0.1
 TREND_MIN = 2
-BRIEF_ACT = 8
-BRIEF_WEEK = 8
-BRIEF_WATCH = 5
+BRIEF_WORDS = 600
+BRIEF_ASSETS = 3
 BRIEF_OUTAGES = 2
-BRIEF_TEXT = 160
 FULL_TEXT = 8000
+# (act, this week, watchlist, text length). A busy window steps down these tiers
+# until the brief is under BRIEF_WORDS. The first tier is the normal case.
+BRIEF_TIERS = (
+    (8, 8, 5, 160),
+    (5, 5, 3, 100),
+    (3, 3, 2, 60),
+    (2, 2, 1, 40),
+    (1, 1, 1, 24),
+)
 
 WEEKDAYS = (
     "Monday",
@@ -80,7 +87,10 @@ SOURCES = (
     ("cloudflare-radar", "Cloudflare Radar"),
     ("intel-store", "Intel store"),
 )
-_SECRET = re.compile(r"(?i)\b(token|api[_-]?key|secret|password)\s*=\s*\S+")
+_SECRET = re.compile(
+    r"(?i)\b([a-z0-9_-]*(?:token|api[_-]?key|access[_-]?key|private[_-]?key|secret|passwd|password))"
+    r"\s*=\s*\S+"
+)
 _BEARER = re.compile(r"(?i)\bbearer\s+\S+")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
 _WORDS = re.compile(r"[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?")
@@ -183,9 +193,28 @@ def render(
         raise ValueError("detail must be brief or full")
     if channel not in {"owner", "external"}:
         raise ValueError("channel must be owner or external")
+    if detail == "full":
+        return _compose(pack, assets, as_of, detail, channel, inventory_configured, None)
+    text = ""
+    for tier in BRIEF_TIERS:
+        text = _compose(pack, assets, as_of, detail, channel, inventory_configured, tier)
+        if word_count(text) < BRIEF_WORDS:
+            break
+    return text
+
+
+def _compose(
+    pack: dict,
+    assets: list[Asset],
+    as_of: datetime,
+    detail: str,
+    channel: str,
+    inventory_configured: bool,
+    tier: tuple[int, int, int, int] | None,
+) -> str:
+    act_cap, week_cap, watch_cap, limit = tier if tier else (None, None, None, None)
     start, end, hours = window_for(as_of)
     connectors = _connectors(pack)
-    limit = None if detail == "full" else BRIEF_TEXT
     alerts, advisories = _acsc(connectors, start, end, limit)
     records = _records(connectors)
     act_vulns, movers = _vulnerabilities(
@@ -206,14 +235,14 @@ def render(
         limit,
         assets if inventory_configured else [],
     )
-    internet = _internet(connectors, start, end, detail == "brief")
+    internet = _internet(connectors, start, end, limit)
     sources, missing = _sources(connectors)
 
-    act_lines = _cap(act, None if detail == "full" else BRIEF_ACT)
+    act_lines = _cap(act, act_cap)
     if not inventory_configured:
         note = "Asset inventory is not configured, so asset matches were skipped."
         act_lines = [note, *act_lines]
-    elif inventory_configured and not assets:
+    elif not assets:
         note = "Asset inventory is empty, so asset matches were skipped."
         act_lines = [note, *act_lines]
 
@@ -235,7 +264,7 @@ def render(
         "",
         "## This week",
         "",
-        _body(_cap(week, None if detail == "full" else BRIEF_WEEK)),
+        _body(_cap(week, week_cap)),
         "",
         "## Australian internet picture",
         "",
@@ -243,7 +272,7 @@ def render(
         "",
         "## Watchlist hits",
         "",
-        _body(_cap(watch, None if detail == "full" else BRIEF_WATCH)),
+        _body(_cap(watch, watch_cap)),
         "",
         "## Sources",
         "",
@@ -308,7 +337,15 @@ def _parse(value: str) -> datetime:
 
 
 def _in_window(value: str, start: datetime, end: datetime) -> bool:
+    """A timestamp is in the half-open window. A date-only value is the whole Sydney day.
+
+    KEV dateAdded and EPSS dates carry no time and are stamped in US time. Midnight
+    would drop an entry dated yesterday from this morning's window, and no later
+    window would pick it up.
+    """
     moment = _parse(value).astimezone(SYDNEY)
+    if "T" not in str(value):
+        return moment < end and moment + timedelta(days=1) > start
     return start <= moment < end
 
 
@@ -550,10 +587,13 @@ def _vuln_bullet(
     elif epss and epss.get("date"):
         when = f", scored {epss['date']}"
     if channel == "owner":
+        shown = matched if detail == "full" else matched[:BRIEF_ASSETS]
         names = "; ".join(
             f"{asset.name} ({asset.vendor} {asset.product}, {asset.exposure}, owner {asset.owner})"
-            for asset in matched
+            for asset in shown
         )
+        if len(shown) < len(matched):
+            names += f"; and {len(matched) - len(shown)} more"
         text = f"{cve} ({label}{when}), rule {rule}, matches {names}."
     else:
         text = f"{cve} ({label}{when}), rule {rule}, matches {_count(matched)}."
@@ -703,8 +743,9 @@ def _watchlist(
 
 
 def _internet(
-    connectors: dict[str, dict], start: datetime, end: datetime, brief: bool
+    connectors: dict[str, dict], start: datetime, end: datetime, limit: int | None
 ) -> list[str]:
+    brief = limit is not None
     item = connectors["cloudflare-radar"]
     if item.get("status") != "ok":
         return ["Not available in this run."]
@@ -729,7 +770,7 @@ def _internet(
     lines: list[str] = []
     shown = outages if not brief else outages[:BRIEF_OUTAGES]
     for row in shown:
-        name = _flatten(row.get("name"), BRIEF_TEXT if brief else FULL_TEXT)
+        name = _flatten(row.get("name"), limit if brief else FULL_TEXT)
         lines.append(
             "Cloudflare Radar. Outage: "
             f"{name}, AU, started {_display(str(row.get('started')))}."
@@ -739,8 +780,8 @@ def _internet(
         lines.append(f"{extra} more outages are in the full briefing.")
     shown_attacks = attacks if not brief else attacks[:1]
     for row in shown_attacks:
-        layer = _flatten(row.get("layer"), BRIEF_TEXT if brief else FULL_TEXT)
-        change = _flatten(row.get("change"), BRIEF_TEXT if brief else FULL_TEXT)
+        layer = _flatten(row.get("layer"), limit if brief else FULL_TEXT)
+        change = _flatten(row.get("change"), limit if brief else FULL_TEXT)
         lines.append(f"Cloudflare Radar. {layer}-layer attacks: {change}.")
     if brief and len(attacks) > 1:
         lines.append(f"{len(attacks) - 1} more attack summaries are in the full briefing.")

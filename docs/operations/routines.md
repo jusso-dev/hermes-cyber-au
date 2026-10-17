@@ -28,7 +28,7 @@ hermes -p cyber-au cron run cyberau-morning-brief
 
 `hermes -p cyber-au cron pause <id>` pauses one job again. `hermes pause` and `hermes resume` stop and start the scheduler for every job. They do not rewrite each job's own paused flag.
 
-Shipped delivery is `origin` or `local` (saved on this machine). A shipped job has no recorded origin chat, so `origin` sends to the first home channel you have configured for the profile. If none is configured, Hermes skips delivery and keeps the output in the job's last output, which `hermes -p cyber-au cron list` shows. This repository does not store a person, an email address, a chat id, or a webhook URL. Platform tokens for Slack, email, and Telegram, and the reason Microsoft Teams is not listed, are under Morning briefing below. Set any extra target on your own profile with `hermes cron edit <id> --deliver <target>` after you have resumed the job. Do not put that target in the shipped file.
+Shipped delivery is `origin` or `local` (saved on this machine). A shipped job has no recorded origin chat, so `origin` sends to the first home channel you have configured for the profile. If none is configured, Hermes skips delivery and keeps the output in the job's last output, which `hermes -p cyber-au cron list` shows. This repository does not store a person, an email address, a chat id, or a webhook URL. The Slack, email, and Telegram targets, and the reason Microsoft Teams is not listed, are under Morning briefing below. Set any extra target on your own profile with `hermes cron edit <id> --deliver <target>` after you have resumed the job. Do not put that target in the shipped file.
 
 ## Scripts
 

@@ -106,7 +106,7 @@ class DailyBriefingTest(unittest.TestCase):
         self.assertIn("token=[redacted]", text)
         self.assertNotIn("analyst detail for the full briefing", text)
         self.assertNotIn("AL-2099-100", text)
-        self.assertNotIn("CVE-2099-0101", text)
+        self.assertIn("CVE-2099-0101 (KEV, added 2026-10-19)", text)
 
     def test_tuesday_full_matches_the_golden_file(self):
         text = self._render(TUESDAY, "full", "owner")
@@ -215,6 +215,102 @@ class DailyBriefingTest(unittest.TestCase):
         self.assertIn("AL-BUSY-08", full)
         self.assertIn("22 more items are in the full briefing.", brief)
 
+    def test_date_only_values_cover_the_whole_sydney_day(self):
+        asset = briefing.Asset("North gateway", "examplevendor", "edgegate", "internet", "platform")
+        moment = datetime.fromisoformat(TUESDAY)
+        for added, expected in (
+            ("2026-10-18", False),
+            ("2026-10-19", True),
+            ("2026-10-20", True),
+            ("2026-10-21", False),
+        ):
+            pack = {
+                "connectors": {
+                    "cisa-kev": {
+                        "status": "ok",
+                        "envelope": {
+                            "retrieved_at": "2026-10-20T07:25:00+11:00",
+                            "data": {
+                                "entries": [
+                                    {
+                                        "cve_id": "CVE-2099-5000",
+                                        "vendor_project": "Examplevendor",
+                                        "product": "Edgegate ADC",
+                                        "date_added": added,
+                                    }
+                                ]
+                            },
+                        },
+                    }
+                }
+            }
+            text = briefing.render(pack, [asset], moment, inventory_configured=True)
+            self.assertEqual("CVE-2099-5000" in text, expected, added)
+
+    def test_secret_shaped_assignments_are_redacted_with_prefixes(self):
+        for raw in (
+            "access_token=abc123",
+            "client_secret=zzz",
+            "DB_PASSWORD=hunter2",
+            "AWS_SECRET_ACCESS_KEY=abcd",
+            "token=abc",
+        ):
+            flat = briefing._flatten(raw, None)
+            self.assertTrue(flat.endswith("=[redacted]"), flat)
+            self.assertNotIn(raw.split("=", 1)[1], flat)
+
+    def test_brief_stays_under_600_words_with_a_busy_owner_inventory(self):
+        assets = [
+            briefing.Asset(f"Asset number {index}", "examplevendor", "edgegate", "internet", f"team-{index}")
+            for index in range(12)
+        ]
+        title = " ".join(["wordy"] * 40)
+        stamp = "2026-10-20T01:00:00+11:00"
+        alerts = [
+            {"id": f"AL-{i:02d}", "kind": "alert", "title": title, "published": stamp,
+             "cves": [f"CVE-2099-{i:04d}"], "summary": ""}
+            for i in range(20)
+        ] + [
+            {"id": f"ADV-{i:02d}", "kind": "advisory", "title": title, "published": stamp,
+             "cves": [], "summary": ""}
+            for i in range(20)
+        ]
+        kev = [
+            {"cve_id": f"CVE-2099-{i:04d}", "vendor_project": "Examplevendor",
+             "product": "Edgegate", "date_added": "2026-10-20"}
+            for i in range(20)
+        ]
+        hits = [
+            {"id": f"hit-{i}", "kind": title, "value": title, "seen": stamp} for i in range(20)
+        ]
+
+        def ok(data):
+            return {
+                "status": "ok",
+                "envelope": {"retrieved_at": "2026-10-20T07:25:00+11:00", "data": data},
+            }
+
+        pack = {
+            "connectors": {
+                "asd-acsc": ok({"items": alerts}),
+                "cisa-kev": ok({"entries": kev}),
+                "intel-store": ok({"hits": hits}),
+                "cloudflare-radar": ok(
+                    {
+                        "outages": [{"name": title, "location": "AU", "started": stamp}] * 5,
+                        "attacks": [
+                            {"layer": title, "change": title, "location": "AU", "seen": stamp}
+                        ] * 3,
+                    }
+                ),
+            }
+        }
+        moment = datetime.fromisoformat(TUESDAY)
+        brief = briefing.render(pack, assets, moment, "brief", "owner", inventory_configured=True)
+        self.assertLess(briefing.word_count(brief), 600)
+        self._assert_structure_headings(brief)
+        self.assertIn("more items are in the full briefing.", brief)
+
     def test_missing_inventory_skips_asset_matches(self):
         text = briefing.render(
             self.pack,
@@ -291,6 +387,10 @@ class DailyBriefingTest(unittest.TestCase):
     def test_asset_inventory_is_not_shipped(self):
         tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
         self.assertNotIn("plugin-data/cyber-au/assets.yaml", tracked)
+        self.assertEqual(
+            [path for path in tracked if Path(path).name == "assets.yaml"],
+            ["tests/fixtures/daily-briefing/assets.yaml"],
+        )
         self.assertFalse(any(path.startswith("plugin-data/") for path in tracked))
         self.assertFalse((ROOT / "skills/vuln-prioritisation").exists())
         matching = (ROOT / "skills/daily-briefing/references/matching.md").read_text(encoding="utf-8")
@@ -323,6 +423,12 @@ class DailyBriefingTest(unittest.TestCase):
             detail,
             channel,
             inventory_configured=True,
+        )
+
+    def _assert_structure_headings(self, text: str):
+        self.assertEqual(
+            [line for line in text.splitlines() if line.startswith("#")],
+            HEADINGS,
         )
 
     def _assert_structure(self, text: str):
