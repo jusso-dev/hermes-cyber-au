@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["domains"],
+  "properties": {
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["domain"],
+        "properties": {
+          "domain": {"type": "string"},
+          "num_registered": {"type": "integer"},
+          "num_unregistered": {"type": "integer"},
+          "primary_domain": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

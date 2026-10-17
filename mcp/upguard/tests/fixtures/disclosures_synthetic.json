@@ -1,0 +1,23 @@
+{
+  "disclosures": [
+    {
+      "date_disclosed": "2026-06-02T03:48:57Z",
+      "description": "Synthetic disclosure note for example.com.au.",
+      "id": 3426,
+      "image": "data:image/png;base64,AAAA",
+      "implication": "Synthetic implication.",
+      "payload": "{\"secret\":\"do-not-keep\"}",
+      "severity": 7,
+      "status": "Disclosed",
+      "url": "https://files.example.com.au/backup.txt"
+    },
+    {
+      "date_disclosed": "2020-01-02T00:00:00Z",
+      "description": "Old synthetic disclosure.",
+      "id": 100,
+      "severity": 2,
+      "status": "ClosedNoIssue",
+      "url": "https://files.example.com.au/old.txt"
+    }
+  ]
+}

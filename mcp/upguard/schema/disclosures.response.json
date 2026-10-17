@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["disclosures"],
+  "properties": {
+    "disclosures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "status", "date_disclosed"],
+        "properties": {
+          "id": {},
+          "status": {"type": "string"},
+          "date_disclosed": {"type": "string"},
+          "severity": {"type": "integer"},
+          "description": {"type": "string"},
+          "url": {"type": "string"}
+        }
+      }
+    }
+  }
+}

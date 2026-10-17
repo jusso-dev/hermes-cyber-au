@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "since": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "statuses": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "Disclosed",
+          "Acknowledged",
+          "Investigating",
+          "Remediating",
+          "ClosedNoIssue",
+          "ClosedRiskAccepted",
+          "ClosedFixedUnverified",
+          "ClosedFixedVerified"
+        ]
+      }
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["breached_identities", "breaches"],
+  "properties": {
+    "breached_identities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["domain", "breach_ids", "last_breach_date"],
+        "properties": {
+          "domain": {"type": "string"},
+          "breach_ids": {"type": "array"},
+          "last_breach_date": {"type": "string"},
+          "num_breaches": {"type": "integer"}
+        }
+      }
+    },
+    "breaches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id"],
+        "properties": {
+          "id": {},
+          "name": {"type": "string"},
+          "title": {"type": "string"},
+          "exposed_data_classes": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "date_occurred": {"type": "string"},
+          "domain": {"type": "string"}
+        }
+      }
+    }
+  }
+}

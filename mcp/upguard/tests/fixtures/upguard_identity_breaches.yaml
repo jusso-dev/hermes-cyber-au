@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://cyber-risk.upguard.com/api/public/breaches?page_size=10&sort_by=date_last_breach&sort_desc=true
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"breached_identities":[],"breaches":[],"total_results":0}'

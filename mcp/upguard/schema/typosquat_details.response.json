@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["registered", "unregistered", "ignored"],
+  "properties": {
+    "registered": {"$ref": "#/$defs/group"},
+    "unregistered": {"$ref": "#/$defs/group"},
+    "ignored": {"$ref": "#/$defs/group"}
+  },
+  "$defs": {
+    "group": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["hostname", "date_detected"],
+        "properties": {
+          "hostname": {"type": "string"},
+          "date_detected": {"type": "string"},
+          "permutation_type": {"type": "string"},
+          "mx_records": {"type": "array"}
+        }
+      }
+    }
+  }
+}

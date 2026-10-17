@@ -1,0 +1,51 @@
+{
+  "breached_identities": [
+    {
+      "breach_ids": [101],
+      "domain": "example.com.au",
+      "id": 1,
+      "last_breach_date": "2026-06-02T03:48:57Z",
+      "name": "not-a-person",
+      "num_breaches": 1
+    },
+    {
+      "breach_ids": [101],
+      "domain": "example.com.au",
+      "id": 2,
+      "last_breach_date": "2026-06-02T03:48:57Z",
+      "name": "not-a-person",
+      "num_breaches": 1
+    },
+    {
+      "breach_ids": [202],
+      "domain": "other.example.au",
+      "id": 3,
+      "last_breach_date": "2026-06-02T03:48:57Z",
+      "name": "not-a-person",
+      "num_breaches": 1
+    }
+  ],
+  "breaches": [
+    {
+      "breach_type": "Company",
+      "date_occurred": "2026-05-01T00:00:00Z",
+      "date_published": "2026-05-02T00:00:00Z",
+      "description": "Synthetic breach note for example.com.au.",
+      "domain": "example.com.au",
+      "exposed_data_classes": ["Email addresses", "Passwords"],
+      "id": 101,
+      "name": "SyntheticBreach",
+      "title": "Synthetic Breach",
+      "total_exposures": 2
+    },
+    {
+      "date_occurred": "2026-05-01T00:00:00Z",
+      "domain": "other.example.au",
+      "exposed_data_classes": ["Usernames"],
+      "id": 202,
+      "name": "OtherSynthetic",
+      "title": "Other Synthetic"
+    }
+  ],
+  "total_results": 3
+}
