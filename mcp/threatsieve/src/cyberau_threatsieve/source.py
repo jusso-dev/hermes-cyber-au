@@ -8,6 +8,7 @@ are not implemented.
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -37,6 +38,14 @@ _TRANSPORT = None
 _SLEEPER = None
 _RNG = None
 _MAX_INDICATOR = 8192
+# Identifiers and enums pass through. Any other upstream string is free text and gets wrapped.
+_TOKEN = re.compile(r"^[A-Za-z0-9_.:+\-]{1,64}$")
+_SNAPSHOT_WARNING = (
+    "Served from the offline snapshot, which is a synthetic fixture and not a live "
+    "ThreatSieve assessment"
+)
+_DEMO_WARNING = "ThreatSieve marked this assessment as demo data, not a real assessment"
+_STALE_WARNING = "ThreatSieve was unreachable, so this is a cached copy that may be out of date"
 
 
 def threatsieve_assess(indicator: str) -> dict:
@@ -64,8 +73,16 @@ def threatsieve_assess(indicator: str) -> dict:
         )
         return _envelope([], cache, payload, warnings=(note,))
     record = _record(payload)
-    persist_warning = _persist([record])
-    warnings = tuple(item for item in (warning, persist_warning) if item)
+    synthetic = cache == "snapshot" or payload.get("demo") is True
+    notes = [warning]
+    if cache == "snapshot":
+        notes.append(_SNAPSHOT_WARNING)
+    if payload.get("demo") is True:
+        notes.append(_DEMO_WARNING)
+    # Synthetic and cached copies are not new observations, so they stay out of history.
+    if not synthetic and cache not in ("stale", "hit"):
+        notes.append(_persist([record]))
+    warnings = tuple(item for item in notes if item)
     return _envelope([record], cache, payload, warnings=warnings)
 
 
@@ -102,9 +119,13 @@ class _ThreatSieveConnector(Connector):
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        payload, _cache, warning = _fetch("example.com", force_live=True)
+        if os.environ.get("CYBERAU_OFFLINE") == "1":
+            return Probe(self.key, False, "CYBERAU_OFFLINE is set, so no live probe was made")
+        payload, cache, warning = _fetch("example.com", force_live=True)
         if warning or payload is None:
             return Probe(self.key, False, warning or "ThreatSieve is unavailable")
+        if cache != "miss":
+            return Probe(self.key, False, f"live probe was answered from {cache}, not the service")
         problem = schema_drift(payload)
         if problem:
             return Probe(self.key, False, problem)
@@ -151,7 +172,7 @@ def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, st
     cached = cache.get(key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "hit" if cache.fresh(cached) else "stale"
-        return _load_text(cached.body.decode("utf-8")), state, ""
+        return _load_text(_decode(cached.body)), state, ""
     if offline:
         payload, problem = _read_snapshot()
         return payload, "snapshot", problem
@@ -187,7 +208,7 @@ def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, st
             return None, "snapshot", "ThreatSieve is unavailable"
         cached = cache.get(key)
         if cached:
-            return _load_text(cached.body.decode("utf-8")), "stale", ""
+            return _load_text(_decode(cached.body)), "stale", _STALE_WARNING
         return None, "snapshot", "ThreatSieve is unavailable: " + _safe(str(exc), secret)
     finally:
         client.close()
@@ -198,13 +219,14 @@ def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, st
             return None, "snapshot", "ThreatSieve rate limit exceeded"
         cached = cache.get(key)
         if cached:
-            return _load_text(cached.body.decode("utf-8")), "stale", ""
+            return _load_text(_decode(cached.body)), "stale", _STALE_WARNING
         return None, "snapshot", "ThreatSieve rate limit exceeded"
     if response.status >= 400:
         code = _error_code(response)
         detail = f"{response.status} {code}".strip()
         return None, "snapshot", f"ThreatSieve rejected the indicator ({detail})"
-    return _load_text(response.body.decode("utf-8")), response.cache, ""
+    note = _STALE_WARNING if response.cache == "stale" else ""
+    return _load_text(_decode(response.body)), response.cache, note
 
 
 def _read_snapshot() -> tuple[dict | None, str]:
@@ -224,15 +246,21 @@ def _assess_url() -> str:
     raw = (lookup("THREATSIEVE_URL") or DEFAULT_BASE).strip() or DEFAULT_BASE
     if "://" not in raw:
         raw = "http://" + raw
-    parts = urlsplit(raw)
-    host = parts.hostname
-    scheme = (parts.scheme or "http").lower()
+    try:
+        parts = urlsplit(raw)
+        host = parts.hostname
+        port = parts.port
+    except ValueError:
+        host, port = None, None
+    scheme = (parts.scheme or "http").lower() if host else ""
     if not host or scheme not in {"http", "https"}:
         parts = urlsplit(DEFAULT_BASE)
         host = parts.hostname or "127.0.0.1"
+        port = parts.port
         scheme = "http"
-    port = f":{parts.port}" if parts.port else ""
-    return f"{scheme}://{host}{port}{ASSESS_PATH}"
+    if ":" in host:
+        host = f"[{host}]"
+    return f"{scheme}://{host}{f':{port}' if port else ''}{ASSESS_PATH}"
 
 
 def _body(indicator: str) -> dict:
@@ -268,32 +296,32 @@ def _record(payload: dict) -> dict:
     role = payload.get("role") if isinstance(payload.get("role"), dict) else {}
     customer = payload.get("customer") if isinstance(payload.get("customer"), dict) else {}
     return {
-        "assessment_id": payload.get("assessment_id"),
-        "schema_version": payload.get("schema_version"),
-        "observable_type": observable.get("type"),
+        "assessment_id": _token(payload.get("assessment_id")),
+        "schema_version": _token(payload.get("schema_version")),
+        "observable_type": _token(observable.get("type")),
         "observable": untrusted_text(str(observable.get("value") or ""), "threatsieve"),
-        "classification": malicious.get("classification"),
-        "probability": malicious.get("probability"),
-        "role": role.get("value"),
-        "severity": payload.get("severity"),
-        "confidence": payload.get("confidence"),
+        "classification": _token(malicious.get("classification")),
+        "probability": _number(malicious.get("probability")),
+        "role": _token(role.get("value")),
+        "severity": _token(payload.get("severity")),
+        "confidence": _number(payload.get("confidence")),
         "attack": [
-            item.get("techniqueId")
+            _token(item.get("techniqueId"))
             for item in payload.get("attack") or []
             if isinstance(item, dict) and item.get("techniqueId")
         ],
         "actors": [
             {
-                "id": item.get("id"),
+                "id": _token(item.get("id")),
                 "name": untrusted_text(str(item.get("name") or ""), "threatsieve"),
-                "association_probability": item.get("association_probability"),
+                "association_probability": _number(item.get("association_probability")),
             }
             for item in payload.get("actors") or []
             if isinstance(item, dict)
         ],
-        "customer_priority": customer.get("priority"),
+        "customer_priority": _token(customer.get("priority")),
         "recommended_actions": [
-            item.get("action")
+            _token(item.get("action"))
             for item in payload.get("recommended_actions") or []
             if isinstance(item, dict) and item.get("action")
         ],
@@ -302,10 +330,23 @@ def _record(payload: dict) -> dict:
             for item in payload.get("evidence") or []
             if isinstance(item, dict) and _evidence_text(item)
         ],
-        "status": payload.get("status"),
-        "demo": payload.get("demo"),
-        "created_at": payload.get("created_at"),
+        "status": _token(payload.get("status")),
+        "demo": payload.get("demo") is True,
+        "created_at": _token(payload.get("created_at")),
     }
+
+
+def _token(value):
+    """Pass short identifiers through and wrap every other upstream string as untrusted."""
+    if value is None:
+        return None
+    if isinstance(value, str) and _TOKEN.match(value):
+        return value
+    return untrusted_text(str(value), "threatsieve")
+
+
+def _number(value):
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _evidence_text(item: dict) -> str:
@@ -354,8 +395,9 @@ def _envelope(
     warnings: tuple[str, ...] = (),
 ) -> dict:
     as_of = None
-    if isinstance(payload, dict) and payload.get("created_at"):
-        as_of = str(payload["created_at"])
+    if isinstance(payload, dict) and isinstance(payload.get("created_at"), str):
+        created = payload["created_at"]
+        as_of = created if _TOKEN.match(created) else None
     return envelope(
         "threatsieve",
         data,
@@ -365,6 +407,10 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
+
+
+def _decode(body: bytes) -> str:
+    return body.decode("utf-8", errors="replace")
 
 
 def _load_text(text: str | None) -> dict | None:
@@ -378,12 +424,14 @@ def _load_text(text: str | None) -> dict | None:
 
 
 def _error_code(response) -> str:
-    payload = _load_text(response.body.decode("utf-8", errors="replace"))
+    payload = _load_text(_decode(response.body))
     if not isinstance(payload, dict):
         return ""
     error = payload.get("error")
-    if isinstance(error, dict) and error.get("code"):
-        return str(error["code"])
+    if isinstance(error, dict) and isinstance(error.get("code"), str):
+        code = error["code"].strip()
+        # The code comes from the upstream body, so only short identifiers reach a warning.
+        return code if _TOKEN.match(code) else ""
     return ""
 
 
