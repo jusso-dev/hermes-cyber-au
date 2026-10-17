@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["type", "value", "section", "pulse_count", "pulses"],
+  "properties": {
+    "type": {"type": "string"},
+    "value": {"type": "string"},
+    "section": {"type": "string"},
+    "pulse_count": {"type": ["integer", "null"]},
+    "pulses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "description", "modified"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "modified": {"type": "string"}
+        }
+      }
+    },
+    "reputation": {"type": ["number", "null"]},
+    "country_code": {"type": "string"},
+    "country_name": {"type": "string"},
+    "asn": {"type": "string"}
+  }
+}

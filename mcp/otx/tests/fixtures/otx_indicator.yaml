@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://otx.alienvault.com/api/v1/indicators/IPv4/203.0.113.10/general
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"indicator":"203.0.113.10","type":"IPv4","pulse_info":{"count":0,"pulses":[]}}'
