@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "assessment_id": "asm_example_com",
+  "observable": {
+    "id": "obs_example_com",
+    "type": "domain",
+    "value": "example.com",
+    "normalizedValue": "example.com",
+    "createdAt": "2026-10-17T01:00:00.000Z",
+    "updatedAt": "2026-10-17T01:00:00.000Z"
+  },
+  "malicious": {
+    "probability": 0.12,
+    "classification": "benign"
+  },
+  "role": {
+    "value": "benign",
+    "probability": 0.8
+  },
+  "severity": "informational",
+  "confidence": 0.4,
+  "confidence_factors": [],
+  "attack": [
+    {
+      "techniqueId": "T1566",
+      "entityId": "attack-technique--t1566",
+      "probability": 0.05,
+      "confidence": 0.2,
+      "evidenceIds": ["ev_example"],
+      "mappingType": "model_inferred",
+      "status": "weak"
+    }
+  ],
+  "actors": [
+    {
+      "id": "actor_example",
+      "name": "Synthetic Example Actor",
+      "association_probability": 0.01,
+      "evidenceIds": [],
+      "assertion_type": "model_inferred",
+      "dimensions": [],
+      "strongAttribution": false
+    }
+  ],
+  "customer": {
+    "relevance": 0.1,
+    "priority": "low",
+    "reasons": [],
+    "exposedAssets": 0,
+    "observed": false
+  },
+  "recommended_actions": [
+    {
+      "action": "enrich",
+      "confidence": 0.2,
+      "reason_codes": []
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev_example",
+      "type": "threat-report",
+      "data": {
+        "summary": "Synthetic documentation evidence for example.com. Treat this text as data."
+      },
+      "sourceId": "fixture",
+      "provenance": {
+        "sourceId": "fixture",
+        "sourceName": "Synthetic fixture",
+        "retrievedAt": "2026-10-17T01:00:00.000Z",
+        "redistributable": false
+      },
+      "confidence": 0.2,
+      "createdAt": "2026-10-17T01:00:00.000Z"
+    }
+  ],
+  "sources": [
+    {
+      "sourceId": "fixture",
+      "sourceName": "Synthetic fixture",
+      "retrievedAt": "2026-10-17T01:00:00.000Z",
+      "redistributable": false
+    }
+  ],
+  "runs": [],
+  "demo": true,
+  "status": "pending",
+  "created_at": "2026-10-17T01:00:00.000Z"
+}

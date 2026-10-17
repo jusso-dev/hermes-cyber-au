@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: POST
+      uri: http://127.0.0.1:8787/v1/assess
+      body: '{"observable":"example.com"}'
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"schema_version":"1.0","assessment_id":"asm_example_com","observable":{"type":"domain","value":"example.com","normalizedValue":"example.com"},"malicious":{"probability":0.12,"classification":"benign"},"role":{"value":"benign","probability":0.8},"confidence_factors":[],"attack":[],"actors":[],"customer":{"priority":"low"},"recommended_actions":[],"evidence":[],"sources":[],"runs":[],"demo":true,"created_at":"2026-10-17T01:00:00.000Z"}'

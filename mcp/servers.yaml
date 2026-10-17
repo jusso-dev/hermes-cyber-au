@@ -465,3 +465,16 @@ servers:
     - TAXII_COLLECTION_ID
     - TAXII_USERNAME
     - TAXII_PASSWORD
+  threatsieve:
+    connector: threatsieve
+    args:
+    - serve
+    - threatsieve
+    env:
+    - THREATSIEVE_URL=${THREATSIEVE_URL}
+    - THREATSIEVE_API_KEY=${THREATSIEVE_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

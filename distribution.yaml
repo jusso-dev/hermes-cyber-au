@@ -59,3 +59,9 @@ env_requires:
   - name: TAXII_PASSWORD
     description: "HTTP Basic password for TAXII_API_ROOT. Off by default. Never commit a value."
     required: false
+  - name: THREATSIEVE_URL
+    description: "Optional ThreatSieve origin. Defaults to http://127.0.0.1:8787 when unset."
+    required: false
+  - name: THREATSIEVE_API_KEY
+    description: "Optional ThreatSieve scoped API key for POST /v1/assess."
+    required: false

@@ -30,6 +30,8 @@ ENV_NAMES = [
     "GREYNOISE_API_KEY",
     "ABR_GUID",
     "ABUSEIPDB_API_KEY",
+    "THREATSIEVE_URL",
+    "THREATSIEVE_API_KEY",
 ]
 
 # Phrases the Hermes context-file scanner treats as injection or secret access.

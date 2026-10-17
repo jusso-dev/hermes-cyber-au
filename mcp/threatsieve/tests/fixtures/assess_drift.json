@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "record_id": "asm_example_com",
+  "observable": {
+    "id": "obs_example_com",
+    "type": "domain",
+    "value": "example.com",
+    "normalizedValue": "example.com",
+    "createdAt": "2026-10-17T01:00:00.000Z",
+    "updatedAt": "2026-10-17T01:00:00.000Z"
+  },
+  "malicious": {
+    "probability": 0.12,
+    "classification": "benign"
+  },
+  "role": {
+    "value": "benign",
+    "probability": 0.8
+  },
+  "confidence_factors": [],
+  "attack": [],
+  "actors": [],
+  "customer": {
+    "relevance": 0.1,
+    "priority": "low",
+    "reasons": [],
+    "exposedAssets": 0,
+    "observed": false
+  },
+  "recommended_actions": [],
+  "evidence": [],
+  "sources": [],
+  "runs": [],
+  "demo": true
+}

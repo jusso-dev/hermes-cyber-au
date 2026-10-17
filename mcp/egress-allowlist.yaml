@@ -302,3 +302,9 @@ connectors:
     hosts: []
     allow_ip_literals: false
     allow_http_loopback: false
+  threatsieve:
+    hosts:
+    - 127.0.0.1
+    - localhost
+    allow_ip_literals: true
+    allow_http_loopback: true

@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "assessment_id",
+    "observable",
+    "malicious",
+    "role",
+    "confidence_factors",
+    "attack",
+    "actors",
+    "customer",
+    "recommended_actions",
+    "evidence",
+    "sources",
+    "runs",
+    "demo"
+  ],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "assessment_id": {"type": "string"},
+    "observable": {"type": "object"},
+    "malicious": {
+      "type": "object",
+      "required": ["probability", "classification"],
+      "properties": {
+        "probability": {"type": "number"},
+        "classification": {"type": "string"}
+      }
+    },
+    "role": {"type": "object"},
+    "confidence_factors": {"type": "array"},
+    "attack": {"type": "array"},
+    "actors": {"type": "array"},
+    "customer": {"type": "object"},
+    "recommended_actions": {"type": "array"},
+    "evidence": {"type": "array"},
+    "sources": {"type": "array"},
+    "runs": {"type": "array"},
+    "demo": {"type": "boolean"}
+  }
+}
