@@ -1,0 +1,37 @@
+# Agent plus an optional gateway. Keys come from an env file beside this
+# compose file. That file is not part of the image.
+name: hermes-cyber-au
+
+x-hermes: &hermes
+  image: ghcr.io/jusso-dev/hermes-cyber-au:0.1.0
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+    args:
+      HERMES_VERSION: v0.22.2
+      VERSION: "0.1.0"
+  environment:
+    HERMES_PROFILE: cyber-au
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - cyberau:/opt/data
+
+services:
+  agent:
+    <<: *hermes
+    stdin_open: true
+    tty: true
+    command: ["chat"]
+
+  gateway:
+    <<: *hermes
+    profiles: ["gateway"]
+    command: ["-p", "cyber-au", "gateway", "run"]
+    ports:
+      - "127.0.0.1:8642:8642"
+
+volumes:
+  cyberau:
+    name: cyberau
