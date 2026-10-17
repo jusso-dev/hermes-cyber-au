@@ -71,7 +71,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | off | v0.2 | planned | [docs/connectors/junction.md](docs/connectors/junction.md) |
 | Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | on | v1.0 | planned | https://github.com/jusso-dev/Brolga |
 | ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | on | v1.0 | planned | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
-| M365-Secure assessment reports | `(none)` | Author's public tools | none | on | v0.2 | planned | https://github.com/jusso-dev/M365-Secure |
+| M365-Secure assessment reports | `(none)` | Author's public tools | none | on | v0.2 | planned | [docs/connectors/m365-secure.md](docs/connectors/m365-secure.md) |
 | VirusTotal via the official VirusTotal MCP server | `virustotal` | Global threat intelligence | `VTAI_TOKEN` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
 | Have I Been Pwned via the official HIBP MCP server | `hibp` | Global threat intelligence | `HIBP_API_KEY` (optional) | on | v0.1 MVP | planned | [docs/connectors/hibp.md](docs/connectors/hibp.md) |
 | GitHub Advisory Database via the GitHub MCP server | `ghsa` | Vulnerability intelligence | `GITHUB_ADVISORY_TOKEN` | on | v0.1 MVP | planned | [docs/connectors/github-advisories.md](docs/connectors/github-advisories.md) |
