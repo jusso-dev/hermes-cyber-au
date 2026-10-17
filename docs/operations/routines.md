@@ -28,11 +28,13 @@ hermes -p cyber-au cron run cyberau-morning-brief
 
 `hermes -p cyber-au cron pause <id>` pauses one job again. `hermes pause` and `hermes resume` stop and start the scheduler for every job. They do not rewrite each job's own paused flag.
 
-Shipped delivery is `origin` (the chat for this profile) or `local` (saved on this machine). This repository does not name a person, an email address, or a Slack, Teams, or Telegram channel. To send a briefing somewhere else, set the target on your own profile with `hermes cron edit <id> --deliver <target>` after you have resumed the job. Do not put that target in the shipped file.
+Shipped delivery is `origin` or `local` (saved on this machine). A shipped job has no recorded origin chat, so `origin` sends to the first home channel you have configured for the profile. If none is configured, Hermes skips delivery and keeps the output in the job's last output, which `hermes -p cyber-au cron list` shows. This repository does not name a person, an email address, or a Slack, Teams, or Telegram channel. To send a briefing somewhere else, set the target on your own profile with `hermes cron edit <id> --deliver <target>` after you have resumed the job. Do not put that target in the shipped file.
 
 ## Scripts
 
 `cyberau-ingest-public` and `cyberau-store-maintenance` set `no_agent` and name a script. Hermes resolves that name inside `$HERMES_HOME/scripts/` and runs it with a sanitised environment, so provider credentials are not inherited. The ingest script does not open the profile `.env`. Keyed feeds run inside the agent jobs, where each MCP server receives its keys from `mcp_servers.*.env`.
+
+These scripts call `cyberau-mcp refresh` and `cyberau-mcp store`, which the shared library does not implement yet (it exits with `refresh is not part of the shared library yet`). Until the connector and store tickets land, a resumed script job reports that failure line and changes nothing.
 
 Ingest refreshes the keyless sources `asd`, `kev`, `epss`, `auscert`, and `feodo`. Store maintenance runs `cyberau-mcp store backup`, then `store compact` (retention compaction), then `store vacuum`. Each script prints one line on success and one short line on failure. That line is what Hermes delivers.
 

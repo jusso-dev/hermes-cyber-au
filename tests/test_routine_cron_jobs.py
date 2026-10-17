@@ -268,6 +268,8 @@ class RoutineCronJobsTest(unittest.TestCase):
         self.assertIn("timezone: Australia/Sydney", text)
         self.assertIn("NOTHING", text)
         self.assertIn("[SILENT]", text)
+        self.assertIn("home channel", text)
+        self.assertNotIn("the chat for this profile", text)
         self.assertIn("hermes -p cyber-au cron resume cyberau-morning-brief", text)
         self.assertIn("hermes -p cyber-au cron run cyberau-morning-brief", text)
         self.assertNotIn("\u2014", text)
@@ -288,6 +290,7 @@ class RoutineCronJobsTest(unittest.TestCase):
                 capture_output=True,
             )
             self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertTrue(path.read_text(encoding="utf-8").isascii(), name)
             code = "\n".join(
                 line.split("#", 1)[0] for line in path.read_text(encoding="utf-8").splitlines()
             )
