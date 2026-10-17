@@ -304,3 +304,8 @@ connectors:
     - cyber-risk.upguard.com
     allow_ip_literals: false
     allow_http_loopback: false
+  cve-program:
+    hosts:
+    - cveawg.mitre.org
+    allow_ip_literals: false
+    allow_http_loopback: false

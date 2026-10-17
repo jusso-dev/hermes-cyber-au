@@ -78,7 +78,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | Generic TAXII 2.1 reader for ASD CTIS and other TAXII sources | `taxii` | Australian government | `TAXII_API_ROOT`, `TAXII_COLLECTION_ID`, `TAXII_USERNAME`, `TAXII_PASSWORD` | off: bring your own access | v0.2 | planned | [docs/connectors/taxii-ctis.md](docs/connectors/taxii-ctis.md) |
 | NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | Regional government | none | on | v0.2 | planned | [docs/connectors/ncsc-nz.md](docs/connectors/ncsc-nz.md) |
 | Cloudflare URL Scanner (unlisted scans, approval-gated) | `cfscan` | Internet and attack telemetry | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: bring your own access | v0.2 | planned | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
-| CVE Program records (CVE Services API and cvelistV5) | `cve` | Vulnerability intelligence | none | on | v0.2 | planned | https://www.cve.org/ |
+| CVE Program records (CVE Services API and cvelistV5) | `cve` | Vulnerability intelligence | none | on | v0.2 | planned | [docs/connectors/cve-program.md](docs/connectors/cve-program.md) |
 | AbuseIPDB IP reputation | `abuseipdb` | Global threat intelligence | `ABUSEIPDB_API_KEY` | on | v0.2 | planned | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
 | Spamhaus DROP, DROPv6 and ASN-DROP | `drop` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/spamhaus-drop.md](docs/connectors/spamhaus-drop.md) |
 | IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | [docs/connectors/irap.md](docs/connectors/irap.md) |

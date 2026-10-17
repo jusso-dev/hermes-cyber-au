@@ -823,3 +823,14 @@ servers:
     headers:
     - Authorization=${FLARE_API_KEY}
     - X-Flare-Tenant-Id=${FLARE_TENANT_ID}
+  cve:
+    connector: cve-program
+    args:
+    - serve
+    - cve-program
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
