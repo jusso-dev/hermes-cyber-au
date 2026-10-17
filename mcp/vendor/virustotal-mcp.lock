@@ -1,0 +1,16 @@
+# Pinned release of the official VirusTotal MCP server. Bump only through a reviewed change
+# that re-records mcp/virustotal/tests/fixtures/tools_list.json and re-checks expected_tools.txt.
+repository: https://github.com/VirusTotal/virustotal-mcp
+version: v0.9.9
+commit: a450cff05c1377979e3251616dbded02a44e184e
+package: vt-mcp==0.9.9
+python: ">=3.12"
+launcher: bin/vt-mcp
+sdist:
+  url: https://github.com/VirusTotal/virustotal-mcp/releases/download/v0.9.9/vt_mcp-0.9.9.tar.gz
+  sha256: dc05c773719a0cd7880eb82dc82981cb2055d45246c33efabdd50ad5ba5d091e
+wheel:
+  url: https://github.com/VirusTotal/virustotal-mcp/releases/download/v0.9.9/vt_mcp-0.9.9-py3-none-any.whl
+  sha256: 92854787de8862034f680f0725886a0a7c7f9bbdb10160f63cea3974ad374888
+upstream_uv_lock_sha256: 139ae88bb0731aef1a20166d583f04c2783b01b0ea64d2f229c7a0fb37ae34bb
+license: Apache-2.0

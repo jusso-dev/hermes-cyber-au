@@ -131,6 +131,7 @@ connectors:
   virustotal:
     hosts:
       - www.virustotal.com
+      - ai.virustotal.com
   hibp:
     hosts:
     - haveibeenpwned.com

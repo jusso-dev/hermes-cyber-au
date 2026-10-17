@@ -59,6 +59,7 @@ testpaths = [
   "spamhaus-drop/tests",
   "taxii-ctis/tests",
   "threatsieve/tests",
+  "virustotal/tests",
 ]
 addopts = "-q"
 

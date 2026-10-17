@@ -1,0 +1,17 @@
+{
+  "status": "found",
+  "source": "VirusTotal via VTAI",
+  "retrieved_at": "2026-10-17T00:00:00+00:00",
+  "analysis_date": "2026-10-16T08:30:00Z",
+  "report_url": "https://www.virustotal.com/gui/file/275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+  "coverage": {"engines": 70, "categories": ["malicious", "undetected"]},
+  "data": {
+    "id": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+    "source": "VirusTotal",
+    "analysis_date": "2026-10-16T08:30:00Z",
+    "report_url": "https://www.virustotal.com/gui/file/275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+    "type_description": "Text",
+    "last_analysis_stats": {"malicious": 62, "suspicious": 0, "undetected": 8, "harmless": 0},
+    "detections": ["EICAR-Test-File", "Eicar-Signature"]
+  }
+}
