@@ -275,3 +275,8 @@ connectors:
     - api.pwnedpasswords.com
     allow_ip_literals: false
     allow_http_loopback: false
+  irap:
+    hosts:
+    - www.cyber.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false

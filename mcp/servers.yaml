@@ -262,3 +262,14 @@ servers:
         scheme: Bearer
         env: HIBP_API_KEY
       store_results: false
+  irap:
+    connector: irap
+    args:
+    - serve
+    - irap
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
