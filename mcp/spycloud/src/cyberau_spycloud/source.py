@@ -53,6 +53,8 @@ DOCS = "docs/connectors/spycloud.md"
 # HttpClient reserves once more on the same limiter, so the burst leaves room.
 _RATE = 1.0
 _BURST = 4
+_WATCHLIST_SNAPSHOT = "CYBERAU_SPYCLOUD_WATCHLIST_SNAPSHOT"
+_IDENTIFIERS_SNAPSHOT = "CYBERAU_SPYCLOUD_IDENTIFIERS_SNAPSHOT"
 _RECORD_TTL = 3600
 _CATALOG_TTL = 24 * 3600
 
@@ -96,7 +98,21 @@ _CLASS_FOR = {
     "infected_machine_id": "infected device",
     "phone": "phone",
 }
-_PI_KEYS = {"email", "username", "phone", "ip", "ip_addresses", "dob"}
+_PI_KEYS = {
+    "email",
+    "username",
+    "phone",
+    "ip",
+    "ip_addresses",
+    "dob",
+    "ssn",
+    "bank_number",
+    "cc_number",
+    "credit_card",
+    "form_post_data",
+}
+_SNAPSHOT_NOTE = "Served from a snapshot file, not a live SpyCloud result."
+_OFFLINE_NOTE = "Offline, so this came from the local cache and not a live SpyCloud result."
 
 _TRANSPORT = None
 _SLEEPER = None
@@ -179,7 +195,8 @@ def _session_cache() -> HttpCache:
 
 
 def _catalog_cache() -> HttpCache:
-    return HttpCache(data_dir() / "spycloud-catalog.sqlite")
+    # The 24 hour catalogue limit is a retention limit, so cap it in the cache.
+    return HttpCache(data_dir() / "spycloud-catalog.sqlite", ttl_max=_CATALOG_TTL)
 
 
 def _scope() -> str:
@@ -281,6 +298,8 @@ def _http_get(
         return None, response.cache, detail
     if response.status >= 400:
         return None, response.cache, f"SpyCloud returned HTTP {response.status}."
+    if response.cache == "stale":
+        return response.body, "stale", "SpyCloud request failed. Served a stale cached copy."
     return response.body, response.cache, ""
 
 
@@ -288,7 +307,12 @@ def _from_error(cache: HttpCache, key: str, exc: Exception, force_live: bool):
     if not force_live:
         cached = cache.get(key)
         if cached is not None and cache.within_stale(cached, 86400):
-            return cached.body, "stale", ""
+            reason = _clean(str(exc)) or "unavailable"
+            return (
+                cached.body,
+                "stale",
+                f"SpyCloud request failed ({reason}). Served a stale cached copy.",
+            )
     message = _clean(str(exc)) or "unavailable"
     return None, "snapshot", message
 
@@ -309,7 +333,7 @@ def _fetch_json(
         payload, problem = _read_json_file(Path(override))
         if problem:
             return None, "snapshot", problem
-        return payload, "snapshot", ""
+        return payload, "snapshot", _SNAPSHOT_NOTE
     if offline or lookup("SPYCLOUD_API_KEY"):
         cache = cache_factory()
         key = cache.key("GET", url, params, b"", _scope())
@@ -320,7 +344,7 @@ def _fetch_json(
                 state = "stale" if offline else "hit"
                 if problem:
                     return None, state, problem
-                return payload, state, ""
+                return payload, state, _OFFLINE_NOTE if offline else ""
         if offline:
             return None, "snapshot", "unavailable"
         body, state, warning = _http_get(
@@ -339,7 +363,7 @@ def _fetch_json(
     payload, problem = _parse_body(body)
     if problem:
         return None, state, problem
-    return payload, state, ""
+    return payload, state, warning
 
 
 def _result_rows(payload: dict) -> list | None:
@@ -715,6 +739,8 @@ def _collect_watchlist(
     cursor = ""
     cache = "snapshot"
     warnings: list[str] = []
+    failed = False
+    from_snapshot = bool(os.environ.get(_WATCHLIST_SNAPSHOT)) and not force_live
     query_params: dict | None = params or None
     for _page in range(pages):
         if cursor:
@@ -724,7 +750,7 @@ def _collect_watchlist(
             query_params,
             ttl=_RECORD_TTL,
             cache_factory=_session_cache,
-            snapshot_var="CYBERAU_SPYCLOUD_WATCHLIST_SNAPSHOT",
+            snapshot_var=_WATCHLIST_SNAPSHOT,
             force_live=force_live,
             # Cursor tokens expire in about two minutes. Do not replay a cached page.
             skip_cache=bool(cursor),
@@ -732,10 +758,12 @@ def _collect_watchlist(
         if warning:
             warnings.append(warning)
         if payload is None:
+            failed = True
             break
         batch = _result_rows(payload)
         if batch is None:
             warnings.append("SpyCloud watchlist payload was not usable")
+            failed = True
             break
         rows.extend(item for item in batch if isinstance(item, dict))
         next_cursor = payload.get("cursor")
@@ -744,7 +772,7 @@ def _collect_watchlist(
         cursor = next_cursor
         if len(rows) >= limit:
             break
-    if not rows and warnings:
+    if failed and not rows:
         return [], None, cache, tuple(warnings)
     kept = [
         row
@@ -761,12 +789,17 @@ def _collect_watchlist(
         summary_rows.append((_summary_type(row, record_type), _severity(row)))
         if len(findings) >= limit:
             break
-    if kept and not findings and not warnings:
+    if kept and not findings and not failed:
         warnings.append("SpyCloud watchlist payload was not usable")
         return [], None, cache, tuple(warnings)
-    note = _store_findings(findings)
-    if note:
-        warnings.append(note)
+    if from_snapshot:
+        # A snapshot is a fixture. It must not enter the intel store as a vendor finding.
+        if findings:
+            warnings.append("Snapshot records were not stored.")
+    else:
+        note = _store_findings(findings)
+        if note:
+            warnings.append(note)
     by_type: dict[str, int] = {}
     by_severity: dict[str, int] = {}
     for record_label, severity in summary_rows:
@@ -799,11 +832,25 @@ def spycloud_watchlist_exposure(
     return _envelope(data, cache, warnings=warnings)
 
 
+def _safe_breach_id(value, requested: str) -> str:
+    """Only a plain identifier from the feed is returned unwrapped. Otherwise use the request."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    if isinstance(value, str) and _BREACH_ID.fullmatch(value):
+        return value
+    return requested
+
+
 def _breach_payload(record: dict, breach_id: str) -> dict | None:
     title = record.get("title")
     published = record.get("spycloud_publish_date")
     count = record.get("num_records")
-    if not isinstance(title, str) or not isinstance(published, str) or not isinstance(count, int):
+    if (
+        not isinstance(title, str)
+        or isinstance(count, bool)
+        or not isinstance(count, int)
+        or _parse_time(published) is None
+    ):
         return None
     assets = record.get("assets") if isinstance(record.get("assets"), dict) else {}
     classes = []
@@ -814,9 +861,9 @@ def _breach_payload(record: dict, breach_id: str) -> dict | None:
         if label:
             classes.append(_wrap(label))
     payload = {
-        "breach_id": str(record.get("id", breach_id)),
+        "breach_id": _safe_breach_id(record.get("id"), breach_id),
         "title": _wrap(title),
-        "publish_date": published,
+        "publish_date": published.strip(),
         "record_count": count,
         "data_classes": classes,
     }
@@ -860,7 +907,7 @@ def spycloud_breach_info(breach_id: str) -> dict:
             warnings=("SpyCloud breach catalogue payload was not usable",),
             url=url,
         )
-    return _envelope(normalised, cache, url=url)
+    return _envelope(normalised, cache, warnings=(warning,) if warning else (), url=url)
 
 
 def fetch_identifiers() -> tuple[list[dict], str, str]:
@@ -870,7 +917,7 @@ def fetch_identifiers() -> tuple[list[dict], str, str]:
         None,
         ttl=_RECORD_TTL,
         cache_factory=_session_cache,
-        snapshot_var="CYBERAU_SPYCLOUD_IDENTIFIERS_SNAPSHOT",
+        snapshot_var=_IDENTIFIERS_SNAPSHOT,
     )
     if warning and payload is None:
         return [], cache, warning
@@ -892,16 +939,20 @@ def fetch_identifiers() -> tuple[list[dict], str, str]:
 
 def watchlist_doctor(*, enabled: bool) -> str:
     gaps = None
+    note = ""
     local = local_watchlist()
-    if local is not None:
+    # A disabled connector makes no vendor call. A snapshot file is a local read.
+    if local is not None and (enabled or os.environ.get(_IDENTIFIERS_SNAPSHOT)):
         identifiers, _cache, warning = fetch_identifiers()
-        if identifiers and not warning:
+        if identifiers:
             gaps = compare_watchlists(local, identifiers)
-    return doctor_report(
+            note = warning
+    report = doctor_report(
         enabled=enabled,
         key_present=lookup("SPYCLOUD_API_KEY") is not None,
         gaps=gaps,
     )
+    return f"{report}\n{note}" if note else report
 
 
 class SpyCloudConnector(PremiumConnector):
@@ -939,10 +990,13 @@ class SpyCloudConnector(PremiumConnector):
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
-        snapshot = os.environ.get("CYBERAU_SPYCLOUD_WATCHLIST_SNAPSHOT")
+        snapshot = os.environ.get(_WATCHLIST_SNAPSHOT)
         offline = os.environ.get("CYBERAU_OFFLINE") == "1"
         if lookup("SPYCLOUD_API_KEY") is None and not snapshot and not offline:
             raise RuntimeError("SPYCLOUD_API_KEY is not set")
+        if snapshot and not offline:
+            # Findings carry no snapshot label, so a fixture cannot feed exposure as live.
+            raise RuntimeError(f"{_WATCHLIST_SNAPSHOT} is set. {_SNAPSHOT_NOTE}")
         findings, data, _cache, warnings = _collect_watchlist(
             since=since.isoformat(),
             watchlist_type=None,
@@ -973,26 +1027,30 @@ class SpyCloudConnector(PremiumConnector):
             return Probe(self.key, True, "schema ok")
         result = self.health_result(live=False)
         if not result.configured:
+            if live:
+                return Probe(self.key, False, _missing_key())
             return Probe(self.key, True, "not configured")
         if not live:
             return Probe(self.key, True, "offline ok")
         today = datetime.now(SYDNEY).date().isoformat()
-        payload, _cache, warning = _fetch_json(
+        payload, state, warning = _fetch_json(
             WATCHLIST_URL,
             {"since": today},
             ttl=60,
             cache_factory=_session_cache,
-            snapshot_var="CYBERAU_SPYCLOUD_WATCHLIST_SNAPSHOT",
+            snapshot_var=_WATCHLIST_SNAPSHOT,
             force_live=True,
         )
         if warning:
             return Probe(self.key, False, warning)
         if payload is None:
             return Probe(self.key, False, "live probe returned nothing")
-        if check_schema:
-            problem = schema_drift(payload, kind="watchlist")
-            if problem:
-                return Probe(self.key, False, problem)
+        if state != "miss":
+            # Only a fresh upstream answer counts. A cached or snapshot copy proves nothing.
+            return Probe(self.key, False, f"live probe was answered from {state}, not upstream")
+        problem = schema_drift(payload, kind="watchlist")
+        if problem:
+            return Probe(self.key, False, problem)
         return Probe(self.key, True, "live ok")
 
 
