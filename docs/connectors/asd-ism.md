@@ -14,3 +14,8 @@ Read-only ISM controls from the Australian Signals Directorate OSCAL releases.
 The September 2026 catalogue has statement parts and applicability properties. It does not include a separate guideline part, so `guideline` is empty unless a later release adds one.
 
 Information Security Manual content is published by the Australian Signals Directorate. This connector is not endorsed by ASD.
+
+---
+
+Owner ticket: conn-asd-ism
+Last verified: 17 October 2026

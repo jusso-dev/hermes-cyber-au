@@ -14,3 +14,8 @@ Feeds are `alerts`, `advisories`, `publications`, `threats` and `news`. Titles a
 If cyber.gov.au cannot be reached, download the RSS in a browser and run `cyberau-mcp import asd <file> --feed alerts`.
 
 Commonwealth of Australia material from ASD's ACSC (cyber.gov.au). Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. This connector is not endorsed by ASD.
+
+---
+
+Owner ticket: conn-asd-acsc
+Last verified: 17 October 2026

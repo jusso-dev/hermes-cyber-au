@@ -11,3 +11,8 @@ Read-only scores from the FIRST Exploit Prediction Scoring System.
 No API key. Cite the model version and the score date on every claim. The public API allows 1,000 requests a minute. Larger jobs should use the daily bulk file linked from the FIRST site rather than a hard-coded download URL.
 
 Attribution: FIRST EPSS.
+
+---
+
+Owner ticket: conn-first-epss
+Last verified: 17 October 2026

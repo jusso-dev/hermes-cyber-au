@@ -1,0 +1,3 @@
+[codespell]
+ignore-words = tools/docs/en-AU.txt
+skip = .git,.venv-docs,site,mcp/.venv,*.egg-info

@@ -1,0 +1,37 @@
+site_name: hermes-cyber-au
+site_description: Documentation for the hermes-cyber-au Hermes profile distribution.
+repo_url: https://github.com/jusso-dev/hermes-cyber-au
+repo_name: jusso-dev/hermes-cyber-au
+docs_dir: docs
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.expand
+    - content.code.copy
+    - search.highlight
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
+plugins:
+  - search
+nav:
+  - Home: index.md
+  - Getting started: getting-started/index.md
+  - Skills: skills/index.md
+  - Connectors:
+      - Overview: connectors/index.md
+      - ASD ACSC: connectors/asd-acsc.md
+      - ISM: connectors/asd-ism.md
+      - FIRST EPSS: connectors/first-epss.md
+      - NVD: connectors/nvd.md
+  - Routines: routines/index.md
+  - Intel store: intel/index.md
+  - Security: security/index.md
+  - Operations: operations/index.md
+  - Contributing: contributing/index.md
+  - Reference:
+      - Overview: reference/index.md
+      - Hermes structure: research/hermes-structure.md
+      - Connector inventory: research/connectors.md

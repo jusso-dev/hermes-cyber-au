@@ -101,3 +101,8 @@ before code depends on it.
 | Egress allowlist for remote terminal sandboxes: `hermes egress` manages iron-proxy, with `proxy.extra_allowed_hosts`. | `website/docs/user-guide/egress/iron-proxy.md` |
 | `terminal.docker_network: false` runs the sandbox with no network. | `website/docs/user-guide/configuration.md` |
 | Context files are scanned for prompt injection. | `security.md` |
+
+---
+
+Owner ticket: roadmap
+Last verified: 16 October 2026
