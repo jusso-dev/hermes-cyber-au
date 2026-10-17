@@ -1,0 +1,15 @@
+version: 1
+interactions:
+  - request:
+      method: POST
+      uri: https://opencti.example/graphql
+      body: ""
+      headers:
+        authorization: [REDACTED]
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"data":{"stixCoreObjects":{"pageInfo":{"hasNextPage":false,"endCursor":null,"globalCount":0},"edges":[]}}}'

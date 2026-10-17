@@ -1,0 +1,15 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "entity_type", "name", "description", "aliases"],
+    "properties": {
+      "id": {"type": "string"},
+      "entity_type": {"type": "string"},
+      "name": {"type": "string"},
+      "description": {"type": "string"},
+      "aliases": {"type": "array", "items": {"type": "string"}}
+    }
+  }
+}

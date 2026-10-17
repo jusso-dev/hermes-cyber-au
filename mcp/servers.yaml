@@ -340,3 +340,19 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  opencti:
+    connector: opencti
+    args:
+    - serve
+    - opencti
+    env:
+    - OPENCTI_URL=${OPENCTI_URL}
+    - OPENCTI_TOKEN=${OPENCTI_TOKEN}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    required_env:
+    - OPENCTI_URL
+    - OPENCTI_TOKEN

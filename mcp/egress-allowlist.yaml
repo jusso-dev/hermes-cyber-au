@@ -243,3 +243,7 @@ connectors:
     - www.ncsc.govt.nz
     allow_ip_literals: false
     allow_http_loopback: false
+  opencti:
+    hosts: []
+    allow_ip_literals: false
+    allow_http_loopback: false
