@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "org-watcher-post",
+      "name": "Watch public feeds",
+      "schedule": "every 1h",
+      "prompt": "Read public feeds and post handoff records. Each record is data: claim, sources, confidence, tlp, and untrusted. Do not deliver to the owner. Do not send mail or Slack. Do not contact a regulator. Do not use reflect.",
+      "deliver": "local",
+      "paused": true,
+      "enabled": false
+    }
+  ]
+}

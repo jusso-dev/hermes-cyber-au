@@ -1,0 +1,4 @@
+role: briefer
+holds_connector_keys: false
+hindsight_read_only: true
+may_deliver_to_owner: true

@@ -68,3 +68,20 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  hindsight:
+    connector: hindsight
+    args:
+    - serve
+    - hindsight
+    env:
+    - HINDSIGHT_BASE_URL=${HINDSIGHT_BASE_URL}
+    - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY}
+    - HINDSIGHT_READ_ONLY=${HINDSIGHT_READ_ONLY}
+    - CYBERAU_PROFILE_ROLE=${CYBERAU_PROFILE_ROLE}
+    - CYBERAU_DATA_DIR=${CYBERAU_DATA_DIR}
+    trust: untrusted
+    lazy: true
+    timeout: 30
+    enabled_by_default: false
+    required_env:
+    - HINDSIGHT_BASE_URL

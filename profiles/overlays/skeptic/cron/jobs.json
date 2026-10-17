@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "org-skeptic-answer",
+      "name": "Answer claimed handoffs",
+      "schedule": "every 1h",
+      "prompt": "Answer the next claimed handoff. Test the claim against its sources. Your answer is data. Do not deliver to the owner. Do not send mail or Slack. Do not contact a regulator. Do not use reflect.",
+      "deliver": "local",
+      "paused": true,
+      "enabled": false
+    }
+  ]
+}

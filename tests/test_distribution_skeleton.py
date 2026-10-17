@@ -20,6 +20,7 @@ OWNED = [
     "mcp",
     "feeds",
     "playbooks",
+    "profiles",
 ]
 
 ENV_NAMES = [
@@ -28,6 +29,8 @@ ENV_NAMES = [
     "OTX_API_KEY",
     "CLOUDFLARE_RADAR_API_TOKEN",
     "GREYNOISE_API_KEY",
+    "HINDSIGHT_BASE_URL",
+    "HINDSIGHT_API_KEY",
 ]
 
 # Phrases the Hermes context-file scanner treats as injection or secret access.

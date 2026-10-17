@@ -16,6 +16,7 @@ distribution_owned:
   - mcp
   - feeds
   - playbooks
+  - profiles
 env_requires:
   - name: ABUSECH_AUTH_KEY
     description: "abuse.ch Auth-Key (free at https://auth.abuse.ch/). Needed for URLhaus, ThreatFox, MalwareBazaar."
@@ -31,4 +32,10 @@ env_requires:
     required: false
   - name: GREYNOISE_API_KEY
     description: "Optional GreyNoise community key."
+    required: false
+  - name: HINDSIGHT_BASE_URL
+    description: "Optional base URL of your own Hindsight server. The client stays off until this is set. No host is shipped."
+    required: false
+  - name: HINDSIGHT_API_KEY
+    description: "Optional API key for your Hindsight server. Read from the environment. No key is shipped."
     required: false

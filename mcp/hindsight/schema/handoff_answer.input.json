@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "post_id": {"type": "string"},
+    "claim": {"type": "string"},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "tlp": {"type": "string", "enum": ["CLEAR", "GREEN", "AMBER", "RED"]}
+  },
+  "required": ["post_id", "claim", "confidence"]
+}
