@@ -1,0 +1,52 @@
+[
+  {
+    "phish_id": 1001,
+    "url": "https://login.example.com/verify",
+    "phish_detail_url": "https://phishtank.org/phish_detail.php?phish_id=1001",
+    "submission_time": "2026-10-01T00:00:00+00:00",
+    "verified": "yes",
+    "verification_time": "2026-10-01T01:00:00+00:00",
+    "online": "yes",
+    "target": "Example Bank"
+  },
+  {
+    "phish_id": 1002,
+    "url": "https://www.example.com/signin/",
+    "phish_detail_url": "https://phishtank.org/phish_detail.php?phish_id=1002",
+    "submission_time": "2026-10-02T00:00:00+00:00",
+    "verified": "yes",
+    "verification_time": "2026-10-02T01:00:00+00:00",
+    "online": "yes",
+    "target": "Example Mail"
+  },
+  {
+    "phish_id": 1003,
+    "url": "http://example.com/account",
+    "phish_detail_url": "https://phishtank.org/phish_detail.php?phish_id=1003",
+    "submission_time": "2026-10-03T00:00:00+00:00",
+    "verified": "yes",
+    "verification_time": "2026-10-03T01:00:00+00:00",
+    "online": "yes",
+    "target": "Example Shop"
+  },
+  {
+    "phish_id": 1004,
+    "url": "https://example.com/reset?user=ada",
+    "phish_detail_url": "https://phishtank.org/phish_detail.php?phish_id=1004",
+    "submission_time": "2026-10-04T00:00:00+00:00",
+    "verified": "yes",
+    "verification_time": "2026-10-04T01:00:00+00:00",
+    "online": "yes",
+    "target": "Example Cloud"
+  },
+  {
+    "phish_id": 1005,
+    "url": "https://example.net/phish",
+    "phish_detail_url": "https://phishtank.org/phish_detail.php?phish_id=1005",
+    "submission_time": "2026-10-05T00:00:00+00:00",
+    "verified": "yes",
+    "verification_time": "2026-10-05T01:00:00+00:00",
+    "online": "yes",
+    "target": "Example Host"
+  }
+]

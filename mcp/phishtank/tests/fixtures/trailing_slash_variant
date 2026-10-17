@@ -1,0 +1,12 @@
+[
+  {
+    "phish_id": 9001,
+    "url": "https://www.example.com/signin/",
+    "phish_detail_url": "https://phishtank.org/phish_detail.php?phish_id=9001",
+    "submission_time": "2026-10-02T00:00:00+00:00",
+    "verified": "yes",
+    "verification_time": "2026-10-02T01:00:00+00:00",
+    "online": "yes",
+    "target": "Example Mail"
+  }
+]

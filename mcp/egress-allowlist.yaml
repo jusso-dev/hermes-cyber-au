@@ -258,3 +258,9 @@ connectors:
     - api.osv.dev
     allow_ip_literals: false
     allow_http_loopback: false
+  phishtank:
+    hosts:
+    - data.phishtank.com
+    - cdn.phishtank.com
+    allow_ip_literals: false
+    allow_http_loopback: false

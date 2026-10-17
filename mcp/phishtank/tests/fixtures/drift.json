@@ -1,0 +1,9 @@
+[
+  {
+    "phish_id": 1,
+    "phish_url": "https://example.com/renamed",
+    "verified": "yes",
+    "online": "yes",
+    "target": "Example Bank"
+  }
+]

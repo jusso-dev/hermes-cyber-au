@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "phish_id",
+    "url",
+    "phish_detail_url",
+    "submission_time",
+    "verified",
+    "verification_time",
+    "online",
+    "target"
+  ],
+  "properties": {
+    "phish_id": {"type": "string"},
+    "url": {"type": "string"},
+    "phish_detail_url": {"type": "string"},
+    "submission_time": {"type": "string"},
+    "verified": {"type": "string"},
+    "verification_time": {"type": "string"},
+    "online": {"type": "string"},
+    "target": {"type": "string"}
+  }
+}
