@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import datetime
+import decimal
 import json
 import logging
 import os
 import re
+import uuid
 from pathlib import Path
 
 import yaml
@@ -46,14 +49,16 @@ _PLACEHOLDER = re.compile(r"^\$\{(?:env:)?[A-Za-z_][A-Za-z0-9_]*\}$")
 _QUERY_RE = re.compile(r"(?i)([?&](?:api[_-]?key|token|auth|key|access_token)=)([^&\s]+)")
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+\S+")
 _HEADER_RE = re.compile(
-    r"(?i)(?P<name>\b(?:authorization|auth-key|x-otx-api-key|x-api-key|api[_-]?key|key)\b)"
-    r"\s*[:=]\s*[\"']?(?P<value>[^\"'\s,}&]+)"
+    r"(?i)(?<![?&])(?P<head>[\"']?\b"
+    r"(?P<name>authorization|auth-key|x-otx-api-key|x-api-key|api[_-]?key|key)"
+    r"\b[\"']?\s*[:=]\s*[\"']?)"
+    r"(?P<value>(?:(?:bearer|basic|token|digest)\s+)?[^\"'\s,}&]+)"
 )
 _SECRET_ASSIGN = re.compile(
     r"(?i)\b("
     r"[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)"
     r"|authorization|auth-key|x-otx-api-key|x-api-key|api[_-]?key"
-    r")\b\s*[:=]\s*[\"']?([^\"'\s#]+)"
+    r")\b\s*[:=]\s*[\"']?(?:(?:bearer|basic|token)\s+)?([^\"'\s#]+)"
 )
 _TOKEN_RE = re.compile(
     r"AKIA[0-9A-Z]{16}"
@@ -67,6 +72,7 @@ _NAME_CACHE: tuple[str, float, tuple[str, ...]] | None = None
 # Values shorter than this collide with ordinary words, so they are not
 # substituted globally. Header patterns still cover them.
 _MIN_SECRET_LEN = 8
+_PLAIN_TYPES = (datetime.date, datetime.time, decimal.Decimal, uuid.UUID)
 _PLACEHOLDER_VALUES = {"", "[REDACTED]", "XXXX"}
 
 
@@ -111,8 +117,8 @@ def redact(text: str) -> str:
         if secret in rendered:
             rendered = rendered.replace(secret, "[REDACTED]")
     rendered = _QUERY_RE.sub(_query_sub, rendered)
-    rendered = _BEARER_RE.sub("Bearer [REDACTED]", rendered)
     rendered = _HEADER_RE.sub(_header_sub, rendered)
+    rendered = _BEARER_RE.sub("Bearer [REDACTED]", rendered)
     return rendered
 
 
@@ -140,30 +146,62 @@ def redact_data(value):
         return cleaned
     if isinstance(value, list | tuple):
         return [redact_data(item) for item in value]
-    if value is None or isinstance(value, int | float | bool):
+    if isinstance(value, set | frozenset):
+        return [redact_data(item) for item in value]
+    if isinstance(value, bytes | bytearray):
+        return redact(bytes(value).decode("utf-8", "replace"))
+    if value is None or isinstance(value, (int, float, bool, *_PLAIN_TYPES)):
         return value
     return redact(repr(value))
+
+
+def _scrub_record(record: logging.LogRecord) -> None:
+    try:
+        record.msg = redact(record.getMessage())
+        record.args = ()
+    except (TypeError, ValueError):
+        # Bad format arguments: keep the error for the handler, but not the secret.
+        record.msg = redact(str(record.msg))
+        record.args = (
+            redact_data(record.args)
+            if isinstance(record.args, dict)
+            else tuple(redact_data(item) for item in record.args or ())
+        )
+    if record.exc_info:
+        record.exc_text = redact(logging.Formatter().formatException(record.exc_info))
+        record.exc_info = None
+    elif record.exc_text:
+        record.exc_text = redact(record.exc_text)
 
 
 class RedactFilter(logging.Filter):
     """Logging filter that rewrites the rendered message and traceback."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = redact(record.getMessage())
-        record.args = ()
-        if record.exc_info:
-            record.exc_text = redact(logging.Formatter().formatException(record.exc_info))
-            record.exc_info = None
-        elif record.exc_text:
-            record.exc_text = redact(record.exc_text)
+        _scrub_record(record)
         return True
 
 
 def install_log_redaction() -> None:
-    """Attach the redaction filter to the root logger once."""
+    """Redact every log record, whichever logger or handler emits it.
+
+    A filter on the root logger only sees records logged on the root itself, so
+    the scrub also runs when the record is created.
+    """
     root = logging.getLogger()
     if not any(isinstance(existing, RedactFilter) for existing in root.filters):
         root.addFilter(RedactFilter())
+    factory = logging.getLogRecordFactory()
+    if getattr(factory, "_cyberau_redacting", False):
+        return
+
+    def make_record(*args, **kwargs):
+        record = factory(*args, **kwargs)
+        _scrub_record(record)
+        return record
+
+    make_record._cyberau_redacting = True
+    logging.setLogRecordFactory(make_record)
 
 
 def append_audit(path: Path, record: dict) -> None:
@@ -391,7 +429,7 @@ def cassette_findings(root: Path) -> list[str]:
     base = root / "mcp"
     paths = list(base.rglob("*.yaml")) + list(base.rglob("*.yml"))
     for path in sorted(paths):
-        if "fixtures" not in path.parts or ".venv" in path.parts:
+        if ".venv" in path.parts or not {"fixtures", "cassettes"} & set(path.parts):
             continue
         findings.extend(_cassette_file_findings(path))
     return findings
@@ -486,11 +524,13 @@ def _query_sub(match: re.Match[str]) -> str:
 
 
 def _header_sub(match: re.Match[str]) -> str:
-    name = match.group("name")
+    head = match.group("head")
     value = match.group("value")
-    if name.lower() == "key" and value != "[REDACTED]" and len(value) < _MIN_SECRET_LEN:
+    if match.group("name").lower() == "key" and len(value) < _MIN_SECRET_LEN:
         return match.group(0)
-    return f"{name}: [REDACTED]"
+    if value == "[REDACTED]":
+        return match.group(0)
+    return f"{head}[REDACTED]"
 
 
 def _is_placeholder_header(value: object) -> bool:

@@ -25,6 +25,7 @@ from cyberau_common.secrets import (
     parse_env_placeholder,
     placeholder_findings,
     redact,
+    redact_data,
     redact_headers,
     render_profile_config,
     scrub_cassette,
@@ -242,3 +243,77 @@ def test_post_record_scrubber_rewrites_headers(tmp_path):
     assert response_headers["X-OTX-API-KEY"] == ["[REDACTED]"]
     assert response_headers["Auth-Key"] == "[REDACTED]"
     assert response_headers["key"] == "[REDACTED]"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"Authorization: Basic {SEEDED}",
+        f"Authorization: Token {SEEDED}",
+        f"{{'Authorization': 'Bearer {SEEDED}'}}",
+        f'{{"apiKey": "{SEEDED}"}}',
+        f"{{'X-OTX-API-KEY': '{SEEDED}', 'Accept': 'x'}}",
+        f"headers={{'Auth-Key': '{SEEDED}'}}",
+        f"GET /a?apiKey={SEEDED} HTTP/1.1",
+    ],
+)
+def test_redact_covers_quoted_and_scheme_forms(text):
+    assert SEEDED not in redact(text)
+
+
+def test_redact_keeps_query_separator():
+    assert redact(f"/a?apiKey={SEEDED}&x=1") == "/a?apiKey=[REDACTED]&x=1"
+
+
+def test_redaction_reaches_child_logger_on_any_handler():
+    from cyberau_common.secrets import install_log_redaction
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    root = logging.getLogger()
+    root.addHandler(handler)
+    install_log_redaction()
+    try:
+        logging.getLogger("httpx").warning("sent Authorization: Basic %s", SEEDED)
+        try:
+            raise RuntimeError(f"Auth-Key: {SEEDED}")
+        except RuntimeError:
+            logging.getLogger("httpx").exception("failed")
+    finally:
+        root.removeHandler(handler)
+    assert SEEDED not in stream.getvalue()
+
+
+def test_redact_data_keeps_plain_value_types():
+    import datetime
+    import decimal
+
+    stamp = datetime.datetime(2026, 1, 2, 3, 4, 5)
+    cleaned = redact_data({"at": stamp, "n": decimal.Decimal("1.5"), "tags": {"a"}})
+    assert cleaned["at"] is stamp
+    assert cleaned["n"] == decimal.Decimal("1.5")
+    assert cleaned["tags"] == ["a"]
+
+
+def test_github_token_value_is_redacted(monkeypatch):
+    monkeypatch.setenv("CYBERAU_DISTRIBUTION", str(ROOT / "distribution.yaml"))
+    monkeypatch.setenv("GITHUB_TOKEN", SEEDED)
+    assert SEEDED not in redact(f"GitHub said {SEEDED}")
+
+
+def test_bearer_placeholder_in_config_is_not_a_literal():
+    ok = 'headers:\n  Authorization: "Bearer ${GITHUB_TOKEN}"\n'
+    assert literal_key_findings(ok, label="servers.yaml") == []
+    bad = f"headers:\n  Authorization: Bearer {SEEDED}\n"
+    assert literal_key_findings(bad, label="servers.yaml")
+
+
+def test_cassette_scan_covers_cassettes_directories(tmp_path):
+    folder = tmp_path / "mcp" / "demo" / "tests" / "cassettes"
+    folder.mkdir(parents=True)
+    (folder / "dirty.yaml").write_text(
+        "interactions:\n- request:\n    headers:\n      Authorization:\n"
+        f"      - {SEEDED}\n  response:\n    headers: {{}}\n",
+        encoding="utf-8",
+    )
+    assert cassette_findings(tmp_path)
