@@ -1,0 +1,15 @@
+# Heuristic tokens for public Australian bank website domains.
+# A token matches a full label or a hyphen-separated part, not a substring.
+# This list is not exhaustive and a match is not a determination.
+# token defanged-domain
+commbank commbank[.]com[.]au
+westpac westpac[.]com[.]au
+anz anz[.]com[.]au
+nab nab[.]com[.]au
+macquarie macquarie[.]com[.]au
+bendigo bendigobank[.]com[.]au
+stgeorge stgeorge[.]com[.]au
+bankwest bankwest[.]com[.]au
+suncorp suncorp[.]com[.]au
+boq boq[.]com[.]au
+ing ing[.]com[.]au

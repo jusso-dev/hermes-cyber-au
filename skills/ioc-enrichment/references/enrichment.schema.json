@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/hermes-cyber-au/ioc-enrichment/enrichment.schema.json",
+  "title": "IOC enrichment result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["indicators", "missing_sources", "proposals"],
+  "properties": {
+    "indicators": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/indicator"}
+    },
+    "missing_sources": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "proposals": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "indicator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "indicator",
+        "type",
+        "verdict",
+        "confidence",
+        "points",
+        "sources",
+        "context_sources",
+        "first_seen",
+        "last_seen",
+        "tlp",
+        "external_lookup",
+        "from_store",
+        "documentation",
+        "citations"
+      ],
+      "properties": {
+        "indicator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Defanged indicator, except for a lowercase hash."
+        },
+        "type": {
+          "enum": ["ipv4", "ipv6", "domain", "url", "email", "md5", "sha1", "sha256", "unknown"]
+        },
+        "verdict": {"enum": ["malicious", "suspicious", "benign", "unknown"]},
+        "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+        "points": {"$ref": "#/$defs/points"},
+        "sources": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "context_sources": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "first_seen": {"type": ["string", "null"]},
+        "last_seen": {"type": ["string", "null"]},
+        "tlp": {"enum": ["CLEAR", "GREEN", "AMBER", "AMBER+STRICT", "RED"]},
+        "external_lookup": {"type": "boolean"},
+        "from_store": {"type": "boolean"},
+        "documentation": {"type": "boolean"},
+        "refusal": {"type": "string", "minLength": 1},
+        "citations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "untrusted_excerpts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/excerpt"}
+        }
+      }
+    },
+    "points": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["malicious", "suspicious", "benign"],
+      "properties": {
+        "malicious": {"type": "integer", "minimum": 0, "maximum": 100},
+        "suspicious": {"type": "integer", "minimum": 0, "maximum": 100},
+        "benign": {"type": "integer", "minimum": 0, "maximum": 100}
+      }
+    },
+    "excerpt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "text"],
+      "properties": {
+        "source": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
