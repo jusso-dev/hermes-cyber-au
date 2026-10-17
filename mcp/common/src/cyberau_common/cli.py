@@ -14,6 +14,11 @@ from cyberau_common.server import build_server, get_connector
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "store":
+        _configure_logging()
+        return _store_command(argv[1:])
+
     parser = argparse.ArgumentParser(prog="cyberau-mcp")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -36,7 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     imported.add_argument("path")
     imported.add_argument("--feed", default="alerts")
 
-    for name in ("refresh", "regen", "parser-check", "store"):
+    sub.add_parser("store", help="Query and update the local intel store")
+    for name in ("refresh", "regen", "parser-check"):
         command = sub.add_parser(name)
         command.add_argument("rest", nargs=argparse.REMAINDER)
 
@@ -63,6 +69,46 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     return 2
+
+
+def _store_command(argv: list[str]) -> int:
+    root = _plugin_root()
+    if root is None:
+        print("intel store is not installed", file=sys.stderr)
+        return 2
+    entry = str(root)
+    if entry not in sys.path:
+        sys.path.insert(0, entry)
+    try:
+        from store.cli import main as store_main
+    except ModuleNotFoundError as exc:
+        missing = exc.name or ""
+        if missing == "store" or missing.startswith("store."):
+            print("intel store is not installed", file=sys.stderr)
+            return 2
+        raise
+    return store_main(argv)
+
+
+def _plugin_root() -> Path | None:
+    """Find ``plugins/cyber-au`` from the checkout, venv, or profile home."""
+    candidates: list[Path] = []
+    for key in ("CYBERAU_HOME", "HERMES_HOME"):
+        value = os.environ.get(key)
+        if value:
+            candidates.append(Path(value) / "plugins" / "cyber-au")
+    here = Path(__file__).resolve()
+    candidates.extend(parent / "plugins" / "cyber-au" for parent in here.parents)
+    candidates.append(Path.cwd() / "plugins" / "cyber-au")
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if (resolved / "store" / "api.py").is_file():
+            return resolved
+    return None
 
 
 def _import_feed(name: str, path: str, feed: str) -> int:
