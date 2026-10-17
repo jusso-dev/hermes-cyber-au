@@ -150,8 +150,9 @@ class _OpenCTIConnector(Connector):
                 return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        if not lookup("OPENCTI_URL") or not lookup("OPENCTI_TOKEN"):
-            return Probe(self.key, True, "skipped: OPENCTI_URL or OPENCTI_TOKEN is not set")
+        missing = [name for name in ("OPENCTI_URL", "OPENCTI_TOKEN") if not lookup(name)]
+        if missing:
+            return Probe(self.key, False, f"live probe needs {' and '.join(missing)} to be set")
         found = _search("health", None, first=1, max_pages=1, force_live=True)
         problem = _live_problem("opencti_search_entities", found)
         if problem:
@@ -244,7 +245,10 @@ def _search(
         drifted = schema_drift(payload or {}, "search")
         if drifted:
             return _envelope([], state, urls=_urls(endpoint), warnings=(drifted,))
-        root = (payload or {})["data"]["stixCoreObjects"]
+        page = payload or {}
+        if isinstance(page.get("pages"), list):
+            page = page["pages"][0]
+        root = page["data"]["stixCoreObjects"]
         records.extend(_entities(root.get("edges") or []))
         info = root.get("pageInfo") if isinstance(root.get("pageInfo"), dict) else {}
         if page_state in {"stale", "snapshot"} or not info.get("hasNextPage"):
@@ -253,7 +257,7 @@ def _search(
         if not isinstance(cursor, str) or not cursor:
             break
         after = cursor
-    return _envelope(records, state, urls=_urls(endpoint))
+    return _envelope(records, state, urls=_urls(endpoint), warnings=_provenance(state))
 
 
 def _indicator(value: str, *, first: int, force_live: bool) -> dict:
@@ -280,7 +284,7 @@ def _indicator(value: str, *, first: int, force_live: bool) -> dict:
             record = _indicator_record(node)
             if record:
                 records.append(record)
-    return _envelope(records, state, urls=_urls(url))
+    return _envelope(records, state, urls=_urls(url), warnings=_provenance(state))
 
 
 def _graphql(
@@ -513,8 +517,9 @@ def _graphql_error(payload: dict) -> str:
         for item in errors:
             if isinstance(item, dict) and item.get("message"):
                 messages.append(str(item["message"]))
-    text = "; ".join(messages) or "OpenCTI returned an error"
-    if any(word in text.lower() for word in _AUTH_WORDS):
+    raw = "; ".join(messages)
+    text = _text(raw) or "OpenCTI returned an error"
+    if any(word in raw.lower() for word in _AUTH_WORDS):
         return f"{text} Check OPENCTI_TOKEN."
     return text
 
@@ -540,6 +545,8 @@ def _looks_like_indicator(payload: dict) -> bool:
 
 
 def _live_problem(tool: str, payload: dict) -> str:
+    if payload.get("cache") in {"stale", "snapshot"}:
+        return f"{tool} was answered from a {payload['cache']} copy, not a live fetch"
     if payload.get("warnings"):
         return str(payload["warnings"][0])
     return _validate_data(tool, payload.get("data")) or ""
@@ -567,6 +574,17 @@ def _envelope(data, cache: str, *, urls: list[str] | None = None, warnings: tupl
     )
 
 
+def _provenance(state: str) -> tuple[str, ...]:
+    """Say so when a result did not come from a live fetch of the user's instance."""
+    if state == "snapshot":
+        return (
+            "Served from the local snapshot in CYBERAU_OPENCTI_SNAPSHOT, not your live instance.",
+        )
+    if state == "stale":
+        return ("Served from a cached OpenCTI response, not a live fetch.",)
+    return ()
+
+
 def _urls(endpoint: str) -> list[str]:
     return [endpoint] if endpoint else []
 
@@ -583,7 +601,9 @@ def _combine(current: str, new: str) -> str:
 def _text(value) -> str:
     if not isinstance(value, str) or not value.strip():
         return ""
-    return untrusted_text(value, "opencti")
+    # A value must not be able to close or reopen the wrapper markers.
+    neutral = re.sub(r">(?=>)", "> ", re.sub(r"<(?=<)", "< ", value))
+    return untrusted_text(neutral, "opencti")
 
 
 def _ident(value) -> str:

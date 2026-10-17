@@ -19,6 +19,4 @@ A fresh install renders `enabled: false` for `mcp_servers.opencti` even when `OP
 
 Names, descriptions, patterns and other free text are untrusted data.
 
-OpenCTI Community Edition is Apache-2.0. Enterprise Edition has its own licence. Data in your instance stays under the terms you agreed with its sources. This connector is not endorsed by Filigran.
-
 Upstream: https://docs.opencti.io/
