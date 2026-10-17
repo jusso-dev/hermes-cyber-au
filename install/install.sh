@@ -106,6 +106,17 @@ if [ -n "${CYBERAU_REF:-}" ]; then
   REF=$CYBERAU_REF
 fi
 
+case $PROFILE in
+  ''|-*|*[!A-Za-z0-9._-]*)
+    die "Invalid profile name: $PROFILE. Use letters, digits, dot, dash and underscore."
+    ;;
+esac
+case $REF in
+  -*)
+    die "Invalid ref: $REF. A ref must not start with a dash."
+    ;;
+esac
+
 OS_NAME=$(uname -s)
 ARCH_NAME=$(uname -m)
 case $OS_NAME in
@@ -115,7 +126,11 @@ case $OS_NAME in
     ;;
 esac
 if [ -r /proc/version ] && grep -qi microsoft /proc/version; then
-  printf '%s\n' "Detected WSL ($ARCH_NAME)."
+  if grep -qi 'WSL2\|microsoft-standard' /proc/version; then
+    printf '%s\n' "Detected WSL2 ($ARCH_NAME)."
+  else
+    printf '%s\n' "Detected WSL1 ($ARCH_NAME). Only WSL2 is supported; continuing may fail." >&2
+  fi
 else
   printf '%s\n' "Detected $OS_NAME $ARCH_NAME."
 fi
@@ -125,11 +140,16 @@ if [ "$(id -u)" -eq 0 ] && [ "$ALLOW_ROOT" -ne 1 ]; then
 fi
 
 unset CDPATH
-SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+# Piped from curl, $0 is the shell and not this file. Then there is no checkout
+# to trust, and the working directory must not be mistaken for one.
+SCRIPT_DIR=
 CHECKOUT=
-if [ -f "$REPO_ROOT/distribution.yaml" ]; then
-  CHECKOUT=$REPO_ROOT
+if [ -f "$0" ]; then
+  SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+  REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+  if [ -f "$REPO_ROOT/distribution.yaml" ]; then
+    CHECKOUT=$REPO_ROOT
+  fi
 fi
 
 hermes_install_display() {
@@ -258,6 +278,8 @@ clone_at_ref() {
   git -C "$dest" checkout --detach FETCH_HEAD >&2
 }
 
+# Sets SOURCE and CLONE_DIR in this shell. It must not run in a command
+# substitution, or the cleanup trap would never see CLONE_DIR.
 resolve_source() {
   if [ "$OFFLINE" -eq 1 ]; then
     [ -n "$CHECKOUT" ] || die "--offline needs the installer to be inside a cyber-au checkout."
@@ -267,22 +289,22 @@ resolve_source() {
         die "--offline cannot fetch $REF. The local checkout is ${head:-unknown}."
       fi
     fi
-    printf '%s\n' "$CHECKOUT"
+    SOURCE=$CHECKOUT
     return 0
   fi
   if [ -z "$REF" ] && [ -n "$CHECKOUT" ]; then
-    printf '%s\n' "$CHECKOUT"
+    SOURCE=$CHECKOUT
     return 0
   fi
-  dest=$(mktemp -d)
-  CLONE_DIR=$dest
+  command -v git >/dev/null 2>&1 || die "git is required to fetch the profile."
+  CLONE_DIR=$(mktemp -d)
   export GIT_TERMINAL_PROMPT=0
   if [ -n "$REF" ]; then
-    clone_at_ref "$dest" "$REF"
+    clone_at_ref "$CLONE_DIR" "$REF"
   else
-    git clone --depth 1 "$REPO_URL" "$dest" >&2
+    git clone --depth 1 "$REPO_URL" "$CLONE_DIR" >&2
   fi
-  printf '%s\n' "$dest"
+  SOURCE=$CLONE_DIR
 }
 
 install_profile() {
@@ -308,7 +330,7 @@ run_bootstrap() {
   fi
   set -f
   # shellcheck disable=SC2086
-  "$script" --profile "$PROFILE" $extra
+  sh "$script" --profile "$PROFILE" $extra
   set +f
 }
 
@@ -317,7 +339,7 @@ bootstrap_script() {
     printf '%s\n' "$SOURCE/install/bootstrap.sh"
     return 0
   fi
-  if [ -f "$SCRIPT_DIR/bootstrap.sh" ]; then
+  if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/bootstrap.sh" ]; then
     printf '%s\n' "$SCRIPT_DIR/bootstrap.sh"
     return 0
   fi
@@ -333,13 +355,18 @@ bootstrap_script() {
 }
 
 CLONE_DIR=
-trap 'if [ -n "$CLONE_DIR" ]; then rm -rf "$CLONE_DIR"; fi' EXIT INT TERM
+SOURCE=
+trap 'if [ -n "$CLONE_DIR" ]; then rm -rf "$CLONE_DIR"; fi' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 ensure_hermes
 
-SOURCE=
 if profile_ready; then
   printf '%s\n' "Profile $PROFILE is already installed. Running bootstrap."
+  if [ -n "$REF" ]; then
+    printf '%s\n' "Ignoring --ref $REF: the installed profile is not changed here. Use the update path to change versions." >&2
+  fi
   if [ -n "$CHECKOUT" ] && [ -f "$CHECKOUT/distribution.yaml" ]; then
     check_hermes_version "$CHECKOUT/distribution.yaml"
   else
@@ -347,9 +374,10 @@ if profile_ready; then
     check_hermes_version "$(dirname "$config_path")/distribution.yaml"
   fi
 else
-  SOURCE=$(resolve_source)
+  resolve_source
   check_hermes_version "$SOURCE/distribution.yaml"
   install_profile "$SOURCE"
 fi
 
-run_bootstrap "$(bootstrap_script)"
+BOOTSTRAP=$(bootstrap_script)
+run_bootstrap "$BOOTSTRAP"

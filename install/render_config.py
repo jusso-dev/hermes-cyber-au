@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 from pathlib import Path
 
 import yaml
@@ -82,6 +83,9 @@ def _read_set_names(env_file: Path) -> set[str]:
         key, value = matched.group(1), matched.group(2).strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
             value = value[1:-1]
+        else:
+            # An unquoted value ends at " #". KEY=  # todo is still unset.
+            value = re.split(r"\s#", " " + value, maxsplit=1)[0]
         if value.strip():
             names.add(key)
     return names
@@ -213,7 +217,7 @@ def render_config(
     config: dict,
     present: set[str],
     managed_names: set[str],
-) -> tuple[dict, list[dict[str, str]]]:
+) -> tuple[dict, list[dict[str, str]], list[str]]:
     specs = servers_doc.get("servers")
     if not isinstance(specs, dict):
         raise SystemExit("servers.yaml must contain a servers mapping")
@@ -231,8 +235,13 @@ def render_config(
 
     rendered: dict[str, dict] = {}
     missing: list[dict[str, str]] = []
+    skipped: list[str] = []
     for name, spec in specs.items():
         previous = previous_servers.get(name)
+        if name in previous_servers and str(name) not in owned:
+            # A server the person added themselves under a shipped name.
+            skipped.append(str(name))
+            continue
         rendered[str(name)] = _server_entry(str(name), spec, home, previous, present)
         required = []
         if isinstance(spec, dict):
@@ -269,7 +278,60 @@ def render_config(
         updated["timezone"] = "Australia/Sydney"
     updated["mcp_servers"] = merged
     missing.sort(key=lambda item: (item["server"], item["variable"]))
-    return updated, missing
+    skipped.sort()
+    return updated, missing, skipped
+
+
+def _top_level_block(lines: list[str], key: str) -> tuple[int, int] | None:
+    """Line range of a top-level key and its indented body, minus trailing
+    blank or column-zero comment lines (those belong to the next key)."""
+    start = next(
+        (i for i, line in enumerate(lines) if re.match(rf"{re.escape(key)}\s*:", line)),
+        None,
+    )
+    if start is None:
+        return None
+    end = start + 1
+    while end < len(lines) and (
+        lines[end].strip() == "" or lines[end][0] in " \t#"
+    ):
+        end += 1
+    while end > start + 1 and (
+        lines[end - 1].strip() == "" or lines[end - 1].startswith("#")
+    ):
+        end -= 1
+    return start, end
+
+
+def _splice(original: str, updated: dict) -> str | None:
+    """Replace only the mcp_servers block (and a blank timezone) in the
+    original text, so comments and layout elsewhere survive. Returns None when
+    the result does not parse back to exactly `updated`."""
+    lines = original.splitlines(keepends=True)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    block = _dump_yaml({"mcp_servers": updated["mcp_servers"]}).splitlines(keepends=True)
+    found = _top_level_block(lines, "mcp_servers")
+    if found is None:
+        lines.extend(block)
+    else:
+        lines[found[0] : found[1]] = block
+    tz_line = f"timezone: {updated['timezone']}\n"
+    found = _top_level_block(lines, "timezone")
+    try:
+        before = yaml.safe_load("".join(lines)) or {}
+    except yaml.YAMLError:
+        return None
+    if not (isinstance(before, dict) and str(before.get("timezone") or "").strip()):
+        if found is None:
+            lines.append(tz_line)
+        else:
+            lines[found[0] : found[1]] = [tz_line]
+    text = "".join(lines)
+    try:
+        return text if yaml.safe_load(text) == updated else None
+    except yaml.YAMLError:
+        return None
 
 
 def _dump_yaml(data: dict) -> str:
@@ -292,7 +354,18 @@ def _write_if_changed(path: Path, text: str) -> None:
         return
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(text, encoding="utf-8")
+    if path.is_file():
+        shutil.copymode(path, temporary)
     temporary.replace(path)
+
+
+def _print_skipped(skipped: list[str]) -> None:
+    for name in skipped:
+        print(
+            f"Server {name} in config.yaml is not managed by cyber-au, so it was left as it is. "
+            f"The shipped {name} connector was not added.",
+            flush=True,
+        )
 
 
 def _print_missing(missing: list[dict[str, str]]) -> None:
@@ -319,14 +392,16 @@ def main(argv: list[str] | None = None) -> int:
     config = _load_yaml(args.config)
     present = _read_set_names(args.env_file)
     managed_names = _load_managed_names(args.managed)
-    updated, missing = render_config(
+    updated, missing, skipped = render_config(
         profile_home=args.profile_home,
         servers_doc=servers_doc,
         config=config,
         present=present,
         managed_names=managed_names,
     )
-    _write_if_changed(args.config, _dump_yaml(updated))
+    original = args.config.read_text(encoding="utf-8") if args.config.is_file() else ""
+    spliced = _splice(original, updated) if original.strip() else None
+    _write_if_changed(args.config, spliced if spliced is not None else _dump_yaml(updated))
     owned_names = sorted(
         name
         for name, entry in updated.get("mcp_servers", {}).items()
@@ -340,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
         args.status,
         json.dumps({"missing_env": missing}, indent=2) + "\n",
     )
+    _print_skipped(skipped)
     _print_missing(missing)
     return 0
 

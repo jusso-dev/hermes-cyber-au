@@ -286,3 +286,72 @@ servers:
     assert leaked not in proc.stdout
     assert leaked not in proc.stderr
     assert "ABUSECH_AUTH_KEY" in proc.stderr
+
+
+_TWO_SERVERS = """
+servers:
+  kev:
+    args: [serve, kev]
+    env: []
+    trust: untrusted
+    enabled_by_default: true
+    required_env: []
+  abusech:
+    args: [serve, abusech]
+    env:
+      - ABUSECH_AUTH_KEY=${ABUSECH_AUTH_KEY}
+    trust: untrusted
+    enabled_by_default: true
+    required_env:
+      - ABUSECH_AUTH_KEY
+"""
+
+
+def test_comments_and_a_same_named_user_server_survive(tmp_path: Path) -> None:
+    home = tmp_path / "profile"
+    servers = tmp_path / "servers.yaml"
+    config = home / "config.yaml"
+    env_file = home / ".env"
+    _write(servers, _TWO_SERVERS)
+    _write(
+        config,
+        "# kept note\n"
+        "timezone: Australia/Perth  # mine\n"
+        "model:\n"
+        "  default: foo  # chosen\n"
+        "mcp_servers:\n"
+        "  kev:\n"
+        "    command: /usr/local/bin/my-kev\n"
+        "\n"
+        "# after note\n"
+        "other: 1\n",
+    )
+    first = _run(home, servers, config, env_file)
+    assert first.returncode == 0, first.stderr
+    text = config.read_text(encoding="utf-8")
+    for kept in ("# kept note", "# mine", "# chosen", "# after note", "other: 1"):
+        assert kept in text
+    loaded = yaml.safe_load(text)
+    assert loaded["timezone"] == "Australia/Perth"
+    assert loaded["mcp_servers"]["kev"] == {"command": "/usr/local/bin/my-kev"}
+    assert loaded["mcp_servers"]["abusech"]["enabled"] is False
+    assert "Server kev" in first.stdout
+    before = config.read_bytes()
+    assert _run(home, servers, config, env_file).returncode == 0
+    assert config.read_bytes() == before
+
+
+def test_a_commented_blank_key_is_still_unset(tmp_path: Path) -> None:
+    home = tmp_path / "profile"
+    servers = tmp_path / "servers.yaml"
+    config = home / "config.yaml"
+    env_file = home / ".env"
+    _write(servers, _TWO_SERVERS)
+    _write(env_file, "ABUSECH_AUTH_KEY=   # todo\n")
+    assert _run(home, servers, config, env_file).returncode == 0
+    loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert loaded["mcp_servers"]["abusech"]["enabled"] is False
+    _write(env_file, f"ABUSECH_AUTH_KEY={MARKER} # note\n")
+    assert _run(home, servers, config, env_file).returncode == 0
+    loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert loaded["mcp_servers"]["abusech"]["enabled"] is True

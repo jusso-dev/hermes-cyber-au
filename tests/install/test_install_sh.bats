@@ -263,6 +263,23 @@ EOF
   ! grep -q 'git clone' "$GIT_LOG"
 }
 
+@test "the temporary clone is removed when the install finishes" {
+  install_fake_git
+  mkdir -p "$WORK/tmp"
+  TMPDIR="$WORK/tmp" run "$REPO/install/install.sh" --ref v0.1.0 --no-hermes-install --non-interactive --yes
+  [ "$status" -eq 0 ]
+  [ -z "$(ls -A "$WORK/tmp")" ]
+}
+
+@test "a ref or profile that looks like an option is refused" {
+  run "$REPO/install/install.sh" --ref=--upload-pack=x --offline --no-hermes-install
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Invalid ref"* ]]
+  run "$REPO/install/install.sh" --profile ../escape --offline --no-hermes-install
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Invalid profile name"* ]]
+}
+
 @test "offline ref does not fetch" {
   install_fake_git
   run "$REPO/install/install.sh" --offline --ref deadbeef --no-hermes-install --non-interactive --yes

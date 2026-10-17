@@ -91,7 +91,9 @@ profile_home() {
 }
 
 PROFILE_HOME=$(profile_home)
-mkdir -p "$PROFILE_HOME/plugin-data/cyber-au" "$PROFILE_HOME/mcp"
+[ -f "$PROFILE_HOME/mcp/pyproject.toml" ] ||
+  die "The profile connector project is missing at $PROFILE_HOME/mcp. Install the profile before bootstrap."
+mkdir -p "$PROFILE_HOME/plugin-data/cyber-au"
 
 if [ -f "$PROFILE_HOME/mcp/servers.yaml" ]; then
   SERVERS_YAML=$PROFILE_HOME/mcp/servers.yaml
@@ -99,10 +101,6 @@ elif [ -f "$REPO_ROOT/mcp/servers.yaml" ]; then
   SERVERS_YAML=$REPO_ROOT/mcp/servers.yaml
 else
   die "mcp/servers.yaml was not found in the profile or the checkout"
-fi
-
-if [ ! -f "$PROFILE_HOME/mcp/pyproject.toml" ] && [ -f "$REPO_ROOT/mcp/pyproject.toml" ]; then
-  die "profile mcp project is missing at $PROFILE_HOME/mcp. Install the profile before bootstrap."
 fi
 
 printf '%s\n' "Bootstrapping profile $PROFILE at $PROFILE_HOME."
