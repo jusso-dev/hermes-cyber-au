@@ -1,0 +1,256 @@
+[
+  {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+      "capabilities": {
+        "tools": {
+          "listChanged": false
+        }
+      },
+      "protocolVersion": "2025-11-25",
+      "serverInfo": {
+        "name": "junction",
+        "version": "0.1.16"
+      }
+    }
+  },
+  {
+    "id": 2,
+    "jsonrpc": "2.0",
+    "result": {
+      "tools": [
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": true
+          },
+          "description": "Find a bounded set of canonical operations.",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "allow_preview": {
+                "type": "boolean"
+              },
+              "limit": {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "product": {
+                "maxLength": 128,
+                "type": "string"
+              },
+              "query": {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              "service": {
+                "maxLength": 128,
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "type": "object"
+          },
+          "name": "junction_search"
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": true
+          },
+          "description": "Describe one operation and its exact input schema.",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "allow_preview": {
+                "type": "boolean"
+              },
+              "api_version": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "operation": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation"
+            ],
+            "type": "object"
+          },
+          "name": "junction_describe"
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false
+          },
+          "description": "Execute one operation under the configured host policy and context.",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "all": {
+                "type": "boolean"
+              },
+              "allow_preview": {
+                "type": "boolean"
+              },
+              "api_version": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "approval_id": {
+                "pattern": "^[0-9a-f]{32}$",
+                "type": "string"
+              },
+              "continuation": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "input": {
+                "type": "object"
+              },
+              "max_items": {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "max_pages": {
+                "maximum": 10000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "operation": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              "timeout_seconds": {
+                "maximum": 3600,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "wait": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "operation",
+              "input"
+            ],
+            "type": "object"
+          },
+          "name": "junction_execute"
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "openWorldHint": true,
+            "readOnlyHint": false
+          },
+          "description": "Execute a bounded dependency-aware batch under the configured host policy.",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "fail_fast": {
+                "type": "boolean"
+              },
+              "max_parallel": {
+                "maximum": 10,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "operations": {
+                "items": {
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "minItems": 1,
+                "type": "array"
+              },
+              "timeout_seconds": {
+                "maximum": 3600,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "operations"
+            ],
+            "type": "object"
+          },
+          "name": "junction_batch"
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": true
+          },
+          "description": "Inspect authoritative imported permission requirements.",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "allow_preview": {
+                "type": "boolean"
+              },
+              "api_version": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "operation": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation"
+            ],
+            "type": "object"
+          },
+          "name": "junction_permissions"
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "openWorldHint": true,
+            "readOnlyHint": true
+          },
+          "description": "List or inspect operator-configured secret-free contexts.",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "list",
+                  "show"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "type": "object"
+          },
+          "name": "junction_context"
+        }
+      ]
+    }
+  }
+]

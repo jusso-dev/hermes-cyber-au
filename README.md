@@ -68,7 +68,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | https://github.com/SigmaHQ/sigma |
 | crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | https://crt.sh/ |
 | Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | on | v0.2 | planned | https://www.oaic.gov.au/privacy/notifiable-data-breaches |
-| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | on | v0.2 | planned | https://github.com/jusso-dev/junction |
+| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | off | v0.2 | planned | [docs/connectors/junction.md](docs/connectors/junction.md) |
 | Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | on | v1.0 | planned | https://github.com/jusso-dev/Brolga |
 | ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | on | v1.0 | planned | https://github.com/jusso-dev/ThreatSieve |
 | M365-Secure assessment reports | `(none)` | Author's public tools | none | on | v0.2 | planned | https://github.com/jusso-dev/M365-Secure |

@@ -32,3 +32,11 @@ connectors:
     - services.nvd.nist.gov
     allow_ip_literals: false
     allow_http_loopback: false
+  junction:
+    hosts:
+    - graph.microsoft.com
+    - management.azure.com
+    - api.loganalytics.io
+    - login.microsoftonline.com
+    allow_ip_literals: false
+    allow_http_loopback: false

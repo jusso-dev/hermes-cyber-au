@@ -68,3 +68,21 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  junction:
+    command: "${JUNCTION_BIN}"
+    args:
+    - mcp
+    - serve
+    - --policy
+    - read-only
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    required_env: []
+    tools:
+      include:
+      - junction_search
+      - junction_describe
+      - junction_execute
