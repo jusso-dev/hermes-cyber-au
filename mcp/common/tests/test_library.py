@@ -14,7 +14,7 @@ import httpx
 import pytest
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied, EgressPolicy, EgressUnresolved
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
@@ -191,6 +191,42 @@ class TestEgress:
         policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("1.1.1.1")])
         with pytest.raises(EgressDenied, match="blocked"):
             policy.check("https://[fe80::1%25eth0]/")
+
+    def test_loopback_opt_in_does_not_cover_https_or_listed_names(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "connectors:\n  demo:\n    hosts: [example.com, localhost]\n"
+            "    allow_http_loopback: true\n",
+            encoding="utf-8",
+        )
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("127.0.0.1")])
+        with pytest.raises(EgressDenied, match="blocked"):
+            policy.check("https://example.com/")
+        with pytest.raises(EgressDenied, match="blocked"):
+            policy.check("https://localhost/")
+        policy.check("http://localhost/")
+
+    def test_dns_failure_is_a_typed_refusal(self, tmp_path: Path, monkeypatch):
+        path = tmp_path / "allow.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+
+        def failing(*_args, **_kwargs):
+            raise socket.gaierror(-2, "Name or service not known")
+
+        monkeypatch.setattr(socket, "getaddrinfo", failing)
+        with pytest.raises(EgressUnresolved):
+            EgressPolicy(path, "demo").check("https://example.com/")
+
+    def test_host_only_check_does_not_resolve(self, tmp_path: Path):
+        def resolver(host):
+            raise AssertionError("resolved")
+
+        path = tmp_path / "allow.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=resolver)
+        policy.check("https://example.com/", resolve=False)
+        with pytest.raises(EgressDenied):
+            policy.check("https://evil.test/", resolve=False)
 
 
 class TestCache:
@@ -393,6 +429,45 @@ class TestHttp:
         with pytest.raises(EgressDenied, match="blocked"):
             client.get("https://example.com/a", ttl=5)
         assert calls == ["example.com"]
+        client.close()
+
+    def _seeded_dns_down(self, tmp_path: Path, monkeypatch, clock, **kwargs):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b"cached")
+
+        _client(tmp_path, handler, clock=lambda: clock["t"]).get("https://example.com/a", ttl=5)
+
+        def failing(*_args, **_kwargs):
+            raise socket.gaierror(-2, "Name or service not known")
+
+        monkeypatch.setattr(socket, "getaddrinfo", failing)
+        path = tmp_path / "real.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+        return _client(
+            tmp_path,
+            handler,
+            clock=lambda: clock["t"],
+            policy=EgressPolicy(path, "demo"),
+            **kwargs,
+        )
+
+    def test_offline_cache_answer_needs_no_dns(self, tmp_path: Path, monkeypatch):
+        clock = {"t": 0.0}
+        client = self._seeded_dns_down(tmp_path, monkeypatch, clock, offline=True)
+        clock["t"] = 100.0
+        response = client.get("https://example.com/a", ttl=5)
+        assert (response.cache, response.body) == ("stale", b"cached")
+        with pytest.raises(EgressDenied):
+            client.get("https://evil.test/a", ttl=5)
+        client.close()
+
+    def test_dns_failure_serves_stale_or_fails_as_http_error(self, tmp_path: Path, monkeypatch):
+        clock = {"t": 0.0}
+        client = self._seeded_dns_down(tmp_path, monkeypatch, clock)
+        clock["t"] = 100.0
+        assert client.get("https://example.com/a", ttl=5).cache == "stale"
+        with pytest.raises(HttpError):
+            client.get("https://example.com/other", ttl=5)
         client.close()
 
     def test_secrets_are_redacted_in_errors(self, tmp_path: Path):

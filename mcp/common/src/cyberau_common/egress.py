@@ -48,6 +48,10 @@ class EgressDenied(Exception):
     """Raised when a URL is outside the connector allowlist."""
 
 
+class EgressUnresolved(EgressDenied):
+    """Raised when a listed host has no usable DNS answer. The request fails closed."""
+
+
 class EgressPolicy:
     def __init__(
         self,
@@ -67,14 +71,15 @@ class EgressPolicy:
         self.allow_http_loopback = bool(spec.get("allow_http_loopback", False))
         self._networks = _merge_networks(extra_networks)
 
-    def check(self, url: str) -> None:
+    def check(self, url: str, *, resolve: bool = True) -> None:
+        """Refuse a URL. ``resolve=False`` skips DNS, for a call that sends nothing."""
         try:
-            self._check(url)
+            self._check(url, resolve)
         except EgressDenied as exc:
             _LOG.warning("egress refused for %s: %s", self.connector, exc)
             raise
 
-    def _check(self, url: str) -> None:
+    def _check(self, url: str, resolve: bool) -> None:
         parts = urlsplit(url)
         if parts.username or parts.password:
             raise EgressDenied("URLs must not contain userinfo")
@@ -96,13 +101,15 @@ class EgressPolicy:
             loopback and self.allow_http_loopback and scheme == "http"
         ):
             raise EgressDenied(f"host {normalised} is not allowlisted for {self.connector}")
+        if not resolve:
+            return
         # This lookup is only the pre-request check. The HTTP client resolves
         # the name again when it connects.
         addresses = [literal] if literal is not None else self._resolver(host)
         if not addresses:
-            raise EgressDenied(f"host {host} did not resolve")
+            raise EgressUnresolved(f"host {host} did not resolve")
         for address in addresses:
-            if address.is_loopback and self.allow_http_loopback:
+            if address.is_loopback and loopback and scheme == "http" and self.allow_http_loopback:
                 continue
             if _is_blocked_ip(address, self._networks):
                 raise EgressDenied(f"host {host} resolves to a blocked address")
@@ -211,7 +218,11 @@ def _is_blocked_ip(address: ipaddress.IPv4Address | ipaddress.IPv6Address, netwo
 
 def _resolve(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
     found: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
-    for family, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+    try:
+        answers = socket.getaddrinfo(host, None)
+    except OSError as exc:
+        raise EgressUnresolved(f"host {host} did not resolve") from exc
+    for family, _, _, _, sockaddr in answers:
         if family not in (socket.AF_INET, socket.AF_INET6):
             continue
         found.append(ipaddress.ip_address(sockaddr[0]))

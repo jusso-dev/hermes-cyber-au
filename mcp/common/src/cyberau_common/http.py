@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import httpx
 
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common.egress import EgressPolicy, EgressUnresolved
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact, redact_headers
 
@@ -132,7 +132,9 @@ class HttpClient:
         key_body: bytes | None = None,
         skip_cache: bool = False,
     ) -> Response:
-        self.policy.check(url)
+        # Host list only. A cache answer sends nothing, so it needs no DNS.
+        # Every network hop is resolved and checked in _request.
+        self.policy.check(url, resolve=False)
         key_material = key_body if key_body is not None else (content or b"")
         cache_key = self.cache.key(method, url, params, key_material, self.auth_scope)
         cached = None if skip_cache else self.cache.get(cache_key)
@@ -152,7 +154,7 @@ class HttpClient:
             status, response_headers, body, final_url = self._request(
                 method, url, params=params, headers=outbound, content=content
             )
-        except (HttpError, httpx.HTTPError) as exc:
+        except (HttpError, EgressUnresolved, httpx.HTTPError) as exc:
             if cached and self.cache.within_stale(cached, stale_if_error):
                 return _from_cache(cached, "stale", url)
             raise HttpError(redact(str(exc))) from exc

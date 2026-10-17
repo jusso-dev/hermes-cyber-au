@@ -12,7 +12,7 @@ Hermes facts below were checked against NousResearch/hermes-agent at `43faacf` (
 - The host must be in that connector's list. Names are compared after IDNA normalisation. A lookalike character that encodes to a different name is a different host.
 - Userinfo in the URL is refused.
 - IP literals are refused unless that connector sets `allow_ip_literals`. The shipped file does not set it.
-- A connector may set `allow_http_loopback` to permit `http` to `localhost` or a loopback address. The shipped file does not set it. The opt-in does not permit any other private or scoped address.
+- A connector may set `allow_http_loopback` to permit `http` to `localhost` or a loopback address. The shipped file does not set it. The opt-in covers only `http` to a loopback name or address. An `https` request, or a listed public name that resolves to loopback, is still refused.
 - Hosts that are not in the list are refused before DNS resolution and before a socket to that host is opened.
 
 Redirects are not followed by the HTTP library. The client follows at most five hops itself. Each hop is checked with the same policy before the next request is sent. A redirect to a host outside the list, or to a private or scoped address, is refused. Secret headers are dropped before the next hop.
@@ -28,6 +28,8 @@ An address on the connector's host list is still refused when it is private or s
 The policy resolves each hostname and refuses a private or scoped answer before it sends the request. The HTTP client resolves that same hostname again when it connects. The two lookups are not bound to each other. An address accepted by the check is not the address the connection is guaranteed to use.
 
 The private and scoped checks still run before every request, including each redirect. They are not relaxed because of this gap.
+
+A name that does not resolve is refused as well, and the request fails closed. The client then serves a stale cache entry if one is within its stale window, or reports an upstream error. In offline mode a cache answer sends nothing, so it needs no lookup. Only the host list is checked for it.
 
 ## Web and browser tools
 
