@@ -19,3 +19,5 @@ Cache files, when present:
 - `$CYBERAU_DATA_DIR/urlhaus/recent.json`
 
 `CYBERAU_PHISHTANK_CACHE` and `CYBERAU_URLHAUS_CACHE` override those paths. An empty OpenPhish feed does not replace a previous non-empty cache. Seen OpenPhish URLs are appended to `$CYBERAU_DATA_DIR/openphish.sqlite` and are not deleted when they leave the feed.
+
+The packaged `data/feed.txt` is a synthetic example (`phish.example`), not OpenPhish data. Any answer from it, or from a file named by `CYBERAU_OPENPHISH_SNAPSHOT`, carries `cache: snapshot` and a warning, and is not written to `openphish.sqlite`. Live health ignores the snapshot, the offline flag, the cache and the hourly fallback, so a failed fetch, a timeout, a non-feed body or an exhausted hourly limit reports not ok.

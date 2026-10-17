@@ -7,7 +7,7 @@ import sqlite3
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import httpx
 import jsonschema
@@ -44,10 +44,10 @@ def phish_check_url(url: str) -> dict:
     text, cache, warning = _fetch_feed(force_live=False)
     warnings = [warning] if warning else []
     feed_urls = _feed_urls(text) if text and not schema_drift(text) else []
-    if feed_urls:
+    if feed_urls and cache != "snapshot":
         _persist("openphish", feed_urls)
     wanted = _normalise(url)
-    records = [_openphish_record(url, wanted, feed_urls, warning)]
+    records = [_openphish_record(url, wanted, feed_urls, warning, cache)]
     for name in ("phishtank", "urlhaus"):
         cached, status = _sibling_urls(name)
         if status and status != "cache not present":
@@ -126,7 +126,7 @@ class _PublicFeedTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         host = request.url.host or ""
         path = request.url.path or ""
-        if host == GITHUB_HOST and not path.startswith(GITHUB_PREFIX):
+        if host == GITHUB_HOST and not _public_feed_path(path):
             raise EgressDenied("redirect path is not the OpenPhish public feed")
         return self._inner.handle_request(request)
 
@@ -134,6 +134,16 @@ class _PublicFeedTransport(httpx.BaseTransport):
         closer = getattr(self._inner, "close", None)
         if closer:
             closer()
+
+
+def _public_feed_path(path: str) -> bool:
+    """Prefix match on the decoded path, with no dot segments or encoded separators."""
+    if "%2f" in path.lower() or "%5c" in path.lower() or "\\" in path:
+        return False
+    decoded = unquote(path)
+    if any(part in {".", ".."} for part in decoded.split("/")):
+        return False
+    return decoded.startswith(GITHUB_PREFIX)
 
 
 def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
@@ -158,7 +168,7 @@ def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
     try:
         _limit_feed()
     except RateLimited:
-        if previous and _classify(_decode(previous.body) or "") == "ok":
+        if not force_live and previous and _classify(_decode(previous.body) or "") == "ok":
             return _decode(previous.body), "stale", ""
         return None, "snapshot", "OpenPhish feed is unavailable: hourly ceiling reached"
     try:
@@ -245,7 +255,15 @@ def _from_snapshot() -> tuple[str | None, str, str]:
         return None, "snapshot", problem
     if not _feed_urls(text):
         return text, "snapshot", "OpenPhish feed is empty"
-    return text, "snapshot", ""
+    return text, "snapshot", _snapshot_warning()
+
+
+def _snapshot_warning() -> str:
+    if os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT"):
+        return "OpenPhish feed served from a pinned snapshot file, not live data"
+    return (
+        "OpenPhish feed served from the bundled snapshot of synthetic example URLs, not live data"
+    )
 
 
 def _snapshot_text() -> str | None:
@@ -266,10 +284,12 @@ def _restore(cache: HttpCache, key: str, previous) -> None:
     )
 
 
-def _openphish_record(query: str, wanted: str, urls: list[str], warning: str) -> dict:
+def _openphish_record(query: str, wanted: str, urls: list[str], warning: str, cache: str) -> dict:
     listed = wanted in urls
     if listed:
         detail = wanted
+    elif cache == "snapshot" and urls:
+        detail = "not listed in the snapshot copy of the OpenPhish feed"
     elif warning:
         detail = warning
     else:
@@ -426,7 +446,11 @@ def _response_problem(record: dict) -> str | None:
 def _query_problem(url: str) -> str:
     if not isinstance(url, str) or not url.strip():
         return "url is required"
-    parts = urlsplit(url.strip())
+    try:
+        parts = urlsplit(url.strip())
+        _ = parts.port  # a bad port raises ValueError
+    except ValueError:
+        return "url must be an http or https URL"
     if parts.username or parts.password:
         return "url must not contain userinfo"
     if parts.scheme not in {"http", "https"} or not parts.hostname:
@@ -462,7 +486,11 @@ def _feed_urls(text: str) -> list[str]:
 def _line_is_url(value: str) -> bool:
     if any(char.isspace() for char in value):
         return False
-    parts = urlsplit(value)
+    try:
+        parts = urlsplit(value)
+        _ = parts.port  # a bad port raises ValueError
+    except ValueError:
+        return False
     if parts.username or parts.password:
         return False
     return parts.scheme in {"http", "https"} and bool(parts.hostname)

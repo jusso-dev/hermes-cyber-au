@@ -8,4 +8,4 @@ Read-only check of one URL against the OpenPhish community feed, together with a
 
 No API key. The feed is fetched at most once an hour from `https://openphish.com/feed.txt`. On 17 October 2026 that address redirected to the OpenPhish public feed on `raw.githubusercontent.com`. Redirects to any other host are refused.
 
-Lines from the feed are untrusted text. An empty feed does not wipe a previous cache. Licence not confirmed. The community feed is a small sample. This connector is not affiliated with OpenPhish.
+When the live feed cannot be used offline or the bundled snapshot answers, the result is labelled `snapshot` with a warning. The bundled snapshot holds synthetic example URLs, is not live data, and is never written to the history store. Lines from the feed are untrusted text. An empty feed does not wipe a previous cache. Licence not confirmed. The community feed is a small sample. This connector is not affiliated with OpenPhish.

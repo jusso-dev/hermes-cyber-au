@@ -71,7 +71,7 @@ def test_happy_path_matches_schemas_and_wraps_text():
     jsonschema.validate(found, ENVELOPE)
     assert found["cache"] == "snapshot"
     assert found["attribution"].startswith("OpenPhish community feed")
-    assert found["warnings"] == []
+    assert any("snapshot" in item and "not live" in item for item in found["warnings"])
     row = _row(found, "openphish")
     jsonschema.validate(row, response_schema)
     assert row["listed"] is True
@@ -86,8 +86,9 @@ def test_happy_path_matches_schemas_and_wraps_text():
 
 def test_empty_result_and_empty_feed(monkeypatch):
     missing = phish_check_url("https://absent.example/nope")
-    assert missing["warnings"] == []
+    assert all("snapshot" in item for item in missing["warnings"])
     assert all(row["listed"] is False for row in missing["data"])
+    assert "snapshot copy" in _row(missing, "openphish")["detail"]
     monkeypatch.setenv("CYBERAU_OPENPHISH_SNAPSHOT", str(FIXTURES / "feed_empty.txt"))
     empty = phish_check_url(QUERY)
     assert empty["data"]
@@ -268,17 +269,15 @@ def test_sibling_caches_and_history(tmp_path, monkeypatch):
     assert _row(found, "phishtank")["listed"] is True
     assert "<<untrusted source=phishtank>>" in _row(found, "phishtank")["detail"]
     assert _row(found, "urlhaus")["listed"] is False
-    rows = (
-        sqlite3.connect(tmp_path / "openphish.sqlite")
-        .execute("SELECT url FROM indicators WHERE source = 'openphish' ORDER BY url")
-        .fetchall()
+    _live(monkeypatch)
+    feed = {"body": b"https://phish.example/login\n"}
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=feed["body"])
     )
-    assert "https://phish.example/login" in {row[0] for row in rows}
-    monkeypatch.setenv(
-        "CYBERAU_OPENPHISH_SNAPSHOT",
-        str(tmp_path / "later.txt"),
-    )
-    (tmp_path / "later.txt").write_text("https://other.example/new\n", encoding="utf-8")
+    phish_check_url("https://phish.example/login")
+    for name in ("http_cache.sqlite", "rate_limit.sqlite"):
+        (tmp_path / name).unlink()
+    feed["body"] = b"https://other.example/new\n"
     phish_check_url("https://other.example/new")
     kept = {
         row[0]
@@ -288,6 +287,20 @@ def test_sibling_caches_and_history(tmp_path, monkeypatch):
     }
     assert "https://phish.example/login" in kept
     assert "https://other.example/new" in kept
+
+
+def test_snapshot_is_never_written_to_the_history_store(tmp_path):
+    found = phish_check_url(QUERY)
+    assert found["cache"] == "snapshot"
+    assert _row(found, "openphish")["listed"] is True
+    assert not (tmp_path / "openphish.sqlite").exists()
+
+
+def test_bundled_snapshot_is_labelled_synthetic(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OPENPHISH_SNAPSHOT")
+    found = phish_check_url(QUERY)
+    assert found["cache"] == "snapshot"
+    assert any("synthetic" in item and "not live" in item for item in found["warnings"])
 
 
 def test_offline_cache_beats_snapshot_and_missing_snapshot_warns(tmp_path, monkeypatch):
@@ -397,3 +410,77 @@ def test_sibling_renamed_field_warns(tmp_path, monkeypatch):
     found = phish_check_url(QUERY)
     assert any("PhishTank" in item and "url" in item for item in found["warnings"])
     assert _row(found, "phishtank")["listed"] is False
+
+
+def test_live_health_not_ok_on_cached_copy_when_rate_limited(tmp_path, monkeypatch):
+    _live(monkeypatch)
+    body = (FIXTURES / "feed_three_lines.txt").read_bytes()
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    key = cache.key("GET", FEED_URL, None, b"", "anonymous")
+    cache.put(key, status=200, headers={}, body=body, ttl=0)
+    calls = {"n": 0}
+
+    def ok(_request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, content=body)
+
+    source._TRANSPORT = httpx.MockTransport(ok)
+    source._limit_feed()
+    probe = connector().health(live=True)
+    assert calls["n"] == 0
+    assert probe.ok is False
+    assert "hourly" in probe.detail
+
+
+def test_live_health_not_ok_on_timeout_with_cached_copy(tmp_path, monkeypatch):
+    _live(monkeypatch)
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    key = cache.key("GET", FEED_URL, None, b"", "anonymous")
+    cache.put(key, status=200, headers={}, body=b"https://phish.example/login\n", ttl=86400)
+
+    def timeout(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("timed out")
+
+    source._TRANSPORT = httpx.MockTransport(timeout)
+    assert connector().health(live=True).ok is False
+
+
+def test_live_health_not_ok_on_non_feed_body(tmp_path, monkeypatch):
+    _live(monkeypatch)
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=b"<html>not a feed</html>")
+    )
+    assert connector().health(live=True).ok is False
+
+
+def test_unparseable_urls_do_not_raise(monkeypatch):
+    for query in ("https://a.example:99999/", "http://[::1/x", "https://a.example:abc/"):
+        refused = phish_check_url(query)
+        assert refused["data"] == []
+        assert refused["warnings"]
+    assert schema_drift("https://a.example:abc/x")
+    assert schema_drift("http://[::1/x")
+    monkeypatch.setenv("CYBERAU_OPENPHISH_SNAPSHOT", str(FIXTURES / "feed_badport.txt"))
+    warned = phish_check_url(QUERY)
+    assert warned["warnings"]
+    assert _row(warned, "openphish")["listed"] is False
+
+
+def test_encoded_dot_segments_on_github_are_refused(monkeypatch):
+    _live(monkeypatch)
+    hostile = (
+        "https://raw.githubusercontent.com/openphish/public_feed/%2e%2e/%2e%2e/evil/repo/feed.txt"
+    )
+    seen = []
+
+    def redirect(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if request.url.host == "openphish.com":
+            return httpx.Response(302, headers={"location": hostile})
+        return httpx.Response(200, content=b"https://phish.example/login\n")
+
+    source._TRANSPORT = httpx.MockTransport(redirect)
+    refused = phish_check_url(QUERY)
+    assert seen == [FEED_URL]
+    assert refused["warnings"]
+    assert _row(refused, "openphish")["listed"] is False
