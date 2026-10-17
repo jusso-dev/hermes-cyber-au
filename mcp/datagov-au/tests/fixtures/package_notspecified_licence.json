@@ -1,0 +1,25 @@
+{
+  "help": "https://data.gov.au/data/api/3/action/help_show?name=package_show",
+  "success": true,
+  "result": {
+    "id": "pkg-no-licence",
+    "name": "unlicensed-example",
+    "title": "Dataset with no licence",
+    "notes": "The catalogue did not name a licence.",
+    "license_id": "notspecified",
+    "license_title": "License Not Specified",
+    "metadata_modified": "2026-10-01T00:00:00.000000",
+    "organization": {
+      "name": "example-agency",
+      "title": "Example Agency"
+    },
+    "resources": [
+      {
+        "id": "res-3",
+        "name": "Table",
+        "format": "JSON",
+        "url": "https://data.gov.au/data/dataset/unlicensed-example/resource/res-3/download/table.json"
+      }
+    ]
+  }
+}

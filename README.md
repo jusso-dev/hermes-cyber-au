@@ -84,7 +84,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | https://www.cyber.gov.au/irap |
 | Protective Security Policy Framework (PSPF) | `pspf` | Australian government | none | on | v1.0 | planned | https://www.protectivesecurity.gov.au/ |
 | Scamwatch alerts | `scamwatch` | Australian government | none | on | v1.0 | planned | https://www.scamwatch.gov.au/ |
-| data.gov.au (CKAN) | `datagov` | Australian government | none | on | v1.0 | planned | https://data.gov.au/ |
+| data.gov.au (CKAN) | `datagov` | Australian government | none | on | v1.0 | planned | [docs/connectors/datagov-au.md](docs/connectors/datagov-au.md) |
 | AusCERT member URL feed (AusMISP goes through the MISP connector) | `auscertm` | Australian community | `AUSCERT_URL_FEED`, `AUSCERT_FEED_TOKEN` (optional) | off: bring your own access | v1.0 | planned | https://auscert.org.au/services/threat-intelligence/ |
 | ASD Blueprint for Secure Cloud | `blueprint` | Australian government | none | on | v1.0 | planned | https://blueprint.asd.gov.au/ |
 | PhishTank verified phishing URLs | `phish` | Global threat intelligence | `PHISHTANK_APP_KEY` (optional) | on | v1.0 | planned | https://phishtank.org/developer_info.php |

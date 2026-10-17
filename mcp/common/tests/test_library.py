@@ -91,6 +91,28 @@ class TestEgress:
         with pytest.raises(EgressDenied):
             local.check("https://example.com/")
 
+    @pytest.mark.parametrize(
+        "address",
+        [
+            "::ffff:127.0.0.1",
+            "::ffff:10.0.0.1",
+            "::ffff:169.254.169.254",
+            "2002:7f00:1::1",
+            "64:ff9b::7f00:1",
+            "::",
+            "192.0.0.8",
+            "198.18.0.1",
+            "224.0.0.1",
+            "fe80::1%eth0",
+        ],
+    )
+    def test_denies_mapped_embedded_and_special_addresses(self, tmp_path: Path, address: str):
+        path = tmp_path / "allow.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip(address)])
+        with pytest.raises(EgressDenied):
+            policy.check("https://example.com/")
+
     def test_punycode_lookalike_is_denied(self, tmp_path: Path):
         policy = _policy(tmp_path, "connectors:\n  demo:\n    hosts: [example.com]\n")
         lookalike = "ex" + "\u0430" + "mple.com"

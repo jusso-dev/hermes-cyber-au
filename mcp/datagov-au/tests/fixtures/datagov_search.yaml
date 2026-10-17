@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://data.gov.au/data/api/3/action/package_search?q=cyber&rows=10
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"success":true,"result":{"count":1,"results":[{"id":"pkg-cyber-au-example","name":"cyber-au-example-dataset","title":"Synthetic cyber incident counts","license_id":"cc-by","resources":[{"id":"res-1","name":"Incident counts","format":"CSV","url":"https://data.gov.au/data/dataset/cyber-au-example-dataset/resource/res-1/download/counts.csv"}]}]}}'

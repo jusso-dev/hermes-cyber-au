@@ -27,12 +27,22 @@ FLOOR_CIDRS: tuple[str, ...] = (
     "127.0.0.0/8",
     "169.254.0.0/16",
     "172.16.0.0/12",
+    "192.0.0.0/24",
+    "192.0.2.0/24",
     "192.168.0.0/16",
+    "198.18.0.0/15",
+    "198.51.100.0/24",
+    "203.0.113.0/24",
     "224.0.0.0/4",
+    "240.0.0.0/4",
     "255.255.255.255/32",
     "::/128",
     "::1/128",
     "::ffff:0:0/96",
+    "64:ff9b::/96",
+    "64:ff9b:1::/48",
+    "2001:db8::/32",
+    "2002::/16",
     "fc00::/7",
     "fe80::/10",
     "fec0::/10",
@@ -201,6 +211,9 @@ def _is_blocked_ip(address: ipaddress.IPv4Address | ipaddress.IPv6Address, netwo
     # not apply to the IPv6 form, so the mapped address is not given a pass.
     if getattr(address, "ipv4_mapped", None) is not None:
         return True
+    embedded = getattr(address, "sixtofour", None)
+    if embedded is not None:
+        return _is_blocked_ip(embedded, networks)
     if any(address in network for network in networks):
         return True
     if (

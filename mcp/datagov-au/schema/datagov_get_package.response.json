@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "title",
+    "publisher",
+    "licence",
+    "licence_title",
+    "licence_missing",
+    "modified",
+    "notes",
+    "resources"
+  ],
+  "properties": {
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "title": {"type": "string"},
+    "publisher": {"type": "string"},
+    "licence": {"type": "string"},
+    "licence_title": {"type": "string"},
+    "licence_missing": {"type": "boolean"},
+    "modified": {"type": "string"},
+    "notes": {"type": "string"},
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "format", "url"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "format": {"type": "string"},
+          "url": {"type": "string"}
+        }
+      }
+    }
+  }
+}
