@@ -24,7 +24,7 @@ Assumptions:
 | A1 | Provider keys and connector keys | Profile `.env`, referenced only as `${VAR}`. Names start in `distribution.yaml` `env_requires`. | Someone else spends the team's quota or uses a paid feed under the team's licence. A key that reaches git history or a cassette stays disclosed. |
 | A2 | Intel store | `plugin-data/cyber-au/intel.sqlite`. User-owned, so a profile update leaves it in place. Rows may be TLP:CLEAR public feeds or TLP:AMBER analyst data. | Disclosure of an investigation, of customer indicators, or of a draft breach assessment. A poisoned row that a later answer cites as fact. Loss of the store on an update. |
 | A3 | Delivery channels | Slack, Teams, and email, chosen when an operator resumes a routine. | A briefing is a copy. A secret or a TLP:AMBER conclusion in that copy is visible to the whole channel. The post itself is an action taken in the team's name. |
-| A4 | The analyst's trust in outputs | Skill answers and briefings: ISM control ids, Essential Eight claims, NDB assessments, SOCI 12-hour and 72-hour deadlines in Sydney time. | A wrong id or a wrong deadline becomes a missed statutory report or a false compliance claim. The profile states that its output is guidance, and the analyst is still invited to rely on it. |
+| A4 | The analyst's trust in outputs | Skill answers and briefings: ISM control ids, Essential Eight claims, NDB assessments and their 30-day deadline, SOCI 12-hour, 72-hour, and 84-hour deadlines, all in Sydney time. | A wrong id or a wrong deadline becomes a missed statutory report or a false compliance claim. The profile states that its output is guidance, and the analyst is still invited to rely on it. |
 | A5 | The host running Hermes | The machine or container, and the profile home on it. | The host can read `.env`, the store, sessions, and the audit log. Any code this distribution runs (a skill, a plugin hook, a dependency) inherits that access. |
 
 Two further assets sit under those five. Distribution files (`SOUL.md`, skills, cron, plugin code) are the instructions the host will run; tampering with them exposes A1 to A5. The audit log is the record an assessor uses after the fact; losing it is threat T6.
@@ -33,7 +33,7 @@ Two further assets sit under those five. Distribution files (`SOUL.md`, skills, 
 
 | Id | Threat | Entry | Impact on | Later ticket | Test |
 |---|---|---|---|---|---|
-| T1 | Indirect prompt injection in feed content | MCP tool results | A4, then A1, A3, or A5 if it steers a later action | [062](../../tickets/062-sec-prompt-injection.md) (issue 66) | `TestEnvelope.test_untrusted_text_property`; corpus and hook test in issue 66 |
+| T1 | Indirect prompt injection in feed content | MCP tool results | A4, then A1, A3, or A5 if it steers a later action | [062](../../tickets/062-sec-prompt-injection.md) (issue 66) | `TestEnvelope.test_untrusted_text_property`, `TestEnvelope.test_warning_redaction_and_cache_names`; corpus and hook test in issue 66 |
 | T2 | Secret leakage | Tool args, logs, cassettes, exports, briefing delivery | A1, and A2 when a delivery copies store data | [061](../../tickets/061-sec-secrets.md) (issue 65) | Redaction tests in `test_library.py` and `test_nvd.py`; gitleaks in issue 65 |
 | T3 | Exfiltration to an attacker host | Web tools, MCP | A1, A2, A5 | [063](../../tickets/063-sec-egress.md) (issue 67) | `TestEgress` and `TestHttp.test_redirect_to_denied_host`; allowlist check in issue 67 |
 | T4 | Tampered distribution or dependency | `hermes profile update`, uv | A5, then A1 and A2 | [065](../../tickets/065-sec-supply-chain.md) (issue 69) | Release-notes, SBOM, and attestation checks in issue 69 |
@@ -47,11 +47,11 @@ Feed text (RSS items, OTX pulses, advisory pages, email bodies under analysis) a
 
 STRIDE: spoofing and tampering. OWASP: LLM01:2025 Prompt Injection.
 
-Control ticket: [Prompt injection defences for feed content](../../tickets/062-sec-prompt-injection.md) (GitHub issue 66). That ticket wraps free text as untrusted, banners connector results, guards the next write or outbound tool unless the analyst approved it in this session, sets every connector server to `trust: untrusted`, keeps the SOUL rule free of scanner phrases, and states allowed actions in cron prompts.
+Control ticket: [Prompt injection defences for feed content](../../tickets/062-sec-prompt-injection.md) (GitHub issue 66). That ticket wraps free text as untrusted, banners connector results, guards the next write or outbound tool unless the analyst approved it in this session, requires `trust: untrusted` on every connector server, keeps the SOUL rule free of scanner phrases, and states allowed actions in cron prompts.
 
 Tests:
 
-- In tree: `TestEnvelope.test_untrusted_text_property` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py). Feed text is wrapped and flagged untrusted in the result envelope.
+- In tree: `TestEnvelope.test_untrusted_text_property` and `TestEnvelope.test_warning_redaction_and_cache_names` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py). The first checks that feed text is wrapped, length-capped, and stripped of control and bidi characters. The second checks that the result envelope carries `untrusted: true`. Neither shows that the model ignores the text.
 - Specified by issue 66: the corpus under `tests/security/injection/`, and the deterministic hook test that every corpus case is blocked from triggering a write or outbound tool. The model eval pass rate is recorded per release.
 
 ### T2. Secret leakage
@@ -100,7 +100,8 @@ Controls:
 
 - Already in the profile: `SOUL.md` states that the agent proposes and a person acts. Sending a report, blocking an address, opening a ticket, or contacting a regulator needs that person's approval in this session.
 - Platform, relied on and not re-built here: dangerous command approval and `approvals.deny`. See [Hermes security](https://github.com/NousResearch/hermes-agent/blob/43faacfb8de7b29548547a7fbdedad0cc6e7391c/website/docs/user-guide/security.md).
-- Later ticket: issue 66 sets `trust: untrusted` on every connector server, so a tool without `readOnlyHint: true` asks for approval and fails closed in cron, and the `pre_tool_call` guard blocks a write or outbound tool after flagged content unless the analyst approved it in this session.
+- In tree: `mcp/servers.yaml` and the scaffold template already set `trust: untrusted` on every current connector server, so a tool without `readOnlyHint: true` asks for approval and fails closed in cron. No test pins that setting yet. Issue 66 owns the requirement.
+- Later ticket: issue 66 adds the `pre_tool_call` guard, which blocks a write or outbound tool after flagged content unless the analyst approved it in this session.
 
 Tests:
 
@@ -119,9 +120,9 @@ Test specified by issue 68: deleting or editing any line makes `cyber-au audit v
 
 ### T7. Over-trust in a wrong answer
 
-A skill states an ISM control id that is not in the loaded release, or a deadline that is not the SOCI 12-hour or 72-hour clock, and the analyst acts on it. The impact is a false compliance claim or a missed statutory report (A4). The entry point is the skill, including when the underlying feed was silent or stale.
+A skill states an ISM control id that is not in the loaded release, or a deadline that does not match the SOCI 12-hour, 72-hour, or 84-hour clock or the NDB 30-day assessment period, and the analyst acts on it. The impact is a false compliance claim or a missed statutory report (A4). The entry point is the skill, including when the underlying feed was silent or stale.
 
-STRIDE: tampering of the decision record the analyst keeps. OWASP: LLM09:2025 Misinformation.
+STRIDE: no category fits a wrong but honest answer. Tampering is the nearest, with the analyst's decision record as the thing that ends up wrong. OWASP: LLM09:2025 Misinformation.
 
 Control ticket: [Skill authoring standard and offline eval harness](../../tickets/040-skill-standards-evals.md) (GitHub issue 44). Citations are `Source: <name>, <version>, retrieved <date>`. A missing fact is answered with "I don't know". The same rule is already in `SOUL.md`. The workflows where a wrong id or a wrong deadline does the damage are [ISM control lookup](../../tickets/044-skill-ism-control-lookup.md), [NDB breach notification](../../tickets/049-skill-ndb-breach-notification.md), and [SOCI reporting](../../tickets/050-skill-soci-reporting.md). Those skills are held to the issue 44 harness.
 
@@ -140,7 +141,7 @@ These are Hermes v0.22.2 controls. The distribution uses them as they ship. Each
 | `approvals.deny` | A denied command pattern is blocked even when approval mode is relaxed. | T5 |
 | SSRF protection | URL tools refuse private, loopback, and link-local targets. | T3 |
 | `security.website_blocklist` | Named sites are refused for web and browser tools. This is a deny list. The allowlist is issue 67. | T3 |
-| Context-file injection scanning | A distribution `SOUL.md` that matches the scanner is blocked on install and update. | T1, T4 |
+| Context-file injection scanning | A distribution `SOUL.md` that matches the scanner is blocked on install and update. The scanner is a pattern heuristic and covers `SOUL.md` only, so it does not review skills, cron jobs, or plugin code. | T1, T4 |
 | MCP environment filtering | A stdio connector receives a filtered environment plus only the keys that server's `env` lists. | T2 |
 | MCP error redaction | Common secret shapes in connector errors are replaced before the model sees them. | T2 |
 | `trust: untrusted` | A connector tool without `readOnlyHint: true` requires approval and fails closed in cron. | T5 |
@@ -168,7 +169,7 @@ These are Hermes v0.22.2 controls. The distribution uses them as they ship. Each
 | LLM03:2025 | Supply Chain | T4. Issue 69. Distributions are unsigned today; that is the gap issue 69 closes. |
 | LLM04:2025 | Data and Model Poisoning | Vendor model training stays with the model provider. Feed rows can still bias a later answer once they sit in the store. Issue 66 marks that text untrusted. Issue 44 requires a citation for a factual claim. [Store schema and ingest](../../tickets/052-store-schema-ingest.md) keeps a `source_id` on each observation. |
 | LLM05:2025 | Improper Output Handling | A briefing or a drafted ticket is output that Slack, Teams, email, or a tracker may render. T5 requires approval before that write. Issue 65 keeps secrets out of the delivery. Residual: a markup sanitiser for channel posts has no ticket yet. The agent's own later fetches still have to pass the T3 allowlist. |
-| LLM06:2025 | Excessive Agency | T5. Hermes approvals plus `trust: untrusted` in issue 66. Cron ships paused. |
+| LLM06:2025 | Excessive Agency | T5. Hermes approvals plus `trust: untrusted` (set today, required by issue 66). Cron ships paused. |
 | LLM07:2025 | System Prompt Leakage | `SOUL.md` and the skills are published in this repository. Secrecy of the system prompt is not an asset. The impact that matters is a secret written into SOUL or a skill, which issue 65 and `test_env_template_has_no_values` forbid. Hermes still blocks a distribution SOUL that trips the injection scanner. |
 | LLM08:2025 | Vector and Embedding Weaknesses | v0.1 stores indicators as SQLite rows ([store schema](../../tickets/052-store-schema-ingest.md)). Revisit this row if a later ticket adds an embedding index. |
 | LLM09:2025 | Misinformation | T7. Issue 44, with the ISM, NDB, and SOCI skills as the workflows where a wrong fact does harm. |
