@@ -12,6 +12,7 @@ resolution-markers = [
 members = [
     "cyberau-abusech",
     "cyberau-asd-acsc",
+    "cyberau-asd-blueprint",
     "cyberau-asd-ism",
     "cyberau-cisa-kev",
     "cyberau-common",
@@ -381,6 +382,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-asd-acsc"
 version = "0.1.0"
 source = { editable = "asd-acsc" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-asd-blueprint"
+version = "0.1.0"
+source = { editable = "asd-blueprint" }
 dependencies = [
     { name = "cyberau-common" },
 ]

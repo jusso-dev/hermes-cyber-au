@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://blueprint.asd.gov.au/
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "<html><title>ASD's Blueprint for Secure Cloud</title><article><h2>Welcome</h2><p>Blueprint for Secure Cloud</p></article></html>"

@@ -1,0 +1,71 @@
+{
+  "retrieved_at": "2026-10-17T01:25:00Z",
+  "pages": [
+    {
+      "url": "https://blueprint.asd.gov.au/configuration/entra-id/protection/conditional-access/policies/limit-admin-sessions/",
+      "title": "ADM - S - Limit admin sessions",
+      "section": "Configuration / Entra ID / Protection / Conditional Access / Policies",
+      "summary": "This page describes the configuration of policies for Conditional Access within Microsoft Entra ID associated with systems built according to the guidance provided by ASD's Blueprint for Secure Cloud.",
+      "settings": [
+        {"group": "Name", "item": "Name", "value": "ADM - S - Limit admin sessions"},
+        {"group": "Assignments", "item": "Include", "value": "Select users and groups"},
+        {"group": "Assignments", "item": "Guest or external users", "value": "Not checked"},
+        {"group": "Assignments", "item": "Directory roles", "value": "Checked"},
+        {"group": "Assignments", "item": "", "value": "Select applicable administrator roles"},
+        {"group": "Assignments", "item": "Users and groups", "value": "Checked"},
+        {"group": "Assignments", "item": "", "value": "<Administrative user group>"},
+        {"group": "Assignments", "item": "Exclude", "value": ""},
+        {"group": "Assignments", "item": "Guest or external users", "value": "Not checked"},
+        {"group": "Assignments", "item": "Directory roles", "value": "Not checked"},
+        {"group": "Assignments", "item": "Users and groups", "value": "Checked"},
+        {"group": "Assignments", "item": "", "value": "<CA exclude group - ADM - S - Limit admin sessions>"},
+        {"group": "Assignments", "item": "Select what this policy applies to", "value": "Resources (formerly cloud apps)"},
+        {"group": "Assignments", "item": "Include", "value": "All resources (formerly \u2018All cloud apps\u2019)"},
+        {"group": "Assignments", "item": "Exclude", "value": "None"},
+        {"group": "Assignments", "item": "Configure", "value": "No"},
+        {"group": "Assignments", "item": "User risk", "value": "Not configured"},
+        {"group": "Assignments", "item": "Sign-in risk", "value": "Not configured"},
+        {"group": "Assignments", "item": "Insider risk", "value": "Not configured"},
+        {"group": "Assignments", "item": "Device platforms", "value": "Not configured"},
+        {"group": "Assignments", "item": "Locations", "value": "Not configured"},
+        {"group": "Assignments", "item": "Client apps", "value": "Not configured"},
+        {"group": "Assignments", "item": "Filter for devices", "value": "Not configured"},
+        {"group": "Assignments", "item": "Authentication flows (Preview)", "value": "Not configured"},
+        {"group": "Access Controls", "item": "Control access enforcement to block or grant access", "value": "Grant access"},
+        {"group": "Access Controls", "item": "Require multifactor authentication", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require authentication strength", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require device to be marked as compliant", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require Microsoft Entra hybrid joined device", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require approved client app", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require app protection policy", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require password change", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Terms", "value": "Not checked"},
+        {"group": "Access Controls", "item": "For multiple controls", "value": "Require all of the selected controls"},
+        {"group": "Access Controls", "item": "Use app enforced restrictions", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Use Conditional Access App Control", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Sign-in frequency", "value": "Checked"},
+        {"group": "Access Controls", "item": "- Periodic reauthentication", "value": "4 hours"},
+        {"group": "Access Controls", "item": "- Every time", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Persistent browser session", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Customize continuous access evaluation", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Disable resilience defaults", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Require token protection for sign-in sessions (Preview)", "value": "Not checked"},
+        {"group": "Access Controls", "item": "Use Global Secure Access security profile", "value": "Not checked"},
+        {"group": "Enable policy", "item": "Enable policy", "value": "On"}
+      ]
+    },
+    {
+      "url": "https://blueprint.asd.gov.au/configuration/entra-id/users/per-user-mfa/",
+      "title": "Per-user MFA",
+      "section": "Configuration / Entra ID / Users",
+      "summary": "This page describes the configuration of per-user MFA within Microsoft Azure Active Directory associated with systems built according to the guidance provided by ASD's Blueprint for Secure Cloud.",
+      "settings": [
+        {"group": "Service settings", "item": "app passwords", "value": "Do not allow users to create app passwords to sign in to non-browser apps"},
+        {"group": "Service settings", "item": "Skip multi-factor authentication for requests from federated users on my intranet", "value": "Not checked"},
+        {"group": "Service settings", "item": "Methods available to users", "value": "Notification through mobile app"},
+        {"group": "Service settings", "item": "", "value": "Verification code from mobile app or hardware token"},
+        {"group": "Service settings", "item": "Remember multi-factor authentication on trusted device", "value": "Not checked"}
+      ]
+    }
+  ]
+}
