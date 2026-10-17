@@ -47,6 +47,28 @@ def _public(_host: str):
     return [ipaddress.ip_address("1.1.1.1")]
 
 
+PAGE_HTML = (
+    b"<html><title>Blueprint for Secure Cloud</title><article><h2>Synthetic</h2>"
+    b"<p>Synthetic.</p><h3>Controls</h3><table><tr><th>Item</th><th>Value</th></tr>"
+    b"<tr><td>app passwords</td><td>Do not allow</td></tr></table></article></html>"
+)
+
+
+def _paced_clock():
+    clock = {"t": 1_000.0}
+    stamps: list[float] = []
+    slept: list[float] = []
+
+    def now() -> float:
+        return clock["t"]
+
+    def sleeper(seconds: float) -> None:
+        slept.append(seconds)
+        clock["t"] += seconds
+
+    return now, sleeper, stamps, slept
+
+
 def _row(result: dict, item: str) -> dict:
     found = [row for row in result["data"] if item in row["item"]]
     assert found, result["data"]
@@ -225,15 +247,16 @@ def test_auth_refusal_retry_after_timeout_and_redirect(tmp_path, monkeypatch):
             calls["n"] += 1
             if calls["n"] == 1:
                 return httpx.Response(429, headers={"retry-after": "7"}, content=b"slow")
-            assert str(request.url).rstrip("/") == ORIGIN.rstrip("/")
-            body = b"<html><title>ASD's Blueprint for Secure Cloud</title></html>"
-            return httpx.Response(200, content=body)
+            assert str(request.url).startswith(ORIGIN + "configuration/")
+            return httpx.Response(200, content=PAGE_HTML)
 
         slept.clear()
         source._TRANSPORT = httpx.MockTransport(retry)
         live = connector().health(live=True)
         assert live.ok is True
+        assert "2 pages" in live.detail
         assert 7.0 in slept
+        assert calls["n"] == 3
 
         cache = HttpCache(tmp_path / "timeout" / "http_cache.sqlite")
         cached = b"<html><article><h2>Cached Blueprint for Secure Cloud</h2></article></html>"
@@ -336,3 +359,180 @@ def test_cassette_replays_homepage():
         played = httpx.get(ORIGIN)
     assert played.status_code == 200
     assert "Blueprint for Secure Cloud" in played.text
+
+
+def test_snapshot_answer_carries_snapshot_warning(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    for query in ("app passwords", "zzzz-not-a-setting"):
+        found = blueprint_search(query)
+        assert found["cache"] == "snapshot"
+        warning = next(item for item in found["warnings"] if "shipped Blueprint snapshot" in item)
+        assert "2026-10-17T01:25:00Z" in warning
+        assert "not a live page fetch" in warning
+    saved = json.loads(
+        (tmp_path / "blueprint-observations.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
+    assert saved["data_as_of"] == "2026-10-17T01:25:00Z"
+
+
+def test_parser_skips_nav_header_footer_aside_form_and_noscript():
+    html = """
+    <html><article>
+      <header><h2>Header title</h2><p>Header paragraph.</p></header>
+      <nav><h3>Nav group</h3><table><tr><td>nav item</td><td>nav value</td></tr></table></nav>
+      <aside><p>Aside paragraph.</p></aside>
+      <form><h3>Form group</h3><table><tr><td>form item</td><td>form value</td></tr></table></form>
+      <noscript><p>Enable scripts.</p></noscript>
+      <h2>Real title</h2>
+      <p>Real summary.</p>
+      <h3>Real group</h3>
+      <table><tr><td>real item</td><td>real value</td></tr></table>
+      <footer><table><tr><td>footer item</td><td>footer value</td></tr></table></footer>
+    </article></html>
+    """
+    page = parse_html(html, "https://blueprint.asd.gov.au/configuration/example/")
+    assert page["title"] == "Real title"
+    assert page["summary"] == "Real summary."
+    assert page["settings"] == [{"group": "Real group", "item": "real item", "value": "real value"}]
+
+
+def test_parser_recovers_from_unclosed_skipped_tag():
+    html = (
+        "<article><nav><form><h2>Hidden</h2><table><tr><td>x</td><td>y</td></tr></table></nav>"
+        "<h2>Shown</h2><table><tr><td>a</td><td>b</td></tr></table></article>"
+    )
+    page = parse_html(html, "https://blueprint.asd.gov.au/configuration/example/")
+    assert page["title"] == "Shown"
+    assert page["settings"] == [{"group": "", "item": "a", "value": "b"}]
+
+
+def test_page_cannot_set_its_own_source_url():
+    html = (
+        '<html><head><link rel="canonical" href="https://evil.test/x"></head><article>'
+        "<h2>T</h2><p>P</p><table><tr><td>a</td><td>https://evil.test/y</td></tr></table>"
+        "</article></html>"
+    )
+    fetched = "https://blueprint.asd.gov.au/configuration/example/"
+    assert parse_html(html, fetched)["url"] == fetched
+
+
+def test_allowed_page_rejects_other_ports_userinfo_and_hosts():
+    allowed = source._allowed_page
+    assert allowed("https://blueprint.asd.gov.au/configuration/x/")
+    assert allowed("https://blueprint.asd.gov.au:443/x/")
+    assert not allowed("https://blueprint.asd.gov.au:8443/x/")
+    assert not allowed("https://user@blueprint.asd.gov.au/x/")
+    assert not allowed("http://blueprint.asd.gov.au/x/")
+    assert not allowed("https://blueprint.asd.gov.au.evil.test/x/")
+    assert not allowed("https://blueprint.asd.gov.au:bad/x/")
+
+
+def test_live_health_fails_when_any_page_fails_and_never_uses_cache(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.delenv("CYBERAU_BLUEPRINT_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    source._RESOLVER = _public
+    source._CLOCK, source._SLEEP, _stamps, _slept = _paced_clock()
+    seen: list[str] = []
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    for page in json.loads((FIXTURES / "blueprint_two_pages.json").read_text())["pages"]:
+        key = cache.key("GET", page["url"], None, b"", "anonymous")
+        cache.put(key, status=200, headers={}, body=PAGE_HTML, ttl=10**9)
+
+    def second_page_down(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if "per-user-mfa" in str(request.url):
+            raise httpx.ConnectTimeout("timed out")
+        return httpx.Response(200, content=PAGE_HTML)
+
+    try:
+        source._TRANSPORT = httpx.MockTransport(second_page_down)
+        probe = connector().health(live=True)
+        assert probe.ok is False
+        assert "per-user-mfa" in probe.detail
+        assert any("limit-admin-sessions" in url for url in seen)
+        assert any("per-user-mfa" in url for url in seen)
+
+        source._TRANSPORT = httpx.MockTransport(
+            lambda _request: httpx.Response(200, content=b"<html><p>no article</p></html>")
+        )
+        empty = connector().health(live=True)
+        assert empty.ok is False
+        assert "no title or settings" in empty.detail
+    finally:
+        source._TRANSPORT = None
+        source._SLEEP = time.sleep
+        source._CLOCK = time.monotonic
+        source._RESOLVER = None
+
+
+def test_refresh_never_exceeds_one_request_every_five_seconds(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_BLUEPRINT_SNAPSHOT", str(FIXTURES / "blueprint_two_pages.json"))
+    source._RESOLVER = _public
+    now, sleeper, _stamps, _slept = _paced_clock()
+    source._CLOCK, source._SLEEP = now, sleeper
+    times: list[float] = []
+    urls: list[str] = []
+    state = {"n": 0}
+
+    def flaky(request: httpx.Request) -> httpx.Response:
+        times.append(now())
+        urls.append(str(request.url))
+        state["n"] += 1
+        if state["n"] == 1:
+            return httpx.Response(429, headers={"retry-after": "1"}, content=b"slow")
+        if state["n"] == 2:
+            return httpx.Response(302, headers={"location": "/configuration/entra-id/x/"})
+        return httpx.Response(200, content=PAGE_HTML)
+
+    try:
+        source._TRANSPORT = httpx.MockTransport(flaky)
+        refresh_index()
+    finally:
+        source._TRANSPORT = None
+        source._SLEEP = time.sleep
+        source._CLOCK = time.monotonic
+        source._RESOLVER = None
+    assert len(times) >= 4
+    gaps = [later - earlier for earlier, later in zip(times, times[1:], strict=False)]
+    assert all(gap >= 5 - 1e-6 for gap in gaps), gaps
+    assert all(url.startswith("https://blueprint.asd.gov.au/configuration/") for url in urls)
+
+
+def test_failed_or_cached_refresh_keeps_previous_index(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("CYBERAU_BLUEPRINT_SNAPSHOT", raising=False)
+    source._RESOLVER = _public
+    source._CLOCK, source._SLEEP, _stamps, _slept = _paced_clock()
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    pages = json.loads((FIXTURES / "blueprint_two_pages.json").read_text())["pages"]
+    for page in pages:
+        key = cache.key("GET", page["url"], None, b"", "anonymous")
+        cache.put(key, status=200, headers={}, body=PAGE_HTML, ttl=10**9)
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("timed out")
+
+    def one_down(request: httpx.Request) -> httpx.Response:
+        if "per-user-mfa" in str(request.url):
+            return httpx.Response(500, content=b"boom")
+        return httpx.Response(200, content=PAGE_HTML)
+
+    try:
+        for handler in (down, one_down):
+            source._TRANSPORT = httpx.MockTransport(handler)
+            failed = refresh_index()
+            assert failed["data"] == []
+            assert failed["warnings"]
+            assert not (tmp_path / "blueprint-index.json").exists()
+    finally:
+        source._TRANSPORT = None
+        source._SLEEP = time.sleep
+        source._CLOCK = time.monotonic
+        source._RESOLVER = None
+    found = blueprint_search("app passwords")
+    assert found["cache"] == "snapshot"
+    assert {row["url"] for row in found["data"]} >= {page["url"] for page in pages[1:]}

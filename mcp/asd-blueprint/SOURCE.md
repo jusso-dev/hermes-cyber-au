@@ -7,4 +7,4 @@
 - Verified: 2026-10-17
 - Egress hosts: blueprint.asd.gov.au
 
-The shipped snapshot holds two configuration pages retrieved on 17 October 2026: the conditional access policy "ADM - S - Limit admin sessions" and "Per-user MFA". Each record is an item and value from those pages, with the page link. Free text is wrapped as untrusted. A refresh writes `$CYBERAU_DATA_DIR/blueprint-index.json`. Matching rows are also appended to `$CYBERAU_DATA_DIR/blueprint-observations.jsonl`.
+The shipped snapshot holds two configuration pages retrieved on 17 October 2026: the conditional access policy "ADM - S - Limit admin sessions" and "Per-user MFA". Each record is an item and value from those pages, with the page link. Free text is wrapped as untrusted. The live health probe fetches both pages. A refresh is all or nothing: it writes `$CYBERAU_DATA_DIR/blueprint-index.json`. Matching rows are also appended to `$CYBERAU_DATA_DIR/blueprint-observations.jsonl`.

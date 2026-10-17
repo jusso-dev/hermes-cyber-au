@@ -19,8 +19,8 @@ from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimited, RateLimiter
+from cyberau_common.http import HttpClient
+from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from pydantic import Field
@@ -34,6 +34,7 @@ ATTRIBUTION = (
 WEEK = 7 * 24 * 3600
 PAGE_RATE = 1 / 5
 _LIMIT = 20
+_SKIPPED = frozenset({"script", "style", "nav", "header", "footer", "aside", "form", "noscript"})
 _PAGE_FIELDS = ("url", "title", "settings")
 _SETTING_FIELDS = ("item", "value")
 _LABELS = {
@@ -57,22 +58,24 @@ def blueprint_search(query: _Query) -> dict:
     document, cache, problem = _load_document()
     if problem or document is None:
         return _envelope([], cache, warnings=(problem or "Blueprint snapshot was not usable",))
+    provenance = _provenance(document, cache)
     drift = schema_drift(document)
     if drift:
-        return _envelope([], cache, warnings=(drift,), as_of=_as_of(document))
+        return _envelope([], cache, warnings=(drift, *provenance), as_of=_as_of(document))
     rows = _match(document, text)
     if not rows:
         return _envelope(
             [],
             cache,
-            warnings=("no matching Blueprint setting",),
+            warnings=("no matching Blueprint setting", *provenance),
             as_of=_as_of(document),
         )
-    _persist(rows)
+    _persist(rows, _as_of(document))
     return _envelope(
         [_present(row) for row in rows],
         cache,
         urls=_urls(rows),
+        warnings=provenance,
         as_of=_as_of(document),
     )
 
@@ -81,30 +84,30 @@ def refresh_index() -> dict:
     """Fetch the snapshot page URLs and store a fresh index. Weekly, one page every 5 seconds."""
     if os.environ.get("CYBERAU_OFFLINE") == "1":
         return _envelope([], "snapshot", warnings=("offline, Blueprint refresh skipped",))
-    document, cache, problem = _load_document()
+    document, problem = _pinned_or_shipped()
     if problem or document is None:
-        return _envelope([], cache, warnings=(problem or "Blueprint snapshot was not usable",))
+        return _envelope([], "snapshot", warnings=(problem or "Blueprint snapshot was not usable",))
+    drift = schema_drift(document)
+    if drift:
+        return _envelope([], "snapshot", warnings=(drift,))
     pages = []
     warnings: list[str] = []
-    for page in document.get("pages") or []:
-        if not isinstance(page, dict):
-            warnings.append("skipped a Blueprint page that was not an object")
-            continue
+    for page in document["pages"]:
         url = str(page.get("url") or "")
         if not _allowed_page(url):
             warnings.append("skipped a page outside blueprint.asd.gov.au")
             continue
-        body, _state, note = _fetch(url)
-        if not body:
-            warnings.append(note or "Blueprint page was not usable")
+        body, state, note = _fetch(url, force_live=True)
+        if not body or state != "miss":
+            warnings.append(f"{url}: {note or 'Blueprint page was not a live fetch'}")
             continue
         parsed = parse_html(body, url)
-        drift = schema_drift({"pages": [parsed]})
-        if drift or not parsed["title"]:
-            warnings.append(drift or "Blueprint page had no title")
+        if not parsed["title"] or not parsed["settings"]:
+            warnings.append(f"{url}: Blueprint page had no title or settings")
             continue
         pages.append(parsed)
-    if not pages:
+    if warnings or not pages:
+        # A partial index would drop the failed pages from search, so keep the previous one.
         return _envelope([], "snapshot", warnings=tuple(warnings or ("Blueprint refresh failed",)))
     refreshed = {"retrieved_at": _now(), "pages": pages}
     _write_index(refreshed)
@@ -123,7 +126,6 @@ def refresh_index() -> dict:
         [_present(row) for row in rows],
         "miss",
         urls=_urls(rows),
-        warnings=tuple(warnings),
         as_of=refreshed["retrieved_at"],
     )
 
@@ -158,12 +160,28 @@ class _BlueprintConnector(Connector):
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        body, _state, warning = _fetch(ORIGIN, force_live=True)
-        if not body:
-            return Probe(self.key, False, warning or "live probe failed")
-        if "Blueprint for Secure Cloud" not in body:
-            return Probe(self.key, False, warning or "live probe did not return Blueprint HTML")
-        return Probe(self.key, True, "live ok")
+        document, problem = _pinned_or_shipped()
+        if problem or document is None:
+            return Probe(self.key, False, problem or "Blueprint snapshot was not usable")
+        urls = [
+            str(page.get("url") or "")
+            for page in document.get("pages") or []
+            if isinstance(page, dict)
+        ]
+        if not urls:
+            return Probe(self.key, False, "no Blueprint pages to probe")
+        failures = []
+        for url in urls:
+            body, state, note = _fetch(url, force_live=True)
+            if not body or state != "miss":
+                failures.append(f"{url}: {note or 'not a live fetch'}")
+                continue
+            parsed = parse_html(body, url)
+            if not parsed["title"] or not parsed["settings"]:
+                failures.append(f"{url}: no title or settings parsed")
+        if failures:
+            return Probe(self.key, False, "; ".join(failures))
+        return Probe(self.key, True, f"live ok, {len(urls)} pages")
 
 
 def schema_drift(payload: dict) -> str | None:
@@ -205,7 +223,7 @@ def parse_html(html: str, url: str) -> dict:
 class _ArticleParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self._skip = 0
+        self._skipping: list[str] = []
         self._article = 0
         self._capture: str | None = None
         self._buf: list[str] = []
@@ -219,10 +237,10 @@ class _ArticleParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs) -> None:
         tag = tag.lower()
-        if tag in {"script", "style"}:
-            self._skip += 1
+        if tag in _SKIPPED:
+            self._skipping.append(tag)
             return
-        if self._skip:
+        if self._skipping:
             return
         if tag == "article":
             self._article += 1
@@ -247,10 +265,12 @@ class _ArticleParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
-        if tag in {"script", "style"} and self._skip:
-            self._skip -= 1
+        if tag in _SKIPPED:
+            if tag in self._skipping:
+                while self._skipping.pop() != tag:
+                    pass
             return
-        if self._skip:
+        if self._skipping:
             return
         if tag == "article" and self._article:
             self._article -= 1
@@ -285,7 +305,7 @@ class _ArticleParser(HTMLParser):
             self._table -= 1
 
     def handle_data(self, data: str) -> None:
-        if self._skip:
+        if self._skipping:
             return
         if self._cell or self._capture:
             self._buf.append(data)
@@ -308,22 +328,14 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[str | None, str, str]
         return None, "snapshot", "offline and no cached Blueprint page"
     if not _allowed_page(url):
         return None, "snapshot", "skipped a page outside blueprint.asd.gov.au"
-    try:
-        _limit()
-    except (RateLimited, HttpError, OSError) as exc:
-        if not force_live:
-            cached = _cached_body(url)
-            if cached is not None:
-                return cached, "stale", redact(str(exc))
-        return None, "snapshot", redact(str(exc))
     client = HttpClient(
         "asd-blueprint",
         policy=_policy(),
         cache=HttpCache(_data_dir() / "http_cache.sqlite"),
         limiter=RateLimiter(_data_dir() / "rate_limit.sqlite", clock=_CLOCK, sleeper=_SLEEP),
         user_agent=USER_AGENT,
-        rate=4,
-        burst=4,
+        rate=PAGE_RATE,
+        burst=1,
         window="rolling",
         timeout=30,
         retries=3,
@@ -373,15 +385,6 @@ def _denied(status: int) -> str:
     )
 
 
-def _limit() -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", clock=_CLOCK, sleeper=_SLEEP).acquire(
-        "asd-blueprint:page",
-        rate=PAGE_RATE,
-        burst=1,
-        window="rolling",
-    )
-
-
 def _policy() -> EgressPolicy:
     if _RESOLVER is None:
         return EgressPolicy(_allowlist(), "asd-blueprint")
@@ -419,7 +422,9 @@ def _write_index(document: dict) -> None:
     directory = _data_dir()
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "blueprint-index.json"
-    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    staged = path.with_suffix(".json.tmp")
+    staged.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    staged.replace(path)
 
 
 def _read_json(path: Path) -> tuple[dict | None, str]:
@@ -536,7 +541,7 @@ def _present(row: dict) -> dict:
     }
 
 
-def _persist(rows: list[dict]) -> None:
+def _persist(rows: list[dict], data_as_of: str | None) -> None:
     if not rows:
         return
     directory = _data_dir()
@@ -552,7 +557,8 @@ def _persist(rows: list[dict]) -> None:
                 "group": row.get("group") or "",
                 "item": row.get("item") or "",
                 "value": row.get("value") or "",
-                "retrieved_at": stamp,
+                "data_as_of": data_as_of,
+                "observed_at": stamp,
             }
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -592,8 +598,18 @@ def _title_tag(html: str) -> str:
 
 
 def _allowed_page(url: str) -> bool:
-    parts = urlsplit(url)
-    return parts.scheme == "https" and (parts.hostname or "").lower() == HOST
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    return (
+        parts.scheme == "https"
+        and (parts.hostname or "").lower() == HOST
+        and port in (None, 443)
+        and not parts.username
+        and not parts.password
+    )
 
 
 def _cached_body(url: str) -> str | None:
@@ -615,6 +631,19 @@ def _fresh(document: dict) -> bool:
     except ValueError:
         return False
     return datetime.now(UTC) - when < timedelta(days=7)
+
+
+def _provenance(document: dict, cache: str) -> tuple[str, ...]:
+    when = _as_of(document) or "an unknown date"
+    if cache == "snapshot":
+        return (
+            f"Answered from the shipped Blueprint snapshot dated {when}. "
+            "This is not a live page fetch and the Blueprint may have changed since.",
+        )
+    return (
+        f"Answered from the stored Blueprint index retrieved {when}. "
+        "This is not a live page fetch and the Blueprint may have changed since.",
+    )
 
 
 def _as_of(document: dict) -> str | None:
