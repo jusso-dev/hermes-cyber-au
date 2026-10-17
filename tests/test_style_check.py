@@ -71,6 +71,59 @@ class StyleCheckTest(unittest.TestCase):
         for item in errors:
             self.assertNotIn(secret, item)
 
+    def test_banned_name_is_found_through_punctuation(self):
+        digests = {
+            "acme": "Contact Acme.\n",
+            "blue falcon": "Ask Blue Falcon.\n",
+        }
+        for name, text in digests.items():
+            with _TempTree() as root:
+                (root / "notes.md").write_text(text, encoding="utf-8")
+                errors, _hints = self.mod.check(root, extra_names=[name])
+            self.assertTrue(
+                any(item.endswith("banned private name") for item in errors), text
+            )
+
+    def test_banned_name_is_found_inside_hostnames_and_identifiers(self):
+        for text in ("host git.acme.internal\n", "acme_corp and Acme-Corp\n"):
+            with _TempTree() as root:
+                (root / "notes.md").write_text(text, encoding="utf-8")
+                errors, _hints = self.mod.check(root, extra_names=["acme"])
+            self.assertTrue(
+                any(item.endswith("banned private name") for item in errors), text
+            )
+
+    def test_unrelated_word_is_not_banned(self):
+        with _TempTree() as root:
+            (root / "notes.md").write_text("Acmeville is fine.\n", encoding="utf-8")
+            errors, _hints = self.mod.check(root, extra_names=["acme"])
+        self.assertEqual(errors, [])
+
+    def test_look_alike_dash_and_extra_emoji_fail(self):
+        for char, label in (
+            ("\u2015", "em dash"),
+            ("\u2b50", "emoji"),
+            ("\u23f0", "emoji"),
+        ):
+            with _TempTree() as root:
+                (root / "notes.md").write_text(f"a {char} b\n", encoding="utf-8")
+                errors, _hints = self.mod.check(root)
+            self.assertTrue(any(item.endswith(label) for item in errors), char)
+
+    def test_data_directory_is_scanned_outside_mcp(self):
+        with _TempTree() as root:
+            (root / "skills" / "data").mkdir(parents=True)
+            (root / "skills" / "data" / "notes.md").write_text(
+                "A pause \u2014 then more.\n", encoding="utf-8"
+            )
+            (root / "mcp" / "x" / "data").mkdir(parents=True)
+            (root / "mcp" / "x" / "data" / "feed.md").write_text(
+                "Upstream \u2014 text.\n", encoding="utf-8"
+            )
+            errors, _hints = self.mod.check(root)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("skills/data/notes.md", errors[0])
+
     def test_american_spelling_is_a_hint(self):
         with _TempTree() as root:
             (root / "notes.md").write_text(

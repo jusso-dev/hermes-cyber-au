@@ -47,6 +47,20 @@ class ValidateRepoTest(unittest.TestCase):
         self.assertIn("tools/ci/style_check.py", text)
         self.assertNotIn("\u2014", text)
 
+    def test_workflow_pins_every_action_to_a_full_sha(self):
+        import re
+
+        text = (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.MULTILINE)
+        self.assertTrue(uses)
+        for ref in uses:
+            self.assertRegex(ref, r"^[\w./-]+@[0-9a-f]{40}$", ref)
+        self.assertNotIn("CYBERAU_PRIVATE_NAMES", text)
+
+    def test_workflow_stays_out_of_github_workflows(self):
+        self.assertTrue((ROOT / "ci" / "workflows" / "ci.yml").is_file())
+        self.assertFalse((ROOT / ".github" / "workflows" / "ci.yml").exists())
+
     def test_distribution_rejects_a_missing_owned_path(self):
         with self._tree() as root:
             self._write_distribution(root, owned=["missing.txt"])

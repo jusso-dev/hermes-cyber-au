@@ -6,6 +6,8 @@ spellings in prose are printed as hints and do not fail the check.
 Banned names are SHA-256 hashes in tools/ci/private_names.sha256 so the
 plaintext stays out of this public repository. If CYBERAU_PRIVATE_NAMES is
 set, those newline-separated names are hashed in memory and checked as well.
+Hash a name as lowercase words separated by single spaces; matching ignores
+case and punctuation, so a hashed "acme" also catches "Acme." and "acme_corp".
 The workflow does not set that variable and does not carry a secret.
 
 Run from the repository root:
@@ -34,17 +36,24 @@ _SKIP_DIRS = {
     "node_modules",
     "dist",
     "build",
-    "data",
     "fixtures",
 }
+# Bundled upstream feed data under mcp/ is third-party text, not our prose.
+_VENDORED_DIRS = {"data"}
+_VENDORED_ROOT = "mcp"
 _TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".toml", ".txt", ".sh", ".json"}
 _PROSE_SUFFIXES = {".md", ".txt", ".yml", ".yaml"}
-_EM_DASH = "\u2014"
+# U+2014 plus the look-alike dashes U+2015, U+2E3A, U+2E3B and U+FE58.
+_EM_DASH = re.compile("[\u2014\u2015\u2e3a\u2e3b\ufe58]")
 _EMOJI = re.compile(
-    "[\u2600-\u27bf\U0001f1e6-\U0001f1ff\U0001f300-\U0001f6ff\U0001f900-\U0001faff]"
+    "[\u231a\u231b\u23e9-\u23f3\u23f8-\u23fa\u25fd\u25fe"
+    "\u2600-\u27bf\u2b1b\u2b1c\u2b50\u2b55\ufe0f"
+    "\U0001f000-\U0001f6ff\U0001f900-\U0001faff]"
 )
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@+-]{2,}")
 _WORD = re.compile(r"[A-Za-z][A-Za-z'.-]{1,}")
+_ALNUM = re.compile(r"[a-z0-9]+")
+_MAX_WORDS = 4
 _URL = re.compile(r"https?://\S+")
 _HINTS = {
     "analyze": "analyse",
@@ -134,7 +143,7 @@ def check(
 def _character_errors(rel: str, text: str, hashes: set[str]) -> list[str]:
     findings: list[str] = []
     for number, line in enumerate(text.splitlines(), start=1):
-        if _EM_DASH in line:
+        if _EM_DASH.search(line):
             findings.append(f"{rel}:{number}: em dash")
         if _EMOJI.search(line):
             findings.append(f"{rel}:{number}: emoji")
@@ -161,6 +170,13 @@ def _candidates(line: str) -> set[str]:
     for width in (2, 3):
         for index in range(len(words) - width + 1):
             found.add(" ".join(words[index : index + width]))
+    # Punctuation-insensitive runs, so "Acme." or "git.acme.internal" or
+    # "acme_corp" still match a hashed "acme", and "Blue Falcon." a hashed
+    # "blue falcon". Hash names as lowercase words separated by single spaces.
+    parts = _ALNUM.findall(line.lower())
+    for width in range(1, _MAX_WORDS + 1):
+        for index in range(len(parts) - width + 1):
+            found.add(" ".join(parts[index : index + width]))
     return found
 
 
@@ -229,10 +245,13 @@ def _names_from_env() -> list[str]:
 def _iter_files(root: Path) -> list[Path]:
     found: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root):
+        vendored = Path(dirpath).relative_to(root).parts[:1] == (_VENDORED_ROOT,)
         dirnames[:] = [
             name
             for name in dirnames
-            if name not in _SKIP_DIRS and not name.endswith(".egg-info")
+            if name not in _SKIP_DIRS
+            and not name.endswith(".egg-info")
+            and not (vendored and name in _VENDORED_DIRS)
         ]
         for name in filenames:
             path = Path(dirpath) / name
