@@ -1,0 +1,14 @@
+{
+  "retrieved_at": "2026-10-17",
+  "obligations": [
+    {
+      "regime": "ndb",
+      "trigger": "suspected_breach",
+      "rule": "renamed",
+      "passage": "the quote field was renamed",
+      "source_url": "https://www.legislation.gov.au/C2004A03712/latest/text",
+      "retrieved_at": "2026-10-17",
+      "sha256": "abc"
+    }
+  ]
+}

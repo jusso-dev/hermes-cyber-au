@@ -231,3 +231,11 @@ connectors:
     - otx.alienvault.com
     allow_ip_literals: false
     allow_http_loopback: false
+  au-regulatory:
+    hosts:
+    - www.oaic.gov.au
+    - www.cyber.gov.au
+    - www.cisc.gov.au
+    - www.legislation.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false

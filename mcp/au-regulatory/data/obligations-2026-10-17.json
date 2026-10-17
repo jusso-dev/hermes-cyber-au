@@ -1,0 +1,126 @@
+{
+  "retrieved_at": "2026-10-17",
+  "obligations": [
+    {
+      "regime": "ndb",
+      "trigger": "suspected_breach",
+      "citation": "Privacy Act 1988 (Cth) s 26WH(2)",
+      "rule": "An entity that is aware of reasonable grounds to suspect an eligible data breach, and is not yet aware of reasonable grounds to believe that one has occurred, must carry out a reasonable and expeditious assessment. It must take all reasonable steps to complete that assessment within 30 days after it becomes aware of the suspicion. The Act frames the 30 days as the period for those reasonable steps, not as a hard stop.",
+      "quote": "take all reasonable steps to ensure that the assessment is completed within 30 days after the entity becomes aware as mentioned in paragraph (1)(a).",
+      "source_url": "https://www.legislation.gov.au/C2004A03712/latest/text",
+      "guidance_url": "https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches",
+      "retrieved_at": "2026-10-17",
+      "sha256": "4f60f6f50f8016f65c5202452a2361315529de56923692b913460362d057a4c2",
+      "clocks": [
+        {
+          "name": "assessment",
+          "hours": null,
+          "days": 30,
+          "from": "awareness",
+          "basis": "All reasonable steps to complete the assessment within 30 days after awareness (Privacy Act 1988 (Cth) s 26WH(2))."
+        }
+      ]
+    },
+    {
+      "regime": "ndb",
+      "trigger": "eligible_breach",
+      "citation": "Privacy Act 1988 (Cth) ss 26WK(2) and 26WL(3)",
+      "rule": "Once the entity is aware of reasonable grounds to believe there has been an eligible data breach, it must prepare a statement and give a copy to the Commissioner as soon as practicable. It must notify the individuals to whom the information relates, or if that is not practicable the individuals at risk, as soon as practicable after the statement is prepared. If neither is practicable, it must publish the statement and take reasonable steps to publicise it. Section 26WL(3) requires compliance with the notification duty as soon as practicable after the preparation of the statement is completed.",
+      "quote": "do so as soon as practicable after the entity becomes so aware.",
+      "source_url": "https://www.legislation.gov.au/C2004A03712/latest/text",
+      "guidance_url": "https://www.oaic.gov.au/privacy/notifiable-data-breaches/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response/part-4-notifiable-data-breach-ndb-scheme",
+      "retrieved_at": "2026-10-17",
+      "sha256": "a6a56d65bac235ae5e69ef2b1d95a8648f7215601c058f1bdfb044704fe870d1",
+      "clocks": [
+        {
+          "name": "commissioner_statement",
+          "hours": null,
+          "days": null,
+          "from": "belief",
+          "basis": "As soon as practicable after awareness of reasonable grounds to believe there has been an eligible data breach. No fixed hour count (Privacy Act 1988 (Cth) s 26WK(2))."
+        },
+        {
+          "name": "individual_notice",
+          "hours": null,
+          "days": null,
+          "from": "statement_prepared",
+          "basis": "As soon as practicable after the statement is prepared, not from the original awareness time (Privacy Act 1988 (Cth) s 26WL(3))."
+        }
+      ]
+    },
+    {
+      "regime": "soci",
+      "trigger": "critical_incident",
+      "citation": "Security of Critical Infrastructure Act 2018 (Cth) s 30BC",
+      "rule": "A responsible entity for a critical infrastructure asset that becomes aware a cyber security incident has occurred or is occurring, and that the incident has had or is having a significant impact on the availability of the asset, must give the relevant Commonwealth body a report as soon as practicable and within 12 hours. Section 30BEA says a significant impact requires material disruption to the availability of essential goods or services the asset is used to provide, unless the rules specify another circumstance. The report may be oral or in writing. If it is oral, a written record in the approved form is due within 84 hours after the oral report.",
+      "quote": "do so as soon as practicable, and in any event within 12 hours, after the entity becomes so aware.",
+      "source_url": "https://www.legislation.gov.au/C2018A00029/2026-06-04/text",
+      "guidance_url": "https://www.cyber.gov.au/report-a-cyber-security-incident",
+      "retrieved_at": "2026-10-17",
+      "sha256": "b24927d3fe5980aac800ae3bccb4fe4bac0208004eb2170c6fe90a429aeafc14",
+      "clocks": [
+        {
+          "name": "notification",
+          "hours": 12,
+          "days": null,
+          "from": "awareness",
+          "basis": "As soon as practicable, and in any event within 12 hours after awareness (SOCI Act 2018 (Cth) s 30BC)."
+        },
+        {
+          "name": "written_record",
+          "hours": 84,
+          "days": null,
+          "from": "oral_report",
+          "basis": "If the report is oral, within 84 hours after the oral report is given. This clock does not start at awareness (SOCI Act 2018 (Cth) s 30BC(3))."
+        }
+      ]
+    },
+    {
+      "regime": "soci",
+      "trigger": "other_incident",
+      "citation": "Security of Critical Infrastructure Act 2018 (Cth) s 30BD",
+      "rule": "A responsible entity that becomes aware a cyber security incident has occurred, is occurring or is imminent, and that it has had, is having or is likely to have a relevant impact on the asset, must report within 72 hours, unless section 30BC already requires a report. Section 8G treats a relevant impact as an impact on availability, integrity, reliability or confidentiality. The report may be oral or in writing. If it is oral, a written record is due within 48 hours after the oral report.",
+      "quote": "do so as soon as practicable, and in any event within 72 hours, after the entity becomes so aware.",
+      "source_url": "https://www.legislation.gov.au/C2018A00029/2026-06-04/text",
+      "guidance_url": "https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf",
+      "retrieved_at": "2026-10-17",
+      "sha256": "c2549d5cc314f326ab021e3effee0bac66e4968b9aa026c41d68dd3600b35444",
+      "clocks": [
+        {
+          "name": "notification",
+          "hours": 72,
+          "days": null,
+          "from": "awareness",
+          "basis": "As soon as practicable, and in any event within 72 hours after awareness, unless s 30BC already applies (SOCI Act 2018 (Cth) s 30BD)."
+        },
+        {
+          "name": "written_record",
+          "hours": 48,
+          "days": null,
+          "from": "oral_report",
+          "basis": "If the report is oral, within 48 hours after the oral report is given. This clock does not start at awareness (SOCI Act 2018 (Cth) s 30BD(3))."
+        }
+      ]
+    },
+    {
+      "regime": "ransomware_payment",
+      "trigger": "payment",
+      "citation": "Cyber Security Act 2024 (Cth) s 27(1)",
+      "rule": "A reporting business entity that makes a ransomware payment, or becomes aware that another entity provided one on its behalf, must give the designated Commonwealth body a ransomware payment report within 72 hours of the payment or of that awareness, whichever applies. Section 26(2) defines a reporting business entity as a business carried on in Australia whose turnover for the previous financial year is above the threshold prescribed by the rules, excluding Commonwealth bodies, State bodies and responsible entities for critical infrastructure assets, or as a responsible entity for a critical infrastructure asset to which SOCI Act Part 2B applies. Section 8 says that if the rules do not name another body, the designated Commonwealth body is the Department and ASD. The report must be in the form approved by the Secretary and in the manner prescribed by the rules.",
+      "quote": "The reporting business entity must give the designated Commonwealth body a report (a ransomware payment report) that complies with the requirements of this section within 72 hours of making the ransomware payment or becoming aware that the ransomware payment has been made (whichever is applicable).",
+      "source_url": "https://www.legislation.gov.au/C2024A00098/latest/text",
+      "guidance_url": "https://www.cyber.gov.au/report-and-recover/report/ransomware-payment-and-cyber-extortion-payment-reporting",
+      "retrieved_at": "2026-10-17",
+      "sha256": "c52466012a07fc902bb6485064f5cdee9e70606e011dd457c7ca7d0c779eb12d",
+      "clocks": [
+        {
+          "name": "report",
+          "hours": 72,
+          "days": null,
+          "from": "payment_or_awareness",
+          "basis": "Within 72 hours of making the ransomware payment or of becoming aware that it was made, whichever applies (Cyber Security Act 2024 (Cth) s 27(1))."
+        }
+      ]
+    }
+  ]
+}

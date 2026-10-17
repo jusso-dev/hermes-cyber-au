@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "regime",
+    "trigger",
+    "rule",
+    "citation",
+    "quote",
+    "source_url",
+    "guidance_url",
+    "retrieved_at",
+    "sha256",
+    "deadlines"
+  ],
+  "properties": {
+    "regime": {"type": "string"},
+    "trigger": {"type": "string"},
+    "rule": {"type": "string"},
+    "citation": {"type": "string"},
+    "quote": {"type": "string"},
+    "source_url": {"type": "string"},
+    "guidance_url": {"type": "string"},
+    "retrieved_at": {"type": "string"},
+    "sha256": {"type": "string"},
+    "deadlines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "from", "hours", "days", "basis"],
+        "properties": {
+          "name": {"type": "string"},
+          "from": {"type": "string"},
+          "hours": {"type": ["integer", "null"]},
+          "days": {"type": ["integer", "null"]},
+          "basis": {"type": "string"}
+        }
+      }
+    }
+  }
+}

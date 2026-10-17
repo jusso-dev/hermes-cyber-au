@@ -55,17 +55,6 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
-  blueprint:
-    connector: asd-blueprint
-    args:
-    - serve
-    - asd-blueprint
-    env: []
-    trust: untrusted
-    lazy: true
-    timeout: 120
-    enabled_by_default: true
-    required_env: []
   nvd:
     connector: nvd
     args:
@@ -79,6 +68,17 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  blueprint:
+    connector: asd-blueprint
+    args:
+    - serve
+    - asd-blueprint
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   datagov:
     connector: datagov-au
     args:
@@ -132,3 +132,14 @@ servers:
     enabled_by_default: true
     required_env:
     - OTX_API_KEY
+  aureg:
+    connector: au-regulatory
+    args:
+    - serve
+    - au-regulatory
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

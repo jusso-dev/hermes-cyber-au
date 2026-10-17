@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "regime": {
+      "enum": ["ndb", "soci", "ransomware_payment"]
+    },
+    "trigger": {
+      "type": "string"
+    },
+    "aware_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["regime", "trigger", "aware_at"]
+}

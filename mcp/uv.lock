@@ -14,6 +14,7 @@ members = [
     "cyberau-asd-acsc",
     "cyberau-asd-blueprint",
     "cyberau-asd-ism",
+    "cyberau-au-regulatory",
     "cyberau-cisa-kev",
     "cyberau-common",
     "cyberau-datagov-au",
@@ -404,6 +405,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-asd-ism"
 version = "0.1.0"
 source = { editable = "asd-ism" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-au-regulatory"
+version = "0.1.0"
+source = { editable = "au-regulatory" }
 dependencies = [
     { name = "cyberau-common" },
 ]
