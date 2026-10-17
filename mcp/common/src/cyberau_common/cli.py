@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
 from pathlib import Path
 
-from cyberau_common.health import run_health
+from cyberau_common.health import collect_connector_health, run_health
 from cyberau_common.secrets import RedactFilter
 from cyberau_common.server import build_server, get_connector
 
@@ -20,11 +21,13 @@ def main(argv: list[str] | None = None) -> int:
     serve = sub.add_parser("serve", help="Run one connector over stdio")
     serve.add_argument("name")
 
-    health = sub.add_parser("health", help="Probe one connector")
-    health.add_argument("name")
+    health = sub.add_parser("health", help="Probe connectors")
+    health.add_argument("name", nargs="?")
+    health.add_argument("--all", action="store_true", help="Probe every connector in this checkout")
     health.add_argument("--live", action="store_true")
     health.add_argument("--offline", action="store_true")
     health.add_argument("--schema-drift", action="store_true")
+    health.add_argument("--json", dest="json_path", help="Write a JSON report")
 
     new = sub.add_parser("new", help="Create a connector skeleton")
     new.add_argument("key")
@@ -52,6 +55,14 @@ def main(argv: list[str] | None = None) -> int:
         build_server(connector).run(transport="stdio")
         return 0
     if args.command == "health":
+        if args.all and args.name:
+            print("pass a connector name or --all, not both", file=sys.stderr)
+            return 2
+        if args.all:
+            return _health_all(args)
+        if not args.name:
+            print("pass a connector name or --all", file=sys.stderr)
+            return 2
         live = bool(args.live) and not args.offline
         probe = run_health(args.name, live=live, check_schema=bool(args.schema_drift))
         print(f"{probe.name} {'ok' if probe.ok else 'fail'} {probe.detail}")
@@ -63,6 +74,24 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     return 2
+
+
+def _health_all(args) -> int:
+    live = bool(args.live) and not args.offline
+    fixtures = os.environ.get("CYBERAU_HEALTH_FIXTURES")
+    data_dir = os.environ.get("CYBERAU_DATA_DIR")
+    report = collect_connector_health(
+        live=live,
+        check_schema=bool(args.schema_drift),
+        fixtures=Path(fixtures) if fixtures else None,
+        state_path=Path(data_dir) / "connector-health-state.json" if data_dir else None,
+    )
+    if args.json_path:
+        Path(args.json_path).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    for row in report["connectors"]:
+        print(f"{row['key']} {row['status']} {row['detail']}")
+    failed = any(row["status"] == "fail" for row in report["connectors"])
+    return 1 if failed else 0
 
 
 def _import_feed(name: str, path: str, feed: str) -> int:
