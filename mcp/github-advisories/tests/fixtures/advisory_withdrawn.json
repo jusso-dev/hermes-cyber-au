@@ -1,0 +1,30 @@
+{
+  "cve_id": null,
+  "cwe_ids": [
+    "CWE-306"
+  ],
+  "description": "## Duplicate Advisory\n\nThis advisory has been withdrawn because it is a duplicate of GHSA-w5f2-9q9c-ff4h. This link is maintained to preserve external references.\n\n## Original Description\nLMCache multiprocess mode, also called distributed mode, opens an unauthenticated ZeroMQ ROUTER so worker processes can register and share KV cache blocks. Messages on that socket are msgpack. Extension code 1 is passed to DeviceIPCWrapper.Deserialize, which calls pickle.loads, while the server is still decoding request arguments and before the handler runs. A single unauthenticated ZMQ DEALER message to the ",
+  "ghsa_id": "GHSA-vv44-hjm2-qw2f",
+  "html_url": "https://github.com/advisories/GHSA-vv44-hjm2-qw2f",
+  "published_at": "2026-10-07T12:31:58Z",
+  "severity": "critical",
+  "source_code_location": null,
+  "state": null,
+  "summary": "Duplicate Advisory: Remote code execution via unsafe deserialization in multiprocess mode transport",
+  "type": "reviewed",
+  "updated_at": "2026-10-16T20:08:51Z",
+  "vulnerabilities": [
+    {
+      "first_patched_version": null,
+      "package": {
+        "ecosystem": "pip",
+        "name": "lmcache"
+      },
+      "patched_versions": null,
+      "severity": null,
+      "vulnerable_functions": [],
+      "vulnerable_version_range": ">= 0.3.9, < 0.5.6"
+    }
+  ],
+  "withdrawn_at": "2026-10-16T20:08:50Z"
+}

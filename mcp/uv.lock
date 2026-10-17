@@ -15,6 +15,7 @@ members = [
     "cyberau-cisa-kev",
     "cyberau-common",
     "cyberau-first-epss",
+    "cyberau-github-advisories",
     "cyberau-nvd",
     "cyberau-workspace",
 ]
@@ -423,6 +424,17 @@ requires-dist = [
 name = "cyberau-first-epss"
 version = "0.1.0"
 source = { editable = "first-epss" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-github-advisories"
+version = "0.1.0"
+source = { editable = "github-advisories" }
 dependencies = [
     { name = "cyberau-common" },
 ]

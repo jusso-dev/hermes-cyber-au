@@ -12,6 +12,7 @@ from pathlib import Path
 
 import jsonschema
 import pytest
+import yaml
 from cyberau_common.scaffold import generate
 from cyberau_common.server import build_server, get_connector
 
@@ -64,6 +65,8 @@ def _sample_value(prop: dict):
     pattern = str(prop.get("pattern") or "")
     if "CVE" in pattern:
         return "CVE-2024-3400"
+    if "GHSA" in pattern:
+        return "GHSA-w5f2-9q9c-ff4h"
     if "ism-" in pattern:
         return "ism-1173"
     if pattern.startswith("^") and not pattern.endswith("$"):
@@ -120,6 +123,37 @@ def check_connector(package: Path) -> None:
             assert payload["warnings"]
 
 
+def _wrap_entry(package: Path) -> tuple[str, dict] | None:
+    """The servers.yaml name and entry when this package wraps an upstream MCP server."""
+    data = yaml.safe_load((ROOT / "mcp" / "servers.yaml").read_text(encoding="utf-8"))
+    for server, entry in data["servers"].items():
+        if entry.get("connector") == package.name and entry.get("wrap") is True:
+            return server, entry
+    return None
+
+
+def check_wrap(package: Path, server: str, entry: dict) -> None:
+    """A wrap serves the vendor tools, so check the filtered list instead of a local server."""
+    source = (package / "SOURCE.md").read_text(encoding="utf-8")
+    for label in ("Upstream:", "Auth:", "Rate limit:", "Terms:", "Verified:"):
+        assert label in source
+    include = entry["tools"]["include"]
+    assert include
+    assert "--read-only" in entry["args"]
+    recorded = json.loads((package / "tests" / "fixtures" / "tools_list.json").read_text("utf-8"))
+    by_name = {tool["name"]: tool for tool in recorded["tools"]}
+    for name in include:
+        assert _TOOL_NAME.match(name), name
+        assert len(f"mcp__{server}__{name}") <= 64
+        assert by_name[name]["annotations"]["readOnlyHint"] is True
+        schema = json.loads((package / "schema" / f"{name}.input.json").read_text("utf-8"))
+        jsonschema.Draft202012Validator.check_schema(schema)
+        jsonschema.validate(_sample_arguments(schema), schema)
+        assert (package / "schema" / f"{name}.response.json").is_file()
+    for fixture in (package / "tests" / "fixtures").iterdir():
+        assert not _SECRET_HEADER.search(fixture.read_text(encoding="utf-8"))
+
+
 def _payload(result) -> dict:
     if isinstance(result, dict):
         return result
@@ -146,11 +180,17 @@ def _payload(result) -> dict:
     raise AssertionError(f"cannot read tool result {type(result)!r}")
 
 
-def test_repo_connector_contract():
+def test_repo_connector_contract(tmp_path: Path, monkeypatch):
+    # A cache left in /tmp by an earlier run would turn a miss into a hit with no warning.
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     packages = _repo_connectors()
     if not packages:
         pytest.skip("no connector packages yet")
     for package in packages:
+        wrapped = _wrap_entry(package)
+        if wrapped is not None:
+            check_wrap(package, *wrapped)
+            continue
         check_connector(package)
 
 
