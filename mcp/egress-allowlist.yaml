@@ -289,3 +289,8 @@ connectors:
     - mcp.recordedfuture.com
     allow_ip_literals: false
     allow_http_loopback: false
+  socradar:
+    hosts:
+    - platform.socradar.com
+    allow_ip_literals: false
+    allow_http_loopback: false

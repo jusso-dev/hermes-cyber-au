@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["data"],
+  "properties": {
+    "is_success": {"type": "boolean"},
+    "data": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["alarms"],
+      "properties": {
+        "alarms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["alarm_id", "date"],
+            "properties": {
+              "alarm_id": {},
+              "date": {"type": "string"},
+              "alarm_risk_level": {"type": "string"},
+              "alarm_asset": {"type": "string"},
+              "alarm_text": {"type": "string"},
+              "alarm_type_details": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "alarm_main_type": {"type": "string"},
+                  "alarm_sub_type": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "total_pages": {"type": "integer"},
+        "total_records": {"type": "integer"}
+      }
+    }
+  }
+}

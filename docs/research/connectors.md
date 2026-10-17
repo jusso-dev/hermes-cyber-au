@@ -53,7 +53,7 @@ Checked on 16 October 2026. The first 21 sources were compiled and verified for 
 | Intel 471 Titan (watchers, alerts, credentials and breach alerts) | `intel471` | Threat intelligence platforms | `INTEL471_EMAIL`, `INTEL471_API_KEY` | off: paid, bring your own licence | v1.0 | planned | https://github.com/intel471/titan-client-python |
 | Google Threat Intelligence Digital Threat Monitoring (formerly Mandiant) | `gtidtm` | Dark web and leak monitoring | `GTI_API_KEY` | off: paid, bring your own licence | v1.0 | planned | https://gtidocs.virustotal.com/ |
 | CrowdStrike Falcon Adversary Intelligence Recon (dark web monitoring notifications) | `csrecon` | Dark web and leak monitoring | `FALCON_CLIENT_ID`, `FALCON_CLIENT_SECRET`, `FALCON_BASE_URL` (optional) | off: paid, bring your own licence | v1.0 | planned | https://developer.crowdstrike.com/api-reference/collections/recon/ |
-| SOCRadar (company incidents: dark web, leaks, brand and attack surface) | `socradar` | Dark web and leak monitoring | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off: paid, bring your own licence | v1.0 | planned | https://socradar.io/socradar-apis/ |
+| SOCRadar (company incidents: dark web, leaks, brand and attack surface) | `socradar` | Dark web and leak monitoring | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/socradar.md](../connectors/socradar.md) |
 | DarkOwl Vision (dark web search) | `darkowl` | Dark web and leak monitoring | `DARKOWL_PUBLIC_KEY`, `DARKOWL_PRIVATE_KEY` | off: paid, bring your own licence | v1.0 | planned | https://support.darkowl.com/knowledge-base/search-api-documentation |
 | Flare threat exposure management (leaked credentials, stealer logs, leak and ransomware sites, dark web, official MCP) | `flare` | Dark web and leak monitoring | `FLARE_API_KEY`, `FLARE_TENANT_ID` (optional) | off: paid, bring your own licence | v0.2 | planned | https://api.docs.flare.io/introduction/getting-started |
 
@@ -407,7 +407,7 @@ Checked on 16 October 2026. The first 21 sources were compiled and verified for 
 - Auth: Company API key in the `Api-Key` header, plus the numeric company id.
 - Rate limits: Not published publicly. Back off on 429.
 - Terms: Commercial licence. Default flags: metadata only, no STIX export.
-- Verified: Vendor API page (socradar.io/socradar-apis) and vendor-published integrations (Elastic, Cortex XSOAR) for the incidents v4 path and `Api-Key` header. Confirm parameters in the customer portal at build time.
+- Verified: 17 October 2026. The vendor page socradar.io/socradar-apis returned HTTP 403 and the customer portal was not available. The path, the `Api-Key` header, and query parameters `start_date`, `end_date`, `severities`, `page`, `limit` and `include_total_records` are confirmed from the Cortex XSOAR SOCRadarIncidentsV4 integration. Elastic's SOCRadar integration also documents `start_date`, `page`, `limit` and `include_alarm_details`. No rate limit is published. A query parameter named `severity` was not confirmed and is not sent. Detail is in `mcp/socradar/SOURCE.md`.
 
 ### DarkOwl Vision (dark web search)
 - Endpoints: `GET` https://api.darkowl.com/api/v1/search?q=...

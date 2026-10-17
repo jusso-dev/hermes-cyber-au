@@ -1,0 +1,11 @@
+{
+  "is_success": true,
+  "data": {
+    "alarms": [
+      {
+        "incident_id": 1001,
+        "when": "2026-06-01 00:00:00"
+      }
+    ]
+  }
+}
