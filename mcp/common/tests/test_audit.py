@@ -538,3 +538,52 @@ def test_files_are_mode_0600(tmp_path: Path):
     path = next((tmp_path / "audit").glob("*.jsonl"))
     assert path.stat().st_mode & 0o777 == 0o600
     assert os.stat(tmp_path / "audit" / "HEAD").st_mode & 0o777 == 0o600
+
+
+def test_unicode_line_separators_do_not_break_verify(tmp_path: Path):
+    log = _log(tmp_path)
+    log.record("tool_call", tool="intel_search", args={"q": "a b\u0085c d"})
+    assert log.verify() == 1
+    assert "a b" in log.export(date(2000, 1, 1), fmt="jsonl")
+
+
+def test_carriage_return_edit_is_detected(tmp_path: Path):
+    log = _log(tmp_path)
+    log.record("session_start", session_id="s")
+    path = next((tmp_path / "audit").glob("*.jsonl"))
+    path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    with pytest.raises(AuditVerifyError) as caught:
+        log.verify()
+    assert caught.value.line_number == 1
+
+
+def test_unusual_hook_values_are_still_recorded(tmp_path: Path):
+    log = _log(tmp_path)
+    hooks = AuditHooks(log)
+    hooks.post_tool_call("intel_post", json.loads('{"a": NaN, "b": Infinity}'), "ok", "t", 1)
+    hooks.post_tool_call("intel_post", {"a": 1}, "ok", "t", 12.6)
+    hooks.post_tool_call("intel_post", {"a": {1, 2}}, object(), "t", None)
+    assert log.verify() == 3
+    records = [record for _path, _line, record in log.iter_records()]
+    assert records[1]["duration_ms"] == 13
+
+
+def test_secret_shaped_names_and_values_are_redacted(tmp_path: Path):
+    log = _log(tmp_path)
+    fake = "abcd1234efgh5678ijkl"
+    record = log.record(
+        "tool_call",
+        tool="intel_search",
+        args={
+            "aws_secret_access_key": fake,
+            "ssh_key": fake,
+            "passphrase": fake,
+            "cookie": fake,
+            "note": "sk-" + fake,
+            "other": "ghp_" + fake,
+            "url": f"https://user:{fake}@host.example/x",
+        },
+    )
+    blob = json.dumps(record["args_redacted"])
+    assert fake not in blob
+    assert blob.count("[REDACTED]") >= 7

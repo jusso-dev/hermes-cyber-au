@@ -135,8 +135,34 @@ _SECRET_KEY_SUFFIXES = (
     "token",
     "secret",
     "password",
+    "passphrase",
+    "passwd",
+    "pwd",
     "credential",
+    "credentials",
     "authkey",
+    "accesskey",
+    "secretkey",
+    "signingkey",
+    "privatekey",
+    "sshkey",
+    "encryptionkey",
+    "sessionkey",
+    "cookie",
+    "bearer",
+)
+_SECRET_VALUE_PATTERNS = (
+    re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)", re.S
+    ),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
+    re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
+    re.compile(r"(?i)\bBasic\s+[A-Za-z0-9+/]{8,}={0,2}"),
+    re.compile(r"(?<=://)[^/\s:@]+:[^/\s@]+(?=@)"),
 )
 _CSV_FIELDS = (
     "ts",
@@ -339,6 +365,8 @@ def secret_values() -> tuple[str, ...]:
 def redact_text(text: str, secrets: tuple[str, ...] | None = None) -> str:
     """Redact header, query and known environment secrets in a string."""
     cleaned = redact(text)
+    for pattern in _SECRET_VALUE_PATTERNS:
+        cleaned = pattern.sub("[REDACTED]", cleaned)
     for secret in secrets if secrets is not None else secret_values():
         if secret in cleaned:
             cleaned = cleaned.replace(secret, "[REDACTED]")
@@ -357,9 +385,9 @@ def _redact(value: object, secrets: tuple[str, ...]) -> object:
         for key, item in value.items():
             name = str(key)
             if _is_secret_key(name):
-                cleaned[name] = "[REDACTED]"
+                cleaned[redact_text(name, secrets)] = "[REDACTED]"
             else:
-                cleaned[name] = _redact(item, secrets)
+                cleaned[redact_text(name, secrets)] = _redact(item, secrets)
         return cleaned
     if isinstance(value, list):
         return [_redact(item, secrets) for item in value]
@@ -372,14 +400,15 @@ def _json_ready(value: object) -> object:
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError("audit values must be finite numbers")
-        return value
+        # Hermes parses model arguments with json.loads, which accepts NaN and
+        # Infinity. Record them as text so the call is still logged.
+        return value if math.isfinite(value) else str(value)
     if isinstance(value, dict):
         return {str(key): _json_ready(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_ready(item) for item in value]
-    raise ValueError("audit values must be JSON types")
+    # Anything else is logged by its text form, never dropped.
+    return str(value)
 
 
 def _digest_bytes(raw: bytes) -> tuple[str, int]:
@@ -560,12 +589,13 @@ class AuditLog:
         """
         if fmt not in {"jsonl", "csv"}:
             raise AuditUsageError("format must be jsonl or csv")
-        self.verify()
-        rows = [
-            record
-            for _path, _line, record in self.iter_records()
-            if _record_day(record, self.zone) >= since
-        ]
+        with self._shared_lock():
+            self.verify()
+            rows = [
+                record
+                for _path, _line, record in self.iter_records()
+                if _record_day(record, self.zone) >= since
+            ]
         if fmt == "jsonl":
             if not rows:
                 return ""
@@ -687,7 +717,16 @@ class AuditLog:
         text = _read_text(path)
         if text == "":
             return
-        for line_number, line in enumerate(text.splitlines(), start=1):
+        lines = text.split("\n")
+        if lines[-1] == "":
+            lines.pop()
+        else:
+            raise AuditVerifyError(
+                "record is not newline terminated", line_number=len(lines), path=path
+            )
+        # str.splitlines would also split on U+2028, U+0085 and similar, which
+        # canonical JSON leaves unescaped inside strings.
+        for line_number, line in enumerate(lines, start=1):
             if line == "":
                 raise AuditVerifyError(
                     "blank line in the audit log", line_number=line_number, path=path
@@ -988,7 +1027,7 @@ class AuditHooks:
                 result=result,
                 task_id=task_id or None,
                 session_id=_optional_text(kwargs.get("session_id")),
-                duration_ms=duration_ms,
+                duration_ms=_duration(duration_ms),
             )
         except Exception:
             if tool_writes(tool_name, **kwargs):
@@ -1131,6 +1170,15 @@ def _tool_event(tool_name: str) -> str:
     if "deliver" in tokens or "delivery" in tokens:
         return "delivery"
     return "tool_call"
+
+
+def _duration(value: object) -> int | None:
+    """Coerce a hook duration to whole milliseconds so an odd value never drops a record."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return max(0, int(round(value)))
 
 
 def _optional_text(value: object) -> str | None:
