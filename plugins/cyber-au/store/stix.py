@@ -110,6 +110,11 @@ _TLP_MARKINGS = {
     },
 }
 _MARKING_TO_TLP = {body["id"]: name for name, body in _TLP_MARKINGS.items()}
+# Import must recognise every TLP 2.0 marking, including the two export never writes.
+_IMPORT_MARKING_TO_TLP = {
+    **_MARKING_TO_TLP,
+    **{ref: name for name, ref in TLP_NOT_EXPORTED.items()},
+}
 
 
 def export_stix(
@@ -200,9 +205,10 @@ def resolve_export_path(requested: str, store: str | Path | None = None) -> Path
     """Resolve a bundle path and refuse anything outside ``exports``."""
     if not isinstance(requested, str) or not requested.strip() or "\x00" in requested:
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
-    root = (_data_dir(store) / "exports").resolve()
-    if root.is_symlink():
+    unresolved = _data_dir(store) / "exports"
+    if unresolved.is_symlink():
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
+    root = unresolved.resolve()
     raw = Path(requested)
     if any(part == ".." for part in raw.parts):
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
@@ -586,9 +592,7 @@ def _import_indicators(objects: list, path: str | Path | None) -> int:
         original = item.get("x_cyberau_value")
         if not isinstance(original, str):
             original = value_norm
-        marking = item.get("x_cyberau_tlp")
-        if not isinstance(marking, str):
-            marking = "CLEAR"
+        marking = _imported_tlp(item, linked)
         for source in sources:
             if not isinstance(source, dict):
                 raise ValueError("STIX indicator sources are invalid")
@@ -615,6 +619,22 @@ def _import_indicators(objects: list, path: str | Path | None) -> int:
                 path=path,
             )
     return len(seen)
+
+
+def _imported_tlp(*items: dict | None) -> str:
+    """Most restrictive TLP any given object claims. A bundle can only tighten, never loosen."""
+    marking = "CLEAR"
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        declared = item.get("x_cyberau_tlp")
+        if isinstance(declared, str):
+            marking = more_restrictive(marking, declared)
+        refs = item.get("object_marking_refs")
+        for ref in refs if isinstance(refs, list) else []:
+            if isinstance(ref, str) and ref in _IMPORT_MARKING_TO_TLP:
+                marking = more_restrictive(marking, _IMPORT_MARKING_TO_TLP[ref])
+    return marking
 
 
 def _store_type_and_value(item: dict) -> tuple[str | None, str]:
@@ -684,10 +704,7 @@ def _import_advisories(objects: list, path: str | Path | None) -> int:
         url = first.get("url")
         if not isinstance(source, str) or not isinstance(url, str):
             continue
-        marking = "CLEAR"
-        for ref in item.get("object_marking_refs") or []:
-            if ref in _MARKING_TO_TLP:
-                marking = more_restrictive(marking, _MARKING_TO_TLP[ref])
+        marking = _imported_tlp(item)
         ensure_source(source, name=source, default_tlp=marking, path=path)
         created = upsert_advisory(
             advisory_id,
@@ -718,6 +735,8 @@ def _import_relationships(objects: list, path: str | Path | None) -> int:
                 continue
             if not _REL.fullmatch(rel):
                 continue
+            if not (_record_exists(conn, src) and _record_exists(conn, dst)):
+                continue
             source = item.get("x_cyberau_source_id")
             source_id = source if isinstance(source, str) and _SOURCE.fullmatch(source) else None
             seen = item.get("created") if isinstance(item.get("created"), str) else None
@@ -731,6 +750,21 @@ def _import_relationships(objects: list, path: str | Path | None) -> int:
             )
             count += cursor.rowcount
     return count
+
+
+def _record_exists(conn, record_id: str) -> bool:
+    return (
+        conn.execute(
+            """
+            SELECT 1 FROM indicators WHERE id = ?
+            UNION ALL SELECT 1 FROM advisories WHERE id = ?
+            UNION ALL SELECT 1 FROM vulnerabilities WHERE cve_id = ?
+            LIMIT 1
+            """,
+            (record_id, record_id, record_id),
+        ).fetchone()
+        is not None
+    )
 
 
 def _cve_of(item: dict) -> str | None:

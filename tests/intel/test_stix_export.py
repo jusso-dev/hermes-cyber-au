@@ -23,10 +23,12 @@ from store.stix import (
     TLP_NOT_EXPORTED,
     export_stix,
     import_stix,
+    resolve_export_path,
 )
 from store.tools import intel_add_observation, intel_export_stix
 
 HASH = "ab" * 32
+_AMBER_REF = "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421"
 
 
 def _schemas() -> None:
@@ -360,6 +362,76 @@ def test_export_path_stays_under_exports(store_path, monkeypatch):
         intel_export_stix(path=str(store_path.parent / "outside.json"), store=store_path)
     with pytest.raises(ValueError):
         intel_export_stix(path="notes.txt", store=store_path)
+
+
+def test_exports_symlink_pointing_outside_is_refused(store_path, tmp_path):
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (store_path.parent / "exports").symlink_to(outside)
+    with pytest.raises(ValueError):
+        resolve_export_path("bundle.json", store_path)
+    with pytest.raises(ValueError):
+        export_stix(output="bundle.json", store=store_path)
+    assert list(outside.iterdir()) == []
+
+
+@pytest.mark.parametrize("name", ["RED", "AMBER+STRICT", "AMBER"])
+def test_import_keeps_the_marking_a_bundle_carries(store_path, name):
+    ref = TLP_NOT_EXPORTED.get(name) or _AMBER_REF
+    observable = "ipv4-addr--11111111-1111-4111-8111-111111111111"
+    bundle = {
+        "type": "bundle",
+        "objects": [
+            {
+                "type": "ipv4-addr",
+                "id": observable,
+                "spec_version": "2.1",
+                "value": "203.0.113.9",
+                "object_marking_refs": [ref],
+            },
+            {
+                "type": "report",
+                "id": "report--22222222-2222-4222-8222-222222222222",
+                "name": "carried marking",
+                "published": "2026-01-01T00:00:00Z",
+                "x_cyberau_advisory_id": "ADV-MARKED-1",
+                "object_marking_refs": [ref],
+                "object_refs": [observable],
+                "external_references": [{"source_name": "vendor", "url": "https://example.com/a"}],
+            },
+        ],
+    }
+    import_stix(bundle, path=store_path)
+    indicator = next(
+        item for item in lookup("203.0.113.9", path=store_path) if item["kind"] == "indicator"
+    )
+    assert indicator["tlp"] == name
+    advisory = lookup("ADV-MARKED-1", path=store_path)[0]
+    assert advisory["tlp"] == name
+    assert "203.0.113.9" not in export_stix(store=store_path)["text"]
+
+
+def test_import_skips_relationships_with_unknown_ends(store_path):
+    bundle = {
+        "type": "bundle",
+        "objects": [
+            {
+                "type": "relationship",
+                "x_cyberau_src_id": "indicator--missing",
+                "x_cyberau_dst_id": "CVE-2024-0001",
+                "x_cyberau_rel": "related-to",
+            }
+        ],
+    }
+    assert import_stix(bundle, path=store_path)["relationships"] == 0
+    assert (
+        open_store(store_path)
+        .connection()
+        .execute("SELECT COUNT(*) FROM relationships")
+        .fetchone()[0]
+        == 0
+    )
 
 
 def test_since_kinds_and_organisation(store_path, monkeypatch):
