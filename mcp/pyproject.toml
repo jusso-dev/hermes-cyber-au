@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["cyberau-common"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism"]
+members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "asd-essentials"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
@@ -25,6 +25,7 @@ testpaths = [
   "common/tests",
   "../tests",
   "asd-acsc/tests",
+  "asd-essentials/tests",
   "asd-ism/tests",
   "cisa-kev/tests",
   "first-epss/tests",

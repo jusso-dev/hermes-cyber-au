@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "chapter": {
+      "enum": ["enterprise-it", "cloud", "ot"]
+    },
+    "domain": {
+      "type": "string"
+    }
+  },
+  "required": ["chapter"]
+}

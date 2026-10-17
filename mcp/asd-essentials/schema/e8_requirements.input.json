@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "strategy": {
+      "enum": [
+        "patch_applications",
+        "patch_operating_systems",
+        "multi_factor_authentication",
+        "restrict_admin_privileges",
+        "application_control",
+        "restrict_office_macros",
+        "user_application_hardening",
+        "regular_backups"
+      ]
+    },
+    "maturity_level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    }
+  },
+  "required": ["strategy", "maturity_level"]
+}

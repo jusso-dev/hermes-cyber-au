@@ -44,6 +44,17 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  e8:
+    connector: asd-essentials
+    args:
+    - serve
+    - asd-essentials
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   asd:
     connector: asd-acsc
     args:

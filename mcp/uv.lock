@@ -11,6 +11,7 @@ resolution-markers = [
 [manifest]
 members = [
     "cyberau-asd-acsc",
+    "cyberau-asd-essentials",
     "cyberau-asd-ism",
     "cyberau-cisa-kev",
     "cyberau-common",
@@ -367,6 +368,17 @@ wheels = [
 name = "cyberau-asd-acsc"
 version = "0.1.0"
 source = { editable = "asd-acsc" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-asd-essentials"
+version = "0.1.0"
+source = { editable = "asd-essentials" }
 dependencies = [
     { name = "cyberau-common" },
 ]

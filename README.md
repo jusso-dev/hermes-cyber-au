@@ -53,7 +53,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 |---|---|---|---|---|---|---|---|
 | ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | on | v0.1 MVP | planned | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
 | Information Security Manual (ISM) OSCAL catalogue | `ism` | Australian government | `GITHUB_TOKEN` (optional) | on | v0.1 MVP | planned | [docs/connectors/asd-ism.md](docs/connectors/asd-ism.md) |
-| Essential Eight and ASD Essentials | `e8` | Australian government | none | on | v0.1 MVP | planned | https://www.cyber.gov.au/publication/what-is-the-essentials |
+| Essential Eight and ASD Essentials | `e8` | Australian government | none | on | v0.1 MVP | planned | [docs/connectors/asd-essentials.md](docs/connectors/asd-essentials.md) |
 | CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | on | v0.1 MVP | planned | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |
 | FIRST EPSS | `epss` | Vulnerability intelligence | none | on | v0.1 MVP | planned | [docs/connectors/first-epss.md](docs/connectors/first-epss.md) |
 | NIST National Vulnerability Database | `nvd` | Vulnerability intelligence | `NVD_API_KEY` (optional) | on | v0.1 MVP | planned | [docs/connectors/nvd.md](docs/connectors/nvd.md) |
