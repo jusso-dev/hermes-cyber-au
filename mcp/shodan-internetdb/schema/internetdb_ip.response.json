@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ip", "ports", "hostnames", "cpes", "tags", "vulns"],
+  "properties": {
+    "ip": {"type": "string"},
+    "ports": {"type": "array", "items": {"type": "integer"}},
+    "hostnames": {"type": "array", "items": {"type": "string"}},
+    "cpes": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "vulns": {"type": "array", "items": {"type": "string"}}
+  }
+}
