@@ -1,0 +1,32 @@
+{
+  "as_of": "2026-10-17",
+  "framework": "essential-eight",
+  "strategies": [],
+  "controls_requested": ["ISM-9999"],
+  "nist_requested": false,
+  "include_transition": false,
+  "import_requested": false,
+  "evidence": [
+    {
+      "ref": "E-5",
+      "text": "The workbook should cite ISM-9999.",
+      "control_id": "ISM-9999"
+    }
+  ],
+  "e8": {"available": false},
+  "essentials_chapter": {"available": false},
+  "essentials_transition": {"available": false},
+  "ism": {
+    "available": true,
+    "source": "asd-ism",
+    "version": "v2099.01.1",
+    "retrieved_at": "2026-10-17",
+    "controls": {
+      "ism-9999": {
+        "found": false,
+        "statement": "CANARY-BACKUPS-ARE-PERFORMED-DAILY"
+      }
+    }
+  },
+  "evidence_import": {"available": false}
+}
