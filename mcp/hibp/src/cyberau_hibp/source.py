@@ -32,9 +32,9 @@ TEST_ACCOUNT = "account-exists@hibp-integration-tests.com"
 
 _PACKAGE = Path(__file__).resolve().parents[2]
 _HEADERS = {"accept": "application/json, text/event-stream"}
-_PREFIX = re.compile(r"^[0-9A-Fa-f]{5}$")
-_ACCOUNT = re.compile(r"^[^@\s]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}$")
-_DOMAIN = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")
+_PREFIX = re.compile(r"[0-9A-Fa-f]{5}")
+_ACCOUNT = re.compile(r"[^@\s]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}")
+_DOMAIN = re.compile(r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}")
 _RESULT_KEYS = ("breaches", "breach", "matches", "breachesByAlias")
 _BREACH_KEYS = ("Name", "Title", "BreachDate", "PwnCount", "DataClasses")
 _TRANSPORT = None
@@ -114,7 +114,7 @@ def hibp_get_breach(name: str) -> dict:
 
 
 def hibp_get_pwned_passwords_range(prefix: str, limit: int = 25, offset: int = 0) -> dict:
-    if not isinstance(prefix, str) or not _PREFIX.match(prefix):
+    if not isinstance(prefix, str) or not _PREFIX.fullmatch(prefix):
         return _envelope(
             None,
             "snapshot",
@@ -156,7 +156,7 @@ def hibp_get_breached_account(
     approval_token: str | None = None,
 ) -> dict:
     tool = "hibp_get_breached_account"
-    if not isinstance(account, str) or not _ACCOUNT.match(account):
+    if not isinstance(account, str) or not _ACCOUNT.fullmatch(account):
         return _envelope(None, "snapshot", warnings=("account is not an email address",))
     problem = _page_problem(limit, offset) or _domain_problem(domain)
     if problem:
@@ -195,7 +195,7 @@ def hibp_get_breached_domain(
     approval_token: str | None = None,
 ) -> dict:
     tool = "hibp_get_breached_domain"
-    if not isinstance(domain, str) or not _DOMAIN.match(domain):
+    if not isinstance(domain, str) or not _DOMAIN.fullmatch(domain):
         return _envelope(None, "snapshot", warnings=("domain is not a domain name",))
     problem = _page_problem(limit, offset)
     if problem:
@@ -349,8 +349,9 @@ def _missing(rows: list, keys: tuple[str, ...]) -> str | None:
 def _guard(tool: str, subject: str, token: str | None) -> str:
     """Block a personal-information lookup unless a human approved this exact one."""
     key = lookup("CYBERAU_APPROVAL_KEY")
+    expected = issue_approval_token(tool, subject, key).encode() if key else b""
     approved = bool(
-        key and token and hmac.compare_digest(token, issue_approval_token(tool, subject, key))
+        key and isinstance(token, str) and hmac.compare_digest(token.encode(), expected)
     )
     _audit("allowed" if approved else "blocked", tool, subject)
     if approved:
@@ -512,7 +513,8 @@ def _structured(tool: str, status: int, headers: dict, body: bytes) -> tuple[dic
         if code == 429:
             wait = content.get("retryAfterSeconds", "unknown")
             return None, f"HIBP rate limited this call. Retry after {wait} seconds."
-        return None, "HIBP returned an error: " + redact(str(content.get("message", code)))[:200]
+        message = untrusted_text(redact(str(content.get("message", code))), "hibp", 200)
+        return None, f"HIBP returned an error: {message}"
     return content, ""
 
 
@@ -637,7 +639,7 @@ def _page_problem(limit: int, offset: int) -> str:
 
 
 def _domain_problem(domain: str | None) -> str:
-    if domain and not _DOMAIN.match(domain):
+    if domain and not _DOMAIN.fullmatch(domain):
         return "domain is not a domain name"
     return ""
 
