@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "required": ["results"],
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vulns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id"],
+              "properties": {"id": {"type": "string"}, "modified": {"type": "string"}}
+            }
+          },
+          "next_page_token": {"type": "string"}
+        }
+      }
+    }
+  }
+}

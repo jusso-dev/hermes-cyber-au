@@ -576,6 +576,22 @@ class TestHttp:
         assert seen[0][1] == b"q=b&url=http%3A%2F%2Fa.test%2Fx%3Fy%3D1"
         client.close()
 
+    def test_post_json_skip_cache_bypasses_a_fresh_entry(self, tmp_path: Path):
+        calls = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            return httpx.Response(200, content=b'{"ok":true}')
+
+        client = _client(tmp_path, handler)
+        assert client.post_json("https://example.com/a", {"q": 1}, ttl=60).cache == "miss"
+        assert client.post_json("https://example.com/a", {"q": 1}, ttl=60).cache == "hit"
+        assert len(calls) == 1
+        live = client.post_json("https://example.com/a", {"q": 1}, ttl=60, skip_cache=True)
+        assert live.cache == "miss"
+        assert len(calls) == 2
+        client.close()
+
     def test_upstream_errors_and_bare_redirect(self, tmp_path: Path):
         def five_hundred(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500)

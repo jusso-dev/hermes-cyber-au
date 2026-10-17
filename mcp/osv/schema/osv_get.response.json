@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "required": ["id", "modified"],
+  "properties": {
+    "id": {"type": "string"},
+    "modified": {"type": "string"},
+    "published": {"type": "string"},
+    "aliases": {"type": "array", "items": {"type": "string"}},
+    "summary": {"type": "string"},
+    "details": {"type": "string"},
+    "affected": {"type": "array", "items": {"type": "object"}},
+    "database_specific": {"type": "object"}
+  }
+}

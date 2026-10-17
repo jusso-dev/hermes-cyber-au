@@ -253,3 +253,8 @@ connectors:
     - raw.githubusercontent.com
     allow_ip_literals: false
     allow_http_loopback: false
+  osv:
+    hosts:
+    - api.osv.dev
+    allow_ip_literals: false
+    allow_http_loopback: false

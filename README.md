@@ -57,7 +57,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | on | v0.1 MVP | planned | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |
 | FIRST EPSS | `epss` | Vulnerability intelligence | none | on | v0.1 MVP | planned | [docs/connectors/first-epss.md](docs/connectors/first-epss.md) |
 | NIST National Vulnerability Database | `nvd` | Vulnerability intelligence | `NVD_API_KEY` (optional) | on | v0.1 MVP | planned | [docs/connectors/nvd.md](docs/connectors/nvd.md) |
-| OSV.dev open source vulnerabilities | `osv` | Vulnerability intelligence | none | on | v0.2 | planned | https://google.github.io/osv.dev/api/ |
+| OSV.dev open source vulnerabilities | `osv` | Vulnerability intelligence | none | on | v0.2 | planned | [docs/connectors/osv.md](docs/connectors/osv.md) |
 | Cloudflare Radar via Cloudflare's unified MCP server | `cloudflare_radar` | Internet and attack telemetry | `CLOUDFLARE_RADAR_API_TOKEN` (optional) | off: non-commercial terms, bring your own key | v0.1 MVP | planned | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
 | AusCERT public security bulletins | `auscert` | Australian community | none | on | v0.1 MVP | planned | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
 | abuse.ch (URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker) | `abusech` | Global threat intelligence | `ABUSECH_AUTH_KEY` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | [docs/connectors/abusech.md](docs/connectors/abusech.md) |

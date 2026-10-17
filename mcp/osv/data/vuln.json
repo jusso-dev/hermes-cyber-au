@@ -1,0 +1,331 @@
+{
+  "id": "GHSA-jfh8-c2jp-5v3q",
+  "summary": "Remote code injection in Log4j",
+  "details": "# Summary\n\nLog4j versions prior to 2.16.0 are subject to a remote code execution vulnerability via the ldap JNDI parser.\nAs per [Apache's Log4j security guide](https://logging.apache.org/log4j/2.x/security.html): Apache Log4j2 <=2.14.1 JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints. An attacker who can control log messages or log message parameters can execute arbitrary code loaded from LDAP servers when message lookup substitution is enabled. From log4j 2.16.0, this behavior has been disabled by default.\n\nLog4j version 2.15.0 contained an earlier fix for the vulnerability, but that patch did ",
+  "aliases": [
+    "CVE-2021-44228"
+  ],
+  "modified": "2025-10-22T19:37:02.616807Z",
+  "published": "2021-12-10T00:40:56Z",
+  "database_specific": {
+    "nvd_published_at": "2021-12-10T10:15:00Z",
+    "cwe_ids": [
+      "CWE-20",
+      "CWE-400",
+      "CWE-502",
+      "CWE-917"
+    ],
+    "severity": "CRITICAL",
+    "github_reviewed": true,
+    "github_reviewed_at": "2021-12-10T00:40:41Z"
+  },
+  "references": [
+    {
+      "type": "ADVISORY",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+    },
+    {
+      "type": "WEB",
+      "url": "https://github.com/apache/logging-log4j2/pull/608"
+    },
+    {
+      "type": "WEB",
+      "url": "https://github.com/github/advisory-database/pull/5501"
+    },
+    {
+      "type": "WEB",
+      "url": "https://cert-portal.siemens.com/productcert/pdf/ssa-397453.pdf"
+    },
+    {
+      "type": "WEB",
+      "url": "https://packetstormsecurity.com/files/165673/UniFi-Network-Application-Unauthenticated-Log4Shell-Remote-Code-Execution.html"
+    },
+    {
+      "type": "WEB",
+      "url": "https://packetstormsecurity.com/files/167794/Open-Xchange-App-Suite-7.10.x-Cross-Site-Scripting-Command-Injection.html"
+    }
+  ],
+  "affected": [
+    {
+      "package": {
+        "name": "org.apache.logging.log4j:log4j-core",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.apache.logging.log4j/log4j-core"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "2.13.0"
+            },
+            {
+              "fixed": "2.15.0"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "2.13.0",
+        "2.13.1",
+        "2.13.2",
+        "2.13.3",
+        "2.14.0",
+        "2.14.1"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.apache.logging.log4j:log4j-core",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.apache.logging.log4j/log4j-core"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "2.0-beta9"
+            },
+            {
+              "fixed": "2.3.1"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "2.0",
+        "2.0-beta9",
+        "2.0-rc1",
+        "2.0-rc2",
+        "2.0.1",
+        "2.0.2"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.apache.logging.log4j:log4j-core",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.apache.logging.log4j/log4j-core"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "2.4"
+            },
+            {
+              "fixed": "2.12.2"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "2.10.0",
+        "2.11.0",
+        "2.11.1",
+        "2.11.2",
+        "2.12.0",
+        "2.12.1"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "com.guicedee.services:log4j-core",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/com.guicedee.services/log4j-core"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "0"
+            },
+            {
+              "last_affected": "1.2.1.2-jre17"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "1.0.10.0",
+        "1.0.10.0-jre13",
+        "1.0.10.0-jre14",
+        "1.0.10.1",
+        "1.0.10.1-jre14",
+        "1.0.10.3"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.xbib.elasticsearch:log4j",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.xbib.elasticsearch/log4j"
+      },
+      "versions": [
+        "6.3.2.1"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "uk.co.nichesolutions.logging.log4j:log4j-core",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/uk.co.nichesolutions.logging.log4j/log4j-core"
+      },
+      "versions": [
+        "2.6.3-CUSTOM"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.ops4j.pax.logging:pax-logging-log4j2",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.ops4j.pax.logging/pax-logging-log4j2"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "1.8.0"
+            },
+            {
+              "fixed": "1.9.2"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "1.8.0",
+        "1.8.1",
+        "1.8.2",
+        "1.8.3",
+        "1.8.4",
+        "1.8.5"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.ops4j.pax.logging:pax-logging-log4j2",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.ops4j.pax.logging/pax-logging-log4j2"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "1.10.0"
+            },
+            {
+              "fixed": "1.10.8"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "1.10.0",
+        "1.10.1",
+        "1.10.2",
+        "1.10.3",
+        "1.10.4",
+        "1.10.5"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.ops4j.pax.logging:pax-logging-log4j2",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.ops4j.pax.logging/pax-logging-log4j2"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "1.11.0"
+            },
+            {
+              "fixed": "1.11.10"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "1.11.0",
+        "1.11.1",
+        "1.11.2",
+        "1.11.3",
+        "1.11.4",
+        "1.11.5"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    },
+    {
+      "package": {
+        "name": "org.ops4j.pax.logging:pax-logging-log4j2",
+        "ecosystem": "Maven",
+        "purl": "pkg:maven/org.ops4j.pax.logging/pax-logging-log4j2"
+      },
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {
+              "introduced": "2.0.0"
+            },
+            {
+              "fixed": "2.0.11"
+            }
+          ]
+        }
+      ],
+      "versions": [
+        "2.0.0",
+        "2.0.1",
+        "2.0.10",
+        "2.0.2",
+        "2.0.3",
+        "2.0.4"
+      ],
+      "database_specific": {
+        "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/12/GHSA-jfh8-c2jp-5v3q/GHSA-jfh8-c2jp-5v3q.json"
+      }
+    }
+  ],
+  "schema_version": "1.9.0",
+  "severity": [
+    {
+      "type": "CVSS_V3",
+      "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H/E:H"
+    }
+  ]
+}

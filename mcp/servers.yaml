@@ -367,3 +367,14 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  osv:
+    connector: osv
+    args:
+    - serve
+    - osv
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
