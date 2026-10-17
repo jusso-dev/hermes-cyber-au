@@ -238,7 +238,10 @@ class HttpClient:
             try:
                 return min(60.0, float(header))
             except ValueError:
-                parsed = email.utils.parsedate_to_datetime(header)
+                try:
+                    parsed = email.utils.parsedate_to_datetime(header)
+                except (TypeError, ValueError):
+                    parsed = None
                 if parsed is not None:
                     return min(60.0, 1.0)
         return self._backoff(attempt)

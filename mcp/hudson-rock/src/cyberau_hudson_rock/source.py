@@ -68,6 +68,9 @@ _OVERVIEW_TIMES = (
 )
 _UNAVAILABLE = "Hudson Rock is unavailable and no cached or snapshot result is available."
 _UNUSABLE = "Hudson Rock payload was not usable."
+_SNAPSHOT = "Served from a snapshot file. This is not a live Hudson Rock result."
+_SERVED_STALE = "Served from the session cache copy. This is not a live Hudson Rock result."
+_LIVE_STATES = ("miss", "hit")
 
 _TRANSPORT = None
 _SLEEPER = None
@@ -130,7 +133,8 @@ def hudsonrock_domain_exposure(
     warning = warning or build_warning
     if build_warning and not findings:
         return _envelope([], "snapshot", (build_warning,))
-    _remember(findings, watchlist)
+    if cache in _LIVE_STATES:
+        _remember(findings, watchlist)
     return _envelope(
         [finding_payload(item) for item in findings],
         cache,
@@ -164,7 +168,8 @@ def hudsonrock_domain_overview(domain: str) -> dict:
     warning = warning or build_warning
     if build_warning and not findings:
         return _envelope([], "snapshot", (build_warning,))
-    _remember(findings, watchlist)
+    if cache in _LIVE_STATES:
+        _remember(findings, watchlist)
     return _envelope(
         [finding_payload(item) for item in findings],
         cache,
@@ -216,16 +221,20 @@ class _HudsonRock(PremiumConnector):
         if not domains:
             return []
         since_text = since.isoformat()
-        payload, _cache, warning = _collect(
+        payload, cache, warning = _collect(
             SEARCH_URL,
             _search_body(domains, None, since_text),
         )
         if payload is None:
             raise RuntimeError(warning or _UNAVAILABLE)
+        if cache == "snapshot":
+            # Findings carry no warning. A snapshot must not pass as live exposure.
+            raise RuntimeError(_SNAPSHOT)
         findings, build_warning = _search_findings(payload, domains, None, since_text)
         if build_warning and not findings:
             raise RuntimeError(build_warning)
-        _remember(findings, watchlist)
+        if cache in _LIVE_STATES:
+            _remember(findings, watchlist)
         return findings
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
@@ -233,9 +242,13 @@ class _HudsonRock(PremiumConnector):
             return self._schema_probe()
         configured = self.health_result(live=False)
         if not configured.configured:
+            if live:
+                return Probe(self.key, False, f"{KEY_ENV} is not set")
             return Probe(self.key, configured.ok, configured.detail)
         if not live:
             return Probe(self.key, True, "offline ok")
+        if os.environ.get("CYBERAU_OFFLINE") == "1":
+            return Probe(self.key, False, "offline: the live probe was not run")
         domain = _probe_domain()
         if domain is None:
             return Probe(self.key, False, "no org-exposure watchlist domain for the live probe")
@@ -434,6 +447,9 @@ def _collect(url: str, body: dict, *, force_live: bool = False) -> tuple[dict | 
                 return {"data": rows, "nextCursor": None}, state, warning or _UNAVAILABLE
             return None, state, warning
         rows.extend(payload.get("data") or [])
+        if state == "snapshot":
+            cursor = None
+            break
         nxt = payload.get("nextCursor")
         if not isinstance(nxt, str) or not nxt or nxt in seen:
             cursor = None
@@ -454,7 +470,7 @@ def _load_page(url: str, body: dict, *, force_live: bool) -> tuple[dict | None, 
             accepted, problem = _accept(url, snapshot)
             if problem:
                 return None, "snapshot", problem
-            return accepted, "snapshot", ""
+            return accepted, "snapshot", _SNAPSHOT
     secret = lookup(KEY_ENV)
     if secret is None:
         return None, "snapshot", f"{KEY_ENV} is not set."
@@ -465,7 +481,9 @@ def _load_page(url: str, body: dict, *, force_live: bool) -> tuple[dict | None, 
     if cached and not force_live and (offline or session.fresh(cached)):
         payload = _load_cached(cached.body)
         if payload is not None:
-            return payload, "stale" if offline else "hit", ""
+            if offline:
+                return payload, "stale", _SERVED_STALE
+            return payload, "hit", ""
     if offline:
         return None, "snapshot", _UNAVAILABLE
     try:
@@ -483,7 +501,8 @@ def _load_page(url: str, body: dict, *, force_live: bool) -> tuple[dict | None, 
         )
     if status == 429:
         retry = headers.get("retry-after", "").strip()
-        extra = f" Retry after {retry} seconds." if retry else ""
+        # The header is vendor text. Echo it only as a short whole number.
+        extra = f" Retry after {retry} seconds." if retry.isdigit() and len(retry) <= 5 else ""
         return None, "snapshot", f"Hudson Rock rate limit (HTTP 429).{extra}"
     if status == 408 or status >= 500:
         message = (
@@ -511,7 +530,7 @@ def _from_cache_or_warning(cached, message: str) -> tuple[dict | None, str, str]
     if cached is not None:
         payload = _load_cached(cached.body)
         if payload is not None:
-            return payload, "stale", ""
+            return payload, "stale", _SERVED_STALE
     return None, "snapshot", message
 
 
@@ -648,6 +667,12 @@ def _search_findings(
     since: str | None,
 ) -> tuple[list[ExposureFinding], str]:
     selected = list(types or _COUNT_KEYS)
+    # Filtered counts are a different measure. Keep them out of the unfiltered row.
+    scope = ""
+    if types:
+        scope += ":types=" + ",".join(sorted(types))
+    if since:
+        scope += f":since={since}"
     buckets = {domain: {name: 0 for name in selected} for domain in requested}
     first: dict[str, datetime] = {}
     last: dict[str, datetime] = {}
@@ -681,7 +706,7 @@ def _search_findings(
                 buckets[domain],
                 first[domain],
                 last[domain],
-                source_ref=f"search-by-domain:{domain}",
+                source_ref=f"search-by-domain:{domain}{scope}",
                 data_classes=["credential"],
             )
         )
