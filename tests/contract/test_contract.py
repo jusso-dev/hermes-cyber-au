@@ -59,6 +59,8 @@ def _sample_arguments(schema: dict) -> dict:
 def _sample_value(prop: dict):
     if prop.get("type") == "array":
         return [_sample_value(prop.get("items") or {"type": "string"})]
+    if prop.get("type") == "object" and prop.get("required"):
+        return _sample_arguments(prop)
     if "enum" in prop:
         return prop["enum"][0]
     pattern = str(prop.get("pattern") or "")
