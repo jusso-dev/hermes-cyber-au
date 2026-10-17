@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "name", "description", "pattern", "tlp", "revoked", "expired", "values"],
+  "properties": {
+    "id": {"type": "string"},
+    "type": {"type": "string"},
+    "name": {"type": "string"},
+    "description": {"type": "string"},
+    "pattern": {"type": "string"},
+    "valid_from": {"type": "string"},
+    "valid_until": {"type": "string"},
+    "created": {"type": "string"},
+    "modified": {"type": "string"},
+    "tlp": {"type": "string"},
+    "revoked": {"type": "boolean"},
+    "expired": {"type": "boolean"},
+    "labels": {"type": "array", "items": {"type": "string"}},
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value"],
+        "properties": {
+          "kind": {"enum": ["ip", "domain", "url", "hash"]},
+          "value": {"type": "string"}
+        }
+      }
+    },
+    "source_ref": {"type": "string"},
+    "target_ref": {"type": "string"},
+    "relationship_type": {"type": "string"}
+  }
+}

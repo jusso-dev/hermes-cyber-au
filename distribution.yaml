@@ -47,3 +47,15 @@ env_requires:
   - name: OPENCTI_TOKEN
     description: "API token for a read-only OpenCTI user. The connector stays off until enabled in config.yaml."
     required: false
+  - name: TAXII_API_ROOT
+    description: "TAXII 2.1 API root for a server you supply, including ASD CTIS after onboarding. Off by default."
+    required: false
+  - name: TAXII_COLLECTION_ID
+    description: "TAXII collection id for TAXII_API_ROOT. Off by default."
+    required: false
+  - name: TAXII_USERNAME
+    description: "HTTP Basic username for TAXII_API_ROOT. Off by default."
+    required: false
+  - name: TAXII_PASSWORD
+    description: "HTTP Basic password for TAXII_API_ROOT. Off by default. Never commit a value."
+    required: false

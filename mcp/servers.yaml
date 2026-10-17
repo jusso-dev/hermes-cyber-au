@@ -446,3 +446,22 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  taxii:
+    connector: taxii-ctis
+    args:
+    - serve
+    - taxii-ctis
+    env:
+    - TAXII_API_ROOT=${TAXII_API_ROOT}
+    - TAXII_COLLECTION_ID=${TAXII_COLLECTION_ID}
+    - TAXII_USERNAME=${TAXII_USERNAME}
+    - TAXII_PASSWORD=${TAXII_PASSWORD}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    required_env:
+    - TAXII_API_ROOT
+    - TAXII_COLLECTION_ID
+    - TAXII_USERNAME
+    - TAXII_PASSWORD

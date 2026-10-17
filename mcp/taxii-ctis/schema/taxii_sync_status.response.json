@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["collection_id", "last_sync", "object_count", "error"],
+  "properties": {
+    "collection_id": {"type": "string"},
+    "last_sync": {"type": ["string", "null"]},
+    "object_count": {"type": "integer"},
+    "error": {"type": "string"}
+  }
+}

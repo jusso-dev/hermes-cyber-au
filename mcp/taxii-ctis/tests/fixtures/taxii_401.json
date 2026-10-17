@@ -1,0 +1,5 @@
+{
+  "title": "Unauthorized",
+  "description": "Authentication is required.",
+  "http_status": "401"
+}

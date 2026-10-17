@@ -1,0 +1,9 @@
+{
+  "title": "Synthetic TAXII discovery",
+  "description": "Invented discovery document for tests.",
+  "default": "https://example.com/taxii2/root/",
+  "api_roots": [
+    "https://example.com/taxii2/root/",
+    "https://evil.test/api/"
+  ]
+}

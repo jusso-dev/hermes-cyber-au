@@ -298,3 +298,7 @@ connectors:
     - www.spamhaus.org
     allow_ip_literals: false
     allow_http_loopback: false
+  taxii-ctis:
+    hosts: []
+    allow_ip_literals: false
+    allow_http_loopback: false

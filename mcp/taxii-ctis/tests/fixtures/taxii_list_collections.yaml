@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://example.com/taxii2/root/collections/
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"collections":[{"id":"synthetic-collection-alpha","title":"Synthetic demonstration collection","can_read":true,"can_write":false}]}'
