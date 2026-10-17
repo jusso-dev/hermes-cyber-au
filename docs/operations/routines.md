@@ -28,7 +28,7 @@ hermes -p cyber-au cron run cyberau-morning-brief
 
 `hermes -p cyber-au cron pause <id>` pauses one job again. `hermes pause` and `hermes resume` stop and start the scheduler for every job. They do not rewrite each job's own paused flag.
 
-Shipped delivery is `origin` or `local` (saved on this machine). A shipped job has no recorded origin chat, so `origin` sends to the first home channel you have configured for the profile. If none is configured, Hermes skips delivery and keeps the output in the job's last output, which `hermes -p cyber-au cron list` shows. This repository does not name a person, an email address, or a Slack, Teams, or Telegram channel. To send a briefing somewhere else, set the target on your own profile with `hermes cron edit <id> --deliver <target>` after you have resumed the job. Do not put that target in the shipped file.
+Shipped delivery is `origin` or `local` (saved on this machine). A shipped job has no recorded origin chat, so `origin` sends to the first home channel you have configured for the profile. If none is configured, Hermes skips delivery and keeps the output in the job's last output, which `hermes -p cyber-au cron list` shows. This repository does not store a person, an email address, a chat id, or a webhook URL. Platform tokens for Slack, email, and Telegram, and the reason Microsoft Teams is not listed, are under Morning briefing below. Set any extra target on your own profile with `hermes cron edit <id> --deliver <target>` after you have resumed the job. Do not put that target in the shipped file.
 
 ## Scripts
 
@@ -37,6 +37,28 @@ Shipped delivery is `origin` or `local` (saved on this machine). A shipped job h
 These scripts call `cyberau-mcp refresh` and `cyberau-mcp store`, which the shared library does not implement yet (it exits with `refresh is not part of the shared library yet`). Until the connector and store tickets land, a resumed script job reports that failure line and changes nothing.
 
 Ingest refreshes the keyless sources `asd`, `kev`, `epss`, `auscert`, and `feodo`. Store maintenance runs `cyberau-mcp store backup`, then `store compact` (retention compaction), then `store vacuum`. Each script prints one line on success and one short line on failure. That line is what Hermes delivers.
+
+## Morning briefing
+
+`cyberau-morning-brief` follows `skills/daily-briefing/references/format.md`. The window is 72 hours on Monday and 24 hours on every other day, in Australia/Sydney. The default briefing is under 600 words. An analyst can ask for `detail: full`.
+
+The asset inventory is `plugin-data/cyber-au/assets.yaml` on the profile. That file is yours. It is not in this repository. Matching is described in `skills/daily-briefing/references/matching.md`.
+
+Shipped delivery stays `origin`, the owner channel. `local` is also treated as the owner channel. Those renderings name matching assets. If the deliver value includes any other target, the briefing reports exposure as counts only.
+
+Hermes v0.22.2 can send the job to these gateway targets:
+
+| Target | Where it goes |
+|---|---|
+| `slack` | Slack home channel |
+| `email` | Email home channel |
+| `telegram` | Telegram home channel |
+
+```bash
+hermes -p cyber-au cron edit cyberau-morning-brief --deliver slack
+```
+
+Microsoft Teams is not a delivery target in that Hermes version, so this repository does not list one. Do not store a webhook URL, a chat id, or an email address here. A chat id, if you use one, stays on the profile you edit locally.
 
 ## Quiet KEV watch
 

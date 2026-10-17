@@ -1,0 +1,12 @@
+# Synthetic inventory for the briefing fixture. Not a customer file.
+assets:
+  - name: North gateway
+    vendor: examplevendor
+    product: edgegate
+    exposure: internet
+    owner: platform
+  - name: Desk systems
+    vendor: exampleos
+    product: workstation
+    exposure: internal
+    owner: workplace
