@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-16T00:00:00.000",
+  "vulnerabilities": [
+    {
+      "cve": {
+        "id": "CVE-2024-3400",
+        "published": "2024-04-12T00:00:00.000",
+        "descriptions": [
+          {"lang": "en", "value": "Synthetic NVD row for CVE-2024-3400."}
+        ],
+        "metrics": {
+          "cvssMetricV31": [
+            {"cvssData": {"baseScore": 10.0, "baseSeverity": "CRITICAL"}}
+          ]
+        },
+        "weaknesses": [{"description": [{"lang": "en", "value": "CWE-77"}]}],
+        "references": []
+      }
+    }
+  ]
+}

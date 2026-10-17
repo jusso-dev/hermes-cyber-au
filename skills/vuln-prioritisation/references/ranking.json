@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "batch_size": 100,
+  "rules": [
+    {"id": "kev-member", "tier": 1, "when": "kev"},
+    {"id": "au-alert", "tier": 1, "when": "au_mention"},
+    {"id": "epss-high", "tier": 1, "when": {"epss_gte": "0.7"}},
+    {"id": "epss-elevated", "tier": 2, "when": {"epss_gte": "0.1"}},
+    {"id": "cvss-critical-exposed", "tier": 2, "when": {"cvss_gte": "9", "asset": "internet-facing"}},
+    {"id": "residual", "tier": 3, "when": "else"}
+  ]
+}
