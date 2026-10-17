@@ -87,7 +87,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | data.gov.au (CKAN) | `datagov` | Australian government | none | on | v1.0 | planned | https://data.gov.au/ |
 | AusCERT member URL feed (AusMISP goes through the MISP connector) | `auscertm` | Australian community | `AUSCERT_URL_FEED`, `AUSCERT_FEED_TOKEN` (optional) | off: bring your own access | v1.0 | planned | https://auscert.org.au/services/threat-intelligence/ |
 | ASD Blueprint for Secure Cloud | `blueprint` | Australian government | none | on | v1.0 | planned | https://blueprint.asd.gov.au/ |
-| PhishTank verified phishing URLs | `phish` | Global threat intelligence | `PHISHTANK_APP_KEY` (optional) | on | v1.0 | planned | https://phishtank.org/developer_info.php |
+| PhishTank verified phishing URLs | `phish` | Global threat intelligence | `PHISHTANK_APP_KEY` (optional) | on | v1.0 | planned | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
 | OpenPhish community feed | `phish` | Global threat intelligence | none | on | v1.0 | planned | https://openphish.com/ |
 | MISP via the official MISP MCP server, for your own instance or AusMISP | `misp` | CTI platforms | `MISP_URL`, `MISP_API_KEY` | off: bring your own access | v1.0 | planned | https://www.misp-project.org/ |
 | OpenCTI (your own instance) | `opencti` | CTI platforms | `OPENCTI_URL`, `OPENCTI_TOKEN` | off: bring your own access | v1.0 | planned | https://docs.opencti.io/ |

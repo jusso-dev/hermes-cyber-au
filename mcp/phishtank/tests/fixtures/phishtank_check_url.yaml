@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://data.phishtank.com/data/online-valid.json
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '[{"phish_id":1001,"url":"https://login.example.com/verify","phish_detail_url":"https://phishtank.org/phish_detail.php?phish_id=1001","submission_time":"2026-10-01T00:00:00+00:00","verified":"yes","verification_time":"2026-10-01T01:00:00+00:00","online":"yes","target":"Example Bank"}]'

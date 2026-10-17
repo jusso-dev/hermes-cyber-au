@@ -68,3 +68,15 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  phish:
+    connector: phishtank
+    args:
+    - serve
+    - phishtank
+    env:
+    - PHISHTANK_APP_KEY=${PHISHTANK_APP_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
