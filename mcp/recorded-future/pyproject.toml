@@ -1,0 +1,17 @@
+[project]
+name = "cyberau-recorded-future"
+version = "0.1.0"
+description = "Read-only Recorded Future connector for identity, brand and domain exposure."
+requires-python = ">=3.11"
+dependencies = ["cyberau-common", "cyberau-premium"]
+
+[tool.uv.sources]
+cyberau-common = { workspace = true }
+cyberau-premium = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cyberau_recorded_future"]

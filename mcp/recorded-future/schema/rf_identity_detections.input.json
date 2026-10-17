@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "since": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD, Australia/Sydney"
+    },
+    "novel_only": {
+      "type": "boolean",
+      "default": true
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 100
+    }
+  },
+  "required": []
+}

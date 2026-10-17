@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["entity_type", "changed", "etag"],
+  "properties": {
+    "entity_type": {"type": "string"},
+    "risk_rule": {"type": "string"},
+    "changed": {"type": "boolean"},
+    "etag": {"type": "string"},
+    "last_pulled": {"type": ["string", "null"]}
+  }
+}

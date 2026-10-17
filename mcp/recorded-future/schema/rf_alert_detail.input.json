@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "category": {
+      "enum": [
+        "dark_web_brand",
+        "domain_abuse",
+        "identity_novel_exposures"
+      ]
+    },
+    "alert_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "category",
+    "alert_id"
+  ]
+}

@@ -283,3 +283,9 @@ connectors:
     - api.intel471.com
     allow_ip_literals: false
     allow_http_loopback: false
+  recorded-future:
+    hosts:
+    - api.recordedfuture.com
+    - mcp.recordedfuture.com
+    allow_ip_literals: false
+    allow_http_loopback: false

@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "emails_sha1": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{40}$"
+      },
+      "minItems": 1,
+      "maxItems": 100
+    }
+  },
+  "required": [
+    "emails_sha1"
+  ]
+}

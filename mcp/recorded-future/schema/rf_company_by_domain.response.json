@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["domain", "entity_id", "risk_score"],
+  "properties": {
+    "domain": {"type": "string"},
+    "entity_id": {"type": "string"},
+    "name": {"type": "string"},
+    "risk_score": {"type": ["integer", "null"]},
+    "criticality": {"type": "string"},
+    "rules_triggered": {"type": ["integer", "null"]},
+    "top_rules": {"type": "array"}
+  }
+}

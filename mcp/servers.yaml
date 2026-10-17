@@ -589,6 +589,95 @@ servers:
     paid: true
     required_env:
     - RECORDED_FUTURE_API_TOKEN
+  recordedfuture_mcp:
+    connector: recorded-future
+    url: https://mcp.recordedfuture.com/mcp
+    auth: oauth
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: false
+    required_env: []
+    env: []
+    tools:
+      include:
+      - analyst_notes_get_note
+      - analyst_notes_list_sources
+      - analyst_notes_list_topics
+      - analyst_notes_search_notes
+      - asi_get_asset_details
+      - asi_get_exposure_assets
+      - asi_get_filter_options
+      - asi_get_workflow
+      - asi_list_asset_exposures
+      - asi_list_project_exposures
+      - asi_list_projects
+      - asi_list_static_asset_rules
+      - asi_list_tags
+      - asi_search_assets
+      - attack_heatmap
+      - attack_ttp_summary
+      - custom_lists_get_custom_list_by_name
+      - detection_summary
+      - detection_trends
+      - entity_lookup_lookup_master_ids
+      - entity_lookup_resolve_entities_in_text
+      - entity_recent_mentions
+      - get_adversary_mitre_evidence
+      - get_adversary_mitre_matrix
+      - have_i_seen_this
+      - insikt_find_notes_by_diamond_model
+      - insikt_find_notes_by_text
+      - insikt_get_full_note
+      - insikt_get_summaries
+      - insikt_search_analyst_notes
+      - intelligence_cards_get_intelligence_cards
+      - io_mcp_server_influence_network_reports
+      - io_mcp_server_influence_operations_query
+      - io_mcp_server_influence_operations_stats
+      - io_mcp_server_list_influence_networks
+      - links_get_links_for_entities
+      - malware_community_comparison
+      - malware_tools_malware_search_aggregate
+      - malware_tools_malware_search_count
+      - malware_tools_malware_search_translate
+      - mta_get_mta_references
+      - pd_mcp__list_alert_rules
+      - pd_mcp__list_intelligence_requirements
+      - product_get_product_vulnerabilities
+      - ransomware_get_malware_ttp_attributes
+      - ransomware_get_ransomware_metadata
+      - ransomware_get_ransomware_victim_information
+      - ransomware_get_threat_actor_ttp_attributes
+      - raw_api_find_entities_by_name
+      - risk_get_company_risk_score
+      - risk_get_high_risk_entities
+      - risk_get_risk_rules
+      - risk_get_risk_score_history
+      - search_search
+      - threatmap_get_malware_information
+      - threatmap_get_malware_map_diff
+      - threatmap_get_malware_map_information
+      - threatmap_get_map_mitre_evidence
+      - threatmap_get_map_mitre_matrix
+      - threatmap_get_threat_actor_information
+      - threatmap_get_threat_actor_map_diff
+      - threatmap_get_threat_actor_map_information
+      - top_malware_families
+      - top_related_devices
+      - top_related_iocs
+      - top_related_threat_actors
+      - top_related_ttps
+      - top_related_vulnerabilities
+      - vulnerability_get_company_affected_assets
+      - vulnerability_get_company_vulnerabilities
+      - vulnerability_get_portfolio_vuln_exposure
+      - vulnerability_get_vulnerability_detail
+      - vulnerability_get_watchlist_vendors_by_vuln
+      - watchlists_get_watchlist
+      - whoami
   flashpoint:
     connector: flashpoint
     args:

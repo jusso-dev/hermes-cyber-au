@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "entity_type": {
+      "enum": [
+        "ip",
+        "domain",
+        "hash",
+        "url",
+        "vulnerability"
+      ]
+    },
+    "risk_rule": {
+      "type": "string",
+      "description": "Risk rule name; default list when omitted"
+    }
+  },
+  "required": [
+    "entity_type"
+  ]
+}

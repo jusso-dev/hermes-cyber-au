@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["alert_id", "category", "screenshots"],
+  "properties": {
+    "alert_id": {"type": "string"},
+    "category": {"type": "string"},
+    "ransomware": {"type": "boolean"},
+    "panels": {},
+    "screenshots": {"const": "not fetched"}
+  }
+}

@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["cyberau-common", "cyberau-premium", "cyberau-crowdstrike-recon"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert", "cloudflare-urlscanner", "crtsh", "github-advisories", "greynoise", "hibp", "irap", "misp", "mitre-attack", "ncsc-nz", "opencti", "openphish", "osv", "phishtank", "pspf", "ransomware-live", "scamwatch", "shodan-internetdb", "sigma", "spamhaus-drop", "taxii-ctis", "threatsieve", "hindsight", "premium", "crowdstrike-recon", "darkowl", "flare", "flashpoint", "google-ti-dtm", "hudson-rock", "intel471"]
+members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert", "cloudflare-urlscanner", "crtsh", "github-advisories", "greynoise", "hibp", "irap", "misp", "mitre-attack", "ncsc-nz", "opencti", "openphish", "osv", "phishtank", "pspf", "ransomware-live", "scamwatch", "shodan-internetdb", "sigma", "spamhaus-drop", "taxii-ctis", "threatsieve", "hindsight", "premium", "crowdstrike-recon", "darkowl", "flare", "flashpoint", "google-ti-dtm", "hudson-rock", "intel471", "recorded-future"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
@@ -71,6 +71,7 @@ testpaths = [
   "google-ti-dtm/tests",
   "hudson-rock/tests",
   "intel471/tests",
+  "recorded-future/tests",
 ]
 pythonpath = [
   "common/src",
@@ -87,6 +88,7 @@ pythonpath = [
   "google-ti-dtm/src",
   "hudson-rock/src",
   "intel471/src",
+  "recorded-future/src",
 ]
 addopts = "-q"
 

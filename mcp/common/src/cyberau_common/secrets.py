@@ -25,6 +25,7 @@ SECRET_HEADER_NAMES = frozenset(
         "apikey",
         "api_key",
         "key",
+        "x-rftoken",
     }
 )
 
@@ -45,6 +46,8 @@ FILTER_HEADERS = (
     "api_key",
     "key",
     "Key",
+    "x-rftoken",
+    "X-RFToken",
 )
 
 _PLACEHOLDER = re.compile(r"^\$\{(?:env:)?[A-Za-z_][A-Za-z0-9_]*\}$")
@@ -52,14 +55,14 @@ _QUERY_RE = re.compile(r"(?i)([?&](?:api[_-]?key|token|auth|key|access_token)=)(
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+\S+")
 _HEADER_RE = re.compile(
     r"(?i)(?<![?&])(?P<head>[\"']?\b"
-    r"(?P<name>authorization|auth-key|x-otx-api-key|x-api-key|api[_-]?key|key)"
+    r"(?P<name>authorization|auth-key|x-otx-api-key|x-api-key|x-apikey|x-rftoken|api[_-]?key|key)"
     r"\b[\"']?\s*[:=]\s*[\"']?)"
     r"(?P<value>(?:(?:bearer|basic|token|digest)\s+)?[^\"'\s,}&]+)"
 )
 _SECRET_ASSIGN = re.compile(
     r"(?i)\b("
     r"[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)"
-    r"|authorization|auth-key|x-otx-api-key|x-api-key|api[_-]?key"
+    r"|authorization|auth-key|x-otx-api-key|x-api-key|x-apikey|x-rftoken|api[_-]?key"
     r")\b\s*[:=]\s*[\"']?(?:(?:bearer|basic|token)\s+)?([^\"'\s#]+)"
 )
 _TOKEN_RE = re.compile(
