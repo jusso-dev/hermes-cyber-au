@@ -1,0 +1,21 @@
+{
+  "table": "SecurityEvent",
+  "product": "Microsoft Sentinel, Azure Monitor Logs",
+  "source_name": "Microsoft Learn SecurityEvent table",
+  "source_url": "https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/securityevent",
+  "version": "none",
+  "retrieved": "2026-10-17",
+  "partial": true,
+  "time_column": "TimeGenerated",
+  "columns": {
+    "TimeGenerated": "datetime",
+    "CommandLine": "string",
+    "Account": "string",
+    "AccountDomain": "string",
+    "AccountName": "string",
+    "Activity": "string",
+    "TenantId": "string",
+    "ClientIPAddress": "string",
+    "ClientName": "string"
+  }
+}
