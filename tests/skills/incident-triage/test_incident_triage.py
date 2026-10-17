@@ -106,3 +106,42 @@ def test_defang_helper_matches_the_harness():
     ]
     for sample in samples:
         assert helper.defang_observable(sample) == harness.defang_observable(sample)
+
+
+# Argument names from tickets/052-store-schema-ingest.md (Plugin tools).
+INTEL_SEARCH_ARGS = {"query", "kinds", "since", "limit"}
+INTEL_ADD_ARGS = {"type", "value", "verdict", "confidence", "tags", "tlp", "note"}
+INDICATOR_TYPES = {
+    "ipv4",
+    "ipv6",
+    "domain",
+    "url",
+    "email",
+    "md5",
+    "sha1",
+    "sha256",
+    "asn",
+    "cidr",
+}
+
+
+def test_intel_store_calls_match_the_store_schema():
+    loaded = harness.load_eval_file(EVAL)
+    for case in loaded.cases:
+        assert case.offline is not None
+        for call in case.offline.tool_calls:
+            args = set(call.arguments)
+            if call.name == "intel_search":
+                assert "query" in args and args <= INTEL_SEARCH_ARGS, (case.id, args)
+            if call.name == "intel_add_observation":
+                assert {"type", "value"} <= args <= INTEL_ADD_ARGS, (case.id, args)
+                assert call.arguments["type"] in INDICATOR_TYPES, case.id
+
+
+def test_victim_host_is_not_written_to_the_intel_store():
+    loaded = harness.load_eval_file(EVAL)
+    case = next(item for item in loaded.cases if item.id == "soci-water-ransomware")
+    assert case.offline is not None
+    names = [call.name for call in case.offline.tool_calls]
+    assert "intel_add_observation" not in names
+    assert "intel_add_observation" not in case.expect_tools

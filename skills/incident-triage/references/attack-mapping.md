@@ -6,7 +6,7 @@ Use `mcp__attack__attack_technique` when it is available and cite that envelope,
 |---|---|---|
 | A person clicked a phishing link | T1566.002 | Spearphishing Link |
 | A later sign-in to a cloud account is confirmed | T1078.004 | Valid Accounts: Cloud Accounts |
-| A beacon over HTTP or HTTPS | T1071.001 | Application Layer Protocol: Web |
+| A beacon over HTTP or HTTPS | T1071.001 | Application Layer Protocol: Web Protocols |
 | The alert names Cobalt Strike | S0154 | Cobalt Strike |
 | A ransom note, or files confirmed encrypted | T1486 | Data Encrypted for Impact |
 | An inbound network scan | T1595 | Active Scanning |
