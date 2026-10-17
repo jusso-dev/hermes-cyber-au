@@ -11,3 +11,5 @@
 The upstream tree is not vendored. GitHub reports no licence for `MISP/misp-mcp` at that commit (there is no `LICENSE` file). `pyproject.toml` names AGPL-3.0-or-later, which is not a file we can rely on, and AGPL code does not belong in this Apache-2.0 repository. This package keeps the pinned read-only tool list and calls the instance REST API.
 
 Included tools, frozen from that commit: `search_attributes`, `get_event`, `search_events`. Write tools are excluded. AusCERT members point `MISP_URL` at AusMISP.
+
+Live health reports ok only when the answer came from the instance. A cached copy, a failed fetch or a missing key is not ok.

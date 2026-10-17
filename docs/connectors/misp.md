@@ -18,6 +18,12 @@ Doctor lists this connector as off by default: licence terms. Read this page bef
 
 Free text from the instance is wrapped as untrusted data. It is not an instruction.
 
+## TLP and sharing groups
+
+Every event and attribute carries `tlp` (the strictest TLP tag on the object, event tags included), `distribution` and `sharing_group`. An unrecognised TLP value counts as the strictest. When any returned record is TLP:AMBER or above, or limited to an organisation or sharing group, the envelope adds a warning to keep it inside the profile.
+
+Such records are written to the local intel store only when `CYBERAU_DATA_DIR` is set (the profile bootstrap sets it to the profile's `plugin-data/cyber-au`). Files are created owner-only. The HTTP cache is keyed per API key, so a different key never reads another key's answers.
+
 Write tools are not included. The list above is frozen from `MISP/misp-mcp` at `3d033828a78b6b3cb2292b255c8d2ad093c1bee5`.
 
 ## Turn it on

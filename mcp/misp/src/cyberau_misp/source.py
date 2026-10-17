@@ -4,6 +4,7 @@ The official MISP MCP server is pinned, not vendored. GitHub reports no licence
 file for MISP/misp-mcp at the pinned commit.
 """
 
+import hashlib
 import ipaddress
 import json
 import os
@@ -44,6 +45,17 @@ _EVENT_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 _Limit = Annotated[int, Field(ge=1, le=100)]
 _Days = Annotated[int, Field(ge=1, le=90)]
 _EventId = Annotated[str, Field(pattern=r"^[A-Za-z0-9-]{1,64}$")]
+_TLP_RANK = {
+    "clear": 0,
+    "white": 0,
+    "green": 1,
+    "amber": 2,
+    "amber+strict": 3,
+    "red": 4,
+    "ex:chr": 4,
+}
+_RESTRICTED_RANK = 2
+_LIMITED_DISTRIBUTION = {"0", "4"}
 _TRANSPORT = None
 _RESOLVER = None
 _SLEEPER = None
@@ -72,7 +84,7 @@ def search_attributes(
     rows = rows[:limit]
     if cache != "snapshot":
         _persist(rows)
-    warnings = ("no matching MISP records",) if not rows else ()
+    warnings = ("no matching MISP records",) if not rows else _handling(rows)
     return _envelope(rows, cache, urls=urls, warnings=warnings)
 
 
@@ -93,7 +105,7 @@ def get_event(event_id: _EventId) -> dict:
     event = chosen[0]
     if cache != "snapshot":
         _persist([event])
-    return _envelope(event, cache, urls=urls, as_of=_as_of([event]))
+    return _envelope(event, cache, urls=urls, as_of=_as_of([event]), warnings=_handling([event]))
 
 
 def search_events(days: _Days = 7, limit: _Limit = 20, published_only: bool = True) -> dict:
@@ -116,7 +128,7 @@ def search_events(days: _Days = 7, limit: _Limit = 20, published_only: bool = Tr
     events = events[:limit]
     if cache != "snapshot":
         _persist(events)
-    warnings = ("no matching MISP records",) if not events else ()
+    warnings = ("no matching MISP records",) if not events else _handling(events)
     return _envelope(events, cache, urls=urls, as_of=_as_of(events), warnings=warnings)
 
 
@@ -204,9 +216,12 @@ class _MispConnector(Connector):
             ("/attributes/restSearch", _attribute_body(None, None, None, 1), "search_attributes"),
         )
         for path, body, kind in probes:
-            payload, _cache, warning = _fetch(path, body, force_live=True)
+            payload, cache, warning = _fetch(path, body, force_live=True)
             if warning:
                 return Probe(self.key, False, warning)
+            if cache != "miss":
+                detail = f"MISP answer was served from cache ({cache}), not live"
+                return Probe(self.key, False, detail)
             if payload is None:
                 return Probe(self.key, False, "MISP payload was not usable")
             problem = schema_drift(payload)
@@ -329,6 +344,7 @@ def _live(path: str, body: dict, *, offline: bool) -> tuple[dict | None, str, st
             body,
             headers={"Authorization": secret, "Accept": "application/json"},
             ttl=TTL,
+            cache_key_extra=_key_scope(secret),
         )
     except (HttpError, EgressDenied, TimeoutError, OSError) as exc:
         return None, "snapshot", _clean(exc, secret)
@@ -472,7 +488,9 @@ def _normalise_event(raw: dict) -> dict:
         "timestamp": str(raw.get("timestamp") or ""),
         "published": _published(raw.get("published")),
         "org": _text(org),
-        "tlp": _tlp(tags),
+        "tlp": _most_restrictive([_tlp(tags), *(item["tlp"] for item in attributes)]),
+        "distribution": str(raw.get("distribution") or ""),
+        "sharing_group": _sharing_group(raw),
         "tags": [_text(tag) for tag in tags],
         "attributes": attributes,
         "galaxies": _galaxies(raw),
@@ -488,6 +506,9 @@ def _normalise_attribute(raw: dict, event_id: str) -> dict:
         "value": _text(raw.get("value")),
         "comment": _text(raw.get("comment")),
         "to_ids": _published(raw.get("to_ids")),
+        "tlp": _tlp(_tag_names(raw)),
+        "distribution": str(raw.get("distribution") or ""),
+        "sharing_group": _sharing_group(raw),
     }
 
 
@@ -529,13 +550,43 @@ def _tag_names(raw: dict) -> list[str]:
 
 
 def _tlp(tags: list[str]) -> str | None:
+    markings = []
     for tag in tags:
         lower = tag.lower()
-        if "tlp:" not in lower:
-            continue
-        marking = lower.split("tlp:", 1)[1].strip()
-        return marking or None
-    return None
+        if "tlp:" in lower:
+            markings.append(lower.split("tlp:", 1)[1].strip().strip("\"'"))
+    return _most_restrictive(markings)
+
+
+def _most_restrictive(markings: list[str | None]) -> str | None:
+    """The strictest TLP marking. An unknown marking outranks every known one."""
+    found = [item for item in markings if item]
+    if not found:
+        return None
+    return max(found, key=lambda item: _TLP_RANK.get(item, max(_TLP_RANK.values()) + 1))
+
+
+def _restricted(record: dict) -> bool:
+    marking = record.get("tlp")
+    if marking and _TLP_RANK.get(marking, _RESTRICTED_RANK) >= _RESTRICTED_RANK:
+        return True
+    return str(record.get("distribution") or "") in _LIMITED_DISTRIBUTION
+
+
+def _sharing_group(raw: dict) -> str:
+    group = raw.get("SharingGroup")
+    if isinstance(group, dict) and group.get("name"):
+        return _text(group["name"])
+    return ""
+
+
+def _handling(records: list[dict]) -> tuple[str, ...]:
+    if not any(_restricted(item) for item in records):
+        return ()
+    return (
+        "Some records are TLP:AMBER or above, or limited to an organisation or sharing group. "
+        "Keep them inside this profile and do not pass them outside the marking.",
+    )
 
 
 def _published(value) -> bool:
@@ -554,7 +605,12 @@ def _text(value) -> str:
 
 
 def _attribute_body(value, attribute_type, category, limit: int) -> dict:
-    body: dict = {"returnFormat": "json", "limit": limit, "includeEventUuid": 1}
+    body: dict = {
+        "returnFormat": "json",
+        "limit": limit,
+        "includeEventUuid": 1,
+        "includeEventTags": 1,
+    }
     if value:
         body["value"] = value
     if attribute_type:
@@ -630,7 +686,11 @@ def _check_response(kind: str, records: list[dict]) -> str | None:
 
 
 def _parse_base(raw: str) -> tuple[str | None, str]:
-    parts = urlsplit(raw.strip())
+    try:
+        parts = urlsplit(raw.strip())
+        port = parts.port
+    except ValueError:
+        return None, "MISP_URL is not a valid URL."
     if parts.username or parts.password:
         return None, "MISP_URL must not contain userinfo."
     if parts.scheme.lower() != "https" or not parts.hostname:
@@ -644,14 +704,14 @@ def _parse_base(raw: str) -> tuple[str | None, str]:
         literal = True
     if literal or not _HOST.fullmatch(host) or ".." in host:
         return None, "MISP_URL must be a hostname. IP literals are not allowed."
-    port = f":{parts.port}" if parts.port else ""
+    port = f":{port}" if port else ""
     path = parts.path.rstrip("/")
     return f"https://{host}{port}{path}", ""
 
 
 def _runtime_allowlist(host: str) -> Path:
     directory = _data_dir()
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / "misp-egress.yaml"
     hosts: list[str] = []
     for item in [*_static_hosts(), host]:
@@ -696,13 +756,21 @@ def _as_of(events: list[dict]) -> str | None:
     return datetime.fromtimestamp(int(newest), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _key_scope(secret: str) -> str:
+    """Cache scope for one API key, so a different key never reads another key's answers."""
+    return "key:" + hashlib.sha256(secret.encode()).hexdigest()
+
+
 def _persist(records: list[dict]) -> None:
+    if "CYBERAU_DATA_DIR" not in os.environ:
+        records = [item for item in records if not _restricted(item)]
     if not records:
         return
     directory = _data_dir()
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / "misp-events.jsonl"
-    with path.open("a", encoding="utf-8") as handle:
+    descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
         for record in records:
             handle.write(json.dumps(record, sort_keys=True) + "\n")
 

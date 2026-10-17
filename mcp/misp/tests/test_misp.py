@@ -339,6 +339,92 @@ def test_bidi_text_is_stripped(tmp_path, monkeypatch):
     assert "<<untrusted source=misp>>" in event["data"]["info"]
 
 
+def test_tlp_and_sharing_group_are_surfaced(tmp_path, monkeypatch):
+    payload = json.loads((FIXTURES / "event_three_attributes.json").read_text(encoding="utf-8"))
+    event = payload["response"][0]["Event"]
+    event["Tag"] = [{"name": "tlp:white"}, {"name": "TLP:RED"}]
+    event["distribution"] = "4"
+    event["SharingGroup"] = {"name": "Example group"}
+    event["Attribute"][0]["Tag"] = [{"name": "tlp:amber+strict"}]
+    path = tmp_path / "restricted.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_MISP_SNAPSHOT", str(path))
+    found = get_event("example")
+    assert found["data"]["tlp"] == "red"
+    assert found["data"]["distribution"] == "4"
+    assert "Example group" in found["data"]["sharing_group"]
+    assert found["data"]["attributes"][0]["tlp"] == "amber+strict"
+    assert any("TLP:AMBER" in item for item in found["warnings"])
+    rows = search_attributes(value="203.0.113.10")["data"]
+    assert rows[0]["tlp"] == "amber+strict"
+    event["Tag"] = [{"name": "tlp:made-up"}, {"name": "tlp:green"}]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert get_event("example")["data"]["tlp"] == "made-up"
+    event["Tag"] = [{"name": "tlp:green"}]
+    event["distribution"] = "3"
+    del event["Attribute"][0]["Tag"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    calm = get_event("example")
+    assert calm["data"]["tlp"] == "green"
+    assert calm["warnings"] == []
+
+
+def test_restricted_records_stay_in_the_profile_data_dir(tmp_path, monkeypatch):
+    _arm(monkeypatch, tmp_path / "profile")
+    body = (FIXTURES / "event_three_attributes.json").read_bytes()
+    source._TRANSPORT = httpx.MockTransport(lambda _r: httpx.Response(200, content=body))
+    try:
+        get_event("example")
+    finally:
+        source._TRANSPORT = None
+    stored = tmp_path / "profile" / "misp-events.jsonl"
+    assert "amber" in stored.read_text(encoding="utf-8")
+    assert stored.stat().st_mode & 0o077 == 0
+    monkeypatch.delenv("CYBERAU_DATA_DIR")
+    monkeypatch.setattr(source, "_data_dir", lambda: tmp_path / "fallback")
+    source._persist([{"id": "x", "tlp": "amber"}, {"id": "y", "tlp": "white"}])
+    kept = (tmp_path / "fallback" / "misp-events.jsonl").read_text(encoding="utf-8")
+    assert '"y"' in kept
+    assert '"x"' not in kept
+
+
+def test_health_is_not_ok_from_a_cached_copy_and_cache_is_per_key(tmp_path, monkeypatch):
+    _arm(monkeypatch, tmp_path)
+    body = (FIXTURES / "event_three_attributes.json").read_bytes()
+    calls = {"n": 0}
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, content=body)
+
+    source._TRANSPORT = httpx.MockTransport(handler)
+    source._SLEEPER = lambda _delay: None
+    try:
+        source._fetch("/events/restSearch", source._recent_body(1, 7, True))
+        assert calls["n"] == 1
+        cached = connector().health(live=True)
+        assert cached.ok is False
+        assert "served from cache (hit)" in cached.detail
+        monkeypatch.setenv("MISP_API_KEY", "another-key")
+        before = calls["n"]
+        _payload, state, _warning = source._fetch(
+            "/events/restSearch", source._recent_body(1, 7, True)
+        )
+        assert state == "miss"
+        assert calls["n"] == before + 1
+    finally:
+        source._TRANSPORT = None
+        source._SLEEPER = None
+
+
+def test_bad_port_is_a_warning_not_an_exception(tmp_path, monkeypatch):
+    _arm(monkeypatch, tmp_path)
+    for url in ("https://example.com:abc", "https://example.com:99999", "https://[example"):
+        monkeypatch.setenv("MISP_URL", url)
+        assert search_events()["warnings"]
+        assert connector().health(live=True).ok is False
+
+
 def _arm(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
     monkeypatch.delenv("CYBERAU_MISP_SNAPSHOT", raising=False)

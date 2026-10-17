@@ -8,6 +8,9 @@
     "category": {"type": "string"},
     "value": {"type": "string"},
     "comment": {"type": "string"},
-    "to_ids": {"type": "boolean"}
+    "to_ids": {"type": "boolean"},
+    "tlp": {"type": ["string", "null"]},
+    "distribution": {"type": "string"},
+    "sharing_group": {"type": "string"}
   }
 }
