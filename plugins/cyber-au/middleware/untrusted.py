@@ -55,14 +55,17 @@ _FEED_TOOL = re.compile(r"^mcp__([A-Za-z0-9_-]+)__")
 _SERVER_KEY = re.compile(r"^  ([A-Za-z0-9_-]+):\s*$")
 
 _INVISIBLE = re.compile(
-    "[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]"
+    "[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u00ad\u061c\u180b-\u180f\u200b-\u200f"
+    "\u202a-\u202e\u2060-\u2069\ufeff\U000e0000-\U000e007f]"
 )
+_TAG_CHARS = re.compile("[\U000e0020-\U000e007e]+")
+_WS = re.compile(r"\s+")
 _OVERRIDE = re.compile(
     "|".join(
         (
-            r"ignore (?:all |any |the )?(?:previous|prior|above|earlier) "
+            r"ignore (?:(?:all|any|the|your|these|those) )*(?:previous|prior|above|earlier) "
             r"(?:instructions|guidance|rules|prompts|directions)",
-            r"disregard (?:all |any |the )?(?:previous|prior|above|earlier)",
+            r"disregard (?:(?:all|any|the|your|these|those) )*(?:previous|prior|above|earlier)",
             r"forget (?:all |your )?(?:previous |prior )?(?:instructions|rules|guidance)",
             r"do not (?:follow|obey) (?:your |the )?(?:previous|prior|original)",
             r"(?:new|updated) (?:system )?(?:instructions|directive)",
@@ -138,8 +141,15 @@ _WEB_NAMES = {
 }
 _NET = re.compile(
     r"(https?://|\bcurl\b|\bwget\b|\bnc\b|\bncat\b|\bssh\b|\bscp\b|"
-    r"\bsocket\b|\burllib\b|\brequests\b|\bhttpx\b|\bnslookup\b|\bdig\b|\bping\b|\bnmap\b)",
+    r"\bsocket\b|\burllib\b|\brequests\b|\bhttpx\b|\bnslookup\b|\bdig\b|\bping\b|\bnmap\b|"
+    r"\bgit\s+(?:clone|push|pull|fetch|remote|submodule)\b|\brsync\b|\bsftp\b|\bftp\b|"
+    r"\btelnet\b|\bsocat\b|\bopenssl\s+s_client\b|/dev/(?:tcp|udp)/|\baiohttp\b|"
+    r"\bhttp\.client\b|\bsmtplib\b|\bftplib\b|"
+    r"\b(?:pip3?|npm|pnpm|yarn|gem|cargo|apt(?:-get)?|brew)\s+(?:install|add|get|update)\b)",
     re.IGNORECASE,
+)
+_NEGATION = re.compile(
+    r"\b(?:not|no|never|don't|dont|cannot|can't|cant|without|unless|if|but|except|stop|cancel)\b"
 )
 _ALLOWED_ACTIONS = re.compile(r"allowed actions\s*:", re.IGNORECASE)
 _APPROVALS = {
@@ -345,11 +355,16 @@ def _state(session_id: str, turn_id: str) -> _TurnState:
 
 
 def _normalise(text: str) -> str:
-    cleaned = _INVISIBLE.sub("", text or "")
-    return html.unescape(cleaned)
+    raw = text or ""
+    # Tag characters carry hidden ASCII. Read it as text before the characters are stripped.
+    smuggled = "".join(chr(ord(ch) - 0xE0000) for match in _TAG_CHARS.findall(raw) for ch in match)
+    cleaned = _INVISIBLE.sub("", raw)
+    if smuggled:
+        cleaned = f"{cleaned} {smuggled}"
+    return _WS.sub(" ", html.unescape(cleaned))
 
 
-def _hits(text: str) -> bool:
+def _hits(text: str, *, url_send: bool = True) -> bool:
     folded = text.casefold()
     if _OVERRIDE.search(folded):
         return True
@@ -357,7 +372,7 @@ def _hits(text: str) -> bool:
         return True
     if _SECRET.search(folded):
         return True
-    if _URL.search(text) and _SEND_WORD.search(folded):
+    if url_send and _URL.search(text) and _SEND_WORD.search(folded):
         return True
     if _MCP_TOOL.search(folded) or _TOOL_CALL.search(folded):
         return True
@@ -380,12 +395,25 @@ def _decoded_blobs(text: str) -> list[str]:
 
 
 def _hostile(result: object) -> bool:
-    """Scan structured text as the model will read it, not only the JSON encoding."""
-    if isinstance(result, (dict, list)):
-        joined = "\n".join(_strings(result))
-        if joined and detect_possible_injection(joined):
-            return True
-    return detect_possible_injection(_as_text(result))
+    """Scan the free text of a result as the model will read it.
+
+    Envelope metadata such as source URLs is not feed text. The URL plus send rule
+    runs per string, so "send a crafted request" is not flagged only because the
+    envelope also lists a source URL.
+    """
+    payload = _payload_dict(result)
+    body: object = result
+    if payload is not None:
+        body = payload.get("data") if "data" in payload else payload
+    if not isinstance(body, (dict, list)):
+        return detect_possible_injection(body if isinstance(body, str) else _as_text(body))
+    strings = _strings(body)
+    if any(detect_possible_injection(item) for item in strings):
+        return True
+    joined = _normalise("\n".join(strings))
+    return _hits(joined, url_send=False) or any(
+        _hits(_normalise(blob), url_send=False) for blob in _decoded_blobs(joined)
+    )
 
 
 def _strings(value: object) -> list[str]:
@@ -564,8 +592,10 @@ def _outbound(tool_name: str, args: object, session_id: str, turn_id: str) -> bo
 
 
 def _message_approves(message: str) -> bool:
-    text = " ".join(message.split()).casefold()
+    text = " ".join(message.split()).casefold().replace("’", "'").rstrip(".!")
     if not text or len(text) > 160:
+        return False
+    if _NEGATION.search(text):
         return False
     if "<<untrusted" in text or _WARNING in text:
         return False
