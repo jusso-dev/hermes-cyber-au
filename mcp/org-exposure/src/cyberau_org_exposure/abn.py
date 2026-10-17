@@ -24,7 +24,7 @@ from cyberau_common.secrets import lookup, redact
 WEIGHTS = (10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19)
 
 ABN_LOOKUP_URL = "https://abr.business.gov.au/json/AbnDetails.aspx"
-_DIGITS = re.compile(r"^\d{11}$")
+_DIGITS = re.compile(r"[0-9]{11}")
 _GUID_QUERY = re.compile(r"(?i)(guid=)[^&\s]+")
 
 
@@ -190,11 +190,20 @@ def _strip_guid(text: str, guid: str) -> str:
 
 
 def data_dir() -> Path:
-    """Profile data directory. Tests point CYBERAU_DATA_DIR at a temporary directory."""
+    """Profile data directory. Routine state, the ledger and the audit log live here, so it
+    must be the same on every run. Tests point CYBERAU_DATA_DIR at a temporary directory."""
     raw = os.environ.get("CYBERAU_DATA_DIR")
     if raw:
         return Path(raw)
-    return Path(os.environ.get("TMPDIR", "/tmp")) / f"cyberau-org-exposure-{os.getpid()}"
+    return profile_home() / "plugin-data" / "cyber-au"
+
+
+def profile_home() -> Path:
+    """Hermes profile directory: HERMES_HOME, otherwise ~/.hermes."""
+    raw = os.environ.get("HERMES_HOME")
+    if raw:
+        return Path(raw)
+    return Path.home() / ".hermes"
 
 
 def _default_allowlist() -> Path:

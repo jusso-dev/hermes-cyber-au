@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import ipaddress
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +14,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 import yaml
-from cyberau_org_exposure.abn import checksum_ok, lookup_names
+from cyberau_org_exposure.abn import checksum_ok, data_dir, lookup_names, normalise_abn
 from cyberau_org_exposure.cli import main
 from cyberau_org_exposure.findings import stored_values
 from cyberau_org_exposure.service import (
@@ -27,7 +28,7 @@ from cyberau_org_exposure.service import (
     verify_audit,
 )
 from cyberau_org_exposure.tool import SCHEMA, handle
-from cyberau_org_exposure.watchlist import WatchlistError, load_profile
+from cyberau_org_exposure.watchlist import WatchlistError, default_watchlist_path, load_profile
 
 ROOT = Path(__file__).resolve().parents[3]
 EVALS = ROOT / "tests" / "skills" / "au-org-exposure" / "evals.yaml"
@@ -67,6 +68,8 @@ def env(tmp_path, monkeypatch):
     clear_registry()
     yield tmp_path
     clear_registry()
+    # _use() sets this directly, so it would leak into the next test.
+    os.environ.pop("CYBERAU_ORG_WATCHLIST", None)
 
 
 def test_checksum_accepts_only_a_generated_number():
@@ -489,6 +492,87 @@ def _eval_third_party(env, monkeypatch, required):
     assert "Nothing was sent" in result["data"]["message"]
     assert required["discloses_vendor"] is True
     assert stored_values() == []
+
+
+def test_checksum_rejects_non_ascii_digits():
+    number = _first_valid_abn()
+    arabic = "".join(chr(0x0660 + int(char)) for char in number)
+    fullwidth = "".join(chr(0xFF10 + int(char)) for char in number)
+    assert not checksum_ok(arabic)
+    assert not checksum_ok(fullwidth)
+    assert normalise_abn(arabic) == ""
+
+
+def test_a_mail_domain_may_repeat_a_web_domain(env):
+    _write(env / "org.yaml", domains=[DOMAIN], email_domains=[DOMAIN])
+    profile = load_profile(env / "org.yaml")
+    assert profile.domains == (DOMAIN,)
+    assert profile.email_domains == (DOMAIN,)
+    _write(env / "dup.yaml", email_domains=[DOMAIN, DOMAIN])
+    with pytest.raises(WatchlistError) as caught:
+        load_profile(env / "dup.yaml")
+    assert caught.value.code == "duplicate_domain"
+    _write(
+        env / "sub.yaml",
+        subsidiaries=[{"name": "Fixture Services", "domains": [DOMAIN]}],
+    )
+    with pytest.raises(WatchlistError) as caught:
+        load_profile(env / "sub.yaml")
+    assert caught.value.code == "duplicate_domain"
+
+
+def test_state_directory_is_stable_across_processes(monkeypatch, tmp_path):
+    monkeypatch.delenv("CYBERAU_DATA_DIR", raising=False)
+    monkeypatch.delenv("CYBERAU_ORG_WATCHLIST", raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    assert data_dir() == tmp_path / "plugin-data" / "cyber-au"
+    assert default_watchlist_path() == tmp_path / "watchlists" / "org-exposure.yaml"
+    monkeypatch.delenv("HERMES_HOME")
+    monkeypatch.setattr(os, "getpid", lambda: 1)
+    first = data_dir()
+    monkeypatch.setattr(os, "getpid", lambda: 2)
+    assert data_dir() == first
+
+
+def test_a_finding_under_an_abn_registered_name_is_kept(env):
+    number = _first_valid_abn()
+    _write(env / "org.yaml", abns=[number], domains=[], brands=["Harbour"], exclude=["Skip Me"])
+    _use(env / "org.yaml")
+    row = _finding("data_leak_disclosure", "brand", "REGISTERED FIXTURE PTY LTD")
+    lookalike = _finding("data_leak_disclosure", "brand", "Skip Me", source_ref="fixture-2")
+    register_premium_connector(Source("fixture", [row, lookalike]))
+    result = run_tool({}, lookup_fn=lambda _abn: ["Registered Fixture Pty Ltd", "Skip Me"], now=NOW)
+    groups = result["data"]["groups"]
+    assert [group["subject"]["value"] for group in groups] == ["Registered Fixture Pty Ltd"]
+    assert result["data"]["dropped_outside_watchlist"] == 1
+    assert stored_values() == ["Registered Fixture Pty Ltd"]
+
+
+def test_the_window_does_not_move_past_a_skipped_or_failed_vendor(env):
+    _write(env / "org.yaml")
+    _use(env / "org.yaml")
+    state = env / "routine_state" / "premium-exposure-watch.json"
+
+    class Broken(Source):
+        def exposure_for(self, watchlist, since):
+            raise RuntimeError("down")
+
+    register_premium_connector(Broken("broken", []))
+    result = run_exposure_watch(now=NOW)
+    assert result["query"]["data"]["incomplete"] == ["broken"]
+    assert json.loads(state.read_text(encoding="utf-8"))["last_run"] is None
+    clear_registry()
+    register_premium_connector(Source("fixture", [], quota=Quota(calls_per_day=1)))
+    run_exposure_watch(now=NOW)
+    assert json.loads(state.read_text(encoding="utf-8"))["last_run"] is None
+    clear_registry()
+    register_premium_connector(Source("fixture", []))
+    run_exposure_watch(now=NOW)
+    assert json.loads(state.read_text(encoding="utf-8"))["last_run"] == "2026-10-17"
+    _use(env / "missing.yaml")
+    later = datetime(2026, 10, 18, 9, tzinfo=ZoneInfo("Australia/Sydney"))
+    run_exposure_watch(now=later)
+    assert json.loads(state.read_text(encoding="utf-8"))["last_run"] == "2026-10-17"
 
 
 def _run_case(env, monkeypatch, profile, rows):

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from cyberau_org_exposure.abn import checksum_ok, normalise_abn
+from cyberau_org_exposure.abn import checksum_ok, normalise_abn, profile_home
 
 CONFIDENCE = ("vendor_confirmed", "vendor_reported", "unverified_claim")
 ALERT_KINDS = (
@@ -80,6 +80,9 @@ class OrgProfile:
     min_confidence: str
     alert_kinds: tuple[str, ...]
     warnings: tuple[str, ...] = ()
+    # Registered and business names from ABN Lookup. Vendors are searched by them, so a
+    # finding returned under one of them is a finding about this organisation.
+    abn_names: tuple[str, ...] = ()
 
     def vendor_watchlist(self, names: tuple[str, ...] | list[str]) -> Watchlist:
         """Names plus this profile's brands. Excludes and raw ABNs stay local."""
@@ -132,6 +135,7 @@ class OrgProfile:
             min_confidence=self.min_confidence,
             alert_kinds=self.alert_kinds,
             warnings=self.warnings,
+            abn_names=self.abn_names,
         )
 
     def contains(self, subject: str) -> bool:
@@ -156,7 +160,7 @@ class OrgProfile:
             digits = normalise_abn(value)
             return bool(digits and digits in self.abns)
         if subject_type == "brand":
-            return _name_hit(value, (*self.brands, *self.subsidiary_names)) != ""
+            return _name_hit(value, self._all_names()) != ""
         return False
 
     def canonical(self, subject_type: str, value: str) -> str:
@@ -164,7 +168,7 @@ class OrgProfile:
             return _norm_domain(value)
         if subject_type == "abn":
             return normalise_abn(value)
-        hit = _name_hit(value, (*self.brands, *self.subsidiary_names))
+        hit = _name_hit(value, self._all_names())
         return hit or _norm_name(value)
 
     def entry_id(self, subject_type: str, value: str) -> str:
@@ -195,6 +199,9 @@ class OrgProfile:
             found.add(self.entry_id("abn", abn))
         return found
 
+    def _all_names(self) -> tuple[str, ...]:
+        return tuple(_unique((*self.brands, *self.subsidiary_names, *self.abn_names)))
+
     def _all_domains(self) -> tuple[str, ...]:
         return tuple(_unique((*self.domains, *self.email_domains, *self.subsidiary_domains)))
 
@@ -212,12 +219,7 @@ def default_watchlist_path() -> Path:
     override = os.environ.get("CYBERAU_ORG_WATCHLIST")
     if override:
         return Path(override)
-    home = os.environ.get("HERMES_HOME")
-    if home:
-        return Path(home) / "watchlists" / "org-exposure.yaml"
-    from cyberau_org_exposure.abn import data_dir
-
-    return data_dir() / "watchlists" / "org-exposure.yaml"
+    return profile_home() / "watchlists" / "org-exposure.yaml"
 
 
 def load_profile(path: Path, *, routine_path: Path | None = None) -> OrgProfile:
@@ -235,7 +237,9 @@ def load_profile(path: Path, *, routine_path: Path | None = None) -> OrgProfile:
     brands = _names(data.get("brands", []), "brands")
     subsidiary_names, subsidiary_domains = _subsidiaries(data.get("subsidiaries", []))
     exclude = _names(data.get("exclude", []), "exclude")
-    _reject_duplicates((*domains, *email_domains, *subsidiary_domains))
+    # A mail domain may repeat a web domain: they are different entries.
+    _reject_duplicates((*domains, *subsidiary_domains))
+    _reject_duplicates(email_domains)
     min_confidence, kinds = _alert(data.get("alert"))
     searchable = any((abns, domains, email_domains, brands, subsidiary_names, subsidiary_domains))
     if not organisation or not searchable:

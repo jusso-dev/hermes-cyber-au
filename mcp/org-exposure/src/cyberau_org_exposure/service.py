@@ -7,7 +7,7 @@ import json
 import math
 import re
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -107,6 +107,7 @@ def run_tool(
         kinds = list(profile.alert_kinds)
     since = arguments.get("since")
     names, name_warnings = expand_abns(profile.abns, lookup_fn=lookup_fn)
+    profile = replace(profile, abn_names=tuple(names))
     watchlist = profile.vendor_watchlist(names)
     vendors = arguments.get("vendors")
     wanted = set(vendors) if isinstance(vendors, list) else None
@@ -115,6 +116,12 @@ def run_tool(
     actors: dict[str, str] = {}
     dropped = 0
     queried: list[str] = []
+    # Vendors that were skipped or failed. The routine does not move its window past them.
+    incomplete = (
+        ["abn_lookup"]
+        if any(not text.startswith("ABN Lookup is not configured") for text in name_warnings)
+        else []
+    )
     calls = 0
     cost_units = 0.0
     since_date = date.fromisoformat(since) if isinstance(since, str) else None
@@ -129,6 +136,7 @@ def run_tool(
         allowed, limit = _allow(vendor, quota, routine=routine, now=now)
         if not allowed:
             warnings.append(f"{vendor} skipped: {limit}")
+            incomplete.append(vendor)
             continue
         try:
             rows = source.exposure_for(watchlist, since_date) or []
@@ -138,6 +146,7 @@ def run_tool(
             cost_units += quota.cost_units_per_call
             queried.append(vendor)
             warnings.append(f"{vendor} failed")
+            incomplete.append(vendor)
             continue
         _record_call(vendor, quota, now=now)
         calls += 1
@@ -148,6 +157,8 @@ def run_tool(
     if not wanted or "ransomlive" in wanted:
         ransom_rows, ransom_warnings = _ransom(watchlist, since_date, now=now)
         warnings.extend(ransom_warnings)
+        if any(text.endswith("failed") for text in ransom_warnings):
+            incomplete.append("ransomlive")
         if _RANSOM:
             queried.append("ransomlive")
             calls += 1
@@ -161,6 +172,7 @@ def run_tool(
         "groups": groups,
         "dropped_outside_watchlist": dropped,
         "vendors_queried": queried,
+        "incomplete": incomplete,
         "calls": calls,
         "cost_units": _number(cost_units),
         "sent": True,
@@ -202,7 +214,11 @@ def run_exposure_watch(*, since: str | None = None, lookup_fn=None, now=None) ->
     state["alerted"] = sorted(
         set(state.get("alerted") or []) | {item["finding_id"] for item in fresh}
     )
-    state["last_run"] = _sydney(now).date().isoformat()
+    # Move the window only after a complete run. A skipped or failed vendor, a bad watchlist
+    # or an unsent query would otherwise lose findings that arrive in the gap.
+    data = result.get("data") or {}
+    if data.get("sent") is True and not data.get("incomplete"):
+        state["last_run"] = _sydney(now).date().isoformat()
     _save_state(state)
     return {
         "quiet": quiet,

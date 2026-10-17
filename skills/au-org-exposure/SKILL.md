@@ -40,7 +40,7 @@ Do not use this skill to investigate an organisation that is not on the watchlis
 4. If any finding about the user's own organisation includes personal information, add the Notifiable Data Breaches note and offer the `ndb-breach-notification` skill. It drafts. A person decides whether to notify.
 5. Never print secrets, passwords, cookies, tokens or `ABR_GUID`. Never suggest contacting the victim, a regulator or a vendor automatically.
 
-The routine passes `since` as the date of the last successful run, writes an audit record (vendors queried, calls, cost units, new findings count), and alerts only on new finding ids at or above `alert.min_confidence` and in `alert.kinds`. Delivery goes to the owner's configured target only (`delivery.yaml` `owner` in the data directory, otherwise `origin`). If nothing new qualifies, the result is quiet: reply with the single word NOTHING and do not send a briefing.
+The routine passes `since` as the date of the last complete run. A run where a vendor was skipped or failed, or the watchlist could not be used, does not move that date. It writes an audit record (vendors queried, calls, cost units, new findings count), and alerts only on new finding ids at or above `alert.min_confidence` and in `alert.kinds`. Delivery goes to the owner's configured target only (`delivery.yaml` `owner` in the data directory, otherwise `origin`). If nothing new qualifies, the result is quiet: reply with the single word NOTHING and do not send a briefing.
 
 `cyber_au_org_exposure` input:
 

@@ -29,6 +29,7 @@ plans/
 workspace/
 home/
 plugin-data/
+watchlists/
 
 # Caches and generated artefacts
 image_cache/
