@@ -18,6 +18,10 @@ Before the first Recorded Future call in a session, state these terms: commercia
 
 Set `RECORDED_FUTURE_API_TOKEN` in the profile `.env`. Optional: `RECORDED_FUTURE_ORG_ID`, `RECORDED_FUTURE_MCP_CLIENT_ID`, `RECORDED_FUTURE_MCP_CLIENT_SECRET`. A present key does not enable the server. Bootstrap and profile update leave `enabled: false` until you turn it on.
 
+The connector also checks `mcp_servers.recordedfuture.enabled` in the profile `config.yaml` before every upstream call, and counts each call against your quota. If that file is missing or `enabled` is not `true`, every call is refused. Domain inputs must be on the org-exposure watchlist. With no watchlist they are refused unless `CYBERAU_RF_ALLOW_EXTERNAL=1`.
+
+`cyberau-mcp health recorded-future --live` fails when the token is missing, when a call fails, or when the answer came from a cached or snapshot copy.
+
 The optional official MCP entry `recordedfuture_mcp` points at `https://mcp.recordedfuture.com/mcp` with `auth: oauth`, `trust: untrusted` and `enabled: false`. Its `tools.include` list is frozen to read tools. Anything that updates alerts or creates takedowns is excluded.
 
 Suppliers listed under `suppliers` in the org-exposure watchlist are read for `third_party_risk` alerts only. They are not treated as your own organisation.

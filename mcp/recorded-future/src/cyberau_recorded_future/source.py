@@ -31,6 +31,7 @@ from cyberau_premium.base import (
 from cyberau_premium.caching import cache_for_terms
 from cyberau_premium.catalog import get_vendor
 from cyberau_premium.guard import pre_tool_call
+from cyberau_premium.redact import redact_obj, redact_text
 from cyberau_premium.store import ExposureStore
 
 API = "https://api.recordedfuture.com"
@@ -103,6 +104,9 @@ _ROUTINE = False
 _CACHE = None
 _CACHE_PATH: Path | None = None
 _RISK_SEEN_NAME = "risklist-seen.json"
+_HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
+_ETAG = re.compile(r'(?:W/)?"[A-Za-z0-9._:+/=-]{1,128}"')
+_PLAIN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:\-]{0,63}")
 
 
 class _BudgetStop(Exception):
@@ -187,17 +191,31 @@ def _missing_token():
     )
 
 
+def _config() -> dict | None:
+    """Profile config.yaml, found from CYBERAU_DATA_DIR. No file means no `enabled: true`."""
+    if _CONFIG is not None:
+        return _CONFIG
+    data = os.environ.get("CYBERAU_DATA_DIR")
+    if not data:
+        return None
+    path = Path(data).resolve().parent.parent / "config.yaml"
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
 def _admit(tool: str) -> None:
-    if _CONFIG is None:
-        return
+    """Every upstream call passes the shared guard: off unless enabled, then budget."""
     decision = pre_tool_call(
         tool_name=tool,
         vendor="recordedfuture",
         routine=_ROUTINE,
-        config=_CONFIG,
+        config=_config(),
         ledger=_LEDGER,
     )
-    if decision.get("block"):
+    if decision.get("block") or decision.get("needs_approval"):
         raise _BudgetStop(decision.get("message") or "Blocked recordedfuture")
 
 
@@ -342,6 +360,15 @@ def _label(value) -> str:
     return ""
 
 
+def _plain(value) -> str:
+    """Short identifier-like vendor labels pass through. Anything else is wrapped."""
+    if not isinstance(value, str) or not value:
+        return ""
+    if _PLAIN.fullmatch(value):
+        return value
+    return untrusted_text(redact_text(value), "recordedfuture")
+
+
 def _combine(states: list[str]) -> str:
     if not states:
         return "snapshot"
@@ -388,7 +415,15 @@ def _mentions(text: str, needle: str) -> bool:
     return re.search(rf"(?<![\w]){re.escape(pin)}(?![\w])", hay) is not None
 
 
+def _without_suppliers(text: str) -> str:
+    """Remove supplier names so one that contains a brand ("Example Hosting") is not own."""
+    for name in sorted(_supplier_names(), key=len, reverse=True):
+        text = re.sub(re.escape(name), " ", text, flags=re.IGNORECASE)
+    return text
+
+
 def _matched_subject(text: str, watchlist: Watchlist) -> tuple[str, str] | None:
+    text = _without_suppliers(text)
     for needle in _own_needles(watchlist):
         if _mentions(text, needle):
             kind = "domain" if "." in needle else "brand"
@@ -435,11 +470,13 @@ def _loaded_watchlist() -> Watchlist | None:
 
 
 def _domains_allowed(domains: list[str]) -> str | None:
+    if any(not _HOST.fullmatch(domain) for domain in domains):
+        return "domains must be host names"
     if os.environ.get("CYBERAU_RF_ALLOW_EXTERNAL") == "1":
         return None
     watchlist = _loaded_watchlist()
     if watchlist is None:
-        return None
+        return "no org-exposure watchlist found, so domains cannot be checked"
     known = watchlist.known_subjects()
     blocked = [domain for domain in domains if domain.casefold() not in known]
     if blocked:
@@ -671,7 +708,9 @@ def rf_identity_detections(
             continue
         if novel_only and item.get("novel") is False:
             continue
-        domain = _detection_domain(item, domains) or _label(item.get("authorization_service"))
+        domain = _detection_domain(item, domains) or _plain(
+            _label(item.get("authorization_service"))
+        )
         family = _family_name(item.get("malware_family"))
         key = (domain, family)
         row = groups.setdefault(
@@ -738,6 +777,15 @@ def rf_identity_lookup_hashed(emails_sha1: list[str]) -> dict:
         return _result([], cache, urls=[url], warnings=("upstream payload was not usable",))
     rows = []
     identities = payload.get("identities") if isinstance(payload.get("identities"), list) else []
+    if identities and len(identities) != len(hashes):
+        # Results carry no hash of their own. Pairing by position is only safe when
+        # every hash has exactly one result, so otherwise report nothing per identity.
+        return _result(
+            [],
+            cache,
+            urls=[url],
+            warnings=("results could not be matched to the hashes sent",),
+        )
     for index, item in enumerate(identities):
         digest = hashes[index] if index < len(hashes) else ""
         count = 0
@@ -821,11 +869,11 @@ def _normalise_alert(alert: dict, requested: list[str], watchlist: Watchlist | N
         own = bool(matched) if watchlist else True
     summary = _label(alert.get("title"))
     return {
-        "alert_id": str(alert.get("playbook_alert_id") or alert.get("id") or ""),
+        "alert_id": _plain(str(alert.get("playbook_alert_id") or alert.get("id") or "")),
         "category": tool_category,
-        "priority": _label(alert.get("priority")),
-        "status": _label(alert.get("status")),
-        "summary": untrusted_text(summary, "recordedfuture") if summary else "",
+        "priority": _plain(_label(alert.get("priority"))),
+        "status": _plain(_label(alert.get("status"))),
+        "summary": untrusted_text(redact_text(summary), "recordedfuture") if summary else "",
         "ransomware": bool(_RANSOM.search(text)),
         "matched": matched is not None,
         "own_organisation": bool(own and matched is not None) if watchlist else own,
@@ -930,7 +978,7 @@ def rf_alert_detail(category: str, alert_id: str) -> dict:
     if not isinstance(payload, dict):
         return _result([], cache, urls=[url], warnings=("upstream payload was not usable",))
     ransomware = bool(_RANSOM.search(_flatten_text(payload)))
-    panels, _had_image = _scrub(payload.get("data") if "data" in payload else payload)
+    panels, _had_image = _scrub(redact_obj(payload.get("data") if "data" in payload else payload))
     return _result(
         {
             "alert_id": alert_id,
@@ -985,12 +1033,10 @@ def rf_company_by_domain(domain: str) -> dict:
     return _result(
         {
             "domain": domain,
-            "entity_id": entity.get("id") if isinstance(entity.get("id"), str) else "",
+            "entity_id": _plain(entity.get("id")),
             "name": untrusted_text(name, "recordedfuture") if name else "",
             "risk_score": risk.get("score") if isinstance(risk.get("score"), int) else None,
-            "criticality": risk.get("criticalityLabel")
-            if isinstance(risk.get("criticalityLabel"), str)
-            else "",
+            "criticality": _plain(risk.get("criticalityLabel")),
             "rules_triggered": risk.get("rules") if isinstance(risk.get("rules"), int) else None,
             "top_rules": rules,
         },
@@ -1019,7 +1065,11 @@ def rf_risklist_status(entity_type: str, risk_rule: str | None = None) -> dict:
         return _result([], cache, urls=[url], warnings=(warning,))
     etag = ""
     if response is not None:
-        etag = str(response.headers.get("etag") or "")
+        raw_etag = str(response.headers.get("etag") or "")
+        if _ETAG.fullmatch(raw_etag):
+            etag = raw_etag
+        else:
+            etag = untrusted_text(raw_etag, "recordedfuture") if raw_etag else ""
     key = f"{entity_type}:{rule}"
     seen = _risk_seen()
     previous = seen.get(key) if isinstance(seen.get(key), str) else None
@@ -1338,10 +1388,10 @@ class RecordedFutureConnector(PremiumConnector):
             if not live:
                 return Probe(self.key, True, "schema ok")
         basic = self.health_result(live=False)
-        if not basic.configured:
-            return Probe(self.key, True, basic.detail)
         if not live:
-            return Probe(self.key, True, "offline ok")
+            return Probe(self.key, True, basic.detail if not basic.configured else "offline ok")
+        if not basic.configured:
+            return Probe(self.key, False, "RECORDED_FUTURE_API_TOKEN is not set")
         problem = _live_probe()
         if problem:
             return Probe(self.key, False, problem)
@@ -1349,6 +1399,9 @@ class RecordedFutureConnector(PremiumConnector):
 
 
 def _live_probe() -> str:
+    """One cheap call per tool group. Only a fresh upstream answer counts as ok."""
+    if os.environ.get("CYBERAU_OFFLINE") == "1":
+        return "offline mode, no live check was made"
     checks = (
         (
             "POST",
@@ -1356,6 +1409,7 @@ def _live_probe() -> str:
             {"filter": {"novel_only": True}, "limit": 1},
             None,
             "rf_identity_detections",
+            "detections",
         ),
         (
             "POST",
@@ -1363,6 +1417,7 @@ def _live_probe() -> str:
             {"category": ["domain_abuse"], "limit": 1},
             None,
             "rf_brand_alerts",
+            "data",
         ),
         (
             "HEAD",
@@ -1370,20 +1425,27 @@ def _live_probe() -> str:
             None,
             {"list": "default"},
             "rf_risklist_status",
+            "",
         ),
     )
-    for method, url, body, params, tool in checks:
-        _payload, _cache, warning, _response = _request(
+    for method, url, body, params, tool, field in checks:
+        # ttl 0 means a stored copy is never fresh, so a cache hit here can only
+        # be a 304 from the vendor. A stale or snapshot copy is not a live answer.
+        payload, cache, warning, _response = _request(
             method,
             url,
             body=body,
             params=params,
-            ttl=60,
+            ttl=0,
             tool=tool,
             parse_json=method != "HEAD",
         )
         if warning:
             return warning
+        if cache not in {"miss", "hit"}:
+            return f"{tool} was answered from a {cache} copy, not the live service"
+        if field and not isinstance((payload or {}).get(field), list):
+            return f"{tool} response was not usable, expected {field}"
     return ""
 
 
