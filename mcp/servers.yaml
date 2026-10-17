@@ -143,3 +143,14 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  auscert:
+    connector: auscert
+    args:
+    - serve
+    - auscert
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

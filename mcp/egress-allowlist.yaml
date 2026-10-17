@@ -239,3 +239,8 @@ connectors:
     - www.legislation.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  auscert:
+    hosts:
+    - portal.auscert.org.au
+    allow_ip_literals: false
+    allow_http_loopback: false
