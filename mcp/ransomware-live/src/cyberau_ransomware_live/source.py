@@ -43,6 +43,9 @@ POLL_RATE = 1 / 3600
 POLL_BURST = 4
 _CACHE_TTL = 3600
 _SOURCE = "ransomlive"
+_STALE_NOTE = "live fetch failed; served from a stale cached copy"
+_UNUSABLE = "ransomware.live response was not usable"
+_SNAPSHOT_NOTE = "served from the bundled synthetic snapshot, not live data"
 
 
 def ransom_au_victims(
@@ -55,10 +58,9 @@ def ransom_au_victims(
     if problem:
         return _envelope([], "snapshot", warnings=(problem,))
     payload, cache, warning = _query(sector=sector or None, group=group or None)
-    if warning and payload is None:
-        return _envelope([], cache, warnings=(warning,))
     if payload is None:
-        return _envelope([], cache, warnings=("ransomware.live response was not usable",))
+        return _envelope([], cache, warnings=(warning or _UNUSABLE,))
+    notes = (warning,) if warning else ()
     rows, metas, problem = _claims(
         payload,
         since=since,
@@ -67,12 +69,11 @@ def ransom_au_victims(
         limit=limit,
     )
     if problem and not rows:
-        return _envelope([], cache, warnings=(problem,))
-    _persist(metas)
-    warnings: tuple[str, ...] = ()
+        return _envelope([], cache, warnings=(*notes, problem))
+    _persist(metas, cache)
     if not rows:
-        warnings = ("no matching Australian claim",)
-    return _envelope(rows, cache, warnings=warnings)
+        notes = (*notes, "no matching Australian claim")
+    return _envelope(rows, cache, warnings=notes)
 
 
 def ransom_watchlist_match(days: _Days = 7) -> dict:
@@ -83,18 +84,19 @@ def ransom_watchlist_match(days: _Days = 7) -> dict:
     if problem:
         return _envelope([], "snapshot", warnings=(problem,))
     payload, cache, warning = _query(sector=None, group=None)
-    if warning and payload is None:
-        return _envelope([], cache, warnings=(warning,))
     if payload is None:
-        return _envelope([], cache, warnings=("ransomware.live response was not usable",))
+        return _envelope([], cache, warnings=(warning or _UNUSABLE,))
+    notes = (warning,) if warning else ()
     rows, metas, problem = _claims(payload, since=None, sector=None, group=None, limit=500)
     if problem and not rows:
-        return _envelope([], cache, warnings=(problem,))
+        return _envelope([], cache, warnings=(*notes, problem))
     matched = _match(rows, metas, watch or {}, days)
-    _persist([item[1] for item in matched])
+    _persist([item[1] for item in matched], cache)
     if not matched:
-        return _envelope([], cache, warnings=("no claim matched the org exposure watchlist",))
-    return _envelope([item[0] for item in matched], cache)
+        return _envelope(
+            [], cache, warnings=(*notes, "no claim matched the org exposure watchlist")
+        )
+    return _envelope([item[0] for item in matched], cache, warnings=notes)
 
 
 def connector() -> Connector:
@@ -132,9 +134,11 @@ class _RansomLiveConnector(Connector):
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        payload, _cache, warning = _query(sector=None, group=None, force_live=True)
+        payload, cache, warning = _query(sector=None, group=None, force_live=True)
         if warning:
             return Probe(self.key, False, warning)
+        if cache != "miss":
+            return Probe(self.key, False, f"live probe was answered from {cache}, not the service")
         problem = schema_drift(payload)
         if problem:
             return Probe(self.key, False, problem)
@@ -219,16 +223,17 @@ def _fetch(
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     if snapshot and not force_live:
-        return _load(_snapshot_text()), "snapshot", ""
+        return _load(_snapshot_text()), "snapshot", "served from a snapshot file, not live data"
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, params, b"", "anonymous")
     cached = cache.get(cache_key)
     if cached and not force_live and (offline or cache.fresh(cached)):
-        state = "hit" if cache.fresh(cached) else "stale"
-        return _load_bytes(cached.body), state, ""
+        if cache.fresh(cached):
+            return _load_bytes(cached.body), "hit", ""
+        return _load_bytes(cached.body), "stale", "offline; served from a stale cached copy"
     if offline:
-        return _load(_snapshot_text()), "snapshot", ""
+        return _load(_snapshot_text()), "snapshot", f"offline with no cached copy; {_SNAPSHOT_NOTE}"
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = HttpClient(
         "ransomware-live",
@@ -259,6 +264,8 @@ def _fetch(
             return _after_limit(cache, cache_key, force_live=force_live)
         if response.status >= 400:
             return None, "snapshot", f"ransomware.live returned {response.status}"
+        if response.cache == "stale":
+            return _load_bytes(response.body), "stale", _STALE_NOTE
         return _load_bytes(response.body), response.cache, ""
     finally:
         client.close()
@@ -270,15 +277,15 @@ def _after_error(exc: Exception, cache: HttpCache, cache_key: str, *, force_live
         return None, "snapshot", message
     cached = cache.get(cache_key)
     if cached:
-        return _load_bytes(cached.body), "stale", ""
-    return _load(_snapshot_text()), "snapshot", ""
+        return _load_bytes(cached.body), "stale", f"{_STALE_NOTE} ({message})"
+    return None, "snapshot", f"ransomware.live unavailable: {message}"
 
 
 def _after_limit(cache: HttpCache, cache_key: str, *, force_live: bool):
     if not force_live:
         cached = cache.get(cache_key)
         if cached:
-            return _load_bytes(cached.body), "stale", ""
+            return _load_bytes(cached.body), "stale", f"{_STALE_NOTE} (rate limited)"
     return None, "snapshot", "ransomware.live rate limited; retry later"
 
 
@@ -446,14 +453,25 @@ def _watchlist_candidates() -> list[Path]:
     return found
 
 
-def _persist(rows: list[dict]) -> None:
-    if not rows:
+def _persist(rows: list[dict], cache: str) -> None:
+    """Append metadata for claims not stored yet. A snapshot is never real feed history."""
+    if not rows or cache == "snapshot":
         return
     directory = _data_dir()
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "ransomlive-metadata.jsonl"
+    seen: set[str] = set()
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                seen.add(json.loads(line)["record_id"])
+            except (ValueError, KeyError, TypeError):
+                continue
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
+            if row["record_id"] in seen:
+                continue
+            seen.add(row["record_id"])
             handle.write(json.dumps(row, sort_keys=True) + "\n")
 
 

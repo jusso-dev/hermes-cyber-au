@@ -108,10 +108,9 @@ def test_v2_shape_and_watchlist_match(tmp_path, monkeypatch):
     assert MARKER in recent["data"][0]["watchlist_entry"]
     both = ransom_watchlist_match(days=90)
     assert [row["discovered"] for row in both["data"]] == ["2026-10-15", "2026-09-01"]
-    stored = (tmp_path / "ransomlive-metadata.jsonl").read_text(encoding="utf-8")
-    assert "Wattle Sample Pty Ltd" not in stored
-    assert "wattlesample.example" not in stored
-    assert "samplegroup" in stored
+    assert both["cache"] == "snapshot"
+    assert "not live data" in both["warnings"][0]
+    assert not (tmp_path / "ransomlive-metadata.jsonl").exists()
     missing = tmp_path / "missing.yaml"
     monkeypatch.setenv("CYBERAU_ORG_WATCHLIST", str(missing))
     assert ransom_watchlist_match()["warnings"]
@@ -279,7 +278,7 @@ def test_retry_after_redirect_and_timeout(tmp_path, monkeypatch):
         source._TRANSPORT = None
     assert stale["cache"] == "stale"
     assert stale["data"][0]["discovered"] == "2026-10-15"
-    assert stale["warnings"] == []
+    assert "stale cached copy" in stale["warnings"][0]
 
 
 def test_live_health_and_cassettes():
@@ -317,3 +316,169 @@ def test_live_health_and_cassettes():
             played = httpx.get(uri)
         assert played.status_code == 200
         assert played.json()[0]["victim"] == "Wattle Sample Pty Ltd"
+
+
+V2_BODY = (FIXTURES / "recentvictims_v2_synthetic.json").read_bytes()
+
+
+def _live(monkeypatch, tmp_path, handler, key=None):
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.delenv("CYBERAU_RANSOMLIVE_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    if key:
+        monkeypatch.setenv("RANSOMWARE_LIVE_API_KEY", key)
+    else:
+        monkeypatch.delenv("RANSOMWARE_LIVE_API_KEY", raising=False)
+    monkeypatch.setattr(source, "_TRANSPORT", httpx.MockTransport(handler))
+
+
+def _seen_everywhere(directory: Path, needle: str) -> bool:
+    return any(
+        needle.encode() in path.read_bytes() for path in directory.rglob("*") if path.is_file()
+    )
+
+
+def test_keyed_call_uses_pro_for_au_and_the_key_stays_out_of_every_file(tmp_path, monkeypatch):
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, content=V2_BODY)
+
+    _live(monkeypatch, tmp_path, handler, key="not-a-real-key")
+    found = ransom_au_victims()
+    assert [(r.url.host, r.url.path, r.url.params["country"]) for r in requests] == [
+        ("api-pro.ransomware.live", "/victims/", "AU")
+    ]
+    assert requests[0].headers["x-api-key"] == "not-a-real-key"
+    assert found["cache"] == "miss"
+    assert found["warnings"] == []
+    assert not _seen_everywhere(tmp_path, "not-a-real-key")
+    assert "not-a-real-key" not in json.dumps(found)
+    stored = (tmp_path / "ransomlive-metadata.jsonl").read_text(encoding="utf-8")
+    assert "Wattle Sample" not in stored
+    assert "wattlesample.example" not in stored
+
+
+def test_keyless_call_uses_v2_and_keeps_only_au(tmp_path, monkeypatch):
+    requests: list[httpx.Request] = []
+    rows = json.loads(V2_BODY) + [
+        {"victim": "Foreign Sample LLC", "group": "g", "country": "US", "discovered": "2026-10-16"}
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=rows)
+
+    _live(monkeypatch, tmp_path, handler)
+    found = ransom_au_victims()
+    assert [(r.url.host, r.url.path) for r in requests] == [
+        ("api.ransomware.live", "/v2/recentvictims")
+    ]
+    assert "x-api-key" not in requests[0].headers
+    assert found["data"]
+    assert all(row["country"] == "AU" for row in found["data"])
+    assert not any("Foreign Sample" in row["victim"] for row in found["data"])
+
+
+def test_keyed_redirect_off_the_allowlist_is_refused_and_the_key_is_dropped(tmp_path, monkeypatch):
+    seen: list[tuple[str, str | None]] = []
+
+    def off_list(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.host, request.headers.get("x-api-key")))
+        return httpx.Response(302, headers={"location": "https://evil.test/steal"})
+
+    _live(monkeypatch, tmp_path / "off", off_list, key="not-a-real-key")
+    refused = ransom_au_victims()
+    assert seen == [("api-pro.ransomware.live", "not-a-real-key")]
+    assert refused["data"] == []
+    assert "evil.test" in refused["warnings"][0]
+    assert "not-a-real-key" not in json.dumps(refused)
+
+    seen.clear()
+
+    def on_list(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.host, request.headers.get("x-api-key")))
+        if request.url.host == "api-pro.ransomware.live":
+            return httpx.Response(302, headers={"location": "https://api.ransomware.live/x"})
+        return httpx.Response(200, content=V2_BODY)
+
+    _live(monkeypatch, tmp_path / "on", on_list, key="not-a-real-key")
+    ransom_au_victims()
+    assert seen == [("api-pro.ransomware.live", "not-a-real-key"), ("api.ransomware.live", None)]
+
+
+@pytest.mark.parametrize("failure", ["timeout", "http500"])
+def test_live_failure_without_a_cache_is_unavailable_not_a_snapshot(failure, tmp_path, monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(500)
+
+    _live(monkeypatch, tmp_path, handler, key="not-a-real-key")
+    found = ransom_au_victims()
+    assert found["data"] == []
+    assert found["cache"] == "snapshot"
+    assert "unavailable" in found["warnings"][0]
+    assert not (tmp_path / "ransomlive-metadata.jsonl").exists()
+
+
+def test_offline_snapshot_and_stale_copies_carry_a_warning(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "snap"))
+    monkeypatch.delenv("CYBERAU_RANSOMLIVE_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_RANSOMLIVE_TODAY", "2026-10-17")
+    found = ransom_au_victims()
+    assert found["cache"] == "snapshot"
+    assert found["data"]
+    assert "not live data" in found["warnings"][0]
+    assert ransom_watchlist_match()["warnings"]
+    cache = HttpCache(tmp_path / "stale" / "http_cache.sqlite")
+    cache.put(
+        cache.key("GET", V2_RECENT, {}, b"", "anonymous"),
+        status=200,
+        headers={},
+        body=V2_BODY,
+        ttl=0,
+    )
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "stale"))
+    stale = ransom_au_victims()
+    assert stale["cache"] == "stale"
+    assert "stale cached copy" in stale["warnings"][0]
+
+
+def test_metadata_store_is_not_duplicated_on_repeat_calls(tmp_path, monkeypatch):
+    _live(monkeypatch, tmp_path, lambda request: httpx.Response(200, content=V2_BODY))
+    ransom_au_victims()
+    first = (tmp_path / "ransomlive-metadata.jsonl").read_text(encoding="utf-8").splitlines()
+    ransom_au_victims()
+    again = (tmp_path / "ransomlive-metadata.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(first) == 2
+    assert again == first
+
+
+@pytest.mark.parametrize("failure", ["timeout", "http500", "http429", "garbage"])
+def test_live_health_fails_on_a_failed_fetch_even_with_a_cached_copy(
+    failure, tmp_path, monkeypatch
+):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        if failure == "garbage":
+            return httpx.Response(200, content=b"<html>")
+        return httpx.Response(500 if failure == "http500" else 429)
+
+    _live(monkeypatch, tmp_path, handler)
+    cache = HttpCache(tmp_path / "http_cache.sqlite")
+    cache.put(
+        cache.key("GET", V2_RECENT, {}, b"", "anonymous"),
+        status=200,
+        headers={},
+        body=V2_BODY,
+        ttl=3600,
+    )
+    probe = connector().health(live=True)
+    assert probe.ok is False
+    monkeypatch.setenv(
+        "CYBERAU_RANSOMLIVE_SNAPSHOT", str(FIXTURES / "recentvictims_v2_synthetic.json")
+    )
+    assert connector().health(live=True).ok is False

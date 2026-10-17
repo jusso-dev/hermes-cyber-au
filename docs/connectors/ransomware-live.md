@@ -27,4 +27,6 @@ Dates use Australia/Sydney. The watchlist is the user-owned file `watchlists/org
 
 The PRO API allows 500,000 requests a month and returns 429 after that. This connector polls at most about once an hour. Results are cached for one hour.
 
+If the live fetch fails and a cached copy exists, the result is marked `stale` with a warning. With no cached copy it returns an `unavailable` warning and no records. Only offline mode (`CYBERAU_OFFLINE=1`) falls back to the bundled synthetic snapshot, and that result is marked `snapshot` with a warning that it is not live data. A snapshot is never written to the metadata store. `health --live` fails unless the live service answered.
+
 Attribution on every result: ransomware.live. Victim entries are leak-site claims, not confirmed incidents.
