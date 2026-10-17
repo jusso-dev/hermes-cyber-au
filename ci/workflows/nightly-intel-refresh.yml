@@ -1,6 +1,10 @@
-# Proposed: .github/workflows/nightly-intel-refresh.yml
+# Copy to .github/workflows/nightly-intel-refresh.yml.
 # Refresh public threat intel snapshots and the feed catalogue, then open a data PR.
 # 16:00 UTC is 03:00 AEDT and 02:00 AEST.
+# The refresh step calls cyberau-mcp refresh and cyberau-mcp store snapshot --public.
+# Keyed sources run only when their secret is set. If either command is not part
+# of the shared library yet, the step says so and still refuses paths outside
+# the data directories.
 name: nightly-intel-refresh
 
 on:
@@ -15,32 +19,37 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      open_pr: ${{ steps.intel.outputs.open_pr }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - run: python -m pip install "uv<1"
       - run: uv sync --project mcp --all-packages --frozen
       - name: Refresh snapshots (public sources first, keyed sources only when a secret is set)
+        id: intel
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           ABUSECH_AUTH_KEY: ${{ secrets.ABUSECH_AUTH_KEY }}
           OTX_API_KEY: ${{ secrets.OTX_API_KEY }}
           CLOUDFLARE_RADAR_API_TOKEN: ${{ secrets.CLOUDFLARE_RADAR_API_TOKEN }}
           CYBERAU_DATA_DIR: ${{ runner.temp }}/cyberau
-        run: |
-          uv run --project mcp cyberau-mcp refresh \
-            --sources asd,kev,epss,auscert,attack,feodo \
-            --optional-sources nvd,abusech,otx,radar \
-            --snapshot-dir intel/snapshots \
-            --catalogue feeds/catalogue.yaml \
-            --summary PR_BODY.md
+        run: >-
+          uv run --project mcp python tools/ci/nightly_intel_refresh.py
+          --sources asd,kev,epss,auscert,attack,feodo
+          --optional-sources nvd,abusech,otx,radar
+          --snapshot-dir intel/snapshots
+          --catalogue feeds/catalogue.yaml
+          --summary PR_BODY.md
       - name: Validate snapshots
         run: uv run --project mcp pytest -q tests/snapshots --block-network
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: steps.intel.outputs.open_pr == 'true'
         with:
           name: intel-refresh
+          if-no-files-found: warn
           path: |
             intel/snapshots/
             feeds/catalogue.yaml
@@ -48,13 +57,15 @@ jobs:
 
   pr:
     needs: refresh
+    if: needs.refresh.outputs.open_pr == 'true'
     uses: ./.github/workflows/data-update-pr.yml
     with:
       artifact: intel-refresh
       branch_prefix: data/intel-refresh
       title: "Refresh threat intel snapshots"
       body_file: PR_BODY.md
-    secrets: inherit
+    secrets:
+      DATA_PR_TOKEN: ${{ secrets.DATA_PR_TOKEN }}
     permissions:
       contents: write
       pull-requests: write
