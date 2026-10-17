@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["url", "title", "published", "passage", "cves"],
+  "properties": {
+    "url": {"type": "string"},
+    "title": {"type": "string"},
+    "published": {"type": "string"},
+    "passage": {"type": "string"},
+    "cves": {"type": "array", "items": {"type": "string"}}
+  }
+}

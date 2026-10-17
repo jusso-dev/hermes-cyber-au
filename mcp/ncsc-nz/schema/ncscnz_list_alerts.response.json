@@ -1,0 +1,13 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["title", "published", "link", "cves"],
+    "properties": {
+      "title": {"type": "string"},
+      "published": {"type": "string"},
+      "link": {"type": "string"},
+      "cves": {"type": "array", "items": {"type": "string"}}
+    }
+  }
+}

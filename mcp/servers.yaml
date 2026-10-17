@@ -55,17 +55,6 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
-  attack:
-    connector: mitre-attack
-    args:
-    - serve
-    - mitre-attack
-    env: []
-    trust: untrusted
-    lazy: true
-    timeout: 120
-    enabled_by_default: true
-    required_env: []
   nvd:
     connector: nvd
     args:
@@ -79,6 +68,17 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  attack:
+    connector: mitre-attack
+    args:
+    - serve
+    - mitre-attack
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   blueprint:
     connector: asd-blueprint
     args:
@@ -329,3 +329,14 @@ servers:
       commit: 3d033828a78b6b3cb2292b255c8d2ad093c1bee5
       launcher: misp-mcp
       vendored: false
+  ncscnz:
+    connector: ncsc-nz
+    args:
+    - serve
+    - ncsc-nz
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

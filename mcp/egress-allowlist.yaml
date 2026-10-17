@@ -238,3 +238,8 @@ connectors:
     - abr.business.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  ncsc-nz:
+    hosts:
+    - www.ncsc.govt.nz
+    allow_ip_literals: false
+    allow_http_loopback: false
