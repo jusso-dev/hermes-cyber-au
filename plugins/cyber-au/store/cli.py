@@ -6,6 +6,7 @@ import argparse
 import json
 import sqlite3
 import sys
+from datetime import date
 from pathlib import Path
 
 from .api import (
@@ -17,6 +18,7 @@ from .api import (
     upsert_vulnerability,
 )
 from .db import open_store, resolve_db_path
+from .maintenance import backup_store, restore_backup, snapshot_public, vacuum_store
 from .stix import export_stix, import_stix_file
 from .tools import intel_add_observation, intel_get, intel_search
 
@@ -155,6 +157,43 @@ def build_parser() -> argparse.ArgumentParser:
 
     counts = sub.add_parser("counts", parents=[common], help="Print table row counts")
     counts.set_defaults(func=_cmd_counts)
+
+    backup = sub.add_parser(
+        "backup",
+        parents=[common],
+        help="Online backup into plugin-data/cyber-au/backups (7 daily copies)",
+    )
+    backup.add_argument(
+        "--restore",
+        metavar="FILE",
+        help="Replace the live store with this backup file",
+    )
+    backup.set_defaults(func=_cmd_backup)
+
+    snapshot = sub.add_parser(
+        "snapshot",
+        parents=[common],
+        help="Write a public TLP:CLEAR snapshot (requires --public)",
+    )
+    snapshot.add_argument(
+        "--public",
+        action="store_true",
+        required=True,
+        help="Include only public-source TLP:CLEAR data",
+    )
+    snapshot.add_argument(
+        "--output",
+        help="Directory or .sqlite.zst path. Default: intel/snapshots/",
+    )
+    snapshot.add_argument("--date", type=_date_arg, help="UTC date for the file name")
+    snapshot.set_defaults(func=_cmd_snapshot)
+
+    vacuum = sub.add_parser(
+        "vacuum",
+        parents=[common],
+        help="Fold old observations into indicator counters, then VACUUM",
+    )
+    vacuum.set_defaults(func=_cmd_vacuum)
     return parser
 
 
@@ -296,6 +335,31 @@ def _cmd_ingest_kev(args: argparse.Namespace) -> int:
 def _cmd_counts(args: argparse.Namespace) -> int:
     _emit(table_counts(args.path))
     return 0
+
+
+def _cmd_backup(args: argparse.Namespace) -> int:
+    if args.restore:
+        _emit(restore_backup(args.restore, args.path))
+        return 0
+    _emit(backup_store(args.path))
+    return 0
+
+
+def _cmd_snapshot(args: argparse.Namespace) -> int:
+    _emit(snapshot_public(args.path, output=args.output, on=args.date))
+    return 0
+
+
+def _cmd_vacuum(args: argparse.Namespace) -> int:
+    _emit(vacuum_store(args.path))
+    return 0
+
+
+def _date_arg(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("date must be YYYY-MM-DD") from exc
 
 
 def _emit(payload: object) -> None:

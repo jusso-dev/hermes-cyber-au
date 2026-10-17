@@ -11,7 +11,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
 
-_MIGRATION = Path(__file__).resolve().parent / "migrations" / "0001_init.sql"
+_MIGRATIONS = (
+    (Path(__file__).resolve().parent / "migrations" / "0001_init.sql", 1),
+    (Path(__file__).resolve().parent / "migrations" / "0002_retention.sql", 2),
+)
+SCHEMA_VERSION = _MIGRATIONS[-1][1]
 _LOCK = threading.Lock()
 _STORES: dict[str, Store] = {}
 
@@ -19,6 +23,7 @@ TABLES = (
     "sources",
     "indicators",
     "observations",
+    "indicator_counters",
     "vulnerabilities",
     "epss_history",
     "advisories",
@@ -191,15 +196,22 @@ def _statements(script: str) -> Iterator[str]:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Apply the schema once, even when several processes open a new file together."""
-    if _schema_version(conn) >= 1:
+    """Apply pending migrations once, even when several processes open a new file together."""
+    if _schema_version(conn) >= SCHEMA_VERSION:
         return
     conn.execute("BEGIN IMMEDIATE")
     try:
-        if _schema_version(conn) < 1:
-            for statement in _statements(_MIGRATION.read_text(encoding="utf-8")):
+        version = _schema_version(conn)
+        for path, target in _MIGRATIONS:
+            if version >= target:
+                continue
+            for statement in _statements(path.read_text(encoding="utf-8")):
                 conn.execute(statement)
-            conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+            if version == 0:
+                conn.execute("INSERT INTO schema_version(version) VALUES (?)", (target,))
+            else:
+                conn.execute("UPDATE schema_version SET version = ?", (target,))
+            version = target
         conn.execute("COMMIT")
     except BaseException:
         with suppress(sqlite3.Error):

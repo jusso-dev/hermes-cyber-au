@@ -13,3 +13,8 @@ plugins:
   enabled:
     - cyber-au
 mcp_servers: {}
+# Local intel store. Vacuum folds observations older than retention_days into
+# indicator counters. Advisories are kept.
+cyber_au:
+  store:
+    retention_days: 365

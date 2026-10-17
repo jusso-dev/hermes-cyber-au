@@ -31,7 +31,17 @@ Export is a separate path. `export_records` and `cyberau-mcp store export` omit 
 
 Vulnerabilities have no marking column. Catalogue rows are treated as `CLEAR`. An advisory uses the `default_tlp` of its source.
 
-STIX 2.1 export is described in `docs/intel/stix.md`. DuckDB export and retention are separate work.
+STIX 2.1 export is described in `docs/intel/stix.md`. DuckDB export is separate work.
+
+## Retention, backup and public snapshots
+
+`cyber_au.store.retention_days` in `config.yaml` sets how long an observation is kept. The default is 365 days. `cyberau-mcp store vacuum` folds observations older than that into `indicator_counters` (source, verdict, count, confidence sum, earliest and latest time) and then runs SQLite `VACUUM`. Advisories are kept. The indicator verdict and confidence are recomputed from the observations that remain and from those counters, using the same formula as ingest.
+
+`cyberau-mcp store backup` uses the SQLite online backup API. Files land in `plugin-data/cyber-au/backups/` as `intel-<date>.sqlite`. Seven daily copies are kept. A later backup on the same local day replaces that day's file. `store backup --restore FILE` puts a backup back after an integrity check.
+
+`cyberau-mcp store snapshot --public` writes `intel/snapshots/public-<date>.sqlite.zst`. The date is UTC. The file contains public-source TLP:CLEAR indicators, their public observations and counters, advisories from those sources, and catalogue vulnerabilities. A source is public when it is not the analyst source, not marked keyed, and its default marking is CLEAR. Rows marked GREEN, AMBER, AMBER+STRICT or RED are omitted. Analyst observations and keyed-source rows are omitted, including notes, tags and upstream references. Register a keyed source with `ensure_source(..., keyed=True)`. A keyed flag is not cleared later.
+
+The weekly no-agent job `cyberau-store-vacuum` runs `scripts/cyberau_store_vacuum.sh`, which takes a backup and then vacuums. Newly shipped distribution jobs arrive paused.
 
 ## Worked examples
 

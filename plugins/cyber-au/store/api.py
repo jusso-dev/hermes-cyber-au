@@ -160,37 +160,31 @@ def upsert_indicator(
             upsert_fts(conn, "indicator", record_id, indicator_type, body, replace=False)
             return record_id
 
-        conn.execute(
-            """
-            INSERT INTO observations (
-                indicator_id, source_id, source_ref, observed_at, verdict,
-                confidence, tags, raw_sha256
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(indicator_id, source_id, source_ref, raw_sha256) DO UPDATE SET
-                observed_at = excluded.observed_at,
-                verdict = excluded.verdict,
-                confidence = excluded.confidence,
-                tags = excluded.tags
-            """,
-            (
-                existing["id"],
-                source_id,
-                ref,
-                seen,
-                checked_verdict,
-                checked_confidence,
-                tags_json,
-                digest,
-            ),
-        )
-        observations = [
-            {"verdict": row["verdict"], "confidence": row["confidence"]}
-            for row in conn.execute(
-                "SELECT verdict, confidence FROM observations WHERE indicator_id = ?",
-                (existing["id"],),
+        if not _already_folded(conn, existing["id"], source_id, ref, digest, seen):
+            conn.execute(
+                """
+                INSERT INTO observations (
+                    indicator_id, source_id, source_ref, observed_at, verdict,
+                    confidence, tags, raw_sha256
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(indicator_id, source_id, source_ref, raw_sha256) DO UPDATE SET
+                    observed_at = excluded.observed_at,
+                    verdict = excluded.verdict,
+                    confidence = excluded.confidence,
+                    tags = excluded.tags
+                """,
+                (
+                    existing["id"],
+                    source_id,
+                    ref,
+                    seen,
+                    checked_verdict,
+                    checked_confidence,
+                    tags_json,
+                    digest,
+                ),
             )
-        ]
-        merged_verdict, merged_confidence = score(observations)
+        merged_verdict, merged_confidence = _score_for_indicator(conn, existing["id"])
         first_seen = min(existing["first_seen"], seen)
         last_seen = max(existing["last_seen"], seen)
         merged_tlp = more_restrictive(existing["tlp"], marking)
@@ -380,35 +374,52 @@ def ensure_source(
     name: str | None = None,
     licence: str | None = None,
     default_tlp: str | None = None,
+    keyed: bool | None = None,
     path: str | Path | None = None,
 ) -> None:
-    """Create a source, or tighten its default TLP when one is supplied."""
+    """Create a source, or tighten its default TLP when one is supplied.
+
+    ``keyed=True`` marks a source that needs a credential. A keyed source
+    stays keyed. Public snapshots omit keyed sources and the analyst source.
+    """
     checked = require_source_id(source_id)
     marking = None if default_tlp is None else require_tlp(default_tlp)
     kept_name = checked if name is None else clean_untrusted(name, max_len=200)
     if not kept_name:
         raise ValueError("source name is empty")
+    if keyed is not None and not isinstance(keyed, bool):
+        raise ValueError("keyed must be a boolean")
 
     def write(store: Store) -> None:
         conn = store.connection()
         row = conn.execute(
-            "SELECT name, licence, default_tlp FROM sources WHERE id = ?",
+            "SELECT name, licence, default_tlp, keyed FROM sources WHERE id = ?",
             (checked,),
         ).fetchone()
         if row is None:
             conn.execute(
-                "INSERT INTO sources (id, name, licence, default_tlp) VALUES (?, ?, ?, ?)",
-                (checked, kept_name, licence, marking or "CLEAR"),
+                """
+                INSERT INTO sources (id, name, licence, default_tlp, keyed)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (checked, kept_name, licence, marking or "CLEAR", 1 if keyed else 0),
             )
         else:
+            if keyed is False and row["keyed"]:
+                raise ValueError("a keyed source stays keyed")
             next_tlp = row["default_tlp"]
             if marking is not None:
                 next_tlp = more_restrictive(row["default_tlp"], marking)
             next_name = row["name"] if name is None else kept_name
             next_licence = row["licence"] if licence is None else licence
+            next_keyed = 1 if keyed else int(row["keyed"])
             conn.execute(
-                "UPDATE sources SET name = ?, licence = ?, default_tlp = ? WHERE id = ?",
-                (next_name, next_licence, next_tlp, checked),
+                """
+                UPDATE sources
+                SET name = ?, licence = ?, default_tlp = ?, keyed = ?
+                WHERE id = ?
+                """,
+                (next_name, next_licence, next_tlp, next_keyed, checked),
             )
         store.remember_source(checked)
 
@@ -632,6 +643,84 @@ def _ensure_source_row(
     )
 
 
+def _already_folded(
+    conn: sqlite3.Connection,
+    indicator_id: str,
+    source_id: str,
+    source_ref: str,
+    digest: str,
+    observed_at: str,
+) -> bool:
+    """True when a re-ingested record was already folded into a counter.
+
+    Vacuum deletes the folded row, so the unique key no longer catches a rolling
+    feed that serves the same old record again. A record dated inside a span a
+    counter already covers for the same indicator and source is treated as that
+    record, so a counter is never counted twice.
+    """
+    live = conn.execute(
+        """
+        SELECT 1 FROM observations
+        WHERE indicator_id = ? AND source_id = ? AND source_ref = ? AND raw_sha256 = ?
+        """,
+        (indicator_id, source_id, source_ref, digest),
+    ).fetchone()
+    if live is not None:
+        return False
+    covered = conn.execute(
+        """
+        SELECT 1 FROM indicator_counters
+        WHERE indicator_id = ? AND source_id = ? AND first_seen <= ? AND last_seen >= ?
+        """,
+        (indicator_id, source_id, observed_at, observed_at),
+    ).fetchone()
+    return covered is not None
+
+
+def rescore_indicator(conn: sqlite3.Connection, indicator_id: str) -> None:
+    """Recompute verdict and confidence from observations and counters.
+
+    ``first_seen``, ``last_seen`` and TLP stay as they are. The full-text row
+    is rebuilt from the observations that remain.
+    """
+    row = conn.execute("SELECT * FROM indicators WHERE id = ?", (indicator_id,)).fetchone()
+    if row is None:
+        return
+    merged_verdict, merged_confidence = _score_for_indicator(conn, indicator_id)
+    conn.execute(
+        "UPDATE indicators SET verdict = ?, confidence = ? WHERE id = ?",
+        (merged_verdict, merged_confidence, indicator_id),
+    )
+    extras = _observation_index_text(conn, indicator_id)
+    body = _indicator_body(row["value"], row["value_norm"], row["type"], merged_verdict, extras)
+    upsert_fts(conn, "indicator", indicator_id, row["type"], body)
+
+
+def _score_for_indicator(conn: sqlite3.Connection, indicator_id: str) -> tuple[str, int]:
+    observations = [
+        {"verdict": row["verdict"], "confidence": row["confidence"]}
+        for row in conn.execute(
+            "SELECT verdict, confidence FROM observations WHERE indicator_id = ?",
+            (indicator_id,),
+        )
+    ]
+    counters = [
+        {
+            "verdict": row["verdict"],
+            "observations": row["observations"],
+            "confidence_sum": row["confidence_sum"],
+        }
+        for row in conn.execute(
+            """
+            SELECT verdict, observations, confidence_sum
+            FROM indicator_counters WHERE indicator_id = ?
+            """,
+            (indicator_id,),
+        )
+    ]
+    return score(observations, counters)
+
+
 def _indicator_body(
     value: str,
     value_norm: str,
@@ -665,6 +754,9 @@ def _hydrate(conn: sqlite3.Connection, kind: str, ref: str) -> dict | None:
             return None
         record = _indicator_dict(row)
         record["observations"] = _observation_dicts(conn, ref)
+        counters = _counter_dicts(conn, ref)
+        if counters:
+            record["counters"] = counters
         return record
     if kind == "advisory":
         row = conn.execute(
@@ -741,6 +833,28 @@ def _vulnerability_dict(row: sqlite3.Row) -> dict:
         "updated_at": row["updated_at"],
         "tlp": "CLEAR",
     }
+
+
+def _counter_dicts(conn: sqlite3.Connection, indicator: str) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT source_id, verdict, observations, confidence_sum, first_seen, last_seen
+        FROM indicator_counters WHERE indicator_id = ?
+        ORDER BY source_id, verdict
+        """,
+        (indicator,),
+    )
+    return [
+        {
+            "source_id": row["source_id"],
+            "verdict": row["verdict"],
+            "observations": row["observations"],
+            "confidence_sum": row["confidence_sum"],
+            "first_seen": row["first_seen"],
+            "last_seen": row["last_seen"],
+        }
+        for row in rows
+    ]
 
 
 def _observation_dicts(conn: sqlite3.Connection, indicator: str) -> list[dict]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import unittest
 from pathlib import Path
@@ -120,8 +121,26 @@ class DistributionSkeletonTest(unittest.TestCase):
             "cyberau-kev-watch",
             "cyberau-weekly-exec",
             "cyberau-store-maintenance",
+            "cyberau-store-vacuum",
         ):
             self.assertIn(f'"id": "{job_id}"', text)
+
+    def test_weekly_vacuum_job_is_script_only(self):
+        payload = json.loads((ROOT / "cron/jobs.json").read_text(encoding="utf-8"))
+        jobs = {job["id"]: job for job in payload["jobs"]}
+        job = jobs["cyberau-store-vacuum"]
+        self.assertEqual(job["name"], "Weekly store vacuum")
+        self.assertEqual(job["schedule"], "0 3 * * 0")
+        self.assertIs(job["no_agent"], True)
+        self.assertEqual(job["script"], "cyberau_store_vacuum.sh")
+        self.assertEqual(job["deliver"], "local")
+        self.assertNotIn("prompt", job)
+        script = ROOT / "scripts" / job["script"]
+        text = script.read_text(encoding="utf-8")
+        self.assertIn("store backup\n", text)
+        self.assertIn("store vacuum\n", text)
+        self.assertNotIn("store compact", text)
+        self.assertNotIn("\u2014", text)
 
     def test_git_index_has_no_secret_files(self):
         tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()

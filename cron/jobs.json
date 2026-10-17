@@ -86,6 +86,14 @@
       },
       "schedule_display": "0 3 * * 0",
       "deliver": "local"
+    },
+    {
+      "id": "cyberau-store-vacuum",
+      "name": "Weekly store vacuum",
+      "schedule": "0 3 * * 0",
+      "no_agent": true,
+      "script": "cyberau_store_vacuum.sh",
+      "deliver": "local"
     }
   ]
 }

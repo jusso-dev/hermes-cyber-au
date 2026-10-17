@@ -13,7 +13,7 @@ _TIE_BREAK = {name: index for index, name in enumerate(VERDICTS)}
 MISSING_CONFIDENCE = 50
 
 
-def score(observations: list[dict]) -> tuple[str, int]:
+def score(observations: list[dict], counters: list[dict] | None = None) -> tuple[str, int]:
     """Return ``(verdict, confidence)`` for one indicator.
 
     Confidence is ``support^2 / (supporters * total)``, rounded half up.
@@ -21,11 +21,16 @@ def score(observations: list[dict]) -> tuple[str, int]:
     is how many observations cast it, and ``total`` is every observation's
     confidence. A missing confidence counts as 50. A missing verdict counts
     as ``unknown``. An empty set, or a total of 0, is ``unknown`` at 0.
+
+    ``counters`` are folded observations: each has ``verdict``, ``observations``
+    (how many rows were folded) and ``confidence_sum`` (their confidence total,
+    with a missing confidence already counted as 50).
     """
-    buckets: dict[str, list[int]] = {name: [] for name in VERDICTS}
+    support = dict.fromkeys(VERDICTS, 0)
+    supporters = dict.fromkeys(VERDICTS, 0)
     for observation in observations:
         verdict = observation.get("verdict") or "unknown"
-        if verdict not in buckets:
+        if verdict not in support:
             raise ValueError("verdict must be malicious, suspicious, benign or unknown")
         confidence = observation.get("confidence")
         if confidence is None:
@@ -34,19 +39,36 @@ def score(observations: list[dict]) -> tuple[str, int]:
             raise ValueError("confidence must be an integer from 0 to 100")
         if confidence < 0 or confidence > 100:
             raise ValueError("confidence must be an integer from 0 to 100")
-        buckets[verdict].append(confidence)
+        support[verdict] += confidence
+        supporters[verdict] += 1
 
-    totals = {name: sum(values) for name, values in buckets.items()}
-    total = sum(totals.values())
+    for counter in counters or ():
+        verdict = counter.get("verdict") or "unknown"
+        if verdict not in support:
+            raise ValueError("verdict must be malicious, suspicious, benign or unknown")
+        count = counter.get("observations")
+        confidence_sum = counter.get("confidence_sum")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ValueError("counter observations must be a positive integer")
+        if (
+            isinstance(confidence_sum, bool)
+            or not isinstance(confidence_sum, int)
+            or confidence_sum < 0
+        ):
+            raise ValueError("counter confidence_sum must be a non-negative integer")
+        support[verdict] += confidence_sum
+        supporters[verdict] += count
+
+    total = sum(support.values())
     if total == 0:
         return "unknown", 0
 
-    winning = max(VERDICTS, key=lambda name: (totals[name], -_TIE_BREAK[name]))
-    support = totals[winning]
-    supporters = len(buckets[winning])
-    if support == 0 or supporters == 0:
+    winning = max(VERDICTS, key=lambda name: (support[name], -_TIE_BREAK[name]))
+    winning_support = support[winning]
+    winning_supporters = supporters[winning]
+    if winning_support == 0 or winning_supporters == 0:
         return "unknown", 0
-    confidence = _round_half_up(support * support, supporters * total)
+    confidence = _round_half_up(winning_support * winning_support, winning_supporters * total)
     return winning, min(100, confidence)
 
 

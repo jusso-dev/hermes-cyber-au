@@ -23,8 +23,13 @@ def test_store_help_and_missing_command(capsys):
     assert "add-observation" in help_text
     assert "ingest-kev" in help_text
     assert "stix21" in help_text.lower()
+    assert "backup" in help_text
+    assert "snapshot" in help_text
+    assert "vacuum" in help_text
+    assert "compact" not in help_text
     assert "duckdb" not in help_text.lower()
     assert main(["store"]) == 2
+    assert main(["store", "compact"]) == 2
 
 
 def test_cli_dedupes_exports_and_loads_kev(tmp_path, capsys, monkeypatch):
