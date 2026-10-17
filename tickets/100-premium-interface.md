@@ -24,29 +24,32 @@ Paid feeds on Australian organisations (dark web, leak sites, infostealer and br
 ## Interface
 ```python
 class TermsProfile(BaseModel):
-    cache: Literal["none", "session", "ttl"]        # session = memory only, cleared at session end
+    cache: Literal["none", "session", "ttl"]  # session = memory only, cleared at session end
     cache_ttl_max_s: int = 0
-    store: Literal["none", "metadata", "full"]      # what may go into the intel store
-    stix_export: bool = False                       # may findings leave the profile as STIX
-    share_outside_profile: bool = False             # briefings to channels other than the owner's
+    store: Literal["none", "metadata", "full"]  # what may go into the intel store
+    stix_export: bool = False  # may findings leave the profile as STIX
+    share_outside_profile: bool = False  # briefings to channels other than the owner's
     redistribution: Literal["forbidden", "internal", "allowed"] = "forbidden"
     attribution: str
+
 
 class QuotaPolicy(BaseModel):
     calls_per_day: int | None
     calls_per_month: int | None
     cost_units_per_call: float = 1.0
-    monthly_budget_units: float | None              # user-set; None = vendor quota only
-    approval_above_units: float | None              # ask the user before a call that costs more
+    monthly_budget_units: float | None  # user-set; None = vendor quota only
+    approval_above_units: float | None  # ask the user before a call that costs more
     hard_stop: bool = True
 
-class PremiumConnector(Connector):                  # Connector from the shared library ticket
+
+class PremiumConnector(Connector):  # Connector from the shared library ticket
     vendor: str
-    licence_env: tuple[str, ...]                    # names only; values come from the profile .env
+    licence_env: tuple[str, ...]  # names only; values come from the profile .env
     terms: TermsProfile
     quota: QuotaPolicy
+
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]: ...
-    def health(self) -> HealthResult: ...           # one cheap authenticated call, no quota-heavy endpoints
+    def health(self) -> HealthResult: ...  # one cheap authenticated call, no quota-heavy endpoints
 ```
 
 ## Licence key placeholder and default state

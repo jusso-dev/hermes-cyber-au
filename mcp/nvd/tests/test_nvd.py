@@ -147,12 +147,8 @@ def test_live_health_ignores_fresh_cache(tmp_path, monkeypatch):
 def test_v3_severity_is_not_hidden_by_v4(tmp_path, monkeypatch):
     payload = json.loads((FIXTURES / "cve_CVE-2024-3400.json").read_text())
     cve = payload["vulnerabilities"][0]["cve"]
-    cve["metrics"]["cvssMetricV31"] = [
-        {"cvssData": {"baseScore": 7.5, "baseSeverity": "HIGH"}}
-    ]
-    cve["metrics"]["cvssMetricV40"] = [
-        {"cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}
-    ]
+    cve["metrics"]["cvssMetricV31"] = [{"cvssData": {"baseScore": 7.5, "baseSeverity": "HIGH"}}]
+    cve["metrics"]["cvssMetricV40"] = [{"cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}]
     path = tmp_path / "both.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setenv("CYBERAU_NVD_SNAPSHOT", str(path))

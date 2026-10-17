@@ -1,0 +1,8 @@
+# Root config for files outside mcp/, which keeps its own settings in mcp/pyproject.toml.
+# Mirrors those settings. The ticket generators are one-off scripts and are not linted.
+line-length = 100
+target-version = "py311"
+extend-exclude = ["tools/tickets", "tools/issues"]
+
+[lint]
+select = ["E", "F", "I", "UP"]

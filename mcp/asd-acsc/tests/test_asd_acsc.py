@@ -224,9 +224,7 @@ def test_import_and_status():
     assert status["data"][0]["item_count"] == 2
     from cyberau_common.cli import main
 
-    imported = main(
-        ["import", "asd", str(FIXTURES / "rss_advisories.xml"), "--feed", "advisories"]
-    )
+    imported = main(["import", "asd", str(FIXTURES / "rss_advisories.xml"), "--feed", "advisories"])
     assert imported == 0
     assert main(["import", "nope", "missing.xml"]) == 2
 
