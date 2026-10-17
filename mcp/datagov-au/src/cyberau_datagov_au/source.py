@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Annotated
 
@@ -25,6 +26,9 @@ ATTRIBUTION = (
 _REQUIRED = ("id", "title", "resources")
 _NO_LICENCE = {"", "notspecified", "not specified", "not-specified", "none", "null"}
 _PACKAGE = Path(__file__).resolve().parents[2]
+_PLAIN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._~:-]{0,199}")
+_PLAIN_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+/:-]{0,63}")
+_PLAIN_URL = re.compile(r"https?://[^\s<>\"']{1,2000}")
 _Query = Annotated[str, Field(min_length=2)]
 _Limit = Annotated[int, Field(ge=1, le=50)]
 _TRANSPORT = None
@@ -45,8 +49,8 @@ def datagov_search(query: _Query, limit: _Limit = 10) -> dict:
     rows, problem = _collect(payload, cache=cache, query=text, limit=limit, detail=False)
     if problem and not rows:
         return _envelope([], cache, warnings=(problem,), url=SEARCH)
-    _persist(rows)
-    warnings = _licence_warnings(rows)
+    _persist(rows, cache)
+    warnings = _provenance(cache) + _licence_warnings(rows)
     if problem:
         warnings.insert(0, problem)
     return _envelope(rows, cache, warnings=tuple(warnings), url=SEARCH)
@@ -64,8 +68,8 @@ def datagov_get_package(id: str) -> dict:
     rows, problem = _collect(payload, cache=cache, identifier=identifier, detail=True)
     if problem and not rows:
         return _envelope(None, cache, warnings=(problem,), url=SHOW)
-    _persist(rows)
-    warnings = _licence_warnings(rows)
+    _persist(rows, cache)
+    warnings = _provenance(cache) + _licence_warnings(rows)
     if problem:
         warnings.insert(0, problem)
     data = rows[0] if rows else None
@@ -105,13 +109,15 @@ class _DatagovConnector(Connector):
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        payload, _cache, warning = _fetch(
+        payload, cache, warning = _fetch(
             SEARCH,
             {"q": "data", "rows": "1"},
             force_live=True,
         )
         if warning:
             return Probe(self.key, False, warning)
+        if cache != "miss":
+            return Probe(self.key, False, f"live probe was answered from {cache}, not live")
         problem = schema_drift(payload or {})
         if problem:
             return Probe(self.key, False, problem)
@@ -154,6 +160,22 @@ def schema_drift(payload: dict) -> str | None:
     return None
 
 
+class _JsonCache(HttpCache):
+    """Only keeps bodies that parse as a successful CKAN object.
+
+    A 200 maintenance page must not replace a good cached copy for 24 hours.
+    """
+
+    def put(self, key, *, status, headers, body, ttl):
+        try:
+            decoded = _load(body.decode("utf-8"))
+        except UnicodeDecodeError:
+            return
+        if decoded is None or decoded.get("success") is False:
+            return
+        super().put(key, status=status, headers=headers, body=body, ttl=ttl)
+
+
 def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_DATAGOV_SNAPSHOT")
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
@@ -161,18 +183,18 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
         path = Path(snapshot)
         if not path.is_file():
             return None, "snapshot", "data.gov.au is unavailable"
-        return _load(path.read_text(encoding="utf-8")), "snapshot", ""
+        return _parsed(path.read_text(encoding="utf-8"), "snapshot")
     data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-datagov-au"))
-    cache = HttpCache(data_dir / "http_cache.sqlite")
+    cache = _JsonCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", url, params, b"", "anonymous")
     cached = cache.get(key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "stale" if offline or not cache.fresh(cached) else "hit"
-        return _load(cached.body.decode("utf-8")), state, ""
+        return _parsed(cached.body.decode("utf-8"), state)
     if offline:
         shipped = _PACKAGE / "data" / "package_search.json"
         if shipped.is_file():
-            return _load(shipped.read_text(encoding="utf-8")), "snapshot", ""
+            return _parsed(shipped.read_text(encoding="utf-8"), "snapshot")
         return None, "snapshot", "data.gov.au is unavailable"
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = _client(data_dir, allowlist, cache)
@@ -180,11 +202,11 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
         response = client.get(url, params=params, ttl=24 * 3600, skip_cache=force_live)
     except Exception as exc:
         message = _failure_message(exc)
-        if force_live:
+        if force_live or isinstance(exc, EgressDenied):
             return None, "snapshot", message
         cached = cache.get(key)
         if cached is not None:
-            return _load(cached.body.decode("utf-8")), "stale", ""
+            return _parsed(cached.body.decode("utf-8"), "stale")
         return None, "snapshot", message
     finally:
         client.close()
@@ -194,12 +216,22 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
         if not force_live:
             cached = cache.get(key)
             if cached is not None:
-                return _load(cached.body.decode("utf-8")), "stale", ""
+                return _parsed(cached.body.decode("utf-8"), "stale")
         return None, response.cache, f"upstream status {response.status}"
     text = _decode(response.body)
     if text is None:
-        return None, response.cache, "data.gov.au payload was not usable"
-    return _load(text), response.cache, ""
+        return None, response.cache, _UNUSABLE
+    return _parsed(text, response.cache)
+
+
+_UNUSABLE = "data.gov.au payload was not usable"
+
+
+def _parsed(text: str, cache: str) -> tuple[dict | None, str, str]:
+    payload = _load(text)
+    if payload is None:
+        return None, cache, _UNUSABLE
+    return payload, cache, ""
 
 
 def _client(data_dir: Path, allowlist: Path, cache: HttpCache) -> HttpClient:
@@ -294,22 +326,22 @@ def _record(package: dict, *, detail: bool) -> dict:
             continue
         resources.append(
             {
-                "id": str(item.get("id") or ""),
+                "id": _plain(item.get("id"), _PLAIN_ID),
                 "name": _as_text(item.get("name") or ""),
-                "format": str(item.get("format") or ""),
-                "url": str(item.get("url") or ""),
+                "format": _plain(item.get("format"), _PLAIN_TOKEN),
+                "url": _plain(item.get("url"), _PLAIN_URL),
             }
         )
     licence = package.get("license_id")
     row = {
-        "id": str(package.get("id") or ""),
-        "name": str(package.get("name") or ""),
+        "id": _plain(package.get("id"), _PLAIN_ID),
+        "name": _plain(package.get("name"), _PLAIN_ID),
         "title": _as_text(package.get("title") or ""),
         "publisher": _as_text(_publisher(package)),
-        "licence": "" if licence is None else str(licence).strip(),
+        "licence": _plain(licence, _PLAIN_TOKEN),
         "licence_title": _as_text(package.get("license_title") or ""),
         "licence_missing": _licence_missing(licence),
-        "modified": str(package.get("metadata_modified") or ""),
+        "modified": _plain(package.get("metadata_modified"), _PLAIN_TOKEN),
         "resources": resources,
     }
     if detail:
@@ -337,6 +369,29 @@ def _licence_warnings(rows: list[dict]) -> list[str]:
     if not missing:
         return []
     return ["dataset has no licence: " + ", ".join(missing)]
+
+
+def _plain(value, pattern: re.Pattern) -> str:
+    """Pass through short plain values. Anything else is upstream free text, so wrap it."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or pattern.fullmatch(text):
+        return text
+    return _as_text(text)
+
+
+def _provenance(cache: str) -> list[str]:
+    if cache == "stale":
+        return ["answered from a stale cached copy, not a live result"]
+    if cache != "snapshot":
+        return []
+    if os.environ.get("CYBERAU_DATAGOV_SNAPSHOT"):
+        return ["answered from the CYBERAU_DATAGOV_SNAPSHOT file, not a live result"]
+    return [
+        "answered from the synthetic sample snapshot shipped with this connector, "
+        "not live data from data.gov.au"
+    ]
 
 
 def _as_text(value) -> str:
@@ -371,8 +426,8 @@ def _validate_search(query: str, limit: int) -> str:
     return ""
 
 
-def _persist(rows: list[dict]) -> None:
-    if not rows:
+def _persist(rows: list[dict], cache: str) -> None:
+    if not rows or cache == "snapshot":
         return
     directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-datagov-au"))
     directory.mkdir(parents=True, exist_ok=True)
