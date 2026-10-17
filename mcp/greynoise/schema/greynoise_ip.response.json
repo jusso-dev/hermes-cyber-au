@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ip", "noise", "riot", "classification", "name", "link", "last_seen", "message"],
+  "properties": {
+    "ip": {"type": "string"},
+    "noise": {"type": "boolean"},
+    "riot": {"type": "boolean"},
+    "classification": {"type": "string"},
+    "name": {"type": "string"},
+    "link": {"type": "string"},
+    "last_seen": {"type": "string"},
+    "message": {"type": "string"}
+  }
+}

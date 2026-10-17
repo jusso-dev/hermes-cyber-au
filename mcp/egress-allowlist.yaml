@@ -264,3 +264,8 @@ connectors:
     - api.github.com
     allow_ip_literals: false
     allow_http_loopback: false
+  greynoise:
+    hosts:
+    - api.greynoise.io
+    allow_ip_literals: false
+    allow_http_loopback: false

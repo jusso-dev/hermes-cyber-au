@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.greynoise.io/v3/community/1.1.1.1
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"ip":"1.1.1.1","noise":false,"riot":true,"classification":"benign","name":"Cloudflare","link":"https://viz.greynoise.io/riot/1.1.1.1","last_seen":"2020-01-01","message":"Success"}'

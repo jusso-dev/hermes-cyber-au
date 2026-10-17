@@ -220,3 +220,15 @@ servers:
     enabled_by_default: true
     required_env:
     - GITHUB_ADVISORY_TOKEN
+  greynoise:
+    connector: greynoise
+    args:
+    - serve
+    - greynoise
+    env:
+    - GREYNOISE_API_KEY=${GREYNOISE_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
