@@ -1,0 +1,15 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["domain", "counts"],
+    "properties": {
+      "domain": {"type": "string"},
+      "counts": {"type": "object"},
+      "malware_families": {"type": "array"},
+      "first_seen": {"type": ["string", "null"]},
+      "last_seen": {"type": ["string", "null"]}
+    }
+  }
+}

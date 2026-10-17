@@ -1,0 +1,13 @@
+{
+  "data": {
+    "entity": {"id": "ih:example", "name": "Example Pty Ltd", "type": "Company"},
+    "risk": {
+      "score": 42,
+      "criticalityLabel": "Medium",
+      "rules": 2,
+      "evidenceDetails": [
+        {"rule": "syntheticRule", "evidenceString": "Synthetic evidence for example.com.au"}
+      ]
+    }
+  }
+}

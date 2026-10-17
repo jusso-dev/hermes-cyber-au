@@ -17,6 +17,7 @@ members = [
     "cyberau-first-epss",
     "cyberau-nvd",
     "cyberau-premium",
+    "cyberau-recorded-future",
     "cyberau-workspace",
 ]
 
@@ -457,6 +458,21 @@ requires-dist = [
     { name = "cyberau-common", editable = "common" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
+]
+
+[[package]]
+name = "cyberau-recorded-future"
+version = "0.1.0"
+source = { editable = "recorded-future" }
+dependencies = [
+    { name = "cyberau-common" },
+    { name = "cyberau-premium" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
 ]
 
 [[package]]

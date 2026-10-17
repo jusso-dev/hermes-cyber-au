@@ -12,5 +12,6 @@ def vcr_config():
             "api-key",
             "apiKey",
             "apikey",
+            "x-rftoken",
         ]
     }

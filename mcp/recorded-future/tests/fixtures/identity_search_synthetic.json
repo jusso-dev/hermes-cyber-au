@@ -1,0 +1,7 @@
+{
+  "count": 2,
+  "identities": [
+    {"login": "user@example.com.au", "domain": "example.com.au"},
+    {"login": "other@example.com.au", "domain": "example.com.au"}
+  ]
+}

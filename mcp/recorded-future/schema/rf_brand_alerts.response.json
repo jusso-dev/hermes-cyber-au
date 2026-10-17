@@ -1,0 +1,18 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["alert_id", "category", "own_organisation"],
+    "properties": {
+      "alert_id": {"type": "string"},
+      "category": {"type": "string"},
+      "priority": {"type": "string"},
+      "status": {"type": "string"},
+      "summary": {"type": "string"},
+      "ransomware": {"type": "boolean"},
+      "matched": {"type": "boolean"},
+      "own_organisation": {"type": "boolean"},
+      "created": {"type": ["string", "null"]}
+    }
+  }
+}

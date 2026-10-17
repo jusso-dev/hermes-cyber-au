@@ -1,0 +1,13 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["sha1", "exposures"],
+    "properties": {
+      "sha1": {"type": "string"},
+      "exposures": {"type": "integer"},
+      "first_seen": {"type": ["string", "null"]},
+      "last_seen": {"type": ["string", "null"]}
+    }
+  }
+}

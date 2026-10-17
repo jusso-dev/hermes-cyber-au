@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "since": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD, Australia/Sydney"
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "dark_web_brand",
+          "domain_abuse",
+          "identity_novel_exposures",
+          "code_repo_leakage",
+          "third_party_risk"
+        ]
+      },
+      "default": [
+        "dark_web_brand",
+        "domain_abuse"
+      ]
+    },
+    "statuses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 250,
+      "default": 50
+    }
+  },
+  "required": []
+}

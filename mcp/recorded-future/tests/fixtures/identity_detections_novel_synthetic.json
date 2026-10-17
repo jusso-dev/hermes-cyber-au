@@ -1,0 +1,27 @@
+{
+  "total": 1,
+  "detections": [
+    {
+      "id": "det-example-1",
+      "novel": true,
+      "type": "External",
+      "source_type": "MalwareLogs",
+      "subject": "user@example.com.au",
+      "authorization_service": {
+        "url": "https://login.example.com.au",
+        "domain": "example.com.au",
+        "fqdn": "login.example.com.au",
+        "protocols": ["https"],
+        "technology": {"id": "web", "name": "Webmail", "category": "mail"}
+      },
+      "malware_family": {"id": "fam-1", "name": "ExampleStealer"},
+      "dump": {
+        "name": "synthetic-dump",
+        "source": "synthetic",
+        "downloaded": "2026-10-01T00:00:00Z",
+        "breaches": []
+      },
+      "created": "2026-10-16T01:00:00Z"
+    }
+  ]
+}

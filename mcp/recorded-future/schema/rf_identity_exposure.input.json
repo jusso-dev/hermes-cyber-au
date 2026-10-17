@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "hostname"
+      },
+      "minItems": 1,
+      "maxItems": 50,
+      "description": "Must all be on the user's org-exposure watchlist unless `allow_external` is set by the user"
+    },
+    "domain_types": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "Email",
+          "Authorization"
+        ]
+      },
+      "default": [
+        "Email",
+        "Authorization"
+      ]
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 100
+    }
+  },
+  "required": [
+    "domains"
+  ]
+}

@@ -260,12 +260,18 @@ def _from_cache(item, state: str, url: str) -> Response:
     )
 
 
+_REDIRECT_DROPPED = {
+    "authorization",
+    "auth-key",
+    "x-otx-api-key",
+    "x-api-key",
+    "api-key",
+    "x-rftoken",
+}
+
+
 def _drop_secret_headers(headers: dict) -> dict:
-    return {
-        key: value
-        for key, value in headers.items()
-        if key.lower() not in {"authorization", "auth-key", "x-otx-api-key", "x-api-key", "api-key"}
-    }
+    return {key: value for key, value in headers.items() if key.lower() not in _REDIRECT_DROPPED}
 
 
 def _read_capped(response: httpx.Response, max_bytes: int) -> bytes:

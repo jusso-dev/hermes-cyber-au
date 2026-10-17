@@ -1,0 +1,12 @@
+{
+  "identity_search": {"count": 0, "identities": []},
+  "detections": {"total": 0, "detections": []},
+  "playbook_search": {"data": []},
+  "company": {
+    "data": {
+      "entity": {"id": "company:example", "name": "Example Pty Ltd", "type": "Company"},
+      "risk": {"score": 0}
+    }
+  },
+  "alert_detail": {"data": {}}
+}

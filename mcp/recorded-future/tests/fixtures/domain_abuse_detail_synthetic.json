@@ -1,0 +1,11 @@
+{
+  "data": {
+    "playbook_alert_id": "da-1",
+    "panel_evidence_summary": {
+      "explanation": "Lookalike examp1e.com.au impersonates example.com.au",
+      "screenshots": [
+        {"url": "https://cdn.example.com.au/shot.png", "image_id": "img-1"}
+      ]
+    }
+  }
+}
