@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "URLhaus API answers: /v1/url/, /v1/host/, /v1/payload/ and /v1/urls/recent/. Only the fields the connector reads are required.",
+  "type": "object",
+  "required": ["query_status"],
+  "properties": {
+    "query_status": {"type": "string"}
+  },
+  "if": {
+    "properties": {"query_status": {"const": "ok"}},
+    "required": ["query_status"]
+  },
+  "then": {
+    "anyOf": [
+      {"required": ["url", "url_status", "date_added"]},
+      {"required": ["host", "urls"]},
+      {"required": ["sha256_hash", "urls"]},
+      {"required": ["urls"]}
+    ],
+    "properties": {
+      "urls": {
+        "type": "array",
+        "items": {"type": "object", "required": ["url", "url_status"]}
+      },
+      "payloads": {
+        "type": ["array", "null"],
+        "items": {"type": "object", "required": ["response_sha256"]}
+      }
+    }
+  }
+}

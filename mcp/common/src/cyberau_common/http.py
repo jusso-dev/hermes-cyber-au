@@ -5,6 +5,7 @@ from __future__ import annotations
 import email.utils
 import random
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 import httpx
 
@@ -104,6 +105,7 @@ class HttpClient:
         ttl: int,
         cache_key_extra: str = "",
         stale_if_error: int = 86400,
+        skip_cache: bool = False,
     ) -> Response:
         encoded = _json_bytes(body)
         key_body = encoded + b"\n" + cache_key_extra.encode()
@@ -117,6 +119,31 @@ class HttpClient:
             ttl=ttl,
             stale_if_error=stale_if_error,
             key_body=key_body,
+            skip_cache=skip_cache,
+        )
+
+    def post_form(
+        self,
+        url: str,
+        fields: dict[str, str],
+        *,
+        headers=None,
+        ttl: int,
+        stale_if_error: int = 86400,
+        skip_cache: bool = False,
+    ) -> Response:
+        encoded = urlencode(sorted(fields.items())).encode()
+        extra_headers = {"content-type": "application/x-www-form-urlencoded"}
+        return self._fetch(
+            "POST",
+            url,
+            params=None,
+            headers={**extra_headers, **(headers or {})},
+            content=encoded,
+            ttl=ttl,
+            stale_if_error=stale_if_error,
+            key_body=encoded,
+            skip_cache=skip_cache,
         )
 
     def _fetch(

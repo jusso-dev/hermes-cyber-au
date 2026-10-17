@@ -32,3 +32,11 @@ connectors:
     - services.nvd.nist.gov
     allow_ip_literals: false
     allow_http_loopback: false
+  abusech:
+    hosts:
+    - urlhaus-api.abuse.ch
+    - threatfox-api.abuse.ch
+    - mb-api.abuse.ch
+    - feodotracker.abuse.ch
+    allow_ip_literals: false
+    allow_http_loopback: false

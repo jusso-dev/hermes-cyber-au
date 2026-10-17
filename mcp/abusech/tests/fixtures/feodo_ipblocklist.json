@@ -1,0 +1,38 @@
+[
+  {
+    "ip_address": "192.0.2.10",
+    "port": 443,
+    "status": "online",
+    "hostname": null,
+    "as_number": 64496,
+    "as_name": "SYNTHETIC-AS-1",
+    "country": "US",
+    "first_seen": "2026-10-10 04:00:00",
+    "last_online": "2026-10-16",
+    "malware": "Emotet"
+  },
+  {
+    "ip_address": "198.51.100.7",
+    "port": 8080,
+    "status": "offline",
+    "hostname": "c2.example.test",
+    "as_number": 64497,
+    "as_name": "SYNTHETIC-AS-2",
+    "country": "AU",
+    "first_seen": "2026-09-01 04:00:00",
+    "last_online": "2026-10-01",
+    "malware": "QakBot"
+  },
+  {
+    "ip_address": "203.0.113.25",
+    "port": 447,
+    "status": "online",
+    "hostname": null,
+    "as_number": 64498,
+    "as_name": null,
+    "country": "DE",
+    "first_seen": "2026-10-12 09:30:00",
+    "last_online": "2026-10-16",
+    "malware": "Dridex"
+  }
+]

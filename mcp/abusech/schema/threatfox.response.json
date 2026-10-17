@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "ThreatFox API answers for get_iocs, search_ioc and search_hash.",
+  "type": "object",
+  "required": ["query_status"],
+  "properties": {
+    "query_status": {"type": "string"}
+  },
+  "if": {
+    "properties": {"query_status": {"const": "ok"}},
+    "required": ["query_status"]
+  },
+  "then": {
+    "required": ["data"],
+    "properties": {
+      "data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "ioc", "ioc_type", "threat_type", "malware", "confidence_level", "first_seen"]
+        }
+      }
+    }
+  }
+}

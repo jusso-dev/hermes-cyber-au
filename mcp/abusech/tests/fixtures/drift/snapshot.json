@@ -1,0 +1,16 @@
+{
+  "feodo:ipblocklist": [
+    {
+      "port": 443,
+      "status": "online",
+      "hostname": null,
+      "as_number": 64496,
+      "as_name": "SYNTHETIC-AS-1",
+      "country": "US",
+      "first_seen": "2026-10-10 04:00:00",
+      "last_online": "2026-10-16",
+      "malware": "Emotet",
+      "ip": "192.0.2.10"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Feodo Tracker ipblocklist.json: an array of botnet C2 entries.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["ip_address", "port", "status", "country", "malware", "first_seen"]
+  }
+}

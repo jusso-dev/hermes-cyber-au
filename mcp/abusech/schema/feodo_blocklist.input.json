@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "country": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "indicator": {
+      "type": "string",
+      "minLength": 3
+    },
+    "type": {
+      "enum": [
+        "url",
+        "domain",
+        "ip",
+        "md5",
+        "sha1",
+        "sha256"
+      ]
+    }
+  },
+  "required": [
+    "indicator"
+  ]
+}
