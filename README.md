@@ -90,7 +90,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | PhishTank verified phishing URLs | `phish` | Global threat intelligence | `PHISHTANK_APP_KEY` (optional) | on | v1.0 | planned | https://phishtank.org/developer_info.php |
 | OpenPhish community feed | `phish` | Global threat intelligence | none | on | v1.0 | planned | https://openphish.com/ |
 | MISP via the official MISP MCP server, for your own instance or AusMISP | `misp` | CTI platforms | `MISP_URL`, `MISP_API_KEY` | off: bring your own access | v1.0 | planned | https://www.misp-project.org/ |
-| OpenCTI (your own instance) | `opencti` | CTI platforms | `OPENCTI_URL`, `OPENCTI_TOKEN` | off: bring your own access | v1.0 | planned | https://docs.opencti.io/ |
+| OpenCTI (your own instance) | `opencti` | CTI platforms | `OPENCTI_URL`, `OPENCTI_TOKEN` | off: bring your own access | v1.0 | planned | [docs/connectors/opencti.md](docs/connectors/opencti.md) |
 | Hudson Rock Cavalier (infostealer exposure by domain) | `hudsonrock` | Credential and infostealer exposure | `HUDSONROCK_API_KEY` | off: paid, bring your own licence | v1.0 | planned | https://docs.hudsonrock.com/ |
 | SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) | `spycloud` | Credential and infostealer exposure | `SPYCLOUD_API_KEY` | off: paid, bring your own licence | v1.0 | planned | https://docs.spycloud.com/public-sc/docs/api-guidelines |
 | UpGuard CyberRisk (identity breaches, data leaks and typosquats; Australian vendor) | `upguard` | Attack surface and brand monitoring | `UPGUARD_API_KEY` | off: paid, bring your own licence | v0.2 | planned | https://cyber-risk.upguard.com/api/docs |

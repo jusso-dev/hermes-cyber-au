@@ -1,0 +1,49 @@
+{
+  "pages": [
+    {
+      "data": {
+        "stixCoreObjects": {
+          "pageInfo": {
+            "endCursor": "cursor-2",
+            "hasNextPage": true,
+            "globalCount": 2
+          },
+          "edges": [
+            {
+              "node": {
+                "id": "malware--page-1",
+                "entity_type": "Malware",
+                "representative": {"main": "Example Malware"},
+                "name": "Example Malware",
+                "description": "Synthetic malware on page one.",
+                "aliases": ["ExampleFamily"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "data": {
+        "stixCoreObjects": {
+          "pageInfo": {
+            "endCursor": null,
+            "hasNextPage": false,
+            "globalCount": 2
+          },
+          "edges": [
+            {
+              "node": {
+                "id": "report--page-2",
+                "entity_type": "Report",
+                "representative": {"main": "Example Report"},
+                "name": "Example Report",
+                "description": "Synthetic report on page two."
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "data": {
+    "indicators": {
+      "edges": [
+        {
+          "node": {
+            "id": "indicator--example",
+            "entity_type": "Indicator",
+            "name": "example.com",
+            "description": "Synthetic indicator\u0007 with a bell.",
+            "pattern": "[domain-name:value = 'example.com']",
+            "pattern_type": "stix",
+            "x_opencti_score": 70,
+            "representative": {"main": "example.com"},
+            "stixCoreRelationships": {
+              "edges": [
+                {
+                  "node": {
+                    "id": "relationship--example",
+                    "relationship_type": "indicates",
+                    "description": "Indicates the synthetic malware.",
+                    "to": {
+                      "id": "malware--page-1",
+                      "entity_type": "Malware",
+                      "name": "Example Malware"
+                    }
+                  }
+                }
+              ]
+            },
+            "stixSightingRelationships": {
+              "edges": [
+                {
+                  "node": {
+                    "id": "sighting--example",
+                    "description": "Seen in a synthetic network.",
+                    "first_seen": "2026-01-01T00:00:00.000Z",
+                    "last_seen": "2026-01-02T00:00:00.000Z",
+                    "attribute_count": 3
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

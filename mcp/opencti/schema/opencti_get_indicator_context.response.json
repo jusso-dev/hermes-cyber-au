@@ -1,0 +1,65 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "entity_type",
+      "name",
+      "description",
+      "pattern",
+      "pattern_type",
+      "score",
+      "relationships",
+      "sightings"
+    ],
+    "properties": {
+      "id": {"type": "string"},
+      "entity_type": {"type": "string"},
+      "name": {"type": "string"},
+      "description": {"type": "string"},
+      "pattern": {"type": "string"},
+      "pattern_type": {"type": "string"},
+      "score": {"type": ["integer", "null"]},
+      "relationships": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "relationship_type",
+            "description",
+            "target_id",
+            "target_type",
+            "target_name"
+          ],
+          "properties": {
+            "id": {"type": "string"},
+            "relationship_type": {"type": "string"},
+            "description": {"type": "string"},
+            "target_id": {"type": "string"},
+            "target_type": {"type": "string"},
+            "target_name": {"type": "string"}
+          }
+        }
+      },
+      "sightings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "description", "first_seen", "last_seen", "count"],
+          "properties": {
+            "id": {"type": "string"},
+            "description": {"type": "string"},
+            "first_seen": {"type": "string"},
+            "last_seen": {"type": "string"},
+            "count": {"type": ["integer", "null"]}
+          }
+        }
+      }
+    }
+  }
+}

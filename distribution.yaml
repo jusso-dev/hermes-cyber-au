@@ -32,3 +32,9 @@ env_requires:
   - name: GREYNOISE_API_KEY
     description: "Optional GreyNoise community key."
     required: false
+  - name: OPENCTI_URL
+    description: "OpenCTI instance URL. Used only when you enable the opencti connector."
+    required: false
+  - name: OPENCTI_TOKEN
+    description: "API token for a read-only OpenCTI user. The connector stays off until enabled in config.yaml."
+    required: false

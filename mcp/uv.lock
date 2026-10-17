@@ -16,6 +16,7 @@ members = [
     "cyberau-common",
     "cyberau-first-epss",
     "cyberau-nvd",
+    "cyberau-opencti",
     "cyberau-workspace",
 ]
 
@@ -434,6 +435,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-nvd"
 version = "0.1.0"
 source = { editable = "nvd" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-opencti"
+version = "0.1.0"
+source = { editable = "opencti" }
 dependencies = [
     { name = "cyberau-common" },
 ]
