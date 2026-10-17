@@ -90,6 +90,12 @@ class HttpCache:
             ).fetchone()
         if row is None:
             return None
+        if self.ttl_max is not None and self._now() - row[3] >= self.ttl_max:
+            # A licence cache limit is a retention limit. Serving past it, even as
+            # stale-if-error or offline, would use data the terms no longer allow.
+            with self._connect() as conn:
+                conn.execute("DELETE FROM http_cache WHERE key = ?", (key,))
+            return None
         return CachedResponse(
             key=key,
             status=row[0],

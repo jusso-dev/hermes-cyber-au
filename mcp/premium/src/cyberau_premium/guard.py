@@ -47,7 +47,10 @@ def pre_tool_call(
     except TermsRejected as exc:
         return _block(book, spec.server, f"Blocked {spec.server}: {exc}.")
     settings = settings_for(spec, config)
-    pages = _pages(args)
+    try:
+        pages = _pages(args)
+    except (TypeError, ValueError):
+        return _block(book, spec.server, f"Blocked {spec.server}: pages must be a whole number.")
     if pages is not None and pages > settings.max_pages:
         return _block(
             book,
@@ -105,11 +108,9 @@ def _enabled(spec: VendorSpec, config: dict | None) -> bool:
     servers = config.get("mcp_servers") or {}
     entry = servers.get(spec.server) or {}
     if isinstance(entry, dict) and "enabled" in entry:
-        return bool(entry["enabled"])
+        return entry["enabled"] is True
     block = vendor_config(config, spec.server)
-    if "enabled" in block:
-        return bool(block["enabled"])
-    return False
+    return block.get("enabled") is True
 
 
 def _off_message(spec: VendorSpec) -> str:
@@ -123,7 +124,10 @@ def _pages(args: dict | None) -> int | None:
         return None
     for key in ("pages", "max_pages", "page_count"):
         if args.get(key) is not None:
-            return int(args[key])
+            value = args[key]
+            if isinstance(value, bool):
+                raise TypeError("pages must be a whole number")
+            return int(value)
     return None
 
 

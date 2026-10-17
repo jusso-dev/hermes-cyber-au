@@ -58,15 +58,13 @@ class ExposureStore:
         finding: ExposureFinding,
         *,
         terms: TermsProfile,
-        watchlist: Watchlist | None = None,
+        watchlist: Watchlist,
         values: dict | None = None,
         now: datetime | None = None,
     ) -> str:
         finding = clamp_to_terms(canonical_finding(finding), terms)
-        if watchlist is not None:
-            subject = finding.subject.value.casefold()
-            if subject not in watchlist.known_subjects():
-                return "dropped_third_party"
+        if finding.subject.value.casefold() not in watchlist.known_subjects():
+            return "dropped_third_party"
         if terms.store == "none":
             return "dropped_store_none"
         kept_values = values if terms.store == "full" else None
@@ -106,9 +104,7 @@ class ExposureStore:
 
     def rows(self) -> list[sqlite3.Row]:
         with self._connect() as conn:
-            return conn.execute(
-                "SELECT * FROM exposures ORDER BY finding_id"
-            ).fetchall()
+            return conn.execute("SELECT * FROM exposures ORDER BY finding_id").fetchall()
 
     def delete_expired(self, now: datetime) -> int:
         with self._connect() as conn:
@@ -131,18 +127,22 @@ def _row(finding: ExposureFinding, *, now: datetime) -> dict:
     if finding.data_classes is not None:
         data_classes = json.dumps([redact_text(item) for item in finding.data_classes])
     counts = None if finding.counts is None else json.dumps(finding.counts)
+    source_ref = None if finding.source_ref is None else redact_text(finding.source_ref)
+    watchlist_entry = finding.subject.watchlist_entry
+    if watchlist_entry is not None:
+        watchlist_entry = redact_text(watchlist_entry)
     return {
         "finding_id": finding.finding_id,
         "vendor": finding.vendor,
         "kind": finding.kind,
         "subject_type": finding.subject.type,
-        "subject_value": finding.subject.value,
-        "watchlist_entry": finding.subject.watchlist_entry,
+        "subject_value": redact_text(finding.subject.value),
+        "watchlist_entry": watchlist_entry,
         "counts_json": counts,
         "data_classes": data_classes,
         "first_seen": _iso(first),
         "observed_at": _iso(observed),
-        "source_ref": finding.source_ref,
+        "source_ref": source_ref,
         "confidence": finding.confidence,
         "licence_scope": finding.licence_scope,
         "stix_exportable": 1 if finding.stix_exportable else 0,

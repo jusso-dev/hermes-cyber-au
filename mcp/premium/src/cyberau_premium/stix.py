@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import uuid
 
 from cyberau_premium.store import ExposureStore
@@ -37,9 +38,24 @@ def _object(row) -> dict:
         "id": f"indicator--{object_id}",
         "name": row["kind"],
         "pattern_type": "stix",
-        "pattern": f"[domain-name:value = '{row['subject_value']}']",
+        "pattern": _pattern(row["subject_type"], row["subject_value"]),
+        "created": row["observed_at"],
+        "modified": row["observed_at"],
         "valid_from": row["observed_at"],
         "x_cyberau_finding_id": finding,
         "x_cyberau_vendor": row["vendor"],
         "confidence_label": row["confidence"],
     }
+
+
+def _pattern(subject_type: str, value: str) -> str:
+    quoted = value.replace("\\", "\\\\").replace("'", "\\'")
+    if subject_type in {"domain", "email_domain"}:
+        return f"[domain-name:value = '{quoted}']"
+    if subject_type == "ip":
+        try:
+            kind = "ipv6-addr" if ipaddress.ip_address(value).version == 6 else "ipv4-addr"
+        except ValueError:
+            kind = "x-cyberau-ip"
+        return f"[{kind}:value = '{quoted}']"
+    return f"[x-cyberau-{subject_type}:value = '{quoted}']"

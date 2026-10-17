@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
 
 from cyberau_common.secrets import lookup
 from cyberau_common.server import Connector, Probe
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 CacheMode = Literal["none", "session", "ttl"]
 StoreMode = Literal["none", "metadata", "full"]
@@ -33,6 +34,7 @@ _SCOPE_FOR_STORE: dict[StoreMode, LicenceScope] = {
     "metadata": "store_metadata",
     "full": "store_full",
 }
+_COUNT_NAME = re.compile(r"[a-z][a-z0-9_]{0,31}")
 _SCOPE_RANK = {"session_only": 0, "store_metadata": 1, "store_full": 2}
 
 
@@ -46,6 +48,14 @@ class TermsProfile(BaseModel):
     share_outside_profile: bool = False
     redistribution: Redistribution = "forbidden"
     attribution: str
+
+    @model_validator(mode="after")
+    def _ttl_needs_a_cap(self) -> TermsProfile:
+        if self.cache_ttl_max_s < 0:
+            raise ValueError("cache_ttl_max_s cannot be negative")
+        if self.cache == "ttl" and self.cache_ttl_max_s == 0:
+            raise ValueError("cache ttl needs cache_ttl_max_s above zero")
+        return self
 
 
 class QuotaPolicy(BaseModel):
@@ -91,6 +101,16 @@ class ExposureFinding(BaseModel):
     source_ref: str | None = None
     stix_exportable: bool = False
     contains_personal_information: bool = False
+
+    @field_validator("counts")
+    @classmethod
+    def _count_names_are_plain(cls, value: dict[str, int] | None) -> dict[str, int] | None:
+        # Count names come from a feed. Keep them to plain identifiers so they
+        # cannot carry free text into a result.
+        for name in value or {}:
+            if not _COUNT_NAME.fullmatch(name):
+                raise ValueError("counts names must be lower case identifiers")
+        return value
 
 
 class Watchlist(BaseModel):

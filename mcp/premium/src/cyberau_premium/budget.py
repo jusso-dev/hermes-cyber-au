@@ -94,17 +94,19 @@ class BudgetLedger:
             conn.executescript(_SCHEMA)
 
     def usage(self, vendor: str, *, now: datetime | None = None) -> Usage:
-        moment = now or self._now()
-        day, month = sydney_keys(moment)
         with self._connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT day, calls, cost_units, routine
-                FROM premium_ledger
-                WHERE vendor = ? AND month = ?
-                """,
-                (vendor, month),
-            ).fetchall()
+            return self._usage(conn, vendor, now or self._now())
+
+    def _usage(self, conn: sqlite3.Connection, vendor: str, moment: datetime) -> Usage:
+        day, month = sydney_keys(moment)
+        rows = conn.execute(
+            """
+            SELECT day, calls, cost_units, routine
+            FROM premium_ledger
+            WHERE vendor = ? AND month = ?
+            """,
+            (vendor, month),
+        ).fetchall()
         calls_today = calls_month = routine_today = routine_month = 0
         cost_month = routine_cost = 0.0
         for row_day, calls, cost, routine in rows:
@@ -135,16 +137,30 @@ class BudgetLedger:
         approved: bool = False,
         now: datetime | None = None,
     ) -> Decision:
-        decision = self.assess(
-            vendor,
-            settings,
-            routine=routine,
-            approved=approved,
-            now=now,
-        )
-        if decision.decision == "allow":
-            self.commit(vendor, settings.quota.cost_units_per_call, routine=routine, now=now)
-        else:
+        # Check and spend under one write lock, so two concurrent calls cannot
+        # both pass the last unit of a limit.
+        moment = now or self._now()
+        conn = self._connect()
+        try:
+            conn.isolation_level = None
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                decision = self._decide(
+                    vendor,
+                    settings,
+                    self._usage(conn, vendor, moment),
+                    routine=routine,
+                    approved=approved,
+                )
+                if decision.decision == "allow":
+                    self._spend(conn, vendor, settings.quota.cost_units_per_call, routine, moment)
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        finally:
+            conn.close()
+        if decision.decision != "allow":
             self.log(vendor, decision.decision, decision.message, now=now)
             if decision.decision == "block":
                 LOGGER.warning("%s", decision.message)
@@ -159,8 +175,24 @@ class BudgetLedger:
         approved: bool = False,
         now: datetime | None = None,
     ) -> Decision:
+        return self._decide(
+            vendor,
+            settings,
+            self.usage(vendor, now=now),
+            routine=routine,
+            approved=approved,
+        )
+
+    def _decide(
+        self,
+        vendor: str,
+        settings: BudgetSettings,
+        usage: Usage,
+        *,
+        routine: bool,
+        approved: bool,
+    ) -> Decision:
         quota = settings.quota
-        usage = self.usage(vendor, now=now)
         cost = quota.cost_units_per_call
         share = settings.routine_share
         tripped = _first_limit(usage, quota, cost, share, routine)
@@ -199,20 +231,28 @@ class BudgetLedger:
         routine: bool = False,
         now: datetime | None = None,
     ) -> None:
-        moment = now or self._now()
-        day, month = sydney_keys(moment)
-        flag = 1 if routine else 0
         with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO premium_ledger (vendor, day, month, calls, cost_units, routine)
-                VALUES (?, ?, ?, 1, ?, ?)
-                ON CONFLICT(vendor, day, routine) DO UPDATE SET
-                    calls = calls + 1,
-                    cost_units = cost_units + excluded.cost_units
-                """,
-                (vendor, day, month, cost_units, flag),
-            )
+            self._spend(conn, vendor, cost_units, routine, now or self._now())
+
+    def _spend(
+        self,
+        conn: sqlite3.Connection,
+        vendor: str,
+        cost_units: float,
+        routine: bool,
+        moment: datetime,
+    ) -> None:
+        day, month = sydney_keys(moment)
+        conn.execute(
+            """
+            INSERT INTO premium_ledger (vendor, day, month, calls, cost_units, routine)
+            VALUES (?, ?, ?, 1, ?, ?)
+            ON CONFLICT(vendor, day, routine) DO UPDATE SET
+                calls = calls + 1,
+                cost_units = cost_units + excluded.cost_units
+            """,
+            (vendor, day, month, cost_units, 1 if routine else 0),
+        )
 
     def log(self, vendor: str, decision: str, reason: str, *, now: datetime | None = None) -> None:
         moment = now or self._now()

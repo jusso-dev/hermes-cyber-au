@@ -22,7 +22,7 @@ Each premium server in `mcp/servers.yaml` has `default_enabled: false`. Paid ser
 
 | Flag | What it does |
 | --- | --- |
-| `cache` | `none` stores nothing. `session` keeps the response in memory and clears it when the session ends. `ttl` may touch disk, and only up to `cache_ttl_max_s`. |
+| `cache` | `none` stores nothing. `session` keeps the response in memory and clears it when the session ends. `ttl` may touch disk, and only up to `cache_ttl_max_s`. A `ttl` cache needs a cap above zero. An entry older than the cap is deleted and is never served, including offline or when the vendor errors. |
 | `store` | `none` does not write the intel store. `metadata` keeps counts, classes and references, and drops credential values. `full` still redacts passwords, cookies and tokens before anything is kept. |
 | `stix_export` | When false, STIX export skips the finding and reports how many it skipped. |
 | `share_outside_profile` | When false, a briefing sent anywhere other than the owner's channel omits the finding. |
@@ -54,9 +54,9 @@ Where a vendor has not published a number, the quota is not set. Set `monthly_bu
 
 Exposure data often contains personal information about staff or customers. Treat it under the Australian Privacy Principles: collect only what the task needs (APP 3), use it only for the security purpose it was collected for (APP 6), and take reasonable steps to protect it and destroy it when no longer needed (APP 11). Most vendors are overseas, so query parameters sent to them are a cross-border disclosure to consider under APP 8. This is guidance for the operator, not legal advice.
 
-The store keeps a finding for 90 days (`expires_at`), then the retention job deletes it. A repeat finding updates `observed_at` and the counts. Passwords, session cookies and tokens are replaced with a type and a short hash before anything leaves the connector. They are not stored and not displayed.
+The store keeps a finding for 90 days (`expires_at`), then the retention job deletes it. A repeat finding updates `observed_at` and the counts. Passwords, session cookies, tokens, `email:password` lines, URL credentials, Australian phone numbers, tax file, Medicare, passport and licence numbers, and dates of birth are replaced with a type and a short hash before anything leaves the connector. They are not stored and not displayed. Names, street addresses and free-form passwords that contain spaces cannot be found by pattern, so the shared code never stores vendor record bodies, only the fields in the finding schema. Free text that is returned (subject, reference and data classes) is wrapped as untrusted. The short hash is a label, not protection: a weak password can be guessed back from it, so do not paste redacted output into places that are less protected than the original.
 
-Leak site claims are allegations made by criminals. They are labelled `unverified_claim`. Do not download leaked files or follow leak site links. Findings about organisations that are not on your watchlist are not stored and are not mentioned in briefings unless you ask. Nothing in this distribution contacts the OAIC, ASD, affected individuals, the victim organisation or a vendor. A skill can draft. A person sends. A finding about your own organisation may start the clock for assessing a suspected eligible data breach under the NDB scheme. Hand that to the breach notification skill.
+Leak site claims are allegations made by criminals. They are labelled `unverified_claim`. Do not download leaked files or follow leak site links. Findings about organisations that are not on your watchlist (the store requires a watchlist on every write) are not stored and are not mentioned in briefings unless you ask. Nothing in this distribution contacts the OAIC, ASD, affected individuals, the victim organisation or a vendor. A skill can draft. A person sends. A finding about your own organisation may start the clock for assessing a suspected eligible data breach under the NDB scheme. Hand that to the breach notification skill.
 
 ## Vendor notes
 

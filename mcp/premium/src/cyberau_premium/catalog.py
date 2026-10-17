@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from cyberau_premium.base import PremiumConnector, QuotaPolicy, TermsProfile
 from cyberau_premium.paths import data_dir, package_root
@@ -106,7 +106,10 @@ def apply_terms(spec: VendorSpec, config: dict | None, *, audit_path=None) -> Te
     unknown = set(override) - set(_TERM_FIELDS)
     if unknown:
         raise TermsRejected(f"unknown terms fields: {', '.join(sorted(unknown))}")
-    proposed = spec.terms.model_copy(update=override)
+    try:
+        proposed = TermsProfile.model_validate({**spec.terms.model_dump(), **override})
+    except ValidationError as exc:
+        raise TermsRejected(f"invalid terms: {exc.error_count()} problem(s)") from exc
     relaxed = _relaxed_fields(spec.terms, proposed)
     if relaxed:
         if not isinstance(contract_ref, str) or not contract_ref.strip():
