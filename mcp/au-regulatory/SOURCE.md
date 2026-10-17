@@ -14,3 +14,18 @@ Section numbers checked against the register, not by submitting anything to a re
 - Cyber Security Act 2024 (Cth) s 27(1), from the Act as made on 29 November 2024: a reporting business entity must give the designated Commonwealth body a ransomware payment report within 72 hours of making the payment or of becoming aware that it was made. Who must report is s 26. The turnover threshold is the amount prescribed by the rules, not a figure in the Act. The latest register contents still place this duty in Part 3.
 
 The shipped snapshot is `data/obligations-2026-10-17.json`. Each answer is also appended to `$CYBERAU_DATA_DIR/aureg-obligations.jsonl` until the shared intel store exists.
+
+## Operator guide
+
+Read-only deadlines and source quotes for the OAIC Notifiable Data Breaches scheme, SOCI Act cyber incident reporting, and ransomware payment reporting under the Cyber Security Act 2024.
+
+| Tool | What it returns |
+|---|---|
+| `aureg_obligation` | The encoded rule, deadline and quoted source sentence for a regime and trigger |
+| `aureg_deadline` | Those deadlines calculated in Australia/Sydney from an awareness time |
+
+Regimes are `ndb`, `soci` and `ransomware_payment`. Triggers are `suspected_breach`, `eligible_breach`, `critical_incident`, `other_incident` and `payment`. Leave the trigger out of `aureg_obligation` to see every rule for that regime.
+
+Quotes are short passages from Commonwealth legislation, with the URL, retrieval date and SHA-256 of the quoted sentence. The 30 day NDB assessment, the 12 hour and 72 hour SOCI reports, and the 72 hour ransomware payment report are fixed in the shipped snapshot. A written record after an oral SOCI report is timed from the oral report, not from awareness. Notice to the Commissioner and to individuals under the NDB scheme is as soon as practicable, so those clocks do not invent a fixed hour.
+
+This is guidance, not legal advice. It is not endorsed by the OAIC, the Australian Signals Directorate, the Australian Cyber Security Centre or the Cyber and Infrastructure Security Centre.

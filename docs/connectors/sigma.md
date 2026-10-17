@@ -418,3 +418,19 @@ Release `r2026-07-01` (published 2026-07-09) exposes `sigma_core.zip`, `sigma_co
 Checked on PyPI the same day: pySigma 2.0.1 is current, but pySigma-backend-kusto 1.0.1, pySigma-backend-splunk 2.1.0 and pySigma-backend-elasticsearch 2.1.1 all require pySigma below 2. pySigma-backend-microsoft365defender is only a rename notice for the Kusto backend. This connector pins pySigma 1.5.1 and converts with KustoBackend (Microsoft Sentinel and Defender KQL), SplunkBackend and LuceneBackend.
 
 The shipped `rules_subset.zip` is a 10-rule offline fixture, not the upstream package. Rule text is untrusted.
+
+## Operator guide
+
+Read-only Sigma detection rules from SigmaHQ releases.
+
+| Tool | What it returns |
+|---|---|
+| `sigma_search` | Rules matching a keyword, ATT&CK technique, log source or level |
+| `sigma_get` | One rule by id, including the rule YAML |
+| `sigma_convert` | A stored rule, or supplied YAML, converted to Kusto, Splunk or Elasticsearch |
+
+An optional `GITHUB_TOKEN` raises the GitHub API limit. The connector reads the latest release, then downloads the core, core+ and emerging threats packages once for that tag. The offline snapshot is a 10-rule fixture. Rule text is untrusted, and every record keeps the rule id and author.
+
+Conversion uses pySigma with the Kusto backend for Microsoft Sentinel and Defender KQL, plus the Splunk and Elasticsearch Lucene backends. Those backends still require pySigma 1.x.
+
+Sigma rules by SigmaHQ are under the Detection Rule License (DRL) 1.1. Keep the rule id and author.
