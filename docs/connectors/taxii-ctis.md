@@ -36,4 +36,6 @@ Set these in the profile environment. Nothing is built in.
 
 The shipped egress allowlist has no host. Add the API root host before the first live call. Poll at most once an hour. For CTIS, ask for indicators no older than a month. Passing an older `added_after` still works for other TAXII servers, and the answer includes a warning.
 
+The API root must be https and carry no userinfo, query or fragment. A discovery document can only point the client at another root on the same host. A redirect off the allowlist is refused and no credential is sent on any redirect. With no live access the tools fall back to a synthetic sample that is labelled as such.
+
 This connector is not endorsed by ASD.

@@ -42,6 +42,7 @@ WINDOW_WARNING = (
     "added_after is older than 30 days. CTIS guidance is to poll indicators at most a month old."
 )
 UNAVAILABLE = "TAXII is unavailable. There is no cached or snapshot copy."
+SAMPLE_WARNING = "Shipped synthetic sample. This is not data from any TAXII server."
 POLL_LIMIT = "TAXII poll limit reached. Stay at or under one poll an hour."
 PAGE_LIMIT = "TAXII page limit reached for this hour."
 ACCEPT = "application/taxii+json;version=2.1"
@@ -79,6 +80,12 @@ _ADDED_AFTER = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[
 _TYPE_NAME = re.compile(r"^[a-z0-9-]{1,64}$")
 _LABEL = re.compile(r"^[A-Za-z0-9:+._-]{1,64}$")
 _QUOTED = re.compile(r"=\s*'([^']*)'")
+_STIX_ID = re.compile(r"^[a-z][a-z0-9-]{0,62}--[A-Za-z0-9._-]{1,128}$")
+_MEDIA_TYPE = re.compile(
+    r"^[A-Za-z0-9.+_-]{1,64}/[A-Za-z0-9.+_-]{1,64}(?:;[A-Za-z0-9=._ -]{1,64})*$"
+)
+_URL_VALUE = re.compile(r"^https?://[^\s<>\"']{1,2048}$", re.IGNORECASE)
+_TLP_TEXT = re.compile(r"^(?:tlp[:=_ -]*)?(clear|white|green|amber[+_ -]?strict|amber|red)$")
 _TRANSPORT = None
 _RESOLVER = None
 _SLEEP = time.sleep
@@ -93,7 +100,7 @@ def taxii_list_collections() -> dict:
         rows, cache, warning, urls = _list_collections(force_live=False)
     except sqlite3.Error:
         return _envelope([], "snapshot", warnings=("TAXII store could not be read.",))
-    warnings = (warning,) if warning else ()
+    warnings = tuple(item for item in (warning, _sample_note(rows, cache, urls)) if item)
     return _envelope(rows, cache, warnings=warnings, urls=urls)
 
 
@@ -117,6 +124,9 @@ def taxii_get_objects(
         return _envelope([], "snapshot", warnings=("TAXII store could not be read.",))
     if warning:
         warnings.append(warning)
+    note = _sample_note(rows, cache, urls)
+    if note:
+        warnings.append(note)
     return _envelope(rows, cache, warnings=tuple(warnings), urls=urls, data_as_of=as_of)
 
 
@@ -260,7 +270,7 @@ def _list_collections(*, force_live: bool) -> tuple[list[dict], str, str, list[s
     missing = _missing_env()
     if missing:
         return [], "snapshot", missing, []
-    root, problem, spent = _resolve_root(force_live=force_live)
+    root, problem = _resolve_root(force_live=force_live)
     if problem:
         return [], "snapshot", problem, []
     url = _collections_url(root)
@@ -268,7 +278,7 @@ def _list_collections(*, force_live: bool) -> tuple[list[dict], str, str, list[s
         url,
         {},
         ttl=COLLECTION_TTL,
-        poll=not spent,
+        poll=False,
         force_live=force_live,
         kind="collections",
     )
@@ -301,7 +311,8 @@ def _gather_objects(
         if problem:
             return [], cache, problem, urls, None
         raw = [item for item in payload.get("objects") or [] if isinstance(item, dict)]
-        _persist_objects(raw)
+        if urls or os.environ.get("CYBERAU_TAXII_SNAPSHOT"):
+            _persist_objects(raw)
         rows = [_normalise(item) for item in raw if _keep(item, added_after, types)]
         extra = ""
         if payload.get("more"):
@@ -315,7 +326,7 @@ def _gather_objects(
     problem = _collection_problem(collection)
     if problem:
         return [], "snapshot", problem, [], None
-    root, problem, spent = _resolve_root(force_live=force_live)
+    root, problem = _resolve_root(force_live=force_live)
     if problem:
         return [], "snapshot", problem, [], None
     url = _objects_url(root, collection or "")
@@ -324,14 +335,15 @@ def _gather_objects(
         added_after=added_after,
         types=types,
         limit=limit,
-        poll=not spent,
+        poll=True,
         force_live=force_live,
     )
     if warning and not raw:
         _note_error(collection or "unconfigured", warning)
         return [], cache, warning, [url], None
     _persist_objects(raw)
-    rows = [_normalise(item) for item in raw if _keep(item, added_after, types)]
+    # The server applies added_after to its own date-added, which an object does not carry.
+    rows = [_normalise(item) for item in raw if _keep(item, None, types)]
     return rows[:limit], cache, warning, [url], _as_of(rows[:limit])
 
 
@@ -349,6 +361,7 @@ def _page_objects(
         params["added_after"] = added_after
     if types:
         params["match[type]"] = ",".join(types)
+    first = dict(params)
     collected: list[dict] = []
     caches: list[str] = []
     seen: set[str] = set()
@@ -372,7 +385,7 @@ def _page_objects(
         for item in payload.get("objects") or []:
             if isinstance(item, dict):
                 collected.append(item)
-        kept = [item for item in collected if _keep(item, added_after, types)]
+        kept = [item for item in collected if _keep(item, None, types)]
         if len(kept) >= limit or not payload.get("more"):
             return collected, _merge_cache(caches), "", bool(payload.get("more"))
         saw_more = True
@@ -381,10 +394,31 @@ def _page_objects(
             warning = "TAXII page said more but sent no usable next token."
             break
         seen.add(token)
-        params = {"limit": str(max(1, limit)), "next": token}
+        params = {**first, "next": token}
     else:
         warning = "TAXII page cap reached for this poll."
     return collected, _merge_cache(caches), warning, saw_more
+
+
+def _sample_note(rows: list[dict], cache: str, urls: list[str]) -> str:
+    if rows and cache == "snapshot" and not urls and not os.environ.get("CYBERAU_TAXII_SNAPSHOT"):
+        return SAMPLE_WARNING
+    return ""
+
+
+def _store_fresh() -> bool:
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT last_sync FROM sync_status WHERE collection_id = ?",
+            (_active_collection(),),
+        ).fetchone()
+    if row is None or not row[0]:
+        return False
+    try:
+        synced = datetime.fromisoformat(row[0].replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return datetime.now(UTC) - synced < timedelta(seconds=OBJECT_TTL)
 
 
 def _ensure_stored() -> tuple[str, str]:
@@ -394,43 +428,45 @@ def _ensure_stored() -> tuple[str, str]:
     missing = _missing_env()
     if missing:
         return "snapshot", missing
-    if _object_count() > 0:
+    if _store_fresh():
         return "hit", ""
     start = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     _rows, cache, warning, _urls, _stamp = _gather_objects(
         start, ["indicator"], 1000, force_live=False
     )
+    if warning and _object_count() > 0:
+        return "stale", warning
     return cache, warning
 
 
-def _resolve_root(*, force_live: bool) -> tuple[str, str, bool]:
+def _resolve_root(*, force_live: bool) -> tuple[str, str]:
     configured = lookup("TAXII_API_ROOT")
     if not configured:
-        return "", "Set TAXII_API_ROOT.", False
+        return "", "Set TAXII_API_ROOT."
     problem = _validate_root(configured)
     if problem:
-        return "", problem, False
+        return "", problem
     if not _is_discovery(configured):
-        return _normal_root(configured), "", False
+        return _normal_root(configured), ""
     payload, _cache, warning = _http_json(
         _normal_root(configured),
         {},
         ttl=COLLECTION_TTL,
-        poll=True,
+        poll=False,
         force_live=force_live,
         kind="discovery",
     )
     if warning or payload is None:
-        return "", warning or UNAVAILABLE, True
+        return "", warning or UNAVAILABLE
     if not isinstance(payload.get("api_roots"), list):
-        return "", "TAXII discovery payload has no api_roots list.", True
-    chosen = _choose_root(payload)
+        return "", "TAXII discovery payload has no api_roots list."
+    chosen = _choose_root(payload, _host(configured))
     if not chosen:
-        return "", "TAXII discovery did not list an allowlisted API root.", True
-    return chosen, "", True
+        return "", "TAXII discovery did not list an API root on the configured host."
+    return chosen, ""
 
 
-def _choose_root(payload: dict) -> str:
+def _choose_root(payload: dict, host: str) -> str:
     candidates: list[str] = []
     default = payload.get("default")
     if isinstance(default, str):
@@ -439,7 +475,7 @@ def _choose_root(payload: dict) -> str:
     if isinstance(roots, list):
         candidates.extend(item for item in roots if isinstance(item, str))
     for candidate in candidates:
-        if _validate_root(candidate):
+        if _validate_root(candidate) or _host(candidate) != host:
             continue
         if _allowed(candidate):
             return _normal_root(candidate)
@@ -468,6 +504,10 @@ def _http_json(
     missing = _missing_env()
     if missing:
         return None, "snapshot", missing
+    if not force_live:
+        payload, state = _cached_payload(url, params)
+        if payload is not None and state == "hit":
+            return payload, "hit", ""
     limited = _take(poll=poll, host=_host(url))
     if limited:
         return None, "snapshot", limited
@@ -499,9 +539,10 @@ def _http_json(
         except EgressDenied as exc:
             return None, "snapshot", _scrub(str(exc))
         except (HttpError, TimeoutError, RateLimited):
-            payload, state = _cached_payload(url, params)
-            if payload is not None:
-                return payload, "stale", ""
+            if not force_live:
+                payload, state = _cached_payload(url, params)
+                if payload is not None:
+                    return payload, "stale", ""
             return None, "snapshot", UNAVAILABLE
     finally:
         client.close()
@@ -555,12 +596,12 @@ def _collection_rows(payload: dict) -> list[dict]:
         media = item.get("media_types") if isinstance(item.get("media_types"), list) else []
         rows.append(
             {
-                "id": str(item.get("id") or ""),
+                "id": _checked(str(item.get("id") or ""), _COLLECTION_ID),
                 "title": _text(str(item.get("title") or "")),
                 "description": _text(str(item.get("description") or "")),
                 "can_read": True,
                 "can_write": item.get("can_write") is True,
-                "media_types": [str(value) for value in media],
+                "media_types": [_checked(str(value), _MEDIA_TYPE) for value in media],
             }
         )
     return rows
@@ -569,8 +610,8 @@ def _collection_rows(payload: dict) -> list[dict]:
 def _normalise(obj: dict) -> dict:
     pattern = str(obj.get("pattern") or "")
     return {
-        "id": str(obj.get("id") or ""),
-        "type": str(obj.get("type") or ""),
+        "id": _checked(str(obj.get("id") or ""), _STIX_ID),
+        "type": _checked(str(obj.get("type") or ""), _TYPE_NAME),
         "name": _text(str(obj.get("name") or "")),
         "description": _text(str(obj.get("description") or "")),
         "pattern": _text(pattern) if pattern else "",
@@ -583,9 +624,9 @@ def _normalise(obj: dict) -> dict:
         "expired": _expired(obj),
         "labels": _labels(obj),
         "values": [{"kind": kind, "value": value} for kind, value in _indicator_values(pattern)],
-        "source_ref": str(obj.get("source_ref") or ""),
-        "target_ref": str(obj.get("target_ref") or ""),
-        "relationship_type": str(obj.get("relationship_type") or ""),
+        "source_ref": _checked(str(obj.get("source_ref") or ""), _STIX_ID),
+        "target_ref": _checked(str(obj.get("target_ref") or ""), _STIX_ID),
+        "relationship_type": _checked(str(obj.get("relationship_type") or ""), _TYPE_NAME),
     }
 
 
@@ -606,6 +647,13 @@ def _tlp(obj: dict) -> str:
     if isinstance(refs, list):
         for ref in refs:
             mark = _TLP_IDS.get(str(ref))
+            if mark:
+                found.append(mark)
+    granular = obj.get("granular_markings")
+    if isinstance(granular, list):
+        # A marking on part of an object holds back the whole object.
+        for item in granular:
+            mark = _TLP_IDS.get(str(item.get("marking_ref"))) if isinstance(item, dict) else None
             if mark:
                 found.append(mark)
     for label in _labels(obj):
@@ -630,21 +678,18 @@ def _tlp(obj: dict) -> str:
 
 
 def _from_text(value: str) -> str | None:
-    text = value.strip().lower().replace(" ", "").replace("_", "+")
-    for prefix in ("tlp:", "tlp="):
-        if text.startswith(prefix):
-            text = text[len(prefix) :]
-    if text in {"clear", "white"}:
-        return "CLEAR"
-    if text == "green":
-        return "GREEN"
-    if text in {"amber+strict", "amberstrict"}:
-        return "AMBER+STRICT"
-    if text == "amber":
-        return "AMBER"
-    if text == "red":
-        return "RED"
-    return None
+    match = _TLP_TEXT.fullmatch(value.strip().lower())
+    if not match:
+        return None
+    name = re.sub(r"[^a-z]", "", match.group(1))
+    return {
+        "clear": "CLEAR",
+        "white": "CLEAR",
+        "green": "GREEN",
+        "amber": "AMBER",
+        "amberstrict": "AMBER+STRICT",
+        "red": "RED",
+    }[name]
 
 
 def _expired(obj: dict) -> bool:
@@ -682,8 +727,7 @@ def _kind(value: str) -> str | None:
         return "ip"
     except ValueError:
         pass
-    lowered = value.lower()
-    if lowered.startswith(("http://", "https://")):
+    if _URL_VALUE.fullmatch(value):
         return "url"
     if re.fullmatch(r"[0-9a-fA-F]{32}|[0-9a-fA-F]{40}|[0-9a-fA-F]{64}|[0-9a-fA-F]{128}", value):
         return "hash"
@@ -722,30 +766,34 @@ def _selected(*, override: bool) -> list[tuple[dict, dict]]:
 def _search(value: str) -> tuple[list[dict], str]:
     needle = value.lower()
     with _db() as conn:
-        rows = conn.execute(
+        stored = conn.execute(
             """
             SELECT o.normalised
             FROM indicator_values AS v
             JOIN objects AS o ON o.id = v.object_id
-            WHERE v.value = ? AND o.expired = 0 AND o.revoked = 0
+            WHERE v.value = ?
             ORDER BY o.id
             """,
             (needle,),
         ).fetchall()
-        if rows:
-            return [json.loads(row[0]) for row in rows], ""
-        flags = conn.execute(
-            """
-            SELECT o.expired, o.revoked
-            FROM indicator_values AS v
-            JOIN objects AS o ON o.id = v.object_id
-            WHERE v.value = ?
-            """,
-            (needle,),
-        ).fetchall()
-    if any(flag[0] for flag in flags):
+    live: list[dict] = []
+    any_expired = False
+    any_revoked = False
+    for (text,) in stored:
+        record = json.loads(text)
+        # Expiry is judged now, not when the object was stored.
+        record["expired"] = _expired({"valid_until": record.get("valid_until")})
+        if record["expired"]:
+            any_expired = True
+        elif record.get("revoked"):
+            any_revoked = True
+        else:
+            live.append(record)
+    if live:
+        return live, ""
+    if any_expired:
         return [], "The matching indicator is expired."
-    if any(flag[1] for flag in flags):
+    if any_revoked:
         return [], "The matching indicator is revoked."
     return [], "No stored indicator matched."
 
@@ -985,6 +1033,8 @@ def _validate_root(url: str) -> str:
         return "A TAXII URL must use https and must not include a password."
     if parts.scheme.lower() != "https" or not parts.hostname:
         return "A TAXII URL must use https and must not include a password."
+    if parts.query or parts.fragment:
+        return "A TAXII URL must not include a query or fragment."
     return ""
 
 
@@ -1123,9 +1173,16 @@ def _text(value: str) -> str:
 
 
 def _stamp(value) -> str:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not _ADDED_AFTER.fullmatch(value):
         return ""
     return value
+
+
+def _checked(value: str, pattern: re.Pattern) -> str:
+    """Pass a value that has the expected shape. Wrap anything else as untrusted text."""
+    if not value or pattern.fullmatch(value):
+        return value
+    return _text(value)
 
 
 def _as_of(rows: list[dict]) -> str | None:
@@ -1155,7 +1212,10 @@ def _merge_cache(caches: list[str]) -> str:
 
 def _data_dir() -> Path:
     path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-taxii"))
-    path.mkdir(parents=True, exist_ok=True)
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # The store holds licensed CTIS objects. Refuse a directory someone else owns.
+    if path.stat().st_uid != os.getuid():
+        raise PermissionError(f"{path} is not owned by the current user")
     return path
 
 
