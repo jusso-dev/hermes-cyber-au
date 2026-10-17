@@ -2,16 +2,32 @@ name: cyber-au
 version: 0.1.0
 manifest_version: 2
 api_version: 1
-description: "Guards feed content, answers AU org exposure from the user's own watchlist, and reports what works, what is missing and how to fix it."
+description: "In-process intel tools, audit logging, untrusted-content guards, AU org exposure, and the cyber-au doctor."
 author: "Justin Middler"
 license: Apache-2.0
 homepage: https://github.com/jusso-dev/hermes-cyber-au
 python_dependencies:
   - "pyyaml>=6,<7"
+  - "stix2>=3,<4"
 provides_tools:
+  - intel_search
+  - intel_get
+  - intel_add_observation
+  - intel_export_stix
+  - evidence_import
   - cyber_au_org_exposure
 provides_hooks:
   - pre_tool_call
   - post_tool_call
   - pre_llm_call
   - on_session_start
+  - on_session_end
+config_schema:
+  audit_log_path:
+    type: str
+    default: ""
+    description: "Override audit log path"
+  untrusted_banner:
+    type: bool
+    default: true
+    description: "Wrap feed content in an untrusted banner"

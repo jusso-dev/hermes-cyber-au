@@ -1,36 +1,48 @@
-"""cyber-au plugin entrypoint."""
+"""cyber-au plugin entrypoint.
+
+``register(ctx)`` wires the intel store tools, evidence import, audit hooks,
+the untrusted-content middleware, org exposure, and the doctor command.
+"""
 
 from __future__ import annotations
 
-import importlib.util
-import sys
+import os
 from pathlib import Path
 
-from .cli import main, register as register_doctor
+from .cli import main
 
-__all__ = ["main", "register"]
+__all__ = ["data_dir", "main", "register"]
 
 
-def _middleware():
-    name = "cyberau_untrusted_middleware"
-    cached = sys.modules.get(name)
-    if cached is not None:
-        return cached
-    path = Path(__file__).resolve().parent / "middleware" / "untrusted.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+def data_dir() -> Path:
+    """Return the directory for cyber-au plugin state.
+
+    ``CYBERAU_DATA_DIR`` overrides the path. Otherwise state lives under
+    ``$HERMES_HOME/plugin-data/cyber-au``, or ``~/.hermes/plugin-data/cyber-au``
+    when ``HERMES_HOME`` is unset. This function does not create the directory.
+    """
+    override = os.environ.get("CYBERAU_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser()
+    home = os.environ.get("HERMES_HOME", "").strip()
+    root = Path(home).expanduser() if home else Path.home() / ".hermes"
+    return root / "plugin-data" / "cyber-au"
 
 
 def register(ctx) -> None:
-    """Register feed guards, org exposure, and the doctor command."""
-    _middleware().register(ctx)
+    """Register tools, hooks, middleware, and commands."""
     from cyberau_org_exposure.tool import SCHEMA, handle
 
+    from .cli import register as register_doctor
+    from .hooks.audit import register as register_audit
+    from .middleware.untrusted import register as register_middleware
+    from .tools.evidence import register_evidence
+    from .tools.store import register_store
+
+    register_store(ctx)
+    register_evidence(ctx)
+    register_audit(ctx)
+    register_middleware(ctx)
     ctx.register_tool(
         name="cyber_au_org_exposure",
         toolset="cyber-au",
