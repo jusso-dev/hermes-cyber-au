@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["url", "title", "date", "body"],
+  "properties": {
+    "url": {"type": "string"},
+    "title": {"type": "string"},
+    "date": {"type": "string"},
+    "body": {"type": "string"},
+    "headings": {"type": "array", "items": {"type": "string"}}
+  }
+}

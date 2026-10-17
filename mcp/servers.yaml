@@ -401,3 +401,14 @@ servers:
     timeout: 120
     enabled_by_default: false
     required_env: []
+  scamwatch:
+    connector: scamwatch
+    args:
+    - serve
+    - scamwatch
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

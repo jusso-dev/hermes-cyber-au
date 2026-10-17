@@ -275,3 +275,8 @@ connectors:
     - api.ransomware.live
     allow_ip_literals: false
     allow_http_loopback: false
+  scamwatch:
+    hosts:
+    - www.scamwatch.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false
