@@ -68,7 +68,7 @@ jobs:
           LABELS: ${{ inputs.labels }}
         run: |
           set -euo pipefail
-          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard | grep -v '^changed.txt$' || true)" ]; then
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard | grep -vxF -e changed.txt -e "$BODY_FILE" || true)" ]; then
             echo "No change. No pull request."
             exit 0
           fi

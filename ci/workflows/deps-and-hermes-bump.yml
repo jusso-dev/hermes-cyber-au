@@ -66,6 +66,8 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: deps-bump
+          # .github/workflows/ci.yml is hidden, and upload-artifact skips hidden files by default.
+          include-hidden-files: true
           path: |
             mcp/uv.lock
             distribution.yaml

@@ -233,6 +233,7 @@ def test_workflow_pins_actions_and_carries_every_pin_file():
         if "./.github/workflows/" in line:
             continue
         assert re.search(r"@[0-9a-f]{40} # v[0-9]+\.[0-9]+\.[0-9]+", line), line
+    assert "include-hidden-files: true" in text
     match = re.search(r"allowed_paths: '([^']+)'", text)
     assert match is not None
     pattern = match.group(1)
@@ -266,3 +267,12 @@ def test_actionlint_is_clean_when_called_workflows_are_present():
         assert proc.returncode == 0, proc.stdout + proc.stderr
     finally:
         shutil.rmtree(work)
+
+
+def test_no_change_guard_ignores_the_pr_body_so_a_quiet_week_exits_cleanly():
+    text = (ROOT / "ci" / "workflows" / "data-update-pr.yml").read_text(
+        encoding="utf-8"
+    )
+    guard = next(line for line in text.splitlines() if "ls-files --others" in line)
+    assert '-e "$BODY_FILE"' in guard
+    assert "-e changed.txt" in guard
