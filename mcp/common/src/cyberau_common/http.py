@@ -11,13 +11,20 @@ import httpx
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.ratelimit import RateLimiter
-from cyberau_common.secrets import redact, redact_headers
+from cyberau_common.secrets import SECRET_HEADER_NAMES, redact, redact_headers
 
 _REDIRECTS = {301, 302, 303, 307, 308}
 
 
 class HttpError(Exception):
     """A request failed and no stale cache could answer."""
+
+    def __init__(self, message: object = "") -> None:
+        text = message if isinstance(message, str) else str(message)
+        super().__init__(redact(text))
+
+    def __str__(self) -> str:
+        return redact(Exception.__str__(self))
 
 
 @dataclass
@@ -155,7 +162,7 @@ class HttpClient:
         except (HttpError, httpx.HTTPError) as exc:
             if cached and self.cache.within_stale(cached, stale_if_error):
                 return _from_cache(cached, "stale", url)
-            raise HttpError(redact(str(exc))) from exc
+            raise HttpError(redact(str(exc))) from None
         if status == 304:
             if cached is None:
                 raise HttpError("not modified without a cache entry")
@@ -201,7 +208,7 @@ class HttpClient:
                 )
             except httpx.HTTPError as exc:
                 if attempt >= self.retries:
-                    raise HttpError(redact(str(exc))) from exc
+                    raise HttpError(redact(str(exc))) from None
                 self._sleep(self._backoff(attempt))
                 attempt += 1
                 continue
@@ -261,11 +268,7 @@ def _from_cache(item, state: str, url: str) -> Response:
 
 
 def _drop_secret_headers(headers: dict) -> dict:
-    return {
-        key: value
-        for key, value in headers.items()
-        if key.lower() not in {"authorization", "auth-key", "x-otx-api-key", "x-api-key", "api-key"}
-    }
+    return {key: value for key, value in headers.items() if key.lower() not in SECRET_HEADER_NAMES}
 
 
 def _read_capped(response: httpx.Response, max_bytes: int) -> bytes:

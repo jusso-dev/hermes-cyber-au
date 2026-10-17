@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from cyberau_common.secrets import redact
+from cyberau_common.secrets import redact_data
 
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
@@ -36,14 +36,16 @@ def envelope(
     if cache not in {"hit", "miss", "stale", "snapshot"}:
         raise ValueError(f"unknown cache state: {cache}")
     when = retrieved_at or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return {
-        "source": source,
-        "source_urls": list(urls),
-        "retrieved_at": when,
-        "data_as_of": data_as_of,
-        "cache": cache,
-        "attribution": attribution,
-        "untrusted": True,
-        "warnings": [redact(str(item)) for item in warnings],
-        "data": data,
-    }
+    return redact_data(
+        {
+            "source": source,
+            "source_urls": list(urls),
+            "retrieved_at": when,
+            "data_as_of": data_as_of,
+            "cache": cache,
+            "attribution": attribution,
+            "untrusted": True,
+            "warnings": [str(item) for item in warnings],
+            "data": data,
+        }
+    )

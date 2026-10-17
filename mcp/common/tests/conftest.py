@@ -1,16 +1,7 @@
 import pytest
+from cyberau_common.secrets import FILTER_HEADERS
 
 
 @pytest.fixture(scope="session")
 def vcr_config():
-    return {
-        "filter_headers": [
-            "authorization",
-            "auth-key",
-            "x-otx-api-key",
-            "x-api-key",
-            "api-key",
-            "apiKey",
-            "apikey",
-        ]
-    }
+    return {"filter_headers": list(FILTER_HEADERS)}
