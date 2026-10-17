@@ -29,4 +29,12 @@ if [ ! -e /opt/data/active_profile ] \
     chmod 644 /opt/data/active_profile
 fi
 
+# The cyber-au plugin imports connector packages. They live in the profile
+# virtualenv, not in the Hermes interpreter.
+site=$(echo /opt/data/profiles/cyber-au/mcp/.venv/lib/python*/site-packages)
+if [ -d "$site" ]; then
+    PYTHONPATH="${site}${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH
+fi
+
 exec /opt/hermes/docker/entrypoint-dispatch.sh "$@"
