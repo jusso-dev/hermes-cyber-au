@@ -8,10 +8,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-COPY dashboard/server.py /app/server.py
+COPY dashboard/server.py dashboard/conversations.py /app/
 
-RUN useradd --system --no-create-home --uid 10001 dashboard
-USER dashboard
+# The Hermes home is mode 0700 and owned by uid 10000. Run as that uid so a
+# read-only mount can be read. This user is not root.
+USER 10000:10000
 
 EXPOSE 8765
 CMD ["python", "/app/server.py", "--profile", "/opt/data/profiles/cyber-au", "--bind", "0.0.0.0", "--port", "8765"]

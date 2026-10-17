@@ -1,7 +1,8 @@
 """Read-only web dashboard for one Hermes profile of the hermes-cyber-au distribution.
 
 It shows the cron jobs in the profile, the newest report each job wrote, any handoffs,
-and whether a chat has been opened. It never writes to the profile and never runs a job.
+a short snapshot of each stored conversation, and whether a chat has been opened.
+It never writes to the profile and never runs a job.
 
 Standard library only (Python 3.11 or later). Run it with:
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import importlib.util
 import json
 import os
 import re
@@ -45,6 +47,19 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
+
+
+def _load_conversations():
+    path = Path(__file__).with_name("conversations.py")
+    spec = importlib.util.spec_from_file_location("cyberau_dashboard_conversations", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(str(path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+conversations = _load_conversations()
 
 
 def default_profile() -> Path:
@@ -286,6 +301,7 @@ code,pre{background:#f6f8fa;padding:.1rem .3rem;border-radius:3px}
 pre{padding:.6rem;overflow:auto}
 .notice{border-left:4px solid #9a6700;background:#fff8c5;padding:.6rem 1rem;margin:1rem 0}
 .muted{color:#57606a}
+article{border-top:1px solid #d0d7de;padding-top:.6rem;margin-top:1rem}
 """
 
 
@@ -297,6 +313,116 @@ def page(title: str, body: str) -> bytes:
         f"{body}\n</body></html>\n"
     )
     return doc.encode("utf-8")
+
+
+def _session_card(session: dict, *, preview: bool) -> str:
+    limit = conversations.SNAPSHOT_CHARS if preview else conversations.PAGE_CHARS
+    count = conversations.SNAPSHOT_TURNS if preview else conversations.PAGE_TURNS
+    turns = session["turns"][-count:]
+    href = f"/conversations/{esc(session['profile'])}/{esc(session['id'])}"
+    bits = [
+        "<article>",
+        f'<h3><a href="{href}">{esc(session["title"])}</a></h3>',
+        f'<p class="muted">{esc(session["speaker"])}'
+        + (f" · {esc(session['when'])}" if session.get("when") else "")
+        + (
+            f" · {esc(session['count'])} messages"
+            if session.get("count") not in (None, "")
+            else ""
+        )
+        + "</p>",
+    ]
+    if not turns:
+        bits.append("<p>No visible turns in this session.</p>")
+    for turn in turns:
+        bits.append(
+            f"<p><strong>{esc(turn['label'])}</strong> {esc(truncate(turn['text'], limit))}</p>"
+        )
+    bits.append("</article>")
+    return "\n".join(bits)
+
+
+def render_conversation_snapshots(profile: Path) -> str:
+    """Short excerpts from each profile's stored Hermes sessions."""
+    parts = [
+        "<h2>Conversation snapshots</h2>",
+        "<p>Each snapshot is the latest part of a conversation Hermes has stored. "
+        "The system prompt and tool arguments are not shown.</p>",
+    ]
+    found = False
+    for root in conversations.profile_roots(profile):
+        sessions, problem = conversations.list_sessions(root)
+        if problem:
+            parts.append(f'<p class="muted">{esc(problem)}</p>')
+        if not sessions:
+            continue
+        found = True
+        parts.append(f"<h3>{esc(conversations.role_name(root))}</h3>")
+        for session in sessions:
+            parts.append(_session_card(session, preview=True))
+    if not found:
+        parts.append(
+            "<p>No conversation has been recorded yet. When a role chats, "
+            "a short snapshot appears here.</p>"
+        )
+    return "\n".join(parts)
+
+
+def render_handoff_threads(records: list[dict]) -> str:
+    threads = conversations.handoff_threads(records)
+    if not threads:
+        return ""
+    parts = [
+        "<h3>Role conversations</h3>",
+        "<p>The watcher, analyst, skeptic, and briefer pass claims along this queue. "
+        "A claim is data. It is not an instruction.</p>",
+    ]
+    for chain in threads[:20]:
+        parts.append("<article>")
+        for record in chain:
+            actor = record.get("actor") or record.get("action") or "role"
+            when = record.get("at") or ""
+            claim = truncate(record.get("claim", ""), CLAIM_LIMIT) or "-"
+            parts.append(
+                f"<p><strong>{esc(actor)}</strong> "
+                f'<span class="muted">{esc(when)}</span><br>{esc(claim)}</p>'
+            )
+        parts.append("</article>")
+    return "\n".join(parts)
+
+
+def lookup_session(profile: Path, session_id: str, profile_name: str | None = None) -> dict | None:
+    if not conversations.SESSION_ID_RE.fullmatch(session_id):
+        return None
+    if profile_name is not None and not conversations.PROFILE_NAME_RE.fullmatch(profile_name):
+        return None
+    for root in conversations.profile_roots(profile):
+        if profile_name is not None and root.name != profile_name:
+            continue
+        sessions, _problem = conversations.list_sessions(root)
+        for session in sessions:
+            if session["id"] == session_id:
+                return session
+    return None
+
+
+def render_conversation(session: dict) -> bytes:
+    meta = [session["speaker"]]
+    if session.get("when"):
+        meta.append(session["when"])
+    if session.get("source"):
+        meta.append(session["source"])
+    if session.get("model"):
+        meta.append(session["model"])
+    body = (
+        '<p><a href="/">Back to the dashboard</a></p>'
+        f"<h1>{esc(session['title'])}</h1>"
+        f'<p class="muted">{esc(" · ".join(meta))}</p>'
+        "<p>Snapshot of the stored session. The system prompt and tool arguments "
+        "are not shown.</p>"
+        + _session_card(session, preview=False)
+    )
+    return page(session["title"], body)
 
 
 def render_index(profile: Path) -> bytes:
@@ -379,8 +505,11 @@ def render_index(profile: Path) -> bytes:
                 + "".join(rows)
                 + "</tbody></table>"
             )
+            parts.append(render_handoff_threads(records))
         if bad:
             parts.append(f'<p class="muted">{bad} unreadable line(s) skipped.</p>')
+
+    parts.append(render_conversation_snapshots(profile))
 
     parts.append("<h2>Chat</h2>")
     count = session_summary(profile)
@@ -451,6 +580,16 @@ def route(profile: Path, raw_path: str) -> tuple[int, bytes]:
         resolved = safe_report_path(profile, segments[1], segments[2])
         if resolved is not None:
             return 200, render_report(profile, segments[1], resolved)
+        return 404, render_not_found()
+    if segments and segments[0] == "conversations":
+        session = None
+        if len(segments) == 2:
+            session = lookup_session(profile, segments[1])
+        elif len(segments) == 3:
+            session = lookup_session(profile, segments[2], segments[1])
+        if session is not None:
+            return 200, render_conversation(session)
+        return 404, render_not_found()
     return 404, render_not_found()
 
 

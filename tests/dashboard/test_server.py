@@ -230,6 +230,122 @@ def test_handoffs_from_data_dir(
     assert "from-data" in body
 
 
+def _write_session(profile: Path, session_id: str, messages: list[tuple], **session) -> None:
+    import sqlite3
+
+    profile.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(profile / "state.db")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS sessions ("
+        "id TEXT, title TEXT, source TEXT, model TEXT, started_at REAL, "
+        "last_activity_at REAL, message_count INT, profile_name TEXT, hidden INT)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS messages ("
+        "id INT, session_id TEXT, role TEXT, content TEXT, tool_name TEXT, "
+        "tool_calls TEXT, timestamp REAL, active INT)"
+    )
+    conn.execute(
+        "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            session_id,
+            session.get("title", "Untitled"),
+            session.get("source", "cli"),
+            session.get("model", "test-model"),
+            session.get("started_at", 1_760_000_000),
+            session.get("last_activity_at", 1_760_001_000),
+            len(messages),
+            profile.name,
+            session.get("hidden", 0),
+        ),
+    )
+    for index, message in enumerate(messages, start=1):
+        role, content, tool = message
+        conn.execute(
+            "INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (index, session_id, role, content, tool, "api_key=should-not-appear", index, 1),
+        )
+    conn.commit()
+    conn.close()
+
+
+def test_conversation_snapshot_escapes_and_hides_secrets(profile: Path) -> None:
+    _write_session(
+        profile,
+        "sess1",
+        [
+            ("system", "SECRET SYSTEM PROMPT", None),
+            ("user", "What is exposed?", None),
+            ("assistant", "Two hosts <script>alert(1)</script>", None),
+            ("tool", "api_key=supersecretvalue", "web"),
+            ("assistant", "token=abc123secretvalue and then the finding", None),
+        ],
+        title="Morning look",
+    )
+    status, body = _get(profile, "/")
+    assert status == 200
+    assert "Conversation snapshots" in body
+    assert "Morning look" in body
+    assert "What is exposed?" in body
+    assert "Two hosts" in body
+    assert "<script>" not in body
+    assert "&lt;script&gt;" in body
+    assert "SECRET SYSTEM PROMPT" not in body
+    assert "supersecretvalue" not in body
+    assert "should-not-appear" not in body
+    assert "abc123secretvalue" not in body
+    assert "[redacted]" in body
+    assert "Used web" in body
+
+    status, page = _get(profile, "/conversations/cyber-au/sess1")
+    assert status == 200
+    assert "What is exposed?" in page
+    assert "SECRET SYSTEM PROMPT" not in page
+    assert "<script>" not in page
+
+
+def test_hidden_session_and_bad_snapshot_path(profile: Path) -> None:
+    _write_session(profile, "visible1", [("user", "shown turn", None)], hidden=0)
+    _write_session(profile, "hidden1", [("user", "hidden turn", None)], hidden=1)
+    _, body = _get(profile, "/")
+    assert "shown turn" in body
+    assert "hidden turn" not in body
+    for target in (
+        "/conversations/../state.db",
+        "/conversations/%2e%2e/state.db",
+        "/conversations/cyber-au/../sess1",
+        "/conversations/not-a-profile/visible1",
+    ):
+        status, page = _get(profile, target)
+        assert status == 404
+        assert "shown turn" not in page
+    status, page = _get(profile, "/conversations/cyber-au/visible1")
+    assert status == 200
+    assert "shown turn" in page
+
+
+def test_sibling_role_snapshot(tmp_path: Path) -> None:
+    home = tmp_path / "profiles"
+    watcher = home / "watcher"
+    marker = watcher / "plugin-data" / "cyber-au"
+    marker.mkdir(parents=True)
+    (marker / "profile-role").write_text("watcher\n", encoding="utf-8")
+    _write_session(watcher, "w1", [("assistant", "Posted a new claim", None)], title="Watch")
+    analyst = home / "analyst"
+    _write_session(analyst, "a1", [("assistant", "Claimed the item", None)], title="Analysis")
+    status, body = _get(watcher, "/")
+    assert status == 200
+    assert "Posted a new claim" in body
+    assert "Claimed the item" in body
+    assert ">watcher<" in body
+    assert ">analyst<" in body
+
+
+def test_no_session_store_says_so(profile: Path) -> None:
+    _, body = _get(profile, "/")
+    assert "No conversation has been recorded yet." in body
+
+
 def test_sessions_message(profile: Path) -> None:
     _, body = _get(profile, "/")
     assert "No chat has been opened yet" in body

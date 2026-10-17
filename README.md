@@ -114,7 +114,7 @@ Full detail, including what was verified and when: [docs/research/connectors.md]
 
 ## Dashboard
 
-`dashboard/server.py` is a small read-only web page for a less technical team. It lists each routine with its schedule, delivery target and last recorded status, shows the newest report each routine wrote, lists handoffs, and says whether a chat has been opened. It uses only the Python 3.11+ standard library and never runs a job. The morning briefing is set for 07:30 Australia/Sydney, and jobs do nothing until they are resumed.
+`dashboard/server.py` is a small read-only web page for a less technical team. It lists each routine with its schedule, delivery target and last recorded status, shows the newest report each routine wrote, lists handoffs, and shows a snapshot of each conversation Hermes has stored. A snapshot is the latest turns in that session. The system prompt and tool arguments are left out, and secret-shaped text is redacted. Sibling profiles under the same `profiles/` directory are included, so the watcher, analyst, skeptic, briefer, and librarian each appear when they have a session store. The page also says whether a chat has been opened. It uses only the Python 3.11+ standard library and never runs a job. The morning briefing is set for 07:30 Australia/Sydney, and jobs do nothing until they are resumed.
 
 ```bash
 python3 dashboard/server.py --profile ~/.hermes/profiles/cyber-au
@@ -130,7 +130,7 @@ docker run -d --name cyberau-dashboard -v /path/to/hermes-data:/opt/data:ro \
   -p 192.168.1.10:8765:8765 cyberau-dashboard
 ```
 
-Replace `192.168.1.10` with the host's LAN or Tailscale address. The container runs as a non-root user, so the mounted data must be readable by other users. Tests: `python3 -m pytest tests/dashboard`.
+Replace `192.168.1.10` with the host's LAN or Tailscale address. The container runs as uid 10000, the same user that owns a Hermes home, and the volume should be mounted read-only. Tests: `python3 -m pytest tests/dashboard`.
 
 ## Premium feeds (paid, bring your own licence)
 
