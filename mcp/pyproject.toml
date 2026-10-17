@@ -15,6 +15,7 @@ cyberau-crowdstrike-recon = { workspace = true }
 
 [dependency-groups]
 dev = [
+  "cyclonedx-bom>=7.3.0,<8",
   "hypothesis>=6,<7",
   "pytest>=9.0.3,<10",
   "pytest-cov>=5,<7",

@@ -37,9 +37,11 @@ The Hermes details behind this design (manifest fields, what an update replaces,
 
 ## Planned install
 
+Use `install.sh --ref <tag>` when a release tag exists. The branch `main` is not a release. The tag is the commit the release notes, SBOM and attestation refer to. How to check them is in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
+
 ```bash
-# Once v0.1 ships. Not yet.
-hermes profile install github.com/jusso-dev/hermes-cyber-au --alias
+# Once a release tag exists.
+bash install/install.sh --ref <tag>
 cp ~/.hermes/profiles/cyber-au/.env.EXAMPLE ~/.hermes/profiles/cyber-au/.env
 cyber-au chat
 ```
