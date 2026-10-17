@@ -1,0 +1,6 @@
+[codespell]
+# The trailing "-" keeps the built-in clear and rare dictionaries. en-AU.txt maps American
+# spellings to Australian ones. ignore-regex skips code spans, URLs and vendor product names.
+dictionary = tools/docs/en-AU.txt,-
+ignore-regex = (`[^`]*`|https?://\S+|Integration Center)
+skip = .git,.venv-docs,site,mcp/.venv,*.egg-info

@@ -69,3 +69,7 @@ dist/
 .coverage
 coverage.xml
 .DS_Store
+
+# Docs site build and the local install used to build it
+site/
+.venv-docs/

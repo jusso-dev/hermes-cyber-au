@@ -422,3 +422,8 @@ Checked on 16 October 2026. The first 21 sources were compiled and verified for 
 - Rate limits: Per organisation: Basic tier 4 requests a second, Search tier 1 request a second; 429 `RATELIMIT_REACHED`, wait 10 seconds before retrying. Global Search has a monthly quota; each response carries `X-Flare-Global-Searches-Remaining`, which the budget guard records.
 - Terms: Commercial licence. Default flags: event metadata only in the store, no STIX export of Flare content, no sharing outside the profile.
 - Verified: Vendor docs (api.docs.flare.io): authentication guide (API key to 1 hour token, bearer use, restricted keys and expiry), rate limits and quotas page (4 and 1 requests a second, 429 handling, `X-Flare-Global-Searches-Remaining`), Search Credentials, Search Events, List Identifier Events and the tenant events guide (paths above), and the API MCP page (server URL, OAuth or API key, `X-Flare-Tenant-Id`, tool list). Flare's July 2026 release notes announce the MCP beta. From the build box on 16 October 2026, `https://api.flare.io/mcp` answered 401 without auth.
+
+---
+
+Owner ticket: epic-connectors
+Last verified: 16 October 2026
