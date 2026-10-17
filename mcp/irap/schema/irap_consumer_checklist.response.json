@@ -1,0 +1,31 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "page",
+      "kind",
+      "sentence",
+      "url",
+      "retrieved",
+      "sha256",
+      "paragraph_id",
+      "assessment",
+      "endorsed_by_asd"
+    ],
+    "properties": {
+      "id": {"type": "string"},
+      "page": {"type": "string"},
+      "kind": {"const": "check"},
+      "sentence": {"type": "string"},
+      "url": {"type": "string"},
+      "retrieved": {"type": "string"},
+      "sha256": {"type": "string"},
+      "paragraph_id": {"type": "string"},
+      "assessment": {"const": false},
+      "endorsed_by_asd": {"const": false}
+    }
+  }
+}

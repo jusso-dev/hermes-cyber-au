@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.cyber.gov.au/irap
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '<article data-url="https://www.cyber.gov.au/irap" data-retrieved="2026-10-16" data-sentence="IRAP assessors do not accredit, endorse or register systems on our behalf."></article>'

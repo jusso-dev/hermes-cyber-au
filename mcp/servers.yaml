@@ -68,3 +68,14 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  irap:
+    connector: irap
+    args:
+    - serve
+    - irap
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

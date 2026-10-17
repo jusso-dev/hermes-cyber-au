@@ -81,7 +81,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | CVE Program records (CVE Services API and cvelistV5) | `cve` | Vulnerability intelligence | none | on | v0.2 | planned | https://www.cve.org/ |
 | AbuseIPDB IP reputation | `abuseipdb` | Global threat intelligence | `ABUSEIPDB_API_KEY` | on | v0.2 | planned | https://docs.abuseipdb.com/ |
 | Spamhaus DROP, DROPv6 and ASN-DROP | `drop` | Global threat intelligence | none | on | v0.2 | planned | https://www.spamhaus.org/blocklists/do-not-route-or-peer/ |
-| IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | https://www.cyber.gov.au/irap |
+| IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | [docs/connectors/irap.md](docs/connectors/irap.md) |
 | Protective Security Policy Framework (PSPF) | `pspf` | Australian government | none | on | v1.0 | planned | https://www.protectivesecurity.gov.au/ |
 | Scamwatch alerts | `scamwatch` | Australian government | none | on | v1.0 | planned | https://www.scamwatch.gov.au/ |
 | data.gov.au (CKAN) | `datagov` | Australian government | none | on | v1.0 | planned | https://data.gov.au/ |
