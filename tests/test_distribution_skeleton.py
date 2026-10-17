@@ -94,10 +94,18 @@ class DistributionSkeletonTest(unittest.TestCase):
         self.assertNotIn("\u2014", text)
         self.assertNotIn("\u200b", text)
 
-    def test_jobs_file_is_an_empty_list(self):
+    def test_jobs_file_names_the_shipped_routines(self):
         text = (ROOT / "cron/jobs.json").read_text(encoding="utf-8")
         self.assertIn('"jobs"', text)
-        self.assertIn("[]", text)
+        self.assertNotIn('"jobs": []', text)
+        for job_id in (
+            "cyberau-ingest-public",
+            "cyberau-morning-brief",
+            "cyberau-kev-watch",
+            "cyberau-weekly-exec",
+            "cyberau-store-maintenance",
+        ):
+            self.assertIn(f'"id": "{job_id}"', text)
 
     def test_git_index_has_no_secret_files(self):
         tracked = subprocess.check_output(
