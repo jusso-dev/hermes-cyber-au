@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "required": ["list", "asn", "rir", "domain", "cc", "asname"],
+  "properties": {
+    "list": {"type": "string"},
+    "asn": {"type": "integer"},
+    "rir": {"type": "string"},
+    "domain": {"type": "string"},
+    "cc": {"type": "string"},
+    "asname": {"type": "string"}
+  }
+}

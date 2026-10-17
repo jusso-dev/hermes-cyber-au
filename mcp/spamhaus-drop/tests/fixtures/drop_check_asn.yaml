@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.spamhaus.org/drop/asndrop.json
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"asn":64496,"rir":"apnic","domain":"example.net","cc":"AU","asname":"DOCUMENTATION-AS"}\n'
