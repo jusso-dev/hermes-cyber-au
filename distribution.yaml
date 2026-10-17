@@ -13,6 +13,7 @@ distribution_owned:
   - cron/jobs.json
   - scripts
   - plugins/cyber-au
+  - install/bootstrap.sh
   - mcp
   - feeds
   - playbooks
