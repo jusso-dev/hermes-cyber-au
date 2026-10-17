@@ -41,7 +41,7 @@ docker run -it --rm \
   chat
 ```
 
-`--env-file` is optional. Omit it, or pass an empty file, when you have no keys. On a new volume the entrypoint selects the `cyber-au` profile. If the volume already has a default `config.yaml` or `SOUL.md`, that selection is left alone. Use `hermes -p cyber-au` for the distribution profile in that case.
+`--env-file` is optional. Omit it, or pass an empty file, when you have no keys. On a new volume the entrypoint selects the `cyber-au` profile. If the volume already has a default `config.yaml` or `SOUL.md`, that selection is left alone. Use `hermes -p cyber-au` for the distribution profile in that case. The entrypoint seeds `profiles/cyber-au` only when that directory is absent, so an existing profile of that name on the volume is never overwritten, and a new image does not upgrade a profile already on the volume. `HERMES_PROFILE` only labels the profile identity (for example kanban authorship). It does not select a profile; `active_profile` and `-p` do.
 
 Keys are read from the container environment or from the profile `.env` on the volume (`/opt/data/profiles/cyber-au/.env`). Nothing in the image is a real key. Copy `.env.template` from the repository, fill in your own values, and pass that file. Do not commit it.
 

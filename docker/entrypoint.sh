@@ -6,10 +6,16 @@ set -eu
 SEED=/opt/cyber-au/profile
 DEST=/opt/data/profiles/cyber-au
 
-if [ ! -f "$DEST/distribution.yaml" ] && [ -d "$SEED" ]; then
+# Only seed when the profile directory is absent. An existing directory with no
+# distribution.yaml is an operator's own profile; cp -a into it would nest the
+# seed as $DEST/profile. Copy to a temp name and rename so an interrupted boot
+# cannot leave a half-seeded profile that the next boot skips.
+if [ ! -e "$DEST" ] && [ -d "$SEED" ]; then
     mkdir -p /opt/data/profiles
-    cp -a "$SEED" "$DEST"
-    chown -R hermes:hermes "$DEST"
+    rm -rf "$DEST.seeding"
+    cp -a "$SEED" "$DEST.seeding"
+    chown -R hermes:hermes "$DEST.seeding"
+    mv "$DEST.seeding" "$DEST"
 fi
 
 # A fresh volume has no operator config yet. Point it at cyber-au.
