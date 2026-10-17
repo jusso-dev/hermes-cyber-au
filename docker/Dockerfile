@@ -29,9 +29,14 @@ COPY --chown=hermes:hermes . /opt/cyber-au/src
 # home, so the build deletes those files and leaves the base image's
 # dotfiles plus profiles/cyber-au. The seed is also kept outside /opt/data
 # because the upstream image declares that path as a volume.
-RUN hermes profile install /opt/cyber-au/src --name cyber-au --yes \
+# The upstream image does not ship uv. Install it for this build, then let
+# bootstrap download the locked connector wheels. A later air-gapped
+# bootstrap can still pass --offline.
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && export PATH="/root/.local/bin:${PATH}" \
+    && hermes profile install /opt/cyber-au/src --name cyber-au --yes \
     && if [ -f /opt/cyber-au/src/install/bootstrap.sh ]; then \
-         sh /opt/cyber-au/src/install/bootstrap.sh --profile cyber-au --non-interactive --offline; \
+         sh /opt/cyber-au/src/install/bootstrap.sh --profile cyber-au --non-interactive; \
        fi \
     && rm -rf /opt/cyber-au/profile \
     && cp -a /opt/data/profiles/cyber-au /opt/cyber-au/profile \
