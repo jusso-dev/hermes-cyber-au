@@ -105,6 +105,35 @@ def test_written_record_runs_from_the_oral_report_not_from_awareness():
     assert other["written_record_due"] == "2026-06-17T09:00:00+10:00"
 
 
+def test_oral_report_before_awareness_is_rejected_and_a_late_oral_report_is_flagged():
+    with pytest.raises(ValueError, match="before the entity became aware"):
+        deadlines.compute_deadlines(
+            "critical_incident",
+            "2026-10-03T20:00:00+10:00",
+            oral_at="2026-10-03T19:59:00+10:00",
+        )
+    on_time = deadlines.compute_deadlines(
+        "critical_incident",
+        "2026-10-03T20:00:00+10:00",
+        oral_at="2026-10-04T09:00:00+11:00",
+    )
+    assert on_time["oral_after_report_due"] is False
+    late = deadlines.compute_deadlines(
+        "critical_incident",
+        "2026-10-03T20:00:00+10:00",
+        oral_at="2026-10-04T09:01:00+11:00",
+    )
+    assert late["oral_after_report_due"] is True
+    assert late["written_record_due"] == "2026-10-07T21:01:00+11:00"
+    no_oral = deadlines.compute_deadlines("critical_incident", "2026-10-03T20:00:00+10:00")
+    assert no_oral["oral_after_report_due"] is None
+
+
+def test_helper_runs_on_python_before_3_11():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "from datetime import UTC" not in source
+
+
 def test_gap_and_fold_need_an_offset():
     with pytest.raises(ValueError, match="does not exist"):
         deadlines.parse_moment("2026-10-04T02:30:00")

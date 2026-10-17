@@ -48,7 +48,10 @@ The report may be oral or in writing. A written report must be in the approved
 form (a form approved by the Secretary). If the report is oral, make a written
 record in the approved form, give a copy to the relevant Commonwealth body, and
 do so within 84 hours after the oral report is given. The 84 hours do not run
-from awareness unless the oral report was given at that same instant.
+from awareness unless the oral report was given at that same instant. Under
+s 30BC(5) the head of the relevant Commonwealth body may exempt an entity, by
+written notice about a specified incident, from the written record. Ask whether
+there is such a notice. Do not assume one.
 
 s 30BEA: a significant impact on availability means the asset is used in
 connection with the provision of essential goods or services and the incident
@@ -68,7 +71,8 @@ stored in the asset, or computer data if the asset is computer data.
 
 Give the report as soon as practicable, and in any event within 72 hours after
 awareness. Oral or written, same approved-form rule. If oral, the written
-record is due within 48 hours after the oral report is given.
+record is due within 48 hours after the oral report is given. s 30BD(5) gives
+the same written-record exemption.
 
 s 30BD(1), as compiled here, does not say that an incident reported under
 s 30BC is exempt from s 30BD. A significant availability impact is also a
@@ -97,7 +101,9 @@ wall-clock addition of the same number of hours lands on the wrong Sydney time.
 
 The report clock starts at awareness (s 30BC(1)(d), s 30BD(1)(d)). The written
 record clock starts when the oral report is given (s 30BC(3)(b), s 30BD(3)(b)).
-If the oral time is unknown, leave the written-record instant blank.
+If the oral time is unknown, leave the written-record instant blank. An oral
+time before awareness is an input error. An oral time after the report is due
+means the report was late (`oral_after_report_due` in the script output).
 
 ## Related obligations to flag
 

@@ -13,10 +13,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 SYDNEY = ZoneInfo("Australia/Sydney")
+UTC = timezone.utc  # datetime.UTC needs Python 3.11; this helper also runs on 3.9
 
 # report_hours run from awareness. written_record_hours run from the oral report.
 TRIGGERS: dict[str, dict[str, str | int]] = {
@@ -86,6 +87,9 @@ def compute_deadlines(
     written_hours = int(rule["written_record_hours"])
     oral_text = oral_at.strip() if isinstance(oral_at, str) else ""
     oral = parse_moment(oral_text) if oral_text else None
+    if oral is not None and oral.astimezone(UTC) < aware.astimezone(UTC):
+        raise ValueError("The oral report cannot be given before the entity became aware.")
+    report_due = add_hours(aware, report_hours)
     return {
         "regime": "soci",
         "trigger": trigger,
@@ -93,10 +97,13 @@ def compute_deadlines(
         "zone": "Australia/Sydney",
         "aware_at": format_sydney(aware),
         "report_hours": report_hours,
-        "report_due": format_sydney(add_hours(aware, report_hours)),
+        "report_due": format_sydney(report_due),
         "written_record_hours": written_hours,
         "written_record_anchor": "oral_report",
         "oral_at": format_sydney(oral) if oral is not None else None,
+        "oral_after_report_due": (
+            oral.astimezone(UTC) > report_due.astimezone(UTC) if oral is not None else None
+        ),
         "written_record_due": (
             format_sydney(add_hours(oral, written_hours)) if oral is not None else None
         ),
