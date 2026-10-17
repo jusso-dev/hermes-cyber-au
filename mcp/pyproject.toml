@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["cyberau-common", "cyberau-premium"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "premium"]
+members = ["common", "cisa-kev", "darkowl", "first-epss", "nvd", "asd-acsc", "asd-ism", "premium"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
@@ -30,6 +30,7 @@ testpaths = [
   "cisa-kev/tests",
   "first-epss/tests",
   "nvd/tests",
+  "darkowl/tests",
   "premium/tests",
 ]
 pythonpath = [
@@ -39,6 +40,7 @@ pythonpath = [
   "cisa-kev/src",
   "first-epss/src",
   "nvd/src",
+  "darkowl/src",
   "premium/src",
 ]
 addopts = "-q"

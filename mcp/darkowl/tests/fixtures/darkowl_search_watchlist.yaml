@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.darkowl.com/api/v1/search?q=example.com.au&count=0
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"total":0,"resultCount":0,"results":[]}'
