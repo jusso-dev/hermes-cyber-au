@@ -1,5 +1,6 @@
 """Read-only Protective Security Policy Framework quotations."""
 
+import hashlib
 import json
 import os
 import re
@@ -17,16 +18,17 @@ from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from pydantic import Field
 
 HOME_URL = "https://www.protectivesecurity.gov.au/"
 REQUIREMENTS_URL = "https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026"
+DIRECTIONS_URL = "https://www.protectivesecurity.gov.au/protective-security-directions-under-pspf"
 PAGES = (
     ("requirements", REQUIREMENTS_URL),
-    ("home", HOME_URL),
+    ("directions", DIRECTIONS_URL),
 )
 ATTRIBUTION = (
     "Protective Security Policy Framework quotations from the Department of Home Affairs "
@@ -68,8 +70,9 @@ _DIRECT = {
     "user-agent": USER_AGENT,
     "accept": "text/html,application/xhtml+xml, */*",
 }
+# The site hangs on any user agent that carries a URL, so the fallback names the project bare.
 _BROWSER = {
-    "user-agent": f"{USER_AGENT} (compatible; HTTP/1.1 fallback)",
+    "user-agent": f"{USER_AGENT.split(' (', 1)[0]} (compatible; HTTP/1.1 fallback)",
     "accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     "accept-language": "en-AU,en;q=0.9",
     "connection": "close",
@@ -154,9 +157,9 @@ class _PspfConnector(Connector):
         if not live:
             return Probe(self.key, True, "offline ok")
         try:
-            _limit("pspf:regen")
-        except Exception as exc:
-            return Probe(self.key, False, redact(str(exc)))
+            _limit("pspf:health", rate=24 / 86400, burst=3)
+        except RateLimited:
+            return Probe(self.key, False, "live probe budget spent, try again later")
         text, _cache, warning, _method = _fetch_page(REQUIREMENTS_URL, force_live=True)
         if not text:
             return Probe(self.key, False, warning or "PSPF live fetch failed")
@@ -205,23 +208,40 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
         problem = schema_drift(payload)
         if problem:
             return None, "snapshot", problem, "snapshot"
-        state = "stale" if offline and not pinned and _has_records() else "snapshot"
-        if offline and not pinned and _has_records():
+        if offline and not pinned and _has_live_records():
             return _payload_from_store(), "stale", "served from the last stored poll", "stored"
-        return _normalise(payload), state, "", "snapshot"
-    try:
-        _limit("pspf:regen")
-    except Exception as exc:
-        shipped = _shipped()
-        if shipped is None:
-            return None, "snapshot", redact(str(exc)), "snapshot"
-        return shipped, "snapshot", redact(str(exc)), "snapshot"
+        return (
+            _stamp(_normalise(payload), "snapshot", payload.get("as_of")),
+            "snapshot",
+            "",
+            "snapshot",
+        )
+    if force_live or not all(_fresh_cached(url) for _name, url in PAGES):
+        try:
+            _limit("pspf:regen", rate=2 / _WEEK, burst=2)
+        except RateLimited:
+            note = "weekly refresh budget for www.protectivesecurity.gov.au is spent"
+            if _has_live_records():
+                return (
+                    _payload_from_store(),
+                    "stale",
+                    f"{note}; served from the last stored poll",
+                    "stale",
+                )
+            shipped = _shipped()
+            if shipped is None:
+                return None, "snapshot", note, "snapshot"
+            return shipped, "snapshot", f"{note}; served shipped snapshot", "snapshot"
     bodies: dict[str, str] = {}
     warnings: list[str] = []
     caches: list[str] = []
     method = "direct"
+    skip_direct = False
     for name, url in PAGES:
-        text, cache, warning, used = _fetch_page(url, force_live=force_live)
+        text, cache, warning, used = _fetch_page(
+            url, force_live=force_live, skip_direct=skip_direct
+        )
+        skip_direct = skip_direct or used in {"http11", "failed"}
         caches.append(cache)
         if used == "http11":
             method = "http11"
@@ -233,6 +253,7 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
         parsed = _payload_from_bodies(bodies)
         problem = None if parsed is None else schema_drift(parsed)
         if parsed is not None and not problem and _has_content(parsed):
+            parsed = _stamp(parsed, "live", _retrieved(list(bodies)))
             parsed, filled = _fill_gaps(parsed)
             warnings.extend(filled)
             note = "; ".join(item for item in warnings if item)
@@ -244,7 +265,7 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
             warnings.append(problem)
         elif not _has_content(parsed):
             warnings.append("PSPF pages contained no requirements or directions")
-    if not force_live and _has_records():
+    if not force_live and _has_live_records():
         note = "; ".join(warnings) or "served from the last stored poll"
         return _payload_from_store(), "stale", note, "stale"
     shipped = _shipped()
@@ -254,12 +275,16 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
     return None, "snapshot", message, "direct"
 
 
-def _fetch_page(url: str, *, force_live: bool) -> tuple[str | None, str, str, str]:
-    direct = _http(url, _DIRECT, ttl=_WEEK, skip_cache=force_live)
-    accepted = _accept(direct)
-    if accepted is not None:
-        return accepted[0], accepted[1], accepted[2], "direct"
-    fallback = _http(url, _BROWSER, ttl=_WEEK, skip_cache=True)
+def _fetch_page(
+    url: str, *, force_live: bool, skip_direct: bool = False
+) -> tuple[str | None, str, str, str]:
+    direct: tuple[str | None, str, str] = (None, "", "snapshot")
+    if not skip_direct or _fresh_cached(url):
+        direct = _http(url, _DIRECT, ttl=_WEEK, skip_cache=force_live, retries=1)
+        accepted = _accept(direct)
+        if accepted is not None:
+            return accepted[0], accepted[1], accepted[2], "direct"
+    fallback = _http(url, _BROWSER, ttl=_WEEK, skip_cache=True, retries=1)
     accepted = _accept(fallback)
     if accepted is not None:
         return accepted[0], accepted[1], accepted[2], "http11"
@@ -268,7 +293,7 @@ def _fetch_page(url: str, *, force_live: bool) -> tuple[str | None, str, str, st
         cached = _cached_body(url)
         if cached:
             return cached, "stale", "served from cache after the live fetch failed", "stale"
-    return None, "snapshot", message, "direct"
+    return None, "snapshot", message, "failed"
 
 
 def _accept(result: tuple[str | None, str, str]) -> tuple[str, str, str] | None:
@@ -287,7 +312,9 @@ def _failure(result: tuple[str | None, str, str]) -> str:
     return warning
 
 
-def _http(url: str, headers: dict, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
+def _http(
+    url: str, headers: dict, *, ttl: int, skip_cache: bool, retries: int
+) -> tuple[str | None, str, str]:
     data_dir = _data_dir()
     client = HttpClient(
         "pspf",
@@ -298,8 +325,8 @@ def _http(url: str, headers: dict, *, ttl: int, skip_cache: bool) -> tuple[str |
         rate=4,
         burst=20,
         window="rolling",
-        timeout=60,
-        retries=3,
+        timeout=10,
+        retries=retries,
         transport=_TRANSPORT,
         sleeper=_SLEEP,
     )
@@ -449,17 +476,17 @@ def _directions_from_text(plain: str, links: list[tuple[str, str]], page_url: st
 def _publication_from_text(plain: str, url: str) -> dict | None:
     if not url.rstrip("/").endswith("pspf-page-2026"):
         return None
-    if "PSPF" not in plain and "pspf" not in plain.lower():
-        return None
-    date_match = re.search(r"Publication date:\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})", plain)
     sentence = re.search(r"(The PSPF on a page [^.]{0,240}\.)", plain)
+    if sentence is None:
+        return None
+    date_match = re.search(r"Publication date:?\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})", plain)
     return {
         "id": "pspf-page-2026",
         "kind": "publication",
         "title": "PSPF on a page 2026",
         "url": REQUIREMENTS_URL,
-        "published": _iso_date(date_match.group(1)) if date_match else "2026-07-01",
-        "text": sentence.group(1) if sentence else "",
+        "published": _iso_date(date_match.group(1)) if date_match else None,
+        "text": sentence.group(1),
     }
 
 
@@ -500,7 +527,17 @@ def _record(row: dict, kind: str) -> dict:
         "url": str(row.get("url") or HOME_URL),
         "published": None if published in (None, "") else str(published),
         "text": str(row.get("text") or ""),
+        **({"origin": row["origin"]} if row.get("origin") else {}),
+        **({"retrieved_at": row["retrieved_at"]} if row.get("retrieved_at") else {}),
     }
+
+
+def _stamp(payload: dict, origin: str, retrieved: str | None) -> dict:
+    for row in [*payload["requirements"], *payload["directions"]]:
+        row.setdefault("origin", origin)
+        if retrieved and not row.get("retrieved_at"):
+            row["retrieved_at"] = str(retrieved)
+    return payload
 
 
 def _dedupe(payload: dict) -> dict:
@@ -549,6 +586,9 @@ def _public(row: dict) -> dict:
         "url": row.get("url") or HOME_URL,
         "published": row.get("published"),
         "text": _wrap(row.get("text") or ""),
+        "origin": row.get("origin") or "snapshot",
+        "retrieved_at": row.get("retrieved_at"),
+        "source_sha256": hashlib.sha256((row.get("text") or "").encode()).hexdigest(),
     }
 
 
@@ -578,20 +618,24 @@ def _persist(payload: dict) -> None:
     rows = [*payload.get("requirements", []), *payload.get("directions", [])]
     if not rows:
         return
-    fetched = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fetched = _now()
     with _db() as conn:
         for row in rows:
             conn.execute(
                 """
-                INSERT INTO records (id, kind, title, url, published, text, fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO records
+                    (id, kind, title, url, published, text, fetched_at, origin, retrieved_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     kind=excluded.kind,
                     title=excluded.title,
                     url=excluded.url,
                     published=excluded.published,
                     text=excluded.text,
-                    fetched_at=excluded.fetched_at
+                    fetched_at=excluded.fetched_at,
+                    origin=excluded.origin,
+                    retrieved_at=excluded.retrieved_at
+                WHERE excluded.origin = 'live' OR records.origin = 'snapshot'
                 """,
                 (
                     row["id"],
@@ -601,6 +645,8 @@ def _persist(payload: dict) -> None:
                     row.get("published"),
                     row.get("text") or "",
                     fetched,
+                    row.get("origin") or "snapshot",
+                    row.get("retrieved_at"),
                 ),
             )
 
@@ -616,10 +662,9 @@ def _search_store(needle: str) -> list[dict]:
             WHERE lower(id) LIKE ? ESCAPE '\\'
                OR lower(title) LIKE ? ESCAPE '\\'
                OR lower(text) LIKE ? ESCAPE '\\'
-               OR lower(url) LIKE ? ESCAPE '\\'
             ORDER BY coalesce(published, '') DESC, id DESC
             """,
-            (like, like, like, like),
+            (like, like, like),
         ).fetchall()
     return [dict(row) for row in found]
 
@@ -636,10 +681,19 @@ def _has_records() -> bool:
     return row is not None
 
 
+def _has_live_records() -> bool:
+    if not (_data_dir() / "pspf.sqlite").is_file():
+        return False
+    with _db() as conn:
+        row = conn.execute("SELECT 1 FROM records WHERE origin = 'live' LIMIT 1").fetchone()
+    return row is not None
+
+
 def _payload_from_store() -> dict:
     with _db() as conn:
         rows = conn.execute(
-            "SELECT * FROM records ORDER BY coalesce(published, '') DESC, id DESC"
+            "SELECT * FROM records WHERE origin = 'live' "
+            "ORDER BY coalesce(published, '') DESC, id DESC"
         ).fetchall()
     requirements = []
     directions = []
@@ -657,7 +711,7 @@ def _shipped() -> dict | None:
     payload = _read_json(path)
     if payload is None or schema_drift(payload):
         return None
-    return _normalise(payload)
+    return _stamp(_normalise(payload), "snapshot", payload.get("as_of"))
 
 
 def _load_snapshot_file() -> dict | None:
@@ -711,11 +765,33 @@ def _as_of(payload: dict) -> str | None:
     return max(dates) if dates else None
 
 
-def _limit(key: str) -> None:
+def _fresh_cached(url: str) -> bool:
+    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cached = cache.get(cache.key("GET", url, None, b"", "anonymous"))
+    return cached is not None and cache.fresh(cached)
+
+
+def _retrieved(urls: list[str]) -> str:
+    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    times = []
+    for url in urls:
+        cached = cache.get(cache.key("GET", url, None, b"", "anonymous"))
+        if cached is not None:
+            times.append(cached.fetched_at)
+    if not times:
+        return _now()
+    return datetime.fromtimestamp(min(times), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _now() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _limit(key: str, *, rate: float, burst: int) -> None:
     RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         key,
-        rate=2 / _WEEK,
-        burst=2,
+        rate=rate,
+        burst=burst,
         window="rolling",
         timeout=1.0,
     )
@@ -737,7 +813,7 @@ def _envelope(data, cache: str, data_as_of: str | None = None, warnings=()):
     return envelope(
         "pspf",
         data,
-        urls=[REQUIREMENTS_URL, HOME_URL],
+        urls=[REQUIREMENTS_URL, DIRECTIONS_URL],
         cache=cache,
         data_as_of=data_as_of,
         warnings=warnings,
@@ -764,10 +840,16 @@ def _db():
             url TEXT NOT NULL,
             published TEXT,
             text TEXT NOT NULL,
-            fetched_at TEXT NOT NULL
+            fetched_at TEXT NOT NULL,
+            origin TEXT NOT NULL DEFAULT 'snapshot',
+            retrieved_at TEXT
         )
         """
     )
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(records)")}
+    if "origin" not in columns:
+        conn.execute("ALTER TABLE records ADD COLUMN origin TEXT NOT NULL DEFAULT 'snapshot'")
+        conn.execute("ALTER TABLE records ADD COLUMN retrieved_at TEXT")
     try:
         yield conn
         conn.commit()
