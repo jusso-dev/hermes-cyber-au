@@ -96,6 +96,9 @@ TERMS_NOTICE = (
     "No sharing outside the profile. Flare ships off until you set enabled: true."
 )
 _UNCONFIRMED = "The ransomware leak site claim is unconfirmed."
+FIXTURE_WARNING = (
+    "Synthetic fixture data from CYBERAU_FLARE_FIXTURES. This is not a live Flare result."
+)
 _HOST = re.compile(
     r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$",
     re.IGNORECASE,
@@ -104,6 +107,9 @@ _HOST = re.compile(
 
 def _envelope(data, cache: str, warnings: tuple[str, ...] | list[str] = (), urls=()):
     state = cache if cache in {"hit", "miss", "stale", "snapshot"} else "snapshot"
+    warnings = list(warnings)
+    if fixture_dir() is not None:
+        warnings.insert(0, FIXTURE_WARNING)
     return envelope(
         "flare",
         data,
@@ -134,7 +140,7 @@ def _provided(**values) -> dict:
 def load_schema_sample() -> dict:
     raw = lookup("CYBERAU_FLARE_SCHEMA_FIXTURE")
     path = (
-        package_root() / "tests" / "fixtures" / "tenant_events_synthetic.json"
+        package_root() / "tests" / "fixtures" / "flare_tenant_exposure_synthetic.json"
         if raw is None
         else Path(raw)
     )
@@ -193,11 +199,18 @@ def allowed_mcp_tools(names: list[str]) -> list[str]:
 
 
 def render_mcp_entry(entry: dict, *, enabled: bool = False) -> dict:
-    include = list((entry.get("tools") or {}).get("include") or [])
+    include = [name for name in (entry.get("tools") or {}).get("include") or []]
+    headers = {}
+    for item in entry.get("headers") or []:
+        name, raw = str(item).split("=", 1)
+        headers[name] = raw.strip()
     return {
         "enabled": bool(enabled),
         "trust": entry.get("trust", "untrusted"),
         "url": entry.get("url"),
+        "headers": headers,
+        "lazy": bool(entry.get("lazy", True)),
+        "timeout": entry.get("timeout", 120),
         "tools": {"include": include},
     }
 
@@ -299,6 +312,11 @@ def premium_doctor_lines(watchlist: Watchlist, identifiers: list) -> list[str]:
     return [
         f"flare: watchlist entry {item} is not monitored" for item in report["missing_from_flare"]
     ]
+
+
+def _wrap(text: str) -> str:
+    """Upstream text is redacted and wrapped. It is data, never instructions."""
+    return untrusted_text(redact_text(text), "flare")
 
 
 def _primary(item: dict) -> dict | None:
@@ -407,7 +425,8 @@ def normalise_event(item: dict, watchlist: Watchlist) -> dict | None:
     if finding is None or metadata is None:
         return None
     payload = finding_payload(finding)
-    payload["severity"] = metadata.get("severity")
+    severity = metadata.get("severity")
+    payload["severity"] = severity if severity in _SEVERITY else None
     payload["event_type"] = metadata.get("type")
     payload["estimated_created_at"] = metadata.get("estimated_created_at")
     identifier = _primary(item)
@@ -415,7 +434,7 @@ def normalise_event(item: dict, watchlist: Watchlist) -> dict | None:
         payload["identifier_id"] = identifier["id"]
     summary = _summary(item)
     if summary:
-        payload["summary"] = untrusted_text(redact_text(summary), "flare")
+        payload["summary"] = _wrap(summary)
     if metadata.get("type") == "ransomleak":
         payload["briefing"] = untrusted_text(_UNCONFIRMED, "flare")
     return payload
@@ -553,11 +572,15 @@ def flare_identifiers() -> dict:
         if not isinstance(item, dict):
             continue
         name = item.get("name") if isinstance(item.get("name"), str) else ""
+        kind = item.get("type") if isinstance(item.get("type"), str) else ""
+        identifier = item.get("id")
         rows.append(
             {
-                "id": item.get("id"),
-                "name": untrusted_text(redact_text(name), "flare") if name else "",
-                "type": item.get("type"),
+                "id": identifier
+                if isinstance(identifier, int) and not isinstance(identifier, bool)
+                else None,
+                "name": _wrap(name) if name else "",
+                "type": _wrap(kind) if kind else "",
             }
         )
     raw_items = [item for item in fetched.items if isinstance(item, dict)]
@@ -565,7 +588,7 @@ def flare_identifiers() -> dict:
     data = {
         "identifiers": rows,
         "missing_from_flare": compared["missing_from_flare"],
-        "not_on_watchlist": compared["not_on_watchlist"],
+        "not_on_watchlist": [_wrap(name) for name in compared["not_on_watchlist"]],
     }
     return _envelope(data, fetched.cache, fetched.warnings, urls=[IDENTIFIERS_URL])
 
@@ -592,7 +615,7 @@ def aggregate_credentials(items: list, *, since: str | None) -> list[dict]:
             add = 1
         counts[(source_type, day)] = counts.get((source_type, day), 0) + add
     return [
-        {"source_type": source_type, "imported_on": day, "count": count}
+        {"source_type": _wrap(source_type), "imported_on": day, "count": count}
         for (source_type, day), count in sorted(counts.items())
     ]
 
@@ -607,13 +630,22 @@ def flare_domain_credentials(domain: str, since: str | None = None) -> dict:
     problem = _reject("flare_domain_credentials", _provided(domain=domain, since=since))
     if problem or _HOST.fullmatch(domain) is None:
         return _envelope([], "snapshot", (problem or "domain must be a hostname",))
+    # Global Search spends quota, so only the user's own email domains go out.
+    if domain.casefold() not in {item.casefold() for item in load_watchlist().email_domains}:
+        return _envelope([], "snapshot", ("domain is not a watchlist email domain",))
     # Tenant searches do not come through here. The floor is a hard stop.
     # Above the daily count the call asks and does not spend Global Search quota.
-    decision = global_search_decision(load_profile_config(), approved=False)
+    config = load_profile_config()
+    decision = global_search_decision(config, approved=False)
     if decision is not None:
         return _envelope([], "snapshot", (decision["message"],))
     since_iso = _sydney_start(since).isoformat() if since else None
-    fetched = fetch_domain_credentials(domain_query(domain, since=since_iso, size=100))
+
+    def gate() -> str | None:
+        later = global_search_decision(config, approved=False)
+        return None if later is None else later["message"]
+
+    fetched = fetch_domain_credentials(domain_query(domain, since=since_iso, size=100), gate=gate)
     if fetched.warnings and not fetched.items:
         return _envelope([], fetched.cache, fetched.warnings, urls=[CREDENTIALS_URL])
     rows = aggregate_credentials(fetched.items, since=since)
@@ -695,8 +727,10 @@ class FlareConnector(PremiumConnector):
 
     def health_result(self, *, live: bool = False) -> HealthResult:
         result = super().health_result(live=False)
-        if not result.configured or not live:
+        if not live:
             return result
+        if not result.configured:
+            return HealthResult(configured=False, ok=False, detail="not configured")
         ok, detail = probe_token()
         return HealthResult(configured=True, ok=ok, detail=detail)
 

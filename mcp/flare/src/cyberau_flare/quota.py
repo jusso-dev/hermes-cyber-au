@@ -112,7 +112,8 @@ def global_search_decision(
             "needs_approval": True,
             "message": (
                 f"Approval required for flare: global searches today {used} "
-                f"is above the daily threshold {daily}."
+                f"is above the daily threshold {daily}. "
+                "Raise global_searches_per_day in your profile config to allow more today."
             ),
         }
     return None

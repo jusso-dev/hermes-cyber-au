@@ -16,7 +16,7 @@ The connector does not create or change identifiers, groups, matching policies o
 | `flare_domain_credentials` | Counts of leaked credentials for one watchlist email domain, by source type and imported date. This spends Global Search quota and asks first above the daily count you set. |
 | `flare_quota_status` | Global Search searches remaining this month, from the last response header. |
 
-Tenant searches are preferred. Password and email queries are not tools. A ransomware leak site claim is marked as reported by the vendor, and the briefing says the claim is unconfirmed.
+Tenant searches are preferred. `flare_domain_credentials` accepts only a domain in your watchlist `email_domains`, and the daily count and floor are checked before every page of a Global Search. A list Flare returns in more pages than were read comes back with a partial warning. Password and email queries are not tools. A ransomware leak site claim is marked as reported by the vendor, and the briefing says the claim is unconfirmed.
 
 Search calls stay at one request a second. A 429 waits for `Retry-After`, or 10 seconds when that header is absent, then retries once. The API token is refreshed before the one hour expiry and is not logged.
 

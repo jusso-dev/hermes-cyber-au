@@ -253,10 +253,10 @@ Placeholders resolve from the profile `.env` ([`website/docs/reference/mcp-confi
 
 ## Tests
 Recorded fixtures (pytest-recording cassettes, auth headers filtered):
-- `mcp/flare/tests/fixtures/tenant_events_synthetic.json` (synthetic: stealer_log, ransomleak and leak events for example.com.au)
-- `mcp/flare/tests/fixtures/identifier_events_synthetic.json` (synthetic)
-- `mcp/flare/tests/fixtures/identifiers_synthetic.json` (synthetic)
-- `mcp/flare/tests/fixtures/credentials_global_search_synthetic.json` (synthetic, counts only)
+- `mcp/flare/tests/fixtures/flare_tenant_exposure_synthetic.json` (synthetic: stealer_log, ransomleak and leak events for example.com.au)
+- `mcp/flare/tests/fixtures/flare_identifier_events_synthetic.json` (synthetic)
+- `mcp/flare/tests/fixtures/flare_identifiers_synthetic.json` (synthetic)
+- `mcp/flare/tests/fixtures/flare_domain_credentials_synthetic.json` (synthetic, counts only)
 - `mcp/flare/tests/fixtures/token_generate_synthetic.json` (synthetic token, expiry in 1 hour)
 - `mcp/flare/tests/fixtures/flare_429_ratelimit.json`
 - `mcp/flare/tests/fixtures/flare_401.json`

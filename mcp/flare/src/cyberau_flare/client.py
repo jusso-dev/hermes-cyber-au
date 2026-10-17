@@ -38,6 +38,7 @@ RATE_LIMIT_WAIT_S = 10.0
 EVENT_TTL_S = 300
 IDENTIFIER_TTL_S = 3600
 PAGE_SIZE = 100
+_PARTIAL = "Flare has more results than were read. The list is partial."
 
 # Tests inject these. Production leaves them unset.
 TRANSPORT = None
@@ -89,11 +90,18 @@ def fixture_dir() -> Path | None:
     return Path(raw)
 
 
+def _whole(text: str | None) -> int | None:
+    """Parse ASCII digits only. str.isdigit() also accepts forms int() rejects."""
+    if text is None or not text.isascii() or not text.isdigit():
+        return None
+    return int(text)
+
+
 def missing_key_warning() -> str | None:
     if lookup("FLARE_API_KEY") is None:
         return "Flare is not configured. Set FLARE_API_KEY."
     tenant = lookup("FLARE_TENANT_ID")
-    if tenant is not None and not tenant.isdigit():
+    if tenant is not None and _whole(tenant) is None:
         return "FLARE_TENANT_ID must be a whole number."
     return None
 
@@ -187,7 +195,7 @@ def _retry_wait(headers: dict[str, str]) -> float:
     raw = headers.get("retry-after")
     if raw:
         try:
-            return min(60.0, float(raw))
+            return max(0.0, min(60.0, float(raw)))
         except ValueError:
             return RATE_LIMIT_WAIT_S
     return RATE_LIMIT_WAIT_S
@@ -199,13 +207,13 @@ def _fixture_name(url: str) -> str | None:
     if url.endswith("/tokens/test"):
         return "token_test_synthetic.json"
     if url.endswith("/events/tenant/_search"):
-        return "tenant_events_synthetic.json"
+        return "flare_tenant_exposure_synthetic.json"
     if "/events/identifiers/" in url:
-        return "identifier_events_synthetic.json"
+        return "flare_identifier_events_synthetic.json"
     if url.rstrip("/").endswith("/identifiers"):
-        return "identifiers_synthetic.json"
+        return "flare_identifiers_synthetic.json"
     if url.endswith("/credentials/global/_search"):
-        return "credentials_global_search_synthetic.json"
+        return "flare_domain_credentials_synthetic.json"
     return None
 
 
@@ -281,8 +289,8 @@ def _issue_token() -> tuple[str | None, str | None]:
         _TOKEN = token
         _TOKEN_EXPIRES_AT = _clock() + TOKEN_TTL_S
         return token, None
-    tenant = lookup("FLARE_TENANT_ID")
-    body = {"tenant_id": int(tenant)} if tenant else {}
+    tenant = _whole(lookup("FLARE_TENANT_ID"))
+    body = {"tenant_id": tenant} if tenant is not None else {}
     try:
         response = _send(
             "POST",
@@ -396,13 +404,25 @@ def _call(
     items = payload.get("items", [])
     cursor = payload.get("next") if isinstance(payload.get("next"), str) else None
     if count_global and response.cache == "miss":
-        raw = headers.get("x-flare-global-searches-remaining")
-        remaining = int(raw) if isinstance(raw, str) and raw.isdigit() else None
+        remaining = _whole(headers.get("x-flare-global-searches-remaining"))
         record_global_search(remaining)
     return Fetch(items if isinstance(items, list) else [], response.cache, (), headers, cursor)
 
 
-def _post_pages(url: str, body: dict, *, limit: int, ttl: int, count_global: bool = False) -> Fetch:
+def _post_pages(
+    url: str,
+    body: dict,
+    *,
+    limit: int,
+    ttl: int,
+    count_global: bool = False,
+    gate=None,
+) -> Fetch:
+    """Read pages up to `limit`. `gate` runs before each page after the first.
+
+    Each Global Search page spends quota, so a gate that returns a message stops
+    the read and the rows already fetched come back with that message.
+    """
     problem = missing_key_warning()
     if problem:
         return Fetch([], "snapshot", (problem,), {})
@@ -412,9 +432,13 @@ def _post_pages(url: str, body: dict, *, limit: int, ttl: int, count_global: boo
     cache = "miss"
     headers: dict[str, str] = {}
     cursor = None
-    for _page in range(_max_pages()):
+    for index in range(_max_pages()):
         if len(items) >= limit:
             break
+        if gate is not None and index > 0:
+            stop = gate()
+            if stop:
+                return Fetch(items[:limit], cache, (f"{stop} Counts are partial.",), headers)
         page = dict(body)
         page["size"] = min(PAGE_SIZE, max(1, limit - len(items)))
         if cursor:
@@ -430,6 +454,8 @@ def _post_pages(url: str, body: dict, *, limit: int, ttl: int, count_global: boo
         cursor = fetched.next_cursor
         if not cursor:
             break
+    if cursor:
+        return Fetch(items[:limit], cache, (_PARTIAL,), headers)
     return Fetch(items[:limit], cache, (), headers)
 
 
@@ -449,16 +475,21 @@ def fetch_identifiers() -> Fetch:
     if fixture_dir() is not None:
         return _from_fixture(IDENTIFIERS_URL)
     fetched = _call("GET", IDENTIFIERS_URL, ttl=IDENTIFIER_TTL_S, params={"size": PAGE_SIZE})
+    if fetched.next_cursor and not fetched.warnings:
+        # Only the first page is read. A partial list would report monitored
+        # identifiers as missing, so say so.
+        return Fetch(fetched.items, fetched.cache, (_PARTIAL,), fetched.headers)
     return fetched
 
 
-def fetch_domain_credentials(body: dict) -> Fetch:
+def fetch_domain_credentials(body: dict, *, gate=None) -> Fetch:
     return _post_pages(
         CREDENTIALS_URL,
         body,
         limit=PAGE_SIZE * _max_pages(),
         ttl=EVENT_TTL_S,
         count_global=True,
+        gate=gate,
     )
 
 
@@ -467,8 +498,12 @@ def probe_token() -> tuple[bool, str]:
     if problem:
         return False, problem
     if fixture_dir() is not None:
-        return True, "offline ok"
-    fetched = _call("GET", TOKEN_TEST_URL, ttl=60)
+        return False, "fixture mode, not a live check"
+    # ttl=0 so a cached copy is never fresh. A stale copy served after a failed
+    # fetch comes back as hit or stale, and that is not a live answer.
+    fetched = _call("GET", TOKEN_TEST_URL, ttl=0)
     if fetched.warnings:
         return False, fetched.warnings[0]
+    if fetched.cache != "miss":
+        return False, f"served from {fetched.cache} copy, not a live check"
     return True, "live ok"
