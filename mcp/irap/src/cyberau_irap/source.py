@@ -42,6 +42,16 @@ ATTRIBUTION = (
     "(July 2025 consumer guide, CC BY 4.0 except the Coat of Arms). "
     "Short quotations only. This is not an IRAP assessment and it is not endorsed by ASD."
 )
+SNAPSHOT_NOTE = (
+    "Shipped snapshot: short passages seen through a search index on 16 October 2026. "
+    "It is not a full fetch of the cyber.gov.au page. Read the current page before relying on it."
+)
+_STOP = frozenset(
+    "about all and any are can does for from has have how its may not should that the their "
+    "them then there these they this was what when where which who why will with would you "
+    "your".split()
+)
+_CHROME = {"nav", "header", "footer", "aside", "form", "noscript"}
 _PACKAGE = Path(__file__).resolve().parents[2]
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _QUERY = Annotated[str, Field(min_length=2)]
@@ -69,7 +79,7 @@ def irap_search_guidance(query: _QUERY) -> dict:
             warnings=("query must be at least 2 characters",),
         )
     pages = _pages(None)
-    warnings = [page["warning"] for page in pages if page["warning"]]
+    warnings = _page_warnings(pages)
     records = [row for page in pages for row in page["records"]]
     matched = [row for row in records if _matches(query, row["sentence"])]
     cache = _merge_cache([page["cache"] for page in pages])
@@ -87,10 +97,17 @@ def irap_consumer_checklist() -> dict:
     pages = _pages(("consumer-guide",))
     page = pages[0]
     checks = [_public(row) for row in page["records"] if row["kind"] == "check"]
-    warnings = [page["warning"]] if page["warning"] else []
-    if not checks and not warnings:
+    warnings = _page_warnings(pages)
+    if not checks and not page["warning"]:
         warnings.append("consumer guide checklist is empty")
     return _envelope(checks, page["cache"], [page["url"]], _as_of(page["records"]), tuple(warnings))
+
+
+def _page_warnings(pages: list[dict]) -> list[str]:
+    warnings = [page["warning"] for page in pages if page["warning"]]
+    if any(page["snapshot"] for page in pages):
+        warnings.append(SNAPSHOT_NOTE)
+    return warnings
 
 
 def connector() -> Connector:
@@ -124,10 +141,14 @@ class _IrapConnector(Connector):
             return _schema_probe(self.key)
         if not live:
             return Probe(self.key, True, "offline ok")
-        page = _fetch_page("overview", OVERVIEW_URL, "irap_overview.html", force_live=True)
-        if page["warning"] or not page["records"]:
-            return Probe(self.key, False, page["warning"] or "live probe returned no guidance")
-        problem = _validate_responses(page["records"])
+        records: list[dict] = []
+        for page_id, url, filename in PAGES:
+            page = _fetch_page(page_id, url, filename, force_live=True)
+            if page["warning"] or not page["records"]:
+                detail = page["warning"] or f"live probe returned no guidance for {page_id}"
+                return Probe(self.key, False, detail)
+            records.extend(page["records"])
+        problem = _validate_responses(records)
         if problem:
             return Probe(self.key, False, problem)
         return Probe(self.key, True, "live ok")
@@ -394,6 +415,7 @@ class _GuideParser(HTMLParser):
         self.retrieved = ""
         self.items: list[dict] = []
         self._skip = 0
+        self._chrome = 0
         self._capture: str | None = None
         self._buf: list[str] = []
 
@@ -401,6 +423,8 @@ class _GuideParser(HTMLParser):
         attr = {key.lower(): value or "" for key, value in attrs}
         if tag in {"script", "style"}:
             self._skip += 1
+        if tag in _CHROME:
+            self._chrome += 1
         if tag == "article":
             if attr.get("data-url"):
                 self.url = attr["data-url"]
@@ -411,13 +435,15 @@ class _GuideParser(HTMLParser):
             kind = attr.get("data-kind") or ("check" if tag == "li" else "paragraph")
             self.items.append(self._item(attr.get("data-id", ""), kind, sentence))
             return
-        if tag in {"p", "li"} and not self._skip:
+        if tag in {"p", "li"} and not self._skip and not self._chrome:
             self._capture = tag
             self._buf = []
 
     def handle_endtag(self, tag):
         if tag in {"script", "style"} and self._skip:
             self._skip -= 1
+        if tag in _CHROME and self._chrome:
+            self._chrome -= 1
         if self._capture == tag:
             text = " ".join("".join(self._buf).split())
             self._capture = None
@@ -450,14 +476,12 @@ class _GuideParser(HTMLParser):
 def _matches(query: str, sentence: str) -> bool:
     hay = sentence.casefold()
     needle = " ".join(query.casefold().split())
-    if needle in hay:
-        return True
-    tokens = [token for token in _TOKEN.findall(needle) if len(token) >= 4]
-    if not tokens:
-        tokens = _TOKEN.findall(needle)
+    tokens = [token for token in _TOKEN.findall(needle) if len(token) >= 3 and token not in _STOP]
     if not tokens:
         return False
-    return all(token in hay for token in tokens)
+    if needle in hay:
+        return True
+    return all(re.search(rf"\b{re.escape(token)}", hay) for token in tokens)
 
 
 def _public(row: dict) -> dict:
@@ -601,6 +625,7 @@ def _done(
     blocked: bool,
 ) -> dict:
     return {
+        "snapshot": cache == "snapshot",
         "page": page_id,
         "url": url,
         "records": records,

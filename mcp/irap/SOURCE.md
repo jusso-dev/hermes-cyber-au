@@ -13,6 +13,8 @@ Direct fetches of cyber.gov.au failed on 16 October 2026, as recorded in the con
 
 The fallback ladder is a direct fetch, then HTTP/1.1 with browser-like headers that still include `hermes-cyber-au` in the User-Agent, then the last stored copy, then the shipped snapshot. After a connection failure, later pages in the same call use the snapshot.
 
-A question the pages do not answer is returned as `not covered`. The connector does not turn that into an assessment result.
+The live health probe fetches both pages and fails if either cannot be fetched from cyber.gov.au. It never counts the shipped snapshot or a cached copy as ok.
+
+A question the pages do not answer is returned as `not covered`. Queries made only of common words (for example "should" or "what is this") are also `not covered`. The connector does not turn that into an assessment result.
 
 Items are stored in `$CYBERAU_DATA_DIR/irap_guidance.sqlite` (table `guidance`) until the shared intel store exists. Rows are kept when a later copy of the page no longer includes them. Search answers from the current page or snapshot, not from dropped rows.

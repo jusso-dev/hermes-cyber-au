@@ -114,6 +114,37 @@ def test_unanswered_question_is_not_covered():
     assert irap_search_guidance("x")["warnings"]
 
 
+def test_stopword_only_queries_are_not_covered():
+    for query in ("should", "that the", "What should this do?"):
+        found = irap_search_guidance(query)
+        assert found["data"]["coverage"] == "not covered", query
+        assert found["data"]["matches"] == []
+    assert irap_search_guidance("assessment timelines")["data"]["coverage"] == "quoted"
+
+
+def test_snapshot_is_labelled_as_search_index_passages():
+    for result in (irap_search_guidance("three quotes"), irap_consumer_checklist()):
+        note = [w for w in result["warnings"] if w.startswith("Shipped snapshot")]
+        assert len(note) == 1
+        assert "search index" in note[0]
+        assert "16 October 2026" in note[0]
+        assert "not a full fetch" in note[0]
+    missed = irap_search_guidance("What dollar amount does ASD charge?")
+    assert any("search index" in warning for warning in missed["warnings"])
+
+
+def test_page_chrome_is_not_a_checklist_item():
+    html = (
+        "<nav><ul><li>Home page for the Australian Cyber Security Centre website</li></ul></nav>"
+        "<main><ul><li>Agree the assessment boundary with the IRAP assessor first.</li></ul></main>"
+        "<footer><ul><li>We acknowledge the Traditional Custodians of Country</li></ul></footer>"
+    )
+    rows = source._parse(html, "consumer-guide", GUIDE)
+    assert [row["sentence"] for row in rows] == [
+        "Agree the assessment boundary with the IRAP assessor first."
+    ]
+
+
 def test_empty_checklist_and_malformed_page(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_IRAP_SNAPSHOT", str(FIXTURES / "empty"))
     empty = irap_consumer_checklist()
@@ -175,17 +206,21 @@ def test_schema_and_live_health(tmp_path, monkeypatch):
 
     monkeypatch.delenv("CYBERAU_OFFLINE")
     monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
-    overview = (FIXTURES / "irap_overview.html").read_bytes()
+    pages = {
+        "/irap": (FIXTURES / "irap_overview.html").read_bytes(),
+        GUIDE.removeprefix("https://www.cyber.gov.au"): (
+            FIXTURES / "irap_consumer_guide.html"
+        ).read_bytes(),
+    }
     calls = {"n": 0}
 
     def ok(request: httpx.Request) -> httpx.Response:
         calls["n"] += 1
-        assert request.url.path == "/irap"
-        return httpx.Response(200, content=overview)
+        return httpx.Response(200, content=pages[request.url.path])
 
     source._TRANSPORT = httpx.MockTransport(ok)
     live = connector().health(live=True, check_schema=True)
-    assert calls["n"] == 1
+    assert calls["n"] == 2
     assert live.ok is True
 
     def unavailable(_request: httpx.Request) -> httpx.Response:
