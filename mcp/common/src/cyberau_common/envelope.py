@@ -8,14 +8,19 @@ from datetime import UTC, datetime
 from cyberau_common.secrets import redact_data
 
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
+_INVISIBLE = re.compile(
+    "[\u00ad\u061c\u180b-\u180f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff\U000e0000-\U000e007f]"
+)
 _WS = re.compile(r"\s+")
+_MARKER_OPEN = re.compile(r"<<(?=\s*/?\s*(?:end\b\s*)?untrusted)", re.IGNORECASE)
 
 
 def untrusted_text(value: str, source: str, max_len: int = 4000) -> str:
-    """Strip control and bidi characters, collapse whitespace, and wrap the text."""
-    cleaned = _BIDI.sub("", _CONTROL.sub("", value))
+    """Strip control, bidi, and zero-width characters, defuse markers, then cap and wrap."""
+    cleaned = _INVISIBLE.sub("", _CONTROL.sub("", value))
     cleaned = _WS.sub(" ", cleaned).strip()
+    # Break any literal wrapper marker so the text cannot close or reopen the block.
+    cleaned = _MARKER_OPEN.sub("< <", cleaned)
     if len(cleaned) > max_len:
         cleaned = cleaned[:max_len]
     return f"<<untrusted source={source}>> {cleaned} <<end untrusted>>"
