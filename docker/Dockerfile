@@ -44,11 +44,23 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
          ! -name profiles ! -name .bash_logout ! -name .bashrc ! -name .profile \
          -exec rm -rf {} + \
     && rm -rf /opt/cyber-au/src/tickets /opt/cyber-au/src/docs \
-    && if find /opt/cyber-au/src /opt/cyber-au/profile \
+    && find /opt/cyber-au/src /opt/cyber-au/profile \
          \( -name .env -o -name auth.json -o -name credentials.json -o -name '*.pem' -o -name '*.key' \) \
-         -print -quit | grep -q .; then \
-         echo "refusing to bake a credential file into the image" >&2; \
-         exit 1; \
+         -print > /tmp/credential-files \
+    && if [ -s /tmp/credential-files ]; then \
+         echo "credential-shaped paths:" >&2; \
+         cat /tmp/credential-files >&2; \
+         if grep -Ev '/\.env$' /tmp/credential-files | grep -q .; then \
+           echo "refusing to bake a credential file into the image" >&2; \
+           exit 1; \
+         fi; \
+         if grep -Ev '^[[:space:]]*(#.*)?$' /opt/cyber-au/profile/.env 2>/dev/null \
+            | grep -Ev '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[[:space:]]*$' \
+            | grep -Ev '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=\$\{[A-Za-z_][A-Za-z0-9_]*\}[[:space:]]*$' \
+            | grep -q .; then \
+           echo "refusing to bake a filled .env into the image" >&2; \
+           exit 1; \
+         fi; \
        fi \
     && chown -R hermes:hermes /opt/cyber-au/profile
 
