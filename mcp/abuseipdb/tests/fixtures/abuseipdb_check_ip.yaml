@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.abuseipdb.com/api/v2/check?ipAddress=118.25.6.39&maxAgeInDays=90
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"data":{"ipAddress":"118.25.6.39","isPublic":true,"ipVersion":4,"isWhitelisted":false,"abuseConfidenceScore":100,"countryCode":"CN","usageType":"Data Center/Web Hosting/Transit","isp":"Tencent Cloud Computing (Beijing) Co. Ltd","domain":"tencent.com","hostnames":["mail.example"],"isTor":false,"totalReports":1,"numDistinctUsers":1,"lastReportedAt":"2018-12-20T20:55:14+00:00"}}'

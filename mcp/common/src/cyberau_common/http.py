@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import email.utils
 import random
+import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
@@ -57,6 +58,7 @@ class HttpClient:
         sleeper=None,
         rng=None,
         max_bytes: int = 50 * 1024 * 1024,
+        max_retry_wait: float | None = None,
     ):
         self.connector = connector
         self.policy = policy
@@ -73,6 +75,7 @@ class HttpClient:
         self._sleep = sleeper or __import__("time").sleep
         self._rng = rng or random.random
         self.max_bytes = max_bytes
+        self.max_retry_wait = max_retry_wait
         self._client = httpx.Client(
             transport=transport,
             follow_redirects=False,
@@ -202,7 +205,7 @@ class HttpClient:
             if cached and self.cache.within_stale(cached, stale_if_error):
                 return _from_cache(cached, "stale", final_url)
             raise HttpError(f"upstream status {status}")
-        if status < 400:
+        if 200 <= status < 300:
             self.cache.put(cache_key, status=status, headers=stored_headers, body=body, ttl=ttl)
         return Response(
             status=status,
@@ -244,10 +247,14 @@ class HttpClient:
                 attempt += 1
                 continue
             if response.status_code in (429, 503) and attempt < self.retries:
-                self._sleep(self._retry_delay(response, attempt))
-                attempt += 1
-                response.close()
-                continue
+                delay = self._retry_delay(response, attempt)
+                # A Retry-After longer than max_retry_wait is returned, not slept through,
+                # so the caller can stay inside its own tool timeout.
+                if self.max_retry_wait is None or delay <= self.max_retry_wait:
+                    self._sleep(min(60.0, delay))
+                    attempt += 1
+                    response.close()
+                    continue
             if response.status_code in _REDIRECTS and redirects < 5:
                 location = response.headers.get("location")
                 response.close()
@@ -274,11 +281,14 @@ class HttpClient:
         header = response.headers.get("retry-after")
         if header:
             try:
-                return min(60.0, float(header))
+                return max(0.0, float(header))
             except ValueError:
-                parsed = email.utils.parsedate_to_datetime(header)
-                if parsed is not None:
-                    return min(60.0, 1.0)
+                try:
+                    parsed = email.utils.parsedate_to_datetime(header)
+                except (TypeError, ValueError):
+                    parsed = None
+                if parsed is not None and parsed.tzinfo is not None:
+                    return max(0.0, parsed.timestamp() - time.time())
         return self._backoff(attempt)
 
 
@@ -299,7 +309,11 @@ def _from_cache(item, state: str, url: str) -> Response:
 
 
 def _drop_secret_headers(headers: dict) -> dict:
-    return {key: value for key, value in headers.items() if key.lower() not in SECRET_HEADER_NAMES}
+    return {
+        key: value
+        for key, value in headers.items()
+        if key.lower() not in SECRET_HEADER_NAMES
+    }
 
 
 def _read_capped(response: httpx.Response, max_bytes: int) -> bytes:

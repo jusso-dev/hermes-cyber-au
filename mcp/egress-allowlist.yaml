@@ -221,3 +221,8 @@ connectors:
     - feodotracker.abuse.ch
     allow_ip_literals: false
     allow_http_loopback: false
+  abuseipdb:
+    hosts:
+    - api.abuseipdb.com
+    allow_ip_literals: false
+    allow_http_loopback: false

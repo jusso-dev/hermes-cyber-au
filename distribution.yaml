@@ -38,3 +38,6 @@ env_requires:
   - name: ABR_GUID
     description: "Optional ABN Lookup web services GUID. Expands watchlist ABNs to registered names. The ABN is not sent to vendors."
     required: false
+  - name: ABUSEIPDB_API_KEY
+    description: "AbuseIPDB API key. Needed for IP and network reputation checks."
+    required: false

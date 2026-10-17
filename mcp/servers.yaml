@@ -95,3 +95,16 @@ servers:
     terms_doc: docs/connectors/abusech.md
     required_env:
     - ABUSECH_AUTH_KEY
+  abuseipdb:
+    connector: abuseipdb
+    args:
+    - serve
+    - abuseipdb
+    env:
+    - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env:
+    - ABUSEIPDB_API_KEY

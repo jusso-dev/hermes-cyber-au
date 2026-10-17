@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["network", "reported"],
+  "properties": {
+    "network": {"type": "string"},
+    "network_address": {"type": "string"},
+    "netmask": {"type": "string"},
+    "min_address": {"type": "string"},
+    "max_address": {"type": "string"},
+    "num_possible_hosts": {"type": ["integer", "null"]},
+    "address_space": {"type": "string"},
+    "reported": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ip", "abuse_confidence_score", "num_reports"],
+        "properties": {
+          "ip": {"type": "string"},
+          "abuse_confidence_score": {"type": "integer"},
+          "num_reports": {"type": "integer"},
+          "most_recent_report": {"type": ["string", "null"]},
+          "country_code": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

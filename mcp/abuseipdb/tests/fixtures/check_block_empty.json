@@ -1,0 +1,11 @@
+{
+  "data": {
+    "networkAddress": "8.8.8.0",
+    "netmask": "255.255.255.0",
+    "minAddress": "8.8.8.1",
+    "maxAddress": "8.8.8.254",
+    "numPossibleHosts": 254,
+    "addressSpaceDesc": "Public DNS allocation",
+    "reportedAddress": []
+  }
+}
