@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.protectivesecurity.gov.au/
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "<h2>Direction 001-2026 on Mitigate Vulnerabilities in Cisco SD-WAN Systems</h2>"

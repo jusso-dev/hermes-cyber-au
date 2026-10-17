@@ -264,3 +264,8 @@ connectors:
     - cdn.phishtank.com
     allow_ip_literals: false
     allow_http_loopback: false
+  pspf:
+    hosts:
+    - www.protectivesecurity.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false

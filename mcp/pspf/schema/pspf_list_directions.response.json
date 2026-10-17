@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "url",
+    "published",
+    "text",
+    "origin",
+    "retrieved_at",
+    "source_sha256"
+  ],
+  "properties": {
+    "id": {"type": "string"},
+    "kind": {"const": "direction"},
+    "title": {"type": "string"},
+    "url": {"type": "string"},
+    "published": {"type": ["string", "null"]},
+    "text": {"type": "string"},
+    "origin": {"enum": ["live", "snapshot"]},
+    "retrieved_at": {"type": ["string", "null"]},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

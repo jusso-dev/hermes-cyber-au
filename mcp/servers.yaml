@@ -378,3 +378,14 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  pspf:
+    connector: pspf
+    args:
+    - serve
+    - pspf
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
