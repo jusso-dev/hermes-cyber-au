@@ -25,12 +25,26 @@ class CachedResponse:
 
 
 class HttpCache:
-    def __init__(self, path: Path, *, now=None):
+    def __init__(
+        self,
+        path: Path,
+        *,
+        now=None,
+        persistence: str = "ttl",
+        ttl_max: int | None = None,
+    ):
+        if persistence not in {"none", "session", "ttl"}:
+            raise ValueError("cache persistence must be none, session or ttl")
         self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.persistence = persistence
+        self.ttl_max = ttl_max
         self._now = now or time.time
+        self._memory: dict[str, CachedResponse] = {}
         self._compressor = zstandard.ZstdCompressor(level=3)
         self._decompressor = zstandard.ZstdDecompressor()
+        if persistence != "ttl":
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
@@ -62,6 +76,10 @@ class HttpCache:
         return hashlib.sha256(payload.encode()).hexdigest()
 
     def get(self, key: str) -> CachedResponse | None:
+        if self.persistence == "none":
+            return None
+        if self.persistence == "session":
+            return self._memory.get(key)
         with self._connect() as conn:
             row = conn.execute(
                 """
@@ -92,11 +110,27 @@ class HttpCache:
         body: bytes,
         ttl: int,
     ) -> None:
+        if self.persistence == "none":
+            return
+        if self.persistence == "ttl" and self.ttl_max is not None:
+            ttl = min(int(ttl), int(self.ttl_max))
         kept = {
             name: value
             for name, value in headers.items()
             if name.lower() in {"content-type", "etag", "last-modified"}
         }
+        if self.persistence == "session":
+            self._memory[key] = CachedResponse(
+                key=key,
+                status=status,
+                headers=kept,
+                body=body,
+                fetched_at=self._now(),
+                etag=kept.get("etag") or kept.get("ETag"),
+                last_modified=kept.get("last-modified") or kept.get("Last-Modified"),
+                ttl=ttl,
+            )
+            return
         with self._connect() as conn:
             conn.execute(
                 """
@@ -124,7 +158,18 @@ class HttpCache:
                 ),
             )
 
+    def clear_session(self) -> None:
+        """Drop memory-only responses. Called when a session ends."""
+        self._memory.clear()
+
     def touch(self, key: str) -> None:
+        if self.persistence == "none":
+            return
+        if self.persistence == "session":
+            item = self._memory.get(key)
+            if item is not None:
+                item.fetched_at = self._now()
+            return
         with self._connect() as conn:
             conn.execute(
                 "UPDATE http_cache SET fetched_at = ? WHERE key = ?",

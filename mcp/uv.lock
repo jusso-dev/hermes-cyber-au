@@ -16,6 +16,7 @@ members = [
     "cyberau-common",
     "cyberau-first-epss",
     "cyberau-nvd",
+    "cyberau-premium",
     "cyberau-workspace",
 ]
 
@@ -442,11 +443,29 @@ dependencies = [
 requires-dist = [{ name = "cyberau-common", editable = "common" }]
 
 [[package]]
+name = "cyberau-premium"
+version = "0.1.0"
+source = { editable = "premium" }
+dependencies = [
+    { name = "cyberau-common" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "pydantic", specifier = ">=2,<3" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
+
+[[package]]
 name = "cyberau-workspace"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cyberau-common" },
+    { name = "cyberau-premium" },
 ]
 
 [package.dev-dependencies]
@@ -459,7 +478,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "cyberau-common", editable = "common" }]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
+]
 
 [package.metadata.requires-dev]
 dev = [

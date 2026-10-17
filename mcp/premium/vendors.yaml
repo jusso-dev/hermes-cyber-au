@@ -1,0 +1,328 @@
+# Conservative terms and quota defaults for premium feeds.
+# Licence values are never stored here. Names only.
+vendors:
+  hudsonrock:
+    package: hudson-rock
+    name: Hudson Rock Cavalier (infostealer exposure by domain)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - HUDSONROCK_API_KEY
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache only. Store counts and metadata only. No STIX export. No sharing outside the profile.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - hudsonrock_
+  spycloud:
+    package: spycloud
+    name: SpyCloud Enterprise Protection (breach and malware exposure on a watchlist)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - SPYCLOUD_API_KEY
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache for records. Store metadata only. No STIX export. Prefer hashed values when the licence allows.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - spycloud_
+  upguard:
+    package: upguard
+    name: UpGuard CyberRisk (identity breaches, data leaks and typosquats)
+    paid: true
+    milestone: v0.2
+    licence_env:
+      - UPGUARD_API_KEY
+    terms:
+      cache: ttl
+      cache_ttl_max_s: 43200
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Cache at most 12 hours. Store metadata only. No STIX export unless your own contract allows it. No sharing outside the profile.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - upguard_
+  ransomlive:
+    package: ransomware-live
+    name: ransomware.live victim tracker (free, filter by country AU)
+    paid: false
+    milestone: v0.2
+    licence_env: []
+    optional_env:
+      - RANSOMWARE_LIVE_API_KEY
+    terms:
+      cache: ttl
+      cache_ttl_max_s: 3600
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Free community project. Victim entries are unverified claims from criminal leak sites. Cache at most 1 hour. Store metadata only. No STIX export of victim names.
+    quota:
+      calls_per_day: 24
+      calls_per_month: 500000
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - ransom_
+  recordedfuture:
+    package: recorded-future
+    name: Recorded Future (identity exposure, dark web and brand alerts)
+    paid: true
+    milestone: v0.2
+    licence_env:
+      - RECORDED_FUTURE_API_TOKEN
+    optional_env:
+      - RECORDED_FUTURE_ORG_ID
+      - RECORDED_FUTURE_MCP_CLIENT_ID
+      - RECORDED_FUTURE_MCP_CLIENT_SECRET
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Identity and alert metadata only in the store. No STIX export of vendor content. No sharing outside the profile. Risk lists stay inside the profile.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - rf_
+  flashpoint:
+    package: flashpoint
+    name: Flashpoint Ignite (compromised credentials and indicators)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - FLASHPOINT_API_TOKEN
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache. Store metadata only. No STIX export.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - flashpoint_
+  intel471:
+    package: intel471
+    name: Intel 471 Titan (watchers, alerts, credentials and breach alerts)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - INTEL471_EMAIL
+      - INTEL471_API_KEY
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache. The vendor client's own long cache stays off. Store metadata only. No STIX export.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - intel471_
+  gtidtm:
+    package: google-ti-dtm
+    name: Google Threat Intelligence Digital Threat Monitoring (formerly Mandiant)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - GTI_API_KEY
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache. Store metadata only. No STIX export. Do not reuse a VirusTotal Public API key.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - gti_
+  csrecon:
+    package: crowdstrike-recon
+    name: CrowdStrike Falcon Adversary Intelligence Recon
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - FALCON_CLIENT_ID
+      - FALCON_CLIENT_SECRET
+    optional_env:
+      - FALCON_BASE_URL
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache. Store metadata only. No STIX export. Read scope only.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - cs_recon_
+  socradar:
+    package: socradar
+    name: SOCRadar (company incidents)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - SOCRADAR_API_KEY
+      - SOCRADAR_COMPANY_ID
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache. Store metadata only. No STIX export.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - socradar_
+  darkowl:
+    package: darkowl
+    name: DarkOwl Vision (dark web search)
+    paid: true
+    milestone: v1.0
+    licence_env:
+      - DARKOWL_PUBLIC_KEY
+      - DARKOWL_PRIVATE_KEY
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache. Store counts and links only, no snippets. No STIX export.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - darkowl_
+  flare:
+    package: flare
+    name: Flare threat exposure management
+    paid: true
+    milestone: v0.2
+    licence_env:
+      - FLARE_API_KEY
+    optional_env:
+      - FLARE_TENANT_ID
+    terms:
+      cache: session
+      cache_ttl_max_s: 0
+      store: metadata
+      stix_export: false
+      share_outside_profile: false
+      redistribution: forbidden
+      attribution: Commercial licence. Session cache for events and credentials. Store event metadata only. No STIX export of Flare content. No sharing outside the profile.
+    quota:
+      calls_per_day: null
+      calls_per_month: null
+      cost_units_per_call: 1.0
+      monthly_budget_units: null
+      approval_above_units: null
+      hard_stop: true
+    routine_share: 0.5
+    max_pages: 5
+    tool_prefixes:
+      - flare_

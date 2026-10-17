@@ -3,13 +3,14 @@ name = "cyberau-workspace"
 version = "0.1.0"
 description = "Workspace for hermes-cyber-au MCP connectors."
 requires-python = ">=3.11"
-dependencies = ["cyberau-common"]
+dependencies = ["cyberau-common", "cyberau-premium"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism"]
+members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "premium"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
+cyberau-premium = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -29,6 +30,16 @@ testpaths = [
   "cisa-kev/tests",
   "first-epss/tests",
   "nvd/tests",
+  "premium/tests",
+]
+pythonpath = [
+  "common/src",
+  "asd-acsc/src",
+  "asd-ism/src",
+  "cisa-kev/src",
+  "first-epss/src",
+  "nvd/src",
+  "premium/src",
 ]
 addopts = "-q"
 
