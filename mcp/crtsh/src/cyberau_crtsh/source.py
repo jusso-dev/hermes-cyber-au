@@ -10,7 +10,7 @@ from pathlib import Path
 import jsonschema
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
@@ -24,6 +24,9 @@ RATE = 1 / 5
 BURST = 1
 TIMEOUT = 90
 RETRIES = 1
+# The tool timeout is 120 s. The retried request may read for up to 90 s, so a 429 is retried
+# only when Retry-After is short enough to leave room for it. A longer wait is not retried.
+RETRY_WAIT_CAP = 15
 CACHE_TTL = 24 * 3600
 REQUIRED = (
     "serial_number",
@@ -32,12 +35,13 @@ REQUIRED = (
     "issuer_name",
     "not_before",
     "not_after",
-    "entry_timestamp",
     "id",
 )
+# crt.sh dropped entry_timestamp from its JSON. It is used when present, else the id orders rows.
 _HOST = re.compile(
     r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$"
 )
+_SERIAL = re.compile(r"[0-9a-f]{1,128}")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 _SLEEP = time.sleep
@@ -63,7 +67,7 @@ def crtsh_certs(
     payload, cache, warning = _fetch(params)
     if not isinstance(payload, list):
         return _envelope([], cache, warnings=(warning or "crt.sh payload was not usable",))
-    rows, problem = _rows(
+    rows, problem, skipped = _rows(
         payload,
         domain=host,
         include_subdomains=include_subdomains,
@@ -72,13 +76,15 @@ def crtsh_certs(
     warnings: list[str] = []
     if warning:
         warnings.append(warning)
+    if skipped:
+        warnings.append(f"{skipped} crt.sh rows skipped, serial number was not hexadecimal")
     if problem:
         warnings.append(problem)
         return _envelope([], cache, warnings=tuple(warnings))
     if not rows and cache == "snapshot":
         warnings.append("no matching certificate in the offline snapshot or cache")
     _persist(host, rows)
-    newest = rows[0]["logged_at"] if rows else None
+    newest = (rows[0]["logged_at"] or None) if rows else None
     return _envelope(rows, cache, warnings=tuple(warnings), data_as_of=newest)
 
 
@@ -119,7 +125,7 @@ class _CrtshConnector(Connector):
         problem = schema_drift(payload)
         if problem:
             return Probe(self.key, False, problem)
-        rows, row_problem = _rows(
+        rows, row_problem, _skipped = _rows(
             payload,
             domain="example.com",
             include_subdomains=False,
@@ -182,12 +188,15 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str,
         window="rolling",
         timeout=TIMEOUT,
         retries=RETRIES,
+        max_retry_wait=RETRY_WAIT_CAP,
         transport=_TRANSPORT,
         sleeper=_SLEEP,
     )
     try:
         try:
             response = client.get(API, params=params, ttl=CACHE_TTL, skip_cache=force_live)
+        except EgressDenied as exc:
+            return _failed(cache, key, force_live, redact(str(exc)), warn_with_cache=True)
         except Exception as exc:
             return _failed(cache, key, force_live, redact(str(exc)), warn_with_cache=False)
         if response.status in (401, 403):
@@ -226,19 +235,24 @@ def _rows(
     domain: str,
     include_subdomains: bool,
     include_expired: bool,
-) -> tuple[list[dict], str | None]:
+) -> tuple[list[dict], str | None, int]:
     problem = schema_drift(payload)
     if problem:
-        return [], problem
-    grouped: dict[str, list[dict]] = {}
+        return [], problem, 0
+    # A serial is unique only within one issuer, so a second CA cannot hide a certificate
+    # by reusing its serial.
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    skipped = 0
     for row in payload:
         serial = _serial(row.get("serial_number"))
         if not serial:
+            skipped += 1
             continue
-        grouped.setdefault(serial, []).append(row)
+        issuer = str(row.get("issuer_name") or "").strip().lower()
+        grouped.setdefault((issuer, serial), []).append(row)
     now = _now()
     records = []
-    for serial, group in grouped.items():
+    for (_issuer, serial), group in grouped.items():
         best = max(group, key=_stamp)
         names = _merged_names(group)
         common = str(best.get("common_name") or "").strip()
@@ -249,22 +263,22 @@ def _rows(
             continue
         ident = _crtsh_id(best.get("id"))
         if ident is None:
-            return [], "crt.sh schema drift, id is not an integer"
+            return [], "crt.sh schema drift, id is not an integer", skipped
         records.append(
             {
                 "serial_number": serial,
                 "common_name": untrusted_text(common, "crtsh"),
                 "names": [untrusted_text(name, "crtsh") for name in names],
                 "issuer": untrusted_text(str(best.get("issuer_name") or ""), "crtsh"),
-                "not_before": str(best.get("not_before") or ""),
-                "not_after": str(best.get("not_after") or ""),
-                "logged_at": str(best.get("entry_timestamp") or ""),
+                "not_before": _timestamp(best.get("not_before")),
+                "not_after": _timestamp(best.get("not_after")),
+                "logged_at": _timestamp(best.get("entry_timestamp")),
                 "crtsh_id": ident,
                 "expired": expired is True,
             }
         )
-    records.sort(key=lambda row: row["logged_at"], reverse=True)
-    return records, None
+    records.sort(key=lambda row: (row["logged_at"], row["crtsh_id"]), reverse=True)
+    return records, None, skipped
 
 
 def _params(domain: str, *, include_subdomains: bool, include_expired: bool) -> dict[str, str]:
@@ -287,7 +301,15 @@ def _hostname(value: str) -> str | None:
 def _serial(value) -> str:
     if not isinstance(value, str):
         return ""
-    return value.replace(":", "").replace(" ", "").lower()
+    text = value.replace(":", "").replace(" ", "").lower()
+    return text if _SERIAL.fullmatch(text) else ""
+
+
+def _timestamp(value) -> str:
+    """Pass a timestamp through only when it parses, so upstream text cannot ride in a date."""
+    if not isinstance(value, str) or _parse_time(value) is None:
+        return ""
+    return value.strip()
 
 
 def _crtsh_id(value) -> int | None:

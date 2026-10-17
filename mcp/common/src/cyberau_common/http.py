@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import email.utils
+import math
 import random
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import httpx
 
@@ -49,6 +51,7 @@ class HttpClient:
         sleeper=None,
         rng=None,
         max_bytes: int = 50 * 1024 * 1024,
+        max_retry_wait: float | None = None,
     ):
         self.connector = connector
         self.policy = policy
@@ -65,6 +68,7 @@ class HttpClient:
         self._sleep = sleeper or __import__("time").sleep
         self._rng = rng or random.random
         self.max_bytes = max_bytes
+        self.max_retry_wait = max_retry_wait
         self._client = httpx.Client(
             transport=transport,
             follow_redirects=False,
@@ -206,10 +210,13 @@ class HttpClient:
                 attempt += 1
                 continue
             if response.status_code in (429, 503) and attempt < self.retries:
-                self._sleep(self._retry_delay(response, attempt))
-                attempt += 1
-                response.close()
-                continue
+                delay = self._retry_delay(response, attempt)
+                # With a wait ceiling set, an upstream that asks for longer is not retried early.
+                if self.max_retry_wait is None or delay <= self.max_retry_wait:
+                    self._sleep(delay)
+                    attempt += 1
+                    response.close()
+                    continue
             if response.status_code in _REDIRECTS and redirects < 5:
                 location = response.headers.get("location")
                 response.close()
@@ -234,14 +241,32 @@ class HttpClient:
 
     def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
         header = response.headers.get("retry-after")
-        if header:
-            try:
-                return min(60.0, float(header))
-            except ValueError:
-                parsed = email.utils.parsedate_to_datetime(header)
-                if parsed is not None:
-                    return min(60.0, 1.0)
-        return self._backoff(attempt)
+        wait = _retry_after_seconds(header) if header else None
+        if wait is None:
+            return self._backoff(attempt)
+        if self.max_retry_wait is None:
+            return min(60.0, wait)
+        return wait
+
+
+def _retry_after_seconds(header: str) -> float | None:
+    """Seconds from a Retry-After value (delay or HTTP date), never negative."""
+    text = header.strip()
+    try:
+        seconds = float(text)
+    except ValueError:
+        try:
+            parsed = email.utils.parsedate_to_datetime(text)
+        except (TypeError, ValueError):
+            return None
+        if parsed is None:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        seconds = (parsed - datetime.now(UTC)).total_seconds()
+    if not math.isfinite(seconds):
+        return None
+    return max(0.0, seconds)
 
 
 def _json_bytes(body: dict) -> bytes:
