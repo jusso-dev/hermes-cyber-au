@@ -49,13 +49,16 @@ jobs:
       - name: Build distribution tarball, SBOM and checksums
         if: steps.changes.outputs.skip != 'true'
         run: |
-          uv run --project mcp python tools/release/package.py --version "${{ steps.ver.outputs.version }}" --out dist/
+          uv run --project mcp --frozen python tools/release/package.py --version "${{ steps.ver.outputs.version }}" --out dist/
           sha256sum dist/* > dist/SHA256SUMS
-      - uses: actions/attest-build-provenance@v2
+      # Attest the tarball, SBOM, notes and checksums this job has written.
+      - name: Attest release files
+        uses: actions/attest-build-provenance@v2
         if: steps.changes.outputs.skip != 'true'
         with:
           subject-path: dist/*
       - name: Build and push image
+        id: image
         if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -63,11 +66,27 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           image="ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}"
           docker build -f docker/Dockerfile -t "$image" .
-          docker push "$image"
+          push_log=$(docker push "$image" 2>&1)
+          printf '%s\n' "$push_log"
+          digest=$(printf '%s\n' "$push_log" | sed -n 's/.*digest: \(sha256:[0-9a-f]*\).*/\1/p' | tail -n 1)
+          if [ -z "$digest" ]; then
+            echo "image push did not return a digest" >&2
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "name=ghcr.io/${{ github.repository }}" >> "$GITHUB_OUTPUT"
+      # Attest the image only after the push returns its registry digest.
+      - name: Attest image
+        if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
       - name: Tag and publish release
         if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="v${{ steps.ver.outputs.version }}"
-          gh release create "$v" dist/* --title "$v" --generate-notes --target "${{ github.sha }}"
+          gh release create "$v" dist/* --title "$v" --notes-file dist/RELEASE_NOTES.md --target "${{ github.sha }}"
