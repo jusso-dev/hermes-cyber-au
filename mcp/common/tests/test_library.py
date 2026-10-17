@@ -746,3 +746,28 @@ class TestCli:
         assert "ok" in capsys.readouterr().out
         assert main(["health", "missing"]) == 1
         assert main(["refresh"]) == 2
+
+
+class TestRetryAfterParsing:
+    def test_seconds_dates_and_junk(self):
+        from cyberau_common.http import _retry_after_seconds
+
+        assert _retry_after_seconds("7") == 7.0
+        assert _retry_after_seconds("-5") == 0.0
+        assert _retry_after_seconds("inf") is None
+        assert _retry_after_seconds("nonsense") is None
+        assert _retry_after_seconds("Wed, 21 Oct 2015 07:28:00 GMT") == 0.0
+        assert _retry_after_seconds("Wed, 21 Oct 2099 07:28:00 GMT") > 3600
+
+    def test_wait_ceiling_skips_a_longer_retry(self, tmp_path: Path):
+        delays: list[float] = []
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(429, headers={"retry-after": "100"})
+
+        client = _client(tmp_path, handler, sleeper=delays.append, max_retry_wait=10)
+        assert client.get("https://example.com/a", ttl=5).status == 429
+        assert calls["n"] == 1 and delays == []
+        client.close()

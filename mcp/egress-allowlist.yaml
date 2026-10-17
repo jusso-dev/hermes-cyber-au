@@ -254,3 +254,8 @@ connectors:
     - api.cloudflare.com
     allow_ip_literals: false
     allow_http_loopback: false
+  crtsh:
+    hosts:
+    - crt.sh
+    allow_ip_literals: false
+    allow_http_loopback: false

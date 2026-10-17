@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "serial_number",
+    "common_name",
+    "names",
+    "issuer",
+    "not_before",
+    "not_after",
+    "logged_at",
+    "crtsh_id",
+    "expired"
+  ],
+  "properties": {
+    "serial_number": {"type": "string", "minLength": 1},
+    "common_name": {"type": "string"},
+    "names": {"type": "array", "items": {"type": "string"}},
+    "issuer": {"type": "string"},
+    "not_before": {"type": "string"},
+    "not_after": {"type": "string"},
+    "logged_at": {"type": "string"},
+    "crtsh_id": {"type": "integer"},
+    "expired": {"type": "boolean"}
+  }
+}

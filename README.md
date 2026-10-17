@@ -66,7 +66,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | Shodan InternetDB | `internetdb` | Global threat intelligence | none | on | v0.2 | planned | https://internetdb.shodan.io/ |
 | MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | on | v0.1 MVP | planned | https://github.com/mitre-attack/attack-stix-data |
 | SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | https://github.com/SigmaHQ/sigma |
-| crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | https://crt.sh/ |
+| crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
 | Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | on | v0.2 | planned | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
 | Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | on | v0.2 | planned | https://github.com/jusso-dev/junction |
 | Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | on | v1.0 | planned | https://github.com/jusso-dev/Brolga |

@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://crt.sh/?q=%25.example.com&output=json&exclude=expired
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '[{"issuer_ca_id":183267,"issuer_name":"C=AU, O=Example CA, CN=Example CA R3","common_name":"example.com","name_value":"example.com","id":1001,"entry_timestamp":"2026-09-15T00:00:00.000","not_before":"2026-09-15T00:00:00","not_after":"2027-03-15T00:00:00","serial_number":"abc123"}]'

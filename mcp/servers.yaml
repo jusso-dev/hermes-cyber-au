@@ -186,3 +186,14 @@ servers:
     required_env:
     - CLOUDFLARE_URLSCAN_API_TOKEN
     - CLOUDFLARE_ACCOUNT_ID
+  crtsh:
+    connector: crtsh
+    args:
+    - serve
+    - crtsh
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

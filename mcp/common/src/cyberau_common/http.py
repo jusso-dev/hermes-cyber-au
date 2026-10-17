@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import email.utils
+import math
 import random
 import time
 from dataclasses import dataclass
@@ -280,20 +281,32 @@ class HttpClient:
 
     def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
         header = response.headers.get("retry-after")
-        if header:
-            try:
-                return max(0.0, min(60.0, float(header)))
-            except ValueError:
-                try:
-                    parsed = email.utils.parsedate_to_datetime(header)
-                except (TypeError, ValueError):
-                    parsed = None
-                if parsed is not None:
-                    if parsed.tzinfo is None:
-                        parsed = parsed.replace(tzinfo=datetime.UTC)
-                    wait = (parsed - datetime.datetime.now(datetime.UTC)).total_seconds()
-                    return max(0.0, min(60.0, wait))
-        return self._backoff(attempt)
+        wait = _retry_after_seconds(header) if header else None
+        if wait is None:
+            return self._backoff(attempt)
+        if self.max_retry_wait is None:
+            return min(60.0, wait)
+        return wait
+
+
+def _retry_after_seconds(header: str) -> float | None:
+    """Seconds from a Retry-After value (delay or HTTP date), never negative."""
+    text = header.strip()
+    try:
+        seconds = float(text)
+    except ValueError:
+        try:
+            parsed = email.utils.parsedate_to_datetime(text)
+        except (TypeError, ValueError):
+            return None
+        if parsed is None:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime.UTC)
+        seconds = (parsed - datetime.datetime.now(datetime.UTC)).total_seconds()
+    if not math.isfinite(seconds):
+        return None
+    return max(0.0, seconds)
 
 
 def _json_bytes(body: dict) -> bytes:
