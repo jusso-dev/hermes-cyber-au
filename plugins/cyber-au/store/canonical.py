@@ -61,15 +61,22 @@ _HEX = re.compile(r"^[0-9a-f]+$")
 _IPV4 = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _CVE = re.compile(r"^CVE-\d{4}-\d{4,16}$")
-_HXXP = re.compile(r"hxxp", re.IGNORECASE)
+_HXXP = re.compile(r"^(\s*)hxxp(s?)(?=:)", re.IGNORECASE)
+_PCT = re.compile(r"%([0-9A-Fa-f]{2})")
+_UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 _AT = re.compile(r"\[at\]", re.IGNORECASE)
 _ASCII_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
 
 def refang(value: str) -> str:
-    """Undo the defang spellings listed on the store ticket."""
-    text = _HXXP.sub("http", value)
-    text = text.replace("[.]", ".").replace("(.)", ".").replace("[:]", ":")
+    """Undo the defang spellings listed on the store ticket.
+
+    ``hxxp`` is only a defanged scheme when a colon follows at the start, so a
+    host such as ``hxxpbin.example`` or a query value is left alone.
+    """
+    text = value.replace("[:]", ":")
+    text = _HXXP.sub(lambda match: f"{match.group(1)}http{match.group(2)}", text)
+    text = text.replace("[.]", ".").replace("(.)", ".")
     return _AT.sub("@", text)
 
 
@@ -96,7 +103,10 @@ def canonical_timestamp(value: str) -> str:
         raise ValueError("invalid timestamp") from exc
     if moment.tzinfo is None:
         raise ValueError("timestamp needs a timezone")
-    moment = moment.astimezone(UTC).replace(microsecond=0)
+    try:
+        moment = moment.astimezone(UTC).replace(microsecond=0)
+    except OverflowError as exc:
+        raise ValueError("invalid timestamp") from exc
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -273,8 +283,18 @@ def _canonical_url(value: str) -> str:
     except ValueError as exc:
         raise ValueError("invalid url") from exc
     netloc = _netloc(normalised_host, port, parts.username, parts.password, scheme)
-    path = remove_dot_segments(parts.path)
-    return urlunsplit((scheme, netloc, path, parts.query, ""))
+    path = _normalise_percent(remove_dot_segments(parts.path)) or "/"
+    return urlunsplit((scheme, netloc, path, _normalise_percent(parts.query), ""))
+
+
+def _normalise_percent(text: str) -> str:
+    """RFC 3986 6.2.2.1 and 6.2.2.2: uppercase escapes, decode unreserved."""
+
+    def fix(match: re.Match[str]) -> str:
+        char = chr(int(match.group(1), 16))
+        return char if char in _UNRESERVED else f"%{match.group(1).upper()}"
+
+    return _PCT.sub(fix, text)
 
 
 def _canonical_email(value: str) -> str:

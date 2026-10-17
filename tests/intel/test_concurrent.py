@@ -7,7 +7,7 @@ import sqlite3
 
 from store.api import table_counts, upsert_indicator
 from store.db import close_store, open_store
-from store.workers import write_distinct, write_same
+from store.workers import open_fresh, write_distinct, write_same
 
 
 def _intact(path):
@@ -60,3 +60,26 @@ def test_three_writers_share_one_indicator(tmp_path):
     assert counts["indicators"] == 1
     assert counts["observations"] == 31
     close_store(path)
+
+
+def test_simultaneous_first_open_applies_the_schema_once(tmp_path):
+    ctx = multiprocessing.get_context("spawn")
+    for round_number in range(5):
+        path = tmp_path / f"fresh{round_number}.sqlite"
+        barrier = ctx.Barrier(4)
+        results = ctx.Queue()
+        processes = [
+            ctx.Process(target=open_fresh, args=(str(path), barrier, results)) for _ in range(4)
+        ]
+        for proc in processes:
+            proc.start()
+        outcomes = [results.get(timeout=60) for _ in processes]
+        for proc in processes:
+            proc.join(60)
+        assert outcomes == ["ok"] * 4
+        _intact(path)
+        conn = sqlite3.connect(path)
+        try:
+            assert conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0] == 1
+        finally:
+            conn.close()

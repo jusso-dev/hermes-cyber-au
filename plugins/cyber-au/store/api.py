@@ -30,7 +30,13 @@ from .canonical import (
 )
 from .db import TABLES, Store, close_store, open_store, upsert_fts
 from .scoring import VERDICTS, score
-from .text import clean_untrusted, indexable_text, unwrap_untrusted, wrap_untrusted
+from .text import (
+    clean_untrusted,
+    defuse_markers,
+    indexable_text,
+    unwrap_untrusted,
+    wrap_untrusted,
+)
 
 KINDS = ("indicator", "advisory", "vulnerability")
 _TOKEN = re.compile(r"[0-9A-Za-z]{1,128}")
@@ -857,7 +863,7 @@ def _require_tags(tags: Sequence[str]) -> list[str]:
     for tag in tags:
         if not isinstance(tag, str):
             raise ValueError("tags must be strings")
-        text = clean_untrusted(tag, max_len=200)
+        text = defuse_markers(clean_untrusted(tag, max_len=200))
         if text:
             cleaned.append(text)
     return cleaned

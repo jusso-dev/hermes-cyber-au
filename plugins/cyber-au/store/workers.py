@@ -46,3 +46,15 @@ def write_same(path: str, prefix: str, count: int) -> None:
     except Exception:
         traceback.print_exc()
         raise
+
+
+def open_fresh(path: str, barrier, results) -> None:
+    """Open a new database at the same moment as the other writers."""
+    from .db import open_store
+
+    barrier.wait(30)
+    try:
+        open_store(path).connection()
+        results.put("ok")
+    except Exception as exc:
+        results.put(f"{type(exc).__name__}: {exc}")

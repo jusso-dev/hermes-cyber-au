@@ -7,6 +7,7 @@ import re
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
 _WS = re.compile(r"\s+")
+_MARKER = re.compile(r"<<(\s*(?:end\s+)?untrusted)", re.IGNORECASE)
 _WRAPPED = re.compile(r"<<untrusted source=[^>]{1,80}>> (.*) <<end untrusted>>", re.DOTALL)
 
 
@@ -21,9 +22,18 @@ def clean_untrusted(value: str, max_len: int = 4000) -> str:
     return cleaned
 
 
+def defuse_markers(value: str) -> str:
+    """Break up ``<<untrusted`` and ``<<end untrusted`` look-alikes in feed text."""
+    return _MARKER.sub(r"< <\1", value)
+
+
 def wrap_untrusted(value: str, source: str, max_len: int = 4000) -> str:
-    """Return cleaned text inside the shared untrusted envelope markers."""
-    cleaned = clean_untrusted(value, max_len=max_len)
+    """Return cleaned text inside the shared untrusted envelope markers.
+
+    Marker look-alikes in the text are broken up so feed text cannot close the
+    envelope early and place its own words outside it.
+    """
+    cleaned = defuse_markers(clean_untrusted(value, max_len=max_len))
     return f"<<untrusted source={source}>> {cleaned} <<end untrusted>>"
 
 

@@ -182,3 +182,26 @@ def test_cidr_property(addr, prefix):
     network = ipaddress.ip_network(f"{addr}/{prefix}", strict=False)
     defanged = str(addr).replace(".", "[.]") + f"/{prefix}"
     assert canonical_value("cidr", defanged) == str(network)
+
+
+def test_refang_only_touches_a_defanged_scheme():
+    assert canonical_value("domain", "hxxpbin.example") == "hxxpbin.example"
+    assert canonical_value("domain", "hxxp.example") == "hxxp.example"
+    assert canonical_value("url", "http://example.com/?q=hxxp") == "http://example.com/?q=hxxp"
+    assert canonical_value("url", "hxxp[:]//example.com/") == "http://example.com/"
+
+
+def test_url_rfc3986_equivalents_dedupe():
+    assert canonical_value("url", "http://example.com") == canonical_value(
+        "url", "http://example.com/"
+    )
+    assert canonical_value("url", "http://example.com/%7e/a%2fb") == canonical_value(
+        "url", "http://example.com/~/a%2Fb"
+    )
+
+
+def test_timestamp_overflow_is_a_value_error():
+    from store.canonical import canonical_timestamp
+
+    with pytest.raises(ValueError):
+        canonical_timestamp("0001-01-01T00:00:00+05:00")

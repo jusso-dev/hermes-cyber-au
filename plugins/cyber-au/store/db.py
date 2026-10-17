@@ -6,6 +6,7 @@ import hashlib
 import os
 import sqlite3
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
@@ -45,7 +46,7 @@ class Store:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA busy_timeout=30000")
-            conn.execute("PRAGMA journal_mode=WAL")
+            _enable_wal(conn)
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA temp_store=MEMORY")
             conn.execute("PRAGMA cache_size=-131072")
@@ -155,13 +156,52 @@ def upsert_fts(
     )
 
 
-def _migrate(conn: sqlite3.Connection) -> None:
+def _enable_wal(conn: sqlite3.Connection) -> None:
+    """Switch to WAL. The switch needs a lock the busy timeout does not always cover."""
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc) or time.monotonic() > deadline:
+                raise
+            time.sleep(0.02)
+
+
+def _schema_version(conn: sqlite3.Connection) -> int:
     exists = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'"
     ).fetchone()
-    if exists:
-        version = conn.execute("SELECT COALESCE(MAX(version), 0) FROM schema_version").fetchone()
-        if version is not None and version[0] >= 1:
-            return
-    conn.executescript(_MIGRATION.read_text(encoding="utf-8"))
-    conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+    if not exists:
+        return 0
+    return conn.execute("SELECT COALESCE(MAX(version), 0) FROM schema_version").fetchone()[0]
+
+
+def _statements(script: str) -> Iterator[str]:
+    """Split a migration into statements. PRAGMAs are set per connection, not here."""
+    pending = ""
+    for line in script.splitlines(keepends=True):
+        pending += line
+        if sqlite3.complete_statement(pending):
+            statement = pending.strip()
+            pending = ""
+            if statement and not statement.upper().startswith("PRAGMA"):
+                yield statement
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Apply the schema once, even when several processes open a new file together."""
+    if _schema_version(conn) >= 1:
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _schema_version(conn) < 1:
+            for statement in _statements(_MIGRATION.read_text(encoding="utf-8")):
+                conn.execute(statement)
+            conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+        conn.execute("COMMIT")
+    except BaseException:
+        with suppress(sqlite3.Error):
+            conn.execute("ROLLBACK")
+        raise
