@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api-pro.ransomware.live/victims/?country=AU
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '[{"victim":"Wattle Sample Pty Ltd","group":"samplegroup","country":"AU","activity":"Education","website":"wattlesample.example","discovered":"2026-10-15","attackdate":"2026-10-12","description":"Synthetic leak-site claim for tests."}]'

@@ -68,3 +68,15 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  ransomlive:
+    connector: ransomware-live
+    args:
+    - serve
+    - ransomware-live
+    env:
+    - RANSOMWARE_LIVE_API_KEY=${RANSOMWARE_LIVE_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    required_env: []

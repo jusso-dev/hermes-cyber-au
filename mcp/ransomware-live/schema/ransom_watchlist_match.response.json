@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "victim",
+    "group",
+    "country",
+    "sector",
+    "website",
+    "discovered",
+    "attackdate",
+    "claim",
+    "note",
+    "matched_on",
+    "watchlist_entry"
+  ],
+  "properties": {
+    "victim": {"type": "string"},
+    "group": {"type": "string"},
+    "country": {"type": "string"},
+    "sector": {"type": "string"},
+    "website": {"type": "string"},
+    "discovered": {"type": "string"},
+    "attackdate": {"type": "string"},
+    "description": {"type": "string"},
+    "claim": {"const": "unverified"},
+    "note": {"type": "string"},
+    "matched_on": {"enum": ["domain", "name", "brand"]},
+    "watchlist_entry": {"type": "string"}
+  }
+}
