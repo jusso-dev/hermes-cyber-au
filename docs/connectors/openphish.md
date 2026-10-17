@@ -147,3 +147,15 @@ Cache files, when present:
 `CYBERAU_PHISHTANK_CACHE` and `CYBERAU_URLHAUS_CACHE` override those paths. An empty OpenPhish feed does not replace a previous non-empty cache. Seen OpenPhish URLs are appended to `$CYBERAU_DATA_DIR/openphish.sqlite` and are not deleted when they leave the feed.
 
 The packaged `data/feed.txt` is a synthetic example (`phish.example`), not OpenPhish data. Any answer from it, or from a file named by `CYBERAU_OPENPHISH_SNAPSHOT`, carries `cache: snapshot` and a warning, and is not written to `openphish.sqlite`. Live health ignores the snapshot, the offline flag, the cache and the hourly fallback, so a failed fetch, a timeout, a non-feed body or an exhausted hourly limit reports not ok.
+
+## Operator guide
+
+Read-only check of one URL against the OpenPhish community feed, together with any PhishTank and URLhaus caches already on disk. The connector never requests the URL under test.
+
+| Tool | What it returns |
+|---|---|
+| `phish_check_url` | Whether that URL is in the OpenPhish feed, the PhishTank cache, and the URLhaus cache |
+
+No API key. The feed is fetched at most once an hour from `https://openphish.com/feed.txt`. On 17 October 2026 that address redirected to the OpenPhish public feed on `raw.githubusercontent.com`. Redirects to any other host are refused.
+
+When the live feed cannot be used offline or the bundled snapshot answers, the result is labelled `snapshot` with a warning. The bundled snapshot holds synthetic example URLs, is not live data, and is never written to the history store. Lines from the feed are untrusted text. An empty feed does not wipe a previous cache. Licence not confirmed. The community feed is a small sample. This connector is not affiliated with OpenPhish.

@@ -178,3 +178,21 @@ The launch notice names enterprise IT, operational technology and cloud chapters
 Essential Eight control assignment uses the ISM section title in `ISM_E8_ML1/2/3-baseline-resolved-profile_catalog.json` for release `v2026.09.4`. Patching sections are split by the subject of the control statement. Office macro statements, including the trusted-publisher review, stay with Restrict Microsoft Office macros. Memory integrity stays with Restrict administrative privileges. Event logging and incident reporting controls that the ISM does not place under one mitigation strategy are kept in `unassigned_controls` and returned as `cross_cutting`, not copied onto every strategy.
 
 The cloud chapter shows priority phases in a figure, not in text. The snapshot leaves that phase list empty rather than copying another chapter's order.
+
+## Operator guide
+
+Read-only Essential Eight requirements and ASD Essentials chapters.
+
+| Tool | What it returns |
+|---|---|
+| `e8_requirements` | ISM controls for one Essential Eight strategy at one maturity level |
+| `essentials_chapter` | Domains, principles, actions and priority phases for enterprise IT, cloud or OT |
+| `essentials_transition` | ASD's quoted mapping from one Essential Eight strategy into Essentials |
+
+Essential Eight maturity levels and Essentials priority phases are different scales. A phase is a recommended order of domains. It is not a maturity, compliance or assurance score, and the tools do not present it as one.
+
+The shipped snapshot was retrieved on 17 October 2026. Essential Eight rows come from ISM OSCAL release `v2026.09.4`. Chapter text comes from the enterprise IT, cloud and operational technology pages, plus the transition guidance. The cloud priority-phase figure is not transcribed.
+
+Control and action text is untrusted.
+
+Essential Eight and ASD Essentials material is published by the Australian Signals Directorate. This connector is not endorsed by ASD.
