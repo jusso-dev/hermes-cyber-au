@@ -375,11 +375,11 @@ Checked on 16 October 2026. The first 21 sources were compiled and verified for 
 - Verified: Vendor docs (docs.recordedfuture.com, pages updated June to September 2026): authentication table (`X-RFToken`, base URLs), Identity Intelligence search, detections and lookup OpenAPI definitions, Playbook Alerts search (body fields and categories), Dark Web Brand and Domain Abuse detail pages (ransomware site mentions named in the Dark Web Brand description), Connect API company by domain and domain risk list. Vendor support centre: MCP overview (server URL, OAuth methods, single-organisation scope) and 'API & MCP Access & Usage' (unified daily limit, one tool call equals one API call). From the build box on 16 October 2026 a bad token got 401 from the REST API, and `mcp.recordedfuture.com/mcp` answered 401 without auth.
 
 ### Flashpoint Ignite (compromised credentials and indicators)
-- Endpoints: `GET` https://api.flashpoint.io/technical-intelligence/v2/indicators; `GET` (credential sightings search path: confirm in docs.flashpoint.io)
+- Endpoints: `GET` https://api.flashpoint.io/technical-intelligence/v2/indicators. Credential sightings search was not confirmed and is not implemented.
 - Auth: Bearer token (Ignite API key).
-- Rate limits: Not published publicly. Back off on 429.
+- Rate limits: Not published publicly. Back off on 429. Connector ceiling: burst of 2, then one call every two seconds.
 - Terms: Commercial licence. Default flags: metadata only, no STIX export.
-- Verified: `technical-intelligence/v2/indicators` returned 401 without a token from the build box on 16 October 2026. Query syntax and bearer auth from vendor-published integrations (Cortex XSOAR, Splunk SOAR); the portal itself was not readable.
+- Verified: On 17 October 2026 `GET https://api.flashpoint.io/technical-intelligence/v2/indicators` returned 401 `{"message":"Unauthorized"}` with no token (the same path returned 401 on 16 October 2026). `docs.flashpoint.io`, including the indicators reference page, redirected to an Ignite sign-in, so query parameters and the credential sightings search path were not confirmed. Vendor-integration examples were not used as a source of paths. Connector notes: [docs/connectors/flashpoint.md](../connectors/flashpoint.md).
 
 ### Intel 471 Titan (watchers, alerts, credentials and breach alerts)
 - Endpoints: `GET` https://api.intel471.com/v1/alerts; `GET` https://api.intel471.com/v1/watcherGroups , /watcherGroups/{uid}/watchers; `GET` https://api.intel471.com/v1/credentials , /credentials/occurrences , /credentialSets; `GET` https://api.intel471.com/v1/breachAlerts

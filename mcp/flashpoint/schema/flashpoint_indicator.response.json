@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["value"],
+  "properties": {
+    "value": {"type": "string"},
+    "id": {"type": "string"},
+    "type": {"type": "string"},
+    "first_seen": {"type": "string"},
+    "last_seen": {"type": "string"},
+    "score": {"type": "string"},
+    "summary": {"type": "string"}
+  }
+}

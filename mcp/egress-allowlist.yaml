@@ -263,3 +263,8 @@ connectors:
     - api.flare.io
     allow_ip_literals: false
     allow_http_loopback: false
+  flashpoint:
+    hosts:
+    - api.flashpoint.io
+    allow_ip_literals: false
+    allow_http_loopback: false
