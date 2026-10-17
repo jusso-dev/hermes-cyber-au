@@ -260,3 +260,33 @@ servers:
     paid: true
     required_env:
     - FLARE_API_KEY
+  flare_mcp:
+    connector: flare-mcp
+    url: https://api.flare.io/mcp
+    args: []
+    env:
+    - FLARE_API_KEY=${FLARE_API_KEY}
+    - FLARE_TENANT_ID=${FLARE_TENANT_ID}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    tools:
+      include:
+      - search_tenant
+      - search_global
+      - search_validate_search_query
+      - events_get_event
+      - events_expand_event
+      - events_get_event_type
+      - identifiers_list
+      - identifiers_explain_event
+      - identifier_groups_list
+      - matching_policies_list
+      - severity_rules_list
+      - entities_search
+      - profile_get
+    headers:
+    - Authorization=${FLARE_API_KEY}
+    - X-Flare-Tenant-Id=${FLARE_TENANT_ID}

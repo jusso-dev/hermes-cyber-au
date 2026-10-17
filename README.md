@@ -102,7 +102,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | CrowdStrike Falcon Adversary Intelligence Recon (dark web monitoring notifications) | `csrecon` | Dark web and leak monitoring | `FALCON_CLIENT_ID`, `FALCON_CLIENT_SECRET`, `FALCON_BASE_URL` (optional) | off: paid, bring your own licence | v1.0 | planned | https://developer.crowdstrike.com/api-reference/collections/recon/ |
 | SOCRadar (company incidents: dark web, leaks, brand and attack surface) | `socradar` | Dark web and leak monitoring | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off: paid, bring your own licence | v1.0 | planned | https://socradar.io/socradar-apis/ |
 | DarkOwl Vision (dark web search) | `darkowl` | Dark web and leak monitoring | `DARKOWL_PUBLIC_KEY`, `DARKOWL_PRIVATE_KEY` | off: paid, bring your own licence | v1.0 | planned | https://support.darkowl.com/knowledge-base/search-api-documentation |
-| Flare threat exposure management (leaked credentials, stealer logs, leak and ransomware sites, dark web, official MCP) | `flare` | Dark web and leak monitoring | `FLARE_API_KEY`, `FLARE_TENANT_ID` (optional) | off: paid, bring your own licence | v0.2 | planned | https://api.docs.flare.io/introduction/getting-started |
+| Flare threat exposure management (leaked credentials, stealer logs, leak and ransomware sites, dark web, official MCP) | `flare` | Dark web and leak monitoring | `FLARE_API_KEY`, `FLARE_TENANT_ID` (optional) | off: paid, bring your own licence | v0.2 | planned | [docs/connectors/flare.md](docs/connectors/flare.md) |
 <!-- connectors:end -->
 
 Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).

@@ -1,0 +1,15 @@
+interactions:
+- request:
+    method: POST
+    uri: https://api.flare.io/tokens/generate
+    headers:
+      Authorization: [REDACTED]
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      content-type: [application/json]
+    body:
+      string: '{"token":"[REDACTED]","refresh_token_exp":1893456000}'
+version: 1
