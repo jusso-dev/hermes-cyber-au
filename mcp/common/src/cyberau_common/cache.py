@@ -123,7 +123,7 @@ class HttpCache:
         kept = {
             name: value
             for name, value in headers.items()
-            if name.lower() in {"content-type", "etag", "last-modified"}
+            if name.lower() in {"content-type", "etag", "last-modified", "link"}
         }
         if self.persistence == "session":
             self._memory[key] = CachedResponse(

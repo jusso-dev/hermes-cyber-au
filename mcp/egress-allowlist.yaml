@@ -268,3 +268,8 @@ connectors:
     - api.flashpoint.io
     allow_ip_literals: false
     allow_http_loopback: false
+  google-ti-dtm:
+    hosts:
+    - www.virustotal.com
+    allow_ip_literals: false
+    allow_http_loopback: false

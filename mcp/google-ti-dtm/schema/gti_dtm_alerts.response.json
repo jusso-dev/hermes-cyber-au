@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "required": ["alerts"],
+  "properties": {
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "monitor_id", "created_at", "status", "alert_type"],
+        "properties": {
+          "id": {"type": "string"},
+          "monitor_id": {"type": "string"},
+          "created_at": {"type": "string"},
+          "status": {"type": "string"},
+          "alert_type": {"type": "string"},
+          "severity": {"type": "string"},
+          "title": {"type": "string"},
+          "alert_summary": {"type": "string"}
+        }
+      }
+    }
+  }
+}
