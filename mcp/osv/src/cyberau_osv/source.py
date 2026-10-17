@@ -32,6 +32,8 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _ECOSYSTEM = re.compile(r"^[A-Za-z][A-Za-z0-9._:+-]{0,63}$")
+_KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,100}$")
+_MAX_DEPTH = 12
 _TOKEN = re.compile(r"^[A-Za-z0-9._:/@+~=%?&#,;()\[\]-]{1,500}$")
 _Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]
 _Ecosystem = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9._:+-]{0,63}$")]
@@ -106,19 +108,25 @@ def osv_batch(queries: _Queries) -> dict:
     payload, cache, warning = _fetch("batch", "POST", BATCH_URL, body, ttl=QUERY_TTL)
     if warning:
         return _envelope([], cache, warnings=(warning,))
+    warnings: list[str] = []
+    if cache == "snapshot":
+        pool = _load(_snapshot_text("query"))
+        problem = schema_drift(pool) if pool is not None else "snapshot is not JSON"
+        if problem:
+            return _envelope([], cache, warnings=(problem,))
+        payload = _snapshot_batch(queries, pool)
+        if any(q.get("version") for q in queries):
+            warnings.append("offline snapshot is not filtered by version")
+        if not any(result["vulns"] for result in payload["results"]):
+            warnings.append("no matching record in the offline snapshot or cache")
     drift = schema_drift(payload or {}) if payload is not None else "OSV batch was not usable"
     if drift:
         return _envelope([], cache, warnings=(drift,))
     results = payload.get("results")
     if not isinstance(results, list):
         return _envelope([], cache, warnings=("OSV batch response has no results list",))
-    warnings: list[str] = []
     if len(results) != len(queries):
-        warnings.append(
-            f"OSV returned {len(results)} results for {len(queries)} queries"
-            if cache != "snapshot"
-            else "offline snapshot does not cover every query"
-        )
+        warnings.append(f"OSV returned {len(results)} results for {len(queries)} queries")
     rows = []
     for index, (query, result) in enumerate(zip(queries, results, strict=False)):
         vulns = [
@@ -290,6 +298,7 @@ def _record(item: dict) -> dict:
         "details": _text(item.get("details"), 2000),
         "published": _token(item.get("published", "")),
         "modified": _token(item.get("modified", "")),
+        "withdrawn": _token(item.get("withdrawn", "")),
         "severity": [
             {"type": _token(s.get("type", "")), "score": _token(s.get("score", ""))}
             for s in item.get("severity") or []
@@ -345,14 +354,39 @@ def _first(place: dict, names: tuple[str, ...]) -> str:
     return ""
 
 
-def _wrap_tree(value):
+def _wrap_tree(value, depth: int = 0):
     if isinstance(value, str):
         return untrusted_text(value, "osv", 500)
+    if depth >= _MAX_DEPTH:
+        return None
     if isinstance(value, dict):
-        return {str(key)[:100]: _wrap_tree(item) for key, item in value.items()}
+        return {_key(key): _wrap_tree(item, depth + 1) for key, item in value.items()}
     if isinstance(value, list):
-        return [_wrap_tree(item) for item in value[:50]]
+        return [_wrap_tree(item, depth + 1) for item in value[:50]]
     return value
+
+
+def _key(key) -> str:
+    text = str(key)
+    if _KEY.match(text):
+        return text
+    return untrusted_text(text, "osv", 100)
+
+
+def _snapshot_batch(queries: list, pool: dict) -> dict:
+    vulns = pool.get("vulns") or []
+    return {
+        "results": [
+            {
+                "vulns": [
+                    {"id": v["id"], "modified": v.get("modified", "")}
+                    for v in vulns
+                    if _affects(v, q["ecosystem"], q["package"])
+                ]
+            }
+            for q in queries
+        ]
+    }
 
 
 def _text(value, limit: int = 4000) -> str:
@@ -407,10 +441,11 @@ def _validate_batch(queries) -> str:
     for index, query in enumerate(queries):
         if not isinstance(query, dict):
             return f"query {index} must be an object"
+        fields = (query.get("ecosystem"), query.get("package"), query.get("version"))
+        if any(f is not None and not isinstance(f, str) for f in fields):
+            return f"query {index}: ecosystem, package and version must be strings"
         problem = _validate_query(
-            str(query.get("ecosystem") or ""),
-            str(query.get("package") or ""),
-            None if query.get("version") is None else str(query["version"]),
+            query.get("ecosystem") or "", query.get("package") or "", fields[2]
         )
         if problem:
             return f"query {index}: {problem}"
