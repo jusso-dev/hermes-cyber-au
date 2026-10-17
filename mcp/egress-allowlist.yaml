@@ -62,22 +62,32 @@ connectors:
       - api.osv.dev
   cloudflare-radar:
     hosts:
-      - mcp.cloudflare.com
+    - mcp.cloudflare.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   auscert:
     hosts:
-      - portal.auscert.org.au
+    - portal.auscert.org.au
+    allow_ip_literals: false
+    allow_http_loopback: false
   abusech:
     hosts:
-      - urlhaus-api.abuse.ch
-      - threatfox-api.abuse.ch
-      - mb-api.abuse.ch
-      - feodotracker.abuse.ch
+    - urlhaus-api.abuse.ch
+    - threatfox-api.abuse.ch
+    - mb-api.abuse.ch
+    - feodotracker.abuse.ch
+    allow_ip_literals: false
+    allow_http_loopback: false
   otx:
     hosts:
-      - otx.alienvault.com
+    - otx.alienvault.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   greynoise:
     hosts:
-      - api.greynoise.io
+    - api.greynoise.io
+    allow_ip_literals: false
+    allow_http_loopback: false
   shodan-internetdb:
     hosts:
       - internetdb.shodan.io
@@ -91,13 +101,17 @@ connectors:
       - objects.githubusercontent.com
   crtsh:
     hosts:
-      - crt.sh
+    - crt.sh
+    allow_ip_literals: false
+    allow_http_loopback: false
   au-regulatory:
     hosts:
-      - www.oaic.gov.au
-      - www.cyber.gov.au
-      - www.cisc.gov.au
-      - www.legislation.gov.au
+    - www.oaic.gov.au
+    - www.cyber.gov.au
+    - www.cisc.gov.au
+    - www.legislation.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false
   junction:
     hosts:
       - graph.microsoft.com
@@ -119,12 +133,15 @@ connectors:
       - www.virustotal.com
   hibp:
     hosts:
-      - haveibeenpwned.com
-      - api.pwnedpasswords.com
+    - haveibeenpwned.com
+    - api.pwnedpasswords.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   github-advisories:
     hosts:
-      - api.github.com
-  # Inventory host is chosen by the operator. Nothing is reachable until a host is added.
+    - api.github.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   taxii-ctis:
     hosts: []
   ncsc-nz:
@@ -132,19 +149,25 @@ connectors:
       - www.ncsc.govt.nz
   cloudflare-urlscanner:
     hosts:
-      - api.cloudflare.com
+    - api.cloudflare.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   cve-program:
     hosts:
       - cveawg.mitre.org
   abuseipdb:
     hosts:
-      - api.abuseipdb.com
+    - api.abuseipdb.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   spamhaus-drop:
     hosts:
       - www.spamhaus.org
   irap:
     hosts:
-      - www.cyber.gov.au
+    - www.cyber.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false
   pspf:
     hosts:
       - www.protectivesecurity.gov.au
@@ -211,72 +234,5 @@ connectors:
   org-exposure:
     hosts:
     - abr.business.gov.au
-    allow_ip_literals: false
-    allow_http_loopback: false
-  abusech:
-    hosts:
-    - urlhaus-api.abuse.ch
-    - threatfox-api.abuse.ch
-    - mb-api.abuse.ch
-    - feodotracker.abuse.ch
-    allow_ip_literals: false
-    allow_http_loopback: false
-  abuseipdb:
-    hosts:
-    - api.abuseipdb.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  otx:
-    hosts:
-    - otx.alienvault.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  au-regulatory:
-    hosts:
-    - www.oaic.gov.au
-    - www.cyber.gov.au
-    - www.cisc.gov.au
-    - www.legislation.gov.au
-    allow_ip_literals: false
-    allow_http_loopback: false
-  auscert:
-    hosts:
-    - portal.auscert.org.au
-    allow_ip_literals: false
-    allow_http_loopback: false
-  cloudflare-radar:
-    hosts:
-    - mcp.cloudflare.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  cloudflare-urlscanner:
-    hosts:
-    - api.cloudflare.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  crtsh:
-    hosts:
-    - crt.sh
-    allow_ip_literals: false
-    allow_http_loopback: false
-  github-advisories:
-    hosts:
-    - api.github.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  greynoise:
-    hosts:
-    - api.greynoise.io
-    allow_ip_literals: false
-    allow_http_loopback: false
-  hibp:
-    hosts:
-    - haveibeenpwned.com
-    - api.pwnedpasswords.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  irap:
-    hosts:
-    - www.cyber.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
