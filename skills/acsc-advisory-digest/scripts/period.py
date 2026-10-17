@@ -13,9 +13,14 @@ def since_date(watermark: date) -> date:
 def proposed_watermark(*, today: date, fetch_ok: bool, previous: date) -> date | None:
     """Return the new inclusive watermark, or None when it must stay put.
 
-    A failed, timed out, or stale fetch returns None. A successful fetch,
-    including one with no new items, returns ``today``.
+    The feed ``since`` filter works on whole days, so the watermark is the last
+    complete day, which is yesterday. Items published later today then appear in
+    the next digest instead of being skipped. A failed, timed out, stale, or
+    truncated fetch returns None, as does a result that would move the
+    watermark backwards. A successful fetch, including one with no new items,
+    returns yesterday.
     """
-    if not fetch_ok or today < previous:
+    candidate = today - timedelta(days=1)
+    if not fetch_ok or candidate < previous:
         return None
-    return today
+    return candidate

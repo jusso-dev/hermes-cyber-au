@@ -35,4 +35,4 @@ Source: <name>, <version>, retrieved <YYYY-MM-DD>
 
 Proposed watermark: <YYYY-MM-DD> for routine acsc-advisory-digest. Apply this only after the digest above is delivered.
 
-When a feed timed out or was served stale, replace that last line with `Watermark: unchanged`.
+When a feed timed out, was served stale, or a list was truncated, replace that last line with `Watermark: unchanged`.

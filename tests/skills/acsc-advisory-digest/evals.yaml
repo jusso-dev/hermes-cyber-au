@@ -32,7 +32,7 @@ cases:
       - "AusCERT: source missing"
       - "Local intel store: not searched"
       - "not legal advice"
-      - "Proposed watermark: 2026-10-17"
+      - "Proposed watermark: 2026-10-16"
       - "Source: ASD's ACSC, none, retrieved "
       - "Source: CISA Known Exploited Vulnerabilities, digest-0, retrieved "
       - "Source: FIRST EPSS, digest-2026.10.16, retrieved "
@@ -60,7 +60,7 @@ cases:
             - advisories
             - publications
           since: "2026-10-02"
-          limit: 20
+          limit: 100
         env: &asd-env
           CYBERAU_DATA_DIR: ../results/acsc-advisory-digest
           CYBERAU_ASD_SNAPSHOT: fixtures/asd
@@ -155,7 +155,7 @@ cases:
         Source: CISA Known Exploited Vulnerabilities, digest-0, retrieved 2026-10-17.
         Source: FIRST EPSS, digest-2026.10.16, retrieved 2026-10-17.
 
-        Proposed watermark: 2026-10-17 for routine acsc-advisory-digest. Apply this only after the digest above is delivered.
+        Proposed watermark: 2026-10-16 for routine acsc-advisory-digest. Apply this only after the digest above is delivered.
       tool_calls:
         - name: mcp__asd__asd_list_items
           arguments:
@@ -164,7 +164,7 @@ cases:
               - advisories
               - publications
             since: "2026-10-02"
-            limit: 20
+            limit: 100
         - name: mcp__asd__asd_get_item
           arguments:
             url: https://www.cyber.gov.au/about-edge-alert
@@ -194,7 +194,7 @@ cases:
       - "Local intel store: not searched"
       - "not legal advice"
       - "No CVEs."
-      - "Proposed watermark: 2026-10-17"
+      - "Proposed watermark: 2026-10-16"
       - "Source: ASD's ACSC, none, retrieved "
     forbidden_claims:
       - "Synthetic edge router alert"
@@ -215,7 +215,7 @@ cases:
             - alerts
             - advisories
           since: "2026-10-17"
-          limit: 20
+          limit: 100
         env: *asd-env
         expect_in_result: no ASD items matched
     offline:
@@ -248,7 +248,7 @@ cases:
 
         Source: ASD's ACSC, none, retrieved 2026-10-17.
 
-        Proposed watermark: 2026-10-17 for routine acsc-advisory-digest. Apply this only after the digest above is delivered.
+        Proposed watermark: 2026-10-16 for routine acsc-advisory-digest. Apply this only after the digest above is delivered.
       tool_calls:
         - name: mcp__asd__asd_list_items
           arguments:
@@ -256,7 +256,7 @@ cases:
               - alerts
               - advisories
             since: "2026-10-17"
-            limit: 20
+            limit: 100
 
   - id: feed-timeout
     input: "Today is 2026-10-17 in Australia/Sydney. The last digest watermark is 2026-10-01. The alerts feed timed out. Digest the last alerts snapshot and say that you used it."
@@ -280,7 +280,7 @@ cases:
     forbidden_claims:
       - "Nothing new"
       - "Synthetic library advisory"
-      - "Proposed watermark: 2026-10-17"
+      - "Proposed watermark: 2026-10-16"
       - "email sent"
       - "digest posted"
       - "notification sent"
@@ -299,7 +299,7 @@ cases:
           feeds:
             - alerts
           since: "2026-10-02"
-          limit: 20
+          limit: 100
         env: *asd-env
         expect_in_result: Synthetic edge router alert
       - connector: asd-acsc
@@ -363,7 +363,7 @@ cases:
 
         ## Awareness
 
-        No awareness item was in the alerts snapshot.
+        No items in the last snapshot.
 
         ## CVE table
 
@@ -385,7 +385,7 @@ cases:
             feeds:
               - alerts
             since: "2026-10-02"
-            limit: 20
+            limit: 100
         - name: mcp__asd__asd_get_item
           arguments:
             url: https://www.cyber.gov.au/about-edge-alert
