@@ -15,6 +15,7 @@ members = [
     "cyberau-cisa-kev",
     "cyberau-common",
     "cyberau-first-epss",
+    "cyberau-google-ti-dtm",
     "cyberau-nvd",
     "cyberau-premium",
     "cyberau-workspace",
@@ -430,6 +431,25 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-google-ti-dtm"
+version = "0.1.0"
+source = { editable = "google-ti-dtm" }
+dependencies = [
+    { name = "cyberau-common" },
+    { name = "cyberau-premium" },
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
+    { name = "jsonschema", specifier = ">=4,<5" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
 
 [[package]]
 name = "cyberau-nvd"

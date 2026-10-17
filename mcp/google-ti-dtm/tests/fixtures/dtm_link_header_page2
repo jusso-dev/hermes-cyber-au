@@ -1,0 +1,27 @@
+{
+  "alerts": [
+    {
+      "id": "alert-example-2",
+      "monitor_id": "mon-example-1",
+      "created_at": "2026-06-03T02:00:00Z",
+      "updated_at": "2026-06-03T02:00:00Z",
+      "status": "read",
+      "alert_type": "credential",
+      "severity": "medium",
+      "title": "Synthetic credential alert",
+      "alert_summary": "Count only for example.com.au.",
+      "topic_matches": [
+        {
+          "value": "example.com.au"
+        }
+      ],
+      "doc_matches": [],
+      "doc_url": "https://example.com.au/synthetic-credential",
+      "labels_url": "https://www.virustotal.com/api/v3/dtm/alerts/alert-example-2/labels",
+      "topics_url": "https://www.virustotal.com/api/v3/dtm/alerts/alert-example-2/topics",
+      "label_matches": [],
+      "indicator_attributions": [],
+      "monitor_version": 1
+    }
+  ]
+}
