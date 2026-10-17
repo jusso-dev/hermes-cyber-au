@@ -1,34 +1,200 @@
+# Per-connector hosts for hermes-cyber-au. Kept in step with the connector
+# inventory. tools/ci/check_allowlist.py fails if the two drift.
+# global_deny_cidrs is a floor. Removing a network from this list fails CI,
+# and the code keeps refusing that network even if the list is shorter.
+version: 1
+global_deny_cidrs:
+  - 0.0.0.0/8
+  - 10.0.0.0/8
+  - 100.64.0.0/10
+  - 127.0.0.0/8
+  - 169.254.0.0/16
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+  - 224.0.0.0/4
+  - 255.255.255.255/32
+  - "::/128"
+  - "::1/128"
+  - "::ffff:0:0/96"
+  - "fc00::/7"
+  - "fe80::/10"
+  - "fec0::/10"
+  - "ff00::/8"
 connectors:
-  stub:
-    hosts:
-    - example.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  cisa-kev:
-    hosts:
-    - www.cisa.gov
-    allow_ip_literals: false
-    allow_http_loopback: false
-  first-epss:
-    hosts:
-    - api.first.org
-    - www.first.org
-    - epss.empiricalsecurity.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  asd-ism:
-    hosts:
-    - api.github.com
-    - raw.githubusercontent.com
-    allow_ip_literals: false
-    allow_http_loopback: false
   asd-acsc:
     hosts:
-    - www.cyber.gov.au
-    allow_ip_literals: false
-    allow_http_loopback: false
+      - www.cyber.gov.au
+  asd-ism:
+    hosts:
+      - api.github.com
+      - raw.githubusercontent.com
+  asd-essentials:
+    hosts:
+      - www.cyber.gov.au
+      - www.asd.gov.au
+      - raw.githubusercontent.com
+  cisa-kev:
+    hosts:
+      - www.cisa.gov
+  first-epss:
+    hosts:
+      - api.first.org
+      - www.first.org
+      - epss.empiricalsecurity.com
   nvd:
     hosts:
-    - services.nvd.nist.gov
-    allow_ip_literals: false
-    allow_http_loopback: false
+      - services.nvd.nist.gov
+  osv:
+    hosts:
+      - api.osv.dev
+  cloudflare-radar:
+    hosts:
+      - mcp.cloudflare.com
+  auscert:
+    hosts:
+      - portal.auscert.org.au
+  abusech:
+    hosts:
+      - urlhaus-api.abuse.ch
+      - threatfox-api.abuse.ch
+      - mb-api.abuse.ch
+      - feodotracker.abuse.ch
+  otx:
+    hosts:
+      - otx.alienvault.com
+  greynoise:
+    hosts:
+      - api.greynoise.io
+  shodan-internetdb:
+    hosts:
+      - internetdb.shodan.io
+  mitre-attack:
+    hosts:
+      - raw.githubusercontent.com
+  sigma:
+    hosts:
+      - api.github.com
+      - github.com
+      - objects.githubusercontent.com
+  crtsh:
+    hosts:
+      - crt.sh
+  au-regulatory:
+    hosts:
+      - www.oaic.gov.au
+      - www.cyber.gov.au
+      - www.cisc.gov.au
+      - www.legislation.gov.au
+  junction:
+    hosts:
+      - graph.microsoft.com
+      - management.azure.com
+      - api.loganalytics.io
+      - login.microsoftonline.com
+  brolga:
+    hosts:
+      - 127.0.0.1
+      - localhost
+  threatsieve:
+    hosts:
+      - 127.0.0.1
+      - localhost
+  m365-secure:
+    hosts: []
+  virustotal:
+    hosts:
+      - www.virustotal.com
+  hibp:
+    hosts:
+      - haveibeenpwned.com
+      - api.pwnedpasswords.com
+  github-advisories:
+    hosts:
+      - api.github.com
+  # Inventory host is chosen by the operator. Nothing is reachable until a host is added.
+  taxii-ctis:
+    hosts: []
+  ncsc-nz:
+    hosts:
+      - www.ncsc.govt.nz
+  cloudflare-urlscanner:
+    hosts:
+      - api.cloudflare.com
+  cve-program:
+    hosts:
+      - cveawg.mitre.org
+  abuseipdb:
+    hosts:
+      - api.abuseipdb.com
+  spamhaus-drop:
+    hosts:
+      - www.spamhaus.org
+  irap:
+    hosts:
+      - www.cyber.gov.au
+  pspf:
+    hosts:
+      - www.protectivesecurity.gov.au
+  scamwatch:
+    hosts:
+      - www.scamwatch.gov.au
+  datagov-au:
+    hosts:
+      - data.gov.au
+  auscert-member:
+    hosts: []
+  asd-blueprint:
+    hosts:
+      - blueprint.asd.gov.au
+  phishtank:
+    hosts:
+      - data.phishtank.com
+  openphish:
+    hosts:
+      - openphish.com
+  misp:
+    hosts: []
+  opencti:
+    hosts: []
+  hudson-rock:
+    hosts:
+      - api.hudsonrock.com
+  spycloud:
+    hosts:
+      - api.spycloud.io
+  upguard:
+    hosts:
+      - cyber-risk.upguard.com
+  ransomware-live:
+    hosts:
+      - api-pro.ransomware.live
+      - api.ransomware.live
+  recorded-future:
+    hosts:
+      - api.recordedfuture.com
+      - mcp.recordedfuture.com
+  flashpoint:
+    hosts:
+      - api.flashpoint.io
+  intel471:
+    hosts:
+      - api.intel471.com
+  google-ti-dtm:
+    hosts:
+      - www.virustotal.com
+  crowdstrike-recon:
+    hosts:
+      - api.crowdstrike.com
+  socradar:
+    hosts:
+      - platform.socradar.com
+  darkowl:
+    hosts:
+      - api.darkowl.com
+  flare:
+    hosts:
+      - api.flare.io
+  # In-library connector. It does not call the network.
+  stub:
+    hosts:
+      - example.com

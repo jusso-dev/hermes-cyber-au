@@ -45,6 +45,8 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install "uv<1"
       - run: uv sync --project mcp --all-packages --frozen
+      - name: Egress allowlist matches the inventory
+        run: uv run --project mcp python tools/ci/check_allowlist.py
       - name: Unit and fixture tests (network blocked)
         run: uv run --project mcp pytest -q --block-network --record-mode=none --cov=cyberau_common --cov-report=xml
       - name: STIX export validates

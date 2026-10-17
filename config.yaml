@@ -1,5 +1,11 @@
 # Model and provider stay unset. The person who installs this profile chooses them.
 timezone: Australia/Sydney
+agent:
+  # Hermes web tools use a blocklist, not an allowlist. This profile turns
+  # them off. Catalogue hosts are reached through connectors. See
+  # docs/security/egress.md.
+  disabled_toolsets:
+    - web
 security:
   allow_private_urls: false
   redact_secrets: true

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
+import socket
 import sys
 import time
 from pathlib import Path
@@ -13,7 +14,7 @@ import httpx
 import pytest
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied, EgressPolicy, EgressUnresolved
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
@@ -22,8 +23,6 @@ from cyberau_common.server import Connector, ToolSpec, build_server
 from hypothesis import given
 from hypothesis import strategies as st
 
-ROOT = Path(__file__).resolve().parents[3]
-ALLOW = ROOT / "egress-allowlist.yaml"
 SECRET = "super-secret-value"
 
 
@@ -136,6 +135,98 @@ class TestEgress:
             _policy(tmp_path, "connectors:\n  demo:\n    hosts: ['bad host']\n").check(
                 "https://bad host/"
             )
+
+    def test_scoped_and_mapped_addresses_are_refused(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+        for address in (
+            "100.64.0.1",
+            "169.254.169.254",
+            "224.0.0.1",
+            "::",
+            "fec0::1",
+            "ff02::1",
+            "fe80::1%eth0",
+            "::ffff:10.0.0.1",
+            "::ffff:1.1.1.1",
+        ):
+            policy = EgressPolicy(
+                path, "demo", resolver=lambda host, address=address: [_ip(address)]
+            )
+            with pytest.raises(EgressDenied):
+                policy.check("https://example.com/")
+
+    def test_yaml_cannot_drop_the_floor(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "version: 1\n"
+            "global_deny_cidrs: [192.0.2.0/24]\n"
+            "connectors:\n  demo:\n    hosts: [example.com]\n",
+            encoding="utf-8",
+        )
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("100.64.0.1")])
+        with pytest.raises(EgressDenied):
+            policy.check("https://example.com/")
+        extra = EgressPolicy(path, "demo", resolver=lambda host: [_ip("1.2.3.4")])
+        extra_path = tmp_path / "extra.yaml"
+        extra_path.write_text(
+            "version: 1\nglobal_deny_cidrs: [1.2.3.0/24]\nconnectors:\n  demo: [example.com]\n",
+            encoding="utf-8",
+        )
+        listed = EgressPolicy(extra_path, "demo", resolver=lambda host: [_ip("1.2.3.4")])
+        with pytest.raises(EgressDenied):
+            listed.check("https://example.com/")
+        EgressPolicy(extra_path, "demo", resolver=lambda host: [_ip("1.1.1.1")]).check(
+            "https://example.com/"
+        )
+        assert extra.hosts == {"example.com"}
+
+    def test_scoped_literal_is_refused_when_listed(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "connectors:\n  demo:\n    hosts: ['fe80::1%eth0', example.com]\n"
+            "    allow_ip_literals: true\n",
+            encoding="utf-8",
+        )
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("1.1.1.1")])
+        with pytest.raises(EgressDenied, match="blocked"):
+            policy.check("https://[fe80::1%25eth0]/")
+
+    def test_loopback_opt_in_does_not_cover_https_or_listed_names(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "connectors:\n  demo:\n    hosts: [example.com, localhost]\n"
+            "    allow_http_loopback: true\n",
+            encoding="utf-8",
+        )
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("127.0.0.1")])
+        with pytest.raises(EgressDenied, match="blocked"):
+            policy.check("https://example.com/")
+        with pytest.raises(EgressDenied, match="blocked"):
+            policy.check("https://localhost/")
+        policy.check("http://localhost/")
+
+    def test_dns_failure_is_a_typed_refusal(self, tmp_path: Path, monkeypatch):
+        path = tmp_path / "allow.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+
+        def failing(*_args, **_kwargs):
+            raise socket.gaierror(-2, "Name or service not known")
+
+        monkeypatch.setattr(socket, "getaddrinfo", failing)
+        with pytest.raises(EgressUnresolved):
+            EgressPolicy(path, "demo").check("https://example.com/")
+
+    def test_host_only_check_does_not_resolve(self, tmp_path: Path):
+        def resolver(host):
+            raise AssertionError("resolved")
+
+        path = tmp_path / "allow.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=resolver)
+        policy.check("https://example.com/", resolve=False)
+        with pytest.raises(EgressDenied):
+            policy.check("https://evil.test/", resolve=False)
 
 
 class TestCache:
@@ -297,6 +388,86 @@ class TestHttp:
         client = _client(tmp_path, handler)
         with pytest.raises(EgressDenied):
             client.get("https://example.com/a", ttl=5)
+        client.close()
+
+    def test_off_list_host_opens_no_socket(self, tmp_path: Path, monkeypatch):
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(200, content=b"no")
+
+        def opened(*_args, **_kwargs):
+            raise AssertionError("socket opened")
+
+        monkeypatch.setattr(socket, "getaddrinfo", opened)
+        monkeypatch.setattr(socket, "create_connection", opened)
+        client = _client(tmp_path, handler)
+        with pytest.raises(EgressDenied):
+            client.get("https://evil.test/a", ttl=5)
+        assert calls["n"] == 0
+        client.close()
+
+    def test_redirect_to_private_literal_stops_before_the_next_request(self, tmp_path: Path):
+        calls: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request.url.host)
+            return httpx.Response(302, headers={"location": "https://10.0.0.1/secret"})
+
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "connectors:\n  demo:\n    hosts: [example.com, 10.0.0.1]\n"
+            "    allow_ip_literals: true\n",
+            encoding="utf-8",
+        )
+        client = _client(
+            tmp_path,
+            handler,
+            policy=EgressPolicy(path, "demo", resolver=lambda host: [_ip("1.1.1.1")]),
+        )
+        with pytest.raises(EgressDenied, match="blocked"):
+            client.get("https://example.com/a", ttl=5)
+        assert calls == ["example.com"]
+        client.close()
+
+    def _seeded_dns_down(self, tmp_path: Path, monkeypatch, clock, **kwargs):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b"cached")
+
+        _client(tmp_path, handler, clock=lambda: clock["t"]).get("https://example.com/a", ttl=5)
+
+        def failing(*_args, **_kwargs):
+            raise socket.gaierror(-2, "Name or service not known")
+
+        monkeypatch.setattr(socket, "getaddrinfo", failing)
+        path = tmp_path / "real.yaml"
+        path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
+        return _client(
+            tmp_path,
+            handler,
+            clock=lambda: clock["t"],
+            policy=EgressPolicy(path, "demo"),
+            **kwargs,
+        )
+
+    def test_offline_cache_answer_needs_no_dns(self, tmp_path: Path, monkeypatch):
+        clock = {"t": 0.0}
+        client = self._seeded_dns_down(tmp_path, monkeypatch, clock, offline=True)
+        clock["t"] = 100.0
+        response = client.get("https://example.com/a", ttl=5)
+        assert (response.cache, response.body) == ("stale", b"cached")
+        with pytest.raises(EgressDenied):
+            client.get("https://evil.test/a", ttl=5)
+        client.close()
+
+    def test_dns_failure_serves_stale_or_fails_as_http_error(self, tmp_path: Path, monkeypatch):
+        clock = {"t": 0.0}
+        client = self._seeded_dns_down(tmp_path, monkeypatch, clock)
+        clock["t"] = 100.0
+        assert client.get("https://example.com/a", ttl=5).cache == "stale"
+        with pytest.raises(HttpError):
+            client.get("https://example.com/other", ttl=5)
         client.close()
 
     def test_secrets_are_redacted_in_errors(self, tmp_path: Path):
