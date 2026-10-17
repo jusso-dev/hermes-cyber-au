@@ -51,65 +51,60 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 ## Connectors
 
 <!-- connectors:start -->
-| Connector | Server | Group | Auth | Default | Milestone | Status | Docs |
-|---|---|---|---|---|---|---|---|
-| ASD's ACSC alerts, advisories and publications | `asd` | Australian government | none | on | v0.1 MVP | planned | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
-| Information Security Manual (ISM) OSCAL catalogue | `ism` | Australian government | `GITHUB_TOKEN` (optional) | on | v0.1 MVP | planned | [docs/connectors/asd-ism.md](docs/connectors/asd-ism.md) |
-| Essential Eight and ASD Essentials | `e8` | Australian government | none | on | v0.1 MVP | planned | [docs/connectors/asd-essentials.md](docs/connectors/asd-essentials.md) |
-| CISA Known Exploited Vulnerabilities | `kev` | Vulnerability intelligence | none | on | v0.1 MVP | planned | https://www.cisa.gov/known-exploited-vulnerabilities-catalog |
-| FIRST EPSS | `epss` | Vulnerability intelligence | none | on | v0.1 MVP | planned | [docs/connectors/first-epss.md](docs/connectors/first-epss.md) |
-| NIST National Vulnerability Database | `nvd` | Vulnerability intelligence | `NVD_API_KEY` (optional) | on | v0.1 MVP | planned | [docs/connectors/nvd.md](docs/connectors/nvd.md) |
-| OSV.dev open source vulnerabilities | `osv` | Vulnerability intelligence | none | on | v0.2 | planned | [docs/connectors/osv.md](docs/connectors/osv.md) |
-| Cloudflare Radar via Cloudflare's unified MCP server | `cloudflare_radar` | Internet and attack telemetry | `CLOUDFLARE_RADAR_API_TOKEN` (optional) | off: non-commercial terms, bring your own key | v0.1 MVP | planned | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
-| AusCERT public security bulletins | `auscert` | Australian community | none | on | v0.1 MVP | planned | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
-| abuse.ch (URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker) | `abusech` | Global threat intelligence | `ABUSECH_AUTH_KEY` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | [docs/connectors/abusech.md](docs/connectors/abusech.md) |
-| AlienVault OTX | `otx` | Global threat intelligence | `OTX_API_KEY` | on | v0.2 | planned | [docs/connectors/otx.md](docs/connectors/otx.md) |
-| GreyNoise Community | `greynoise` | Global threat intelligence | `GREYNOISE_API_KEY` (optional) | on | v0.2 | planned | [docs/connectors/greynoise.md](docs/connectors/greynoise.md) |
-| Shodan InternetDB | `internetdb` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/shodan-internetdb.md](docs/connectors/shodan-internetdb.md) |
-| MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | on | v0.1 MVP | planned | [docs/connectors/mitre-attack.md](docs/connectors/mitre-attack.md) |
-| SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | [docs/connectors/sigma.md](docs/connectors/sigma.md) |
-| crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
-| Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | on | v0.2 | planned | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
-| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | off | v0.2 | planned | [docs/connectors/junction.md](docs/connectors/junction.md) |
-| Brolga threat intel context engine | `brolga` | Author's public tools | `BROLGA_URL` (optional), `BROLGA_API_TOKEN` | on | v1.0 | planned | https://github.com/jusso-dev/Brolga |
-| ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | on | v1.0 | planned | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
-| M365-Secure assessment reports | `(none)` | Author's public tools | none | on | v0.2 | planned | [docs/connectors/m365-secure.md](docs/connectors/m365-secure.md) |
-| VirusTotal via the official VirusTotal MCP server | `virustotal` | Global threat intelligence | `VTAI_TOKEN` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
-| Have I Been Pwned via the official HIBP MCP server | `hibp` | Global threat intelligence | `HIBP_API_KEY` (optional) | on | v0.1 MVP | planned | [docs/connectors/hibp.md](docs/connectors/hibp.md) |
-| GitHub Advisory Database via the GitHub MCP server | `ghsa` | Vulnerability intelligence | `GITHUB_ADVISORY_TOKEN` | on | v0.1 MVP | planned | [docs/connectors/github-advisories.md](docs/connectors/github-advisories.md) |
-| Generic TAXII 2.1 reader for ASD CTIS and other TAXII sources | `taxii` | Australian government | `TAXII_API_ROOT`, `TAXII_COLLECTION_ID`, `TAXII_USERNAME`, `TAXII_PASSWORD` | off: bring your own access | v0.2 | planned | [docs/connectors/taxii-ctis.md](docs/connectors/taxii-ctis.md) |
-| NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | Regional government | none | on | v0.2 | planned | [docs/connectors/ncsc-nz.md](docs/connectors/ncsc-nz.md) |
-| Cloudflare URL Scanner (unlisted scans, approval-gated) | `cfscan` | Internet and attack telemetry | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: bring your own access | v0.2 | planned | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
-| CVE Program records (CVE Services API and cvelistV5) | `cve` | Vulnerability intelligence | none | on | v0.2 | planned | [docs/connectors/cve-program.md](docs/connectors/cve-program.md) |
-| AbuseIPDB IP reputation | `abuseipdb` | Global threat intelligence | `ABUSEIPDB_API_KEY` | on | v0.2 | planned | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
-| Spamhaus DROP, DROPv6 and ASN-DROP | `drop` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/spamhaus-drop.md](docs/connectors/spamhaus-drop.md) |
-| IRAP guidance | `irap` | Australian government | none | on | v1.0 | planned | [docs/connectors/irap.md](docs/connectors/irap.md) |
-| Protective Security Policy Framework (PSPF) | `pspf` | Australian government | none | on | v1.0 | planned | [docs/connectors/pspf.md](docs/connectors/pspf.md) |
-| Scamwatch alerts | `scamwatch` | Australian government | none | on | v1.0 | planned | [docs/connectors/scamwatch.md](docs/connectors/scamwatch.md) |
-| data.gov.au (CKAN) | `datagov` | Australian government | none | on | v1.0 | planned | [docs/connectors/datagov-au.md](docs/connectors/datagov-au.md) |
-| AusCERT member URL feed (AusMISP goes through the MISP connector) | `auscertm` | Australian community | `AUSCERT_URL_FEED`, `AUSCERT_FEED_TOKEN` (optional) | off: bring your own access | v1.0 | planned | https://auscert.org.au/services/threat-intelligence/ |
-| ASD Blueprint for Secure Cloud | `blueprint` | Australian government | none | on | v1.0 | planned | [docs/connectors/asd-blueprint.md](docs/connectors/asd-blueprint.md) |
-| PhishTank verified phishing URLs | `phish` | Global threat intelligence | `PHISHTANK_APP_KEY` (optional) | on | v1.0 | planned | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
-| OpenPhish community feed | `phish` | Global threat intelligence | none | on | v1.0 | planned | [docs/connectors/openphish.md](docs/connectors/openphish.md) |
-| MISP via the official MISP MCP server, for your own instance or AusMISP | `misp` | CTI platforms | `MISP_URL`, `MISP_API_KEY` | off: bring your own access | v1.0 | planned | [docs/connectors/misp.md](docs/connectors/misp.md) |
-| OpenCTI (your own instance) | `opencti` | CTI platforms | `OPENCTI_URL`, `OPENCTI_TOKEN` | off: bring your own access | v1.0 | planned | [docs/connectors/opencti.md](docs/connectors/opencti.md) |
-| Hudson Rock Cavalier (infostealer exposure by domain) | `hudsonrock` | Credential and infostealer exposure | `HUDSONROCK_API_KEY` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/hudson-rock.md](docs/connectors/hudson-rock.md) |
-| SpyCloud Enterprise Protection (breach and malware exposure on a watchlist) | `spycloud` | Credential and infostealer exposure | `SPYCLOUD_API_KEY` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/spycloud.md](docs/connectors/spycloud.md) |
-| UpGuard CyberRisk (identity breaches, data leaks and typosquats; Australian vendor) | `upguard` | Attack surface and brand monitoring | `UPGUARD_API_KEY` | off: paid, bring your own licence | v0.2 | planned | [docs/connectors/upguard.md](docs/connectors/upguard.md) |
-| ransomware.live victim tracker (free, filter by country AU) | `ransomlive` | Ransomware victim monitoring (free) | `RANSOMWARE_LIVE_API_KEY` (optional) | off: free, victim data | v0.2 | planned | [docs/connectors/ransomware-live.md](docs/connectors/ransomware-live.md) |
-| Recorded Future (identity exposure, dark web and ransomware brand alerts, domain abuse, risk lists, official MCP) | `recordedfuture` | Threat intelligence platforms | `RECORDED_FUTURE_API_TOKEN`, `RECORDED_FUTURE_ORG_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_SECRET` (optional) | off: paid, bring your own licence | v0.2 | planned | [docs/connectors/recorded-future.md](docs/connectors/recorded-future.md) |
-| Flashpoint Ignite (compromised credentials and indicators) | `flashpoint` | Threat intelligence platforms | `FLASHPOINT_API_TOKEN` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/flashpoint.md](docs/connectors/flashpoint.md) |
-| Intel 471 Titan (watchers, alerts, credentials and breach alerts) | `intel471` | Threat intelligence platforms | `INTEL471_EMAIL`, `INTEL471_API_KEY` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/intel471.md](docs/connectors/intel471.md) |
-| Google Threat Intelligence Digital Threat Monitoring (formerly Mandiant) | `gtidtm` | Dark web and leak monitoring | `GTI_API_KEY` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/google-ti-dtm.md](docs/connectors/google-ti-dtm.md) |
-| CrowdStrike Falcon Adversary Intelligence Recon (dark web monitoring notifications) | `csrecon` | Dark web and leak monitoring | `FALCON_CLIENT_ID`, `FALCON_CLIENT_SECRET`, `FALCON_BASE_URL` (optional) | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/crowdstrike-recon.md](docs/connectors/crowdstrike-recon.md) |
-| SOCRadar (company incidents: dark web, leaks, brand and attack surface) | `socradar` | Dark web and leak monitoring | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/socradar.md](docs/connectors/socradar.md) |
-| DarkOwl Vision (dark web search) | `darkowl` | Dark web and leak monitoring | `DARKOWL_PUBLIC_KEY`, `DARKOWL_PRIVATE_KEY` | off: paid, bring your own licence | v1.0 | planned | [docs/connectors/darkowl.md](docs/connectors/darkowl.md) |
-| Flare threat exposure management (leaked credentials, stealer logs, leak and ransomware sites, dark web, official MCP) | `flare` | Dark web and leak monitoring | `FLARE_API_KEY`, `FLARE_TENANT_ID` (optional) | off: paid, bring your own licence | v0.2 | planned | [docs/connectors/flare.md](docs/connectors/flare.md) |
+Connectors with a `SOURCE.md` in this checkout. Planned sources without a connector directory are listed in [docs/research/connectors.md](docs/research/connectors.md).
+
+| Connector | Server | Auth | Default | Docs |
+|---|---|---|---|---|
+| Abuse.ch connector: URLhaus, ThreatFox, MalwareBazaar and Feodo Tracker | `abusech` | `ABUSECH_AUTH_KEY` | off | [docs/connectors/abusech.md](docs/connectors/abusech.md) |
+| AbuseIPDB IP reputation. Reporting an address is not implemented | `abuseipdb` | `ABUSEIPDB_API_KEY` | on | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
 | ASD ACSC alerts, advisories and publications | `asd` | none | on | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
+| ASD Blueprint for Secure Cloud lookup | `blueprint` | none | on | [docs/connectors/asd-blueprint.md](docs/connectors/asd-blueprint.md) |
+| Essential Eight and ASD Essentials connector | `e8` | none | on | [docs/connectors/asd-essentials.md](docs/connectors/asd-essentials.md) |
 | Information Security Manual OSCAL catalogue | `ism` | `GITHUB_TOKEN` (optional) | on | [docs/connectors/asd-ism.md](docs/connectors/asd-ism.md) |
+| Australian reporting obligations | `aureg` | none | on | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
+| AusCERT public security bulletins | `auscert` | none | on | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
 | CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [docs/connectors/cisa-kev.md](docs/connectors/cisa-kev.md) |
+| cloudflare-radar | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
+| Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
+| CrowdStrike Falcon Adversary Intelligence Recon connector | `csrecon` | `FALCON_CLIENT_ID` (optional), `FALCON_CLIENT_SECRET` (optional), `FALCON_BASE_URL` (optional) | off | [docs/connectors/crowdstrike-recon.md](docs/connectors/crowdstrike-recon.md) |
+| Crt.sh certificate transparency search | `crtsh` | none | on | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
+| CVE Program records from the CVE Services API | `cve` | none | on | [docs/connectors/cve-program.md](docs/connectors/cve-program.md) |
+| DarkOwl Vision search | `darkowl` | none | off | [docs/connectors/darkowl.md](docs/connectors/darkowl.md) |
+| Data.gov.au CKAN catalogue | `datagov` | none | on | [docs/connectors/datagov-au.md](docs/connectors/datagov-au.md) |
 | FIRST EPSS scores | `epss` | none | on | [docs/connectors/first-epss.md](docs/connectors/first-epss.md) |
+| Flare tools. Tenant searches are the default. Nothing here creates identifiers | `flare` | `FLARE_API_KEY` (optional), `FLARE_TENANT_ID` (optional) | off | [docs/connectors/flare.md](docs/connectors/flare.md) |
+| Flashpoint Ignite indicators | `flashpoint` | `FLASHPOINT_API_TOKEN` | off | [docs/connectors/flashpoint.md](docs/connectors/flashpoint.md) |
+| github-advisories | `ghsa` | `GITHUB_ADVISORY_TOKEN` | on | [docs/connectors/github-advisories.md](docs/connectors/github-advisories.md) |
+| Google Threat Intelligence Digital Threat Monitoring connector | `gtidtm` | `GTI_API_KEY` | off | [docs/connectors/google-ti-dtm.md](docs/connectors/google-ti-dtm.md) |
+| GreyNoise Community IP classification | `greynoise` | `GREYNOISE_API_KEY` (optional) | on | [docs/connectors/greynoise.md](docs/connectors/greynoise.md) |
+| Read-only, pinned wrap of the official Have I Been Pwned MCP server | `hibp` | `HIBP_API_KEY` | on | [docs/connectors/hibp.md](docs/connectors/hibp.md) |
+| MCP tools for Hindsight and the local handoff queue | `hindsight` | `HINDSIGHT_API_KEY` | off | [docs/connectors/hindsight.md](docs/connectors/hindsight.md) |
+| Hudson Rock Cavalier connector | `hudsonrock` | `HUDSONROCK_API_KEY` | off | [docs/connectors/hudson-rock.md](docs/connectors/hudson-rock.md) |
+| Intel 471 Titan alerts. Watchers are not created or edited | `intel471` | `INTEL471_EMAIL`, `INTEL471_API_KEY` | off | [docs/connectors/intel471.md](docs/connectors/intel471.md) |
+| IRAP guidance from cyber.gov.au | `irap` | none | on | [docs/connectors/irap.md](docs/connectors/irap.md) |
+| MISP connector for a user-supplied instance, including AusMISP | `misp` | `MISP_URL`, `MISP_API_KEY` | off | [docs/connectors/misp.md](docs/connectors/misp.md) |
+| MITRE ATT&CK (STIX 2.1) connector | `attack` | none | on | [docs/connectors/mitre-attack.md](docs/connectors/mitre-attack.md) |
+| NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | none | on | [docs/connectors/ncsc-nz.md](docs/connectors/ncsc-nz.md) |
 | NIST National Vulnerability Database CVE API | `nvd` | `NVD_API_KEY` (optional) | on | [docs/connectors/nvd.md](docs/connectors/nvd.md) |
+| GraphQL client for a user-supplied OpenCTI instance | `opencti` | `OPENCTI_URL`, `OPENCTI_TOKEN` | off | [docs/connectors/opencti.md](docs/connectors/opencti.md) |
+| OpenPhish community feed. Never requests the URL under test | `phish` | none | on | [docs/connectors/openphish.md](docs/connectors/openphish.md) |
+| OSV.dev open source vulnerabilities | `osv` | none | on | [docs/connectors/osv.md](docs/connectors/osv.md) |
+| AlienVault OTX indicators and subscribed pulses | `otx` | `OTX_API_KEY` | on | [docs/connectors/otx.md](docs/connectors/otx.md) |
+| PhishTank verified-online phishing URL database | `phish` | `PHISHTANK_APP_KEY` (optional) | not listed | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
+| Status tool for the shared premium interface. It does not call a vendor | `premium` | none | not listed | [docs/connectors/premium.md](docs/connectors/premium.md) |
+| Protective Security Policy Framework quotations | `pspf` | none | on | [docs/connectors/pspf.md](docs/connectors/pspf.md) |
+| Ransomware.live victim claims for Australia | `ransomlive` | `RANSOMWARE_LIVE_API_KEY` (optional) | off | [docs/connectors/ransomware-live.md](docs/connectors/ransomware-live.md) |
+| Recorded Future tools on the shared premium client | `recordedfuture`, `recordedfuture_mcp` | `RECORDED_FUTURE_API_TOKEN` (optional), `RECORDED_FUTURE_ORG_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_SECRET` (optional) | off | [docs/connectors/recorded-future.md](docs/connectors/recorded-future.md) |
+| Scamwatch homepage alerts | `scamwatch` | none | on | [docs/connectors/scamwatch.md](docs/connectors/scamwatch.md) |
+| Shodan InternetDB lookups | `internetdb` | none | on | [docs/connectors/shodan-internetdb.md](docs/connectors/shodan-internetdb.md) |
+| SigmaHQ detection rules | `sigma` | `GITHUB_TOKEN` (optional) | on | [docs/connectors/sigma.md](docs/connectors/sigma.md) |
+| SOCRadar company incidents connector | `socradar` | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off | [docs/connectors/socradar.md](docs/connectors/socradar.md) |
+| Spamhaus DROP, DROPv6 and ASN-DROP lists | `drop` | none | on | [docs/connectors/spamhaus-drop.md](docs/connectors/spamhaus-drop.md) |
+| SpyCloud Enterprise Protection connector | `spycloud` | `SPYCLOUD_API_KEY` | off | [docs/connectors/spycloud.md](docs/connectors/spycloud.md) |
+| TAXII 2.1 client for a user-supplied API root | `taxii` | `TAXII_USERNAME`, `TAXII_PASSWORD` | off | [docs/connectors/taxii-ctis.md](docs/connectors/taxii-ctis.md) |
+| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` (optional) | on | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
+| UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [docs/connectors/upguard.md](docs/connectors/upguard.md) |
+| virustotal | not listed | `VTAI_TOKEN` | not listed | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
 <!-- connectors:end -->
 
 Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).

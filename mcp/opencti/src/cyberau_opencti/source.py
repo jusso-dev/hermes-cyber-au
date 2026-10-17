@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 import jsonschema
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy, _normalise_host
+from cyberau_common.egress import EgressDenied, EgressPolicy, normalise_host
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
@@ -372,7 +372,7 @@ def _policy(url: str) -> EgressPolicy:
     policy = EgressPolicy(_allowlist(), "opencti", resolver=_RESOLVER)
     host = urlsplit(url).hostname or ""
     if host:
-        policy.hosts.add(_normalise_host(host))
+        policy.hosts.add(normalise_host(host))
     return policy
 
 

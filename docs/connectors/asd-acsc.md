@@ -213,11 +213,11 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-Commonwealth of Australia material from ASD's ACSC. The copyright page could not be fetched on 17 October 2026, so the licence wording is not copied here. Confirm https://www.cyber.gov.au/about-us/copyright before reuse. This connector is not endorsed by ASD.
+Creative Commons Attribution 4.0 International, except the Coat of Arms, the ACSC logo, third-party content, and other excluded material. Attribute as © Commonwealth of Australia 2026. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
 
 Attribution returned with each result:
 
-> Commonwealth of Australia material from ASD's ACSC (cyber.gov.au). Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. This connector is not endorsed by ASD.
+> © Commonwealth of Australia 2026. Material from ASD's ACSC (cyber.gov.au), Creative Commons Attribution 4.0 International. Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. This connector is not endorsed by ASD.
 
 ## Runtime fetch on 17 October 2026
 

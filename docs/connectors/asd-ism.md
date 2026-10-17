@@ -215,11 +215,11 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-ISM content is published by the Australian Signals Directorate. Record the release tag and SHA-256 with every answer. This connector is not endorsed by ASD.
+The ism-oscal README states Creative Commons Attribution 4.0 International and © Commonwealth of Australia 2024, except the Coat of Arms, the ASD logo, and where otherwise stated. The cyber.gov.au copyright page says to attribute website material as © Commonwealth of Australia 2026. Record the release tag and SHA-256 with every answer. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
 
 Attribution returned with each result:
 
-> Information Security Manual content is published by the Australian Signals Directorate. This connector is not endorsed by ASD.
+> © Commonwealth of Australia 2024. Information Security Manual content is published by the Australian Signals Directorate under Creative Commons Attribution 4.0 International. This connector is not endorsed by ASD.
 
 ## Notes
 

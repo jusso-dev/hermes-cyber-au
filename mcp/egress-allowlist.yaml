@@ -99,7 +99,6 @@ connectors:
     - api.github.com
     - github.com
     - objects.githubusercontent.com
-    - release-assets.githubusercontent.com
     allow_ip_literals: false
     allow_http_loopback: false
   crtsh:

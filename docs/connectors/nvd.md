@@ -182,7 +182,7 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-This product uses data from the NVD API but is not endorsed or certified by the NVD.
+This product uses data from the NVD API but is not endorsed or certified by the NVD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
 
 Attribution returned with each result:
 

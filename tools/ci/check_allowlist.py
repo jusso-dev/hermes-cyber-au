@@ -22,6 +22,8 @@ DEFAULT_ALLOWLIST = ROOT / "mcp" / "egress-allowlist.yaml"
 # In-library connector. It does not call the network and is not an inventory row.
 _STUB = "stub"
 _STUB_HOSTS = frozenset({"example.com"})
+_ORG_EXPOSURE = "org-exposure"
+_ORG_EXPOSURE_HOSTS = frozenset({"abr.business.gov.au"})
 _LOOPBACK = frozenset({"localhost", "127.0.0.1"})
 
 
@@ -92,6 +94,11 @@ def differences(allowlist_path: Path, rows: list[dict]) -> list[str]:
             actual = _listed_hosts(listed[key], key, problems)
             if actual is not None and actual != _STUB_HOSTS:
                 problems.append("stub hosts must stay example.com")
+            continue
+        if key == _ORG_EXPOSURE:
+            actual = _listed_hosts(listed[key], key, problems)
+            if actual is not None and actual != _ORG_EXPOSURE_HOSTS:
+                problems.append("org-exposure hosts must stay abr.business.gov.au")
             continue
         problems.append(f"{key} is in the allowlist but not the inventory")
     return problems
