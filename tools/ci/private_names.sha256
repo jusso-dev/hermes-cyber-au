@@ -1,0 +1,6 @@
+# SHA-256 hashes of banned private names, one lowercase hex digest per line.
+# The names themselves stay out of this public repository.
+# Add a name with: printf '%s' 'the name' | shasum -a 256
+# Optional local names can be supplied as newline-separated plaintext in
+# CYBERAU_PRIVATE_NAMES. The workflow does not set that variable and does
+# not carry a secret.
