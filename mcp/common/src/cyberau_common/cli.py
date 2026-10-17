@@ -44,7 +44,16 @@ def main(argv: list[str] | None = None) -> int:
     imported.add_argument("path")
     imported.add_argument("--feed", default="alerts")
 
-    for name in ("refresh", "regen", "parser-check", "store"):
+    regen = sub.add_parser("regen", help="Regenerate local skill data")
+    regen.add_argument("source")
+    regen.add_argument("--keep", type=int, default=2)
+    regen.add_argument("--force", action="store_true")
+
+    parser_check = sub.add_parser("parser-check", help="Re-check advisory parsers")
+    parser_check.add_argument("--sources", default="")
+    parser_check.add_argument("--json", dest="json_path", default="")
+
+    for name in ("refresh", "store"):
         command = sub.add_parser(name)
         command.add_argument("rest", nargs=argparse.REMAINDER)
 
@@ -81,6 +90,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if probe.ok else 1
     if args.command == "import":
         return _import_feed(args.name, args.path, args.feed)
+    if args.command == "regen":
+        from cyberau_common.regen import regen_main
+
+        forwarded = [args.source, "--keep", str(args.keep)]
+        if args.force:
+            forwarded.append("--force")
+        return regen_main(forwarded)
+    if args.command == "parser-check":
+        from cyberau_common.regen import parser_check_main
+
+        forwarded = ["--sources", args.sources]
+        if args.json_path:
+            forwarded.extend(["--json", args.json_path])
+        return parser_check_main(forwarded)
     print(
         f"{args.command} is not part of the shared library yet",
         file=sys.stderr,

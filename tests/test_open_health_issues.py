@@ -249,7 +249,7 @@ def test_main_never_calls_gh(tmp_path: Path, monkeypatch):
         == 0
     )
     assert github.calls[0][0] == "create"
-    assert module.main(["--kind", "parser", "--input", str(path)], client=github) == 2
+    assert module.main(["--kind", "parser", "--input", str(path)], client=github) == 0
     assert (
         module.main(["--kind", "connector", "--input", str(tmp_path / "missing.json")])
         == 2

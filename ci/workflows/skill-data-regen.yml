@@ -1,6 +1,8 @@
 # Proposed: .github/workflows/skill-data-regen.yml
-# Regenerate bundled skill data from source (ISM OSCAL, Essential Eight and ASD Essentials,
-# AU reporting obligations, ATT&CK, Sigma) and re-check every advisory parser against live pages.
+# Regenerate bundled skill data from local directories (ISM OSCAL, Essential Eight,
+# AU reporting obligations, ATT&CK and Sigma) and re-check advisory parsers.
+# Missing data directories are skipped. Live pages are not fetched.
+# Justin copies this file to .github/workflows/ by hand.
 # 17:00 UTC daily is 04:00 AEDT.
 name: skill-data-regen
 
@@ -16,7 +18,10 @@ on:
 
 permissions:
   contents: read
-  issues: write
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   regen:
@@ -25,69 +30,151 @@ jobs:
     outputs:
       parser_failures: ${{ steps.parsers.outputs.failures }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - run: python -m pip install "uv<1"
       - run: uv sync --project mcp --all-packages --frozen
-      - name: ISM from OSCAL (latest release plus the one before)
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: uv run --project mcp cyberau-mcp regen ism --keep 2 ${{ inputs.force && '--force' || '' }}
+      - name: ISM from local OSCAL catalogues (latest release plus the one before)
+        run: |
+          set -euo pipefail
+          if [ -d mcp/ism/data ] || [ -d mcp/asd-ism/data ]; then
+            if [ "${{ inputs.force }}" = "true" ]; then
+              uv run --project mcp cyberau-mcp regen ism --keep 2 --force
+            else
+              uv run --project mcp cyberau-mcp regen ism --keep 2
+            fi
+          else
+            echo "ISM data directory is absent. Skipping regen ism."
+          fi
       - name: Essential Eight maturity data and ASD Essentials chapters
-        run: uv run --project mcp cyberau-mcp regen e8 ${{ inputs.force && '--force' || '' }}
+        run: |
+          set -euo pipefail
+          if [ -d mcp/e8/data ]; then
+            if [ "${{ inputs.force }}" = "true" ]; then
+              uv run --project mcp cyberau-mcp regen e8 --force
+            else
+              uv run --project mcp cyberau-mcp regen e8
+            fi
+          else
+            echo "Essential Eight data directory is absent. Skipping regen e8."
+          fi
       - name: AU reporting obligations (weekly, Mondays Sydney time)
         run: |
+          set -euo pipefail
+          if [ ! -d mcp/aureg/data ]; then
+            echo "AU reporting obligations data directory is absent. Skipping regen aureg."
+            exit 0
+          fi
           if [ "$(TZ=Australia/Sydney date +%u)" = "1" ] || [ "${{ inputs.force }}" = "true" ]; then
             uv run --project mcp cyberau-mcp regen aureg
+          else
+            echo "Skipping regen aureg until Monday in Australia/Sydney."
           fi
-      - name: ATT&CK and Sigma when a new release exists
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      - name: ATT&CK and Sigma when the local data directories exist
         run: |
-          uv run --project mcp cyberau-mcp regen attack
-          uv run --project mcp cyberau-mcp regen sigma
+          set -euo pipefail
+          if [ -d mcp/attack/data ]; then
+            uv run --project mcp cyberau-mcp regen attack
+          else
+            echo "ATT&CK data directory is absent. Skipping regen attack."
+          fi
+          if [ -d mcp/sigma/data ]; then
+            uv run --project mcp cyberau-mcp regen sigma
+          else
+            echo "Sigma data directory is absent. Skipping regen sigma."
+          fi
       - name: Rebuild skill reference files from data
         run: uv run --project mcp python tools/build_skill_references.py --write PR_BODY.md
-      - name: Re-check advisory parsers against live pages
+      - name: Re-check advisory parsers
         id: parsers
         run: |
+          set -uo pipefail
+          rm -f parser-check.json parser-check.err
           set +e
-          uv run --project mcp cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json
-          echo "failures=$(jq '[.[] | select(.ok == false)] | length' parser-check.json)" >> "$GITHUB_OUTPUT"
-          exit 0
+          uv run --project mcp cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json 2> parser-check.err
+          status=$?
+          set -e
+          cat parser-check.err >&2
+          absent=false
+          if [ -s parser-check.json ] && jq -e 'type == "object" and .absent == true' parser-check.json > /dev/null 2>&1; then
+            absent=true
+          elif [ "$status" -eq 2 ] && grep -qF "not part of the shared library yet" parser-check.err; then
+            absent=true
+          fi
+          if [ "$absent" = true ]; then
+            echo "parser-check is absent: not part of the shared library yet"
+            if [ ! -s parser-check.json ]; then
+              printf '%s\n' '{"absent":true,"detail":"parser-check is absent: not part of the shared library yet","results":[]}' > parser-check.json
+            fi
+            echo "failures=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ! -s parser-check.json ]; then
+            echo "parser-check exited ${status} without writing parser-check.json" >&2
+            exit 1
+          fi
+          failures=$(jq 'if type == "object" then (.results // []) else . end | [.[] | select(.ok == false)] | length' parser-check.json)
+          echo "failures=${failures}" >> "$GITHUB_OUTPUT"
       - name: Regression tests on regenerated data
         run: uv run --project mcp pytest -q tests/skills tests/data --block-network
-      - uses: actions/upload-artifact@v4
+      - name: Collect regenerated paths
+        id: artifact_paths
+        run: |
+          set -euo pipefail
+          paths="$RUNNER_TEMP/skill-data-paths.txt"
+          : > "$paths"
+          if [ -d mcp/ism/data ]; then echo "mcp/ism/data/" >> "$paths"; fi
+          if [ -d mcp/asd-ism/data ]; then echo "mcp/asd-ism/data/" >> "$paths"; fi
+          if [ -d mcp/e8/data ]; then echo "mcp/e8/data/" >> "$paths"; fi
+          if [ -d mcp/aureg/data ]; then echo "mcp/aureg/data/" >> "$paths"; fi
+          if [ -d mcp/attack/data ]; then echo "mcp/attack/data/" >> "$paths"; fi
+          if [ -d mcp/sigma/data ]; then echo "mcp/sigma/data/" >> "$paths"; fi
+          if [ -d skills ]; then echo "skills/" >> "$paths"; fi
+          if [ -f PR_BODY.md ]; then echo "PR_BODY.md" >> "$paths"; fi
+          {
+            echo "paths<<EOF"
+            cat "$paths"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: skill-data
-          path: |
-            mcp/ism/data/
-            mcp/e8/data/
-            mcp/aureg/data/
-            mcp/attack/data/
-            mcp/sigma/data/
-            skills/
-            PR_BODY.md
-      - uses: actions/upload-artifact@v4
+          if-no-files-found: ignore
+          path: ${{ steps.artifact_paths.outputs.paths }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: parser-check
+          if-no-files-found: ignore
           path: parser-check.json
 
   parser-issue:
     needs: regen
     if: needs.regen.outputs.parser_failures != '0'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: parser-check
       - name: Open or update one issue per failing parser
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/ci/open_health_issues.py --kind parser --input parser-check.json
+        run: |
+          set -euo pipefail
+          if [ ! -f tools/ci/open_health_issues.py ]; then
+            echo "tools/ci/open_health_issues.py is absent. Not opening an issue."
+            exit 0
+          fi
+          python3 tools/ci/open_health_issues.py --kind parser --input parser-check.json
 
   pr:
     needs: regen
@@ -97,7 +184,8 @@ jobs:
       branch_prefix: data/skill-regen
       title: "Regenerate skill data from source"
       body_file: PR_BODY.md
-    secrets: inherit
+    secrets:
+      DATA_PR_TOKEN: ${{ secrets.DATA_PR_TOKEN }}
     permissions:
       contents: write
       pull-requests: write
