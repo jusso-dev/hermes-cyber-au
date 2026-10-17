@@ -53,6 +53,7 @@ def test_list_and_get_happy_path(tmp_path, monkeypatch):
     jsonschema.validate({"limit": 10}, _input("scamwatch_list_alerts"))
     jsonschema.validate(listed, ENVELOPE)
     assert listed["cache"] == "snapshot"
+    assert listed["source_urls"] == [HOME]
     assert listed["attribution"].startswith("Scamwatch alerts")
     assert listed["data_as_of"] == "2026-09-01"
     assert [row["date"] for row in listed["data"]] == [
@@ -108,9 +109,7 @@ def test_empty_malformed_drift_and_bad_input(monkeypatch):
     assert connector().health(live=False, check_schema=True).ok is True
     assert scamwatch_list_alerts(limit=0)["warnings"]
     assert scamwatch_get_alert("https://evil.example/phish")["warnings"]
-    missing = scamwatch_get_alert(
-        "https://www.scamwatch.gov.au/about-us/news-and-alerts/missing"
-    )
+    missing = scamwatch_get_alert("https://www.scamwatch.gov.au/about-us/news-and-alerts/missing")
     assert missing["data"] is None
     assert missing["warnings"]
 
@@ -223,6 +222,44 @@ def test_timeout_falls_back_to_cache_and_redirect_is_refused(tmp_path, monkeypat
     assert missing["warnings"]
 
 
+def test_repeat_call_after_403_still_says_blocked(tmp_path, monkeypatch):
+    _live(monkeypatch, tmp_path)
+    body = (FIXTURES / "scamwatch_403.html").read_bytes()
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(403, content=body))
+    try:
+        results = [scamwatch_list_alerts(), scamwatch_list_alerts()]
+        alert = scamwatch_get_alert(PAGE)
+        again = scamwatch_get_alert(PAGE)
+        probes = [connector().health(live=True), connector().health(live=True)]
+    finally:
+        source._TRANSPORT = None
+    for result in results:
+        assert result["data"] == []
+        assert "blocked" in result["warnings"][0]
+    assert alert["data"] is None
+    assert "blocked" in alert["warnings"][0]
+    assert "blocked" in again["warnings"][0]
+    assert all(not probe.ok and "blocked" in probe.detail for probe in probes)
+
+
+def test_alert_page_read_keeps_homepage_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_SCAMWATCH_PAGES", str(FIXTURES / "pages"))
+    scamwatch_list_alerts()
+    scamwatch_get_alert(PAGE + "#top")
+    scamwatch_list_alerts()
+    scamwatch_get_alert(HOME)
+    with sqlite3.connect(tmp_path / "scamwatch.sqlite") as conn:
+        assert conn.execute("select count(*) from alerts").fetchone()[0] == 3
+        summary, body = conn.execute(
+            "select summary, body from alerts where url = ?", (PAGE,)
+        ).fetchone()
+    assert summary
+    assert "parcel fee" in body
+    rows = (tmp_path / "scamwatch-alerts.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 4
+
+
 def test_403_with_cache_is_not_an_empty_list(tmp_path, monkeypatch):
     _live(monkeypatch, tmp_path)
     page = (FIXTURES / "homepage_three_alerts.html").read_bytes()
@@ -243,9 +280,7 @@ def test_403_with_cache_is_not_an_empty_list(tmp_path, monkeypatch):
 
 
 def test_advertised_schema_and_live_health(tmp_path, monkeypatch):
-    tools = {
-        tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())
-    }
+    tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     assert tools["scamwatch_list_alerts"].inputSchema["properties"]["limit"]["maximum"] == 50
     url_schema = tools["scamwatch_get_alert"].inputSchema["properties"]["url"]
     assert tools["scamwatch_get_alert"].inputSchema["required"] == ["url"]

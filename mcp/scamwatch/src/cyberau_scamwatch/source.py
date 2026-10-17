@@ -137,7 +137,8 @@ def scamwatch_get_alert(url: _Url) -> dict:
             warnings=(_join(warning, "Scamwatch alert page had no text"),),
             urls=(url,),
         )
-    _persist([page], body=page["body"])
+    if _alert_slug(url):
+        _persist([{**page, "url": _canonical(url)}], body=page["body"])
     warnings = (warning,) if warning else ()
     return _envelope(
         _public_page(page),
@@ -227,7 +228,7 @@ def _fetch_url(url: str, *, force_live: bool) -> tuple[str | None, str, str]:
         cached, state = _cached(url)
         if cached is not None:
             return cached, state, ""
-        stored = _stored_body(url)
+        stored = _stored_body(_canonical(url))
         if stored:
             return stored, "stale", ""
         return None, "snapshot", "unavailable: Scamwatch has no cached or snapshot copy"
@@ -250,12 +251,13 @@ def _offline_home() -> tuple[str | None, str, str]:
 def _live(url: str, *, force_live: bool, fallback: bool) -> tuple[str | None, str, str]:
     budget = _take_budget()
     if budget:
+        budget = _recent_block() or budget
         if force_live or not fallback:
             return None, "snapshot", budget
         cached, _state = _cached(url)
         if cached is not None:
             return cached, "stale", budget
-        stored = _stored_body(url) if url != HOME else ""
+        stored = _stored_body(_canonical(url)) if url != HOME else ""
         if stored:
             return stored, "stale", budget
         return None, "snapshot", budget
@@ -277,6 +279,7 @@ def _http(url: str, *, skip_cache: bool, fallback: bool) -> tuple[str | None, st
         client.close()
     if response.status in (401, 403):
         warning = _blocked(response.status)
+        _note_block(warning)
         if fallback:
             cached, _state = _cached(url)
             if cached is not None:
@@ -298,10 +301,38 @@ def _http(url: str, *, skip_cache: bool, fallback: bool) -> tuple[str | None, st
         text = response.body.decode("utf-8")
     except UnicodeDecodeError:
         return None, response.cache, "Scamwatch page was not UTF-8"
+    _note_block("")
     warning = ""
     if response.cache == "stale":
         warning = "served from cache after the live fetch failed"
     return text, response.cache, warning
+
+
+def _block_path() -> Path:
+    return _data_dir() / "blocked.json"
+
+
+def _note_block(warning: str) -> None:
+    """Remember a 401 or 403 so a repeat call inside the poll budget still says blocked.
+
+    The block is per host: a refusal for one page means the next page is refused too.
+    """
+    path = _block_path()
+    if warning:
+        mark = {"at": time.time(), "warning": warning}
+        path.write_text(json.dumps(mark), encoding="utf-8")
+    else:
+        path.unlink(missing_ok=True)
+
+
+def _recent_block() -> str:
+    try:
+        mark = json.loads(_block_path().read_text(encoding="utf-8"))
+        if time.time() - float(mark["at"]) < TTL:
+            return str(mark["warning"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return ""
 
 
 def _client() -> HttpClient:
@@ -576,23 +607,20 @@ def _persist(rows: list[dict], *, body: str) -> None:
             url = str(row.get("url") or "")
             if not url:
                 continue
-            title = _plain(str(row.get("title") or ""))
-            published = _plain(str(row.get("date") or ""))
-            summary = _plain(str(row.get("summary") or ""))
-            page_body = _plain(body or str(row.get("body") or ""))
-            digest = hashlib.sha256(
-                "\n".join((title, published, summary, page_body)).encode()
-            ).hexdigest()
             existing = conn.execute(
-                "SELECT content_hash, body FROM alerts WHERE id = ?",
+                "SELECT content_hash, title, published, summary, body FROM alerts WHERE id = ?",
                 (_alert_id(url),),
             ).fetchone()
-            kept_body = page_body
-            if existing and not page_body:
-                kept_body = existing["body"]
-                digest = hashlib.sha256(
-                    "\n".join((title, published, summary, kept_body)).encode()
-                ).hexdigest()
+            # The homepage has no body and an alert page has no summary. Keep what the
+            # other source stored so each read does not blank the other's fields.
+            old = existing or {"title": "", "published": "", "summary": "", "body": ""}
+            title = _plain(str(row.get("title") or "")) or old["title"]
+            published = _plain(str(row.get("date") or "")) or old["published"]
+            summary = _plain(str(row.get("summary") or "")) or old["summary"]
+            kept_body = _plain(body or str(row.get("body") or "")) or old["body"]
+            digest = hashlib.sha256(
+                "\n".join((title, published, summary, kept_body)).encode()
+            ).hexdigest()
             changed = existing is None or existing["content_hash"] != digest
             conn.execute(
                 """
@@ -603,7 +631,7 @@ def _persist(rows: list[dict], *, body: str) -> None:
                     title=excluded.title,
                     published=excluded.published,
                     summary=excluded.summary,
-                    body=CASE WHEN excluded.body = '' THEN alerts.body ELSE excluded.body END,
+                    body=excluded.body,
                     content_hash=excluded.content_hash,
                     last_seen=excluded.last_seen
                 """,
@@ -704,7 +732,7 @@ def _envelope(
     return envelope(
         "scamwatch",
         data,
-        urls=list(HOME if urls is None else urls),
+        urls=[HOME] if urls is None else list(urls),
         cache=cache,
         data_as_of=as_of,
         warnings=warnings,
@@ -776,10 +804,7 @@ def _blocked(status: int) -> str:
 
 
 def _blocked_page() -> str:
-    return (
-        "blocked: Scamwatch returned an access denied page. "
-        "This is not an empty alert list."
-    )
+    return "blocked: Scamwatch returned an access denied page. This is not an empty alert list."
 
 
 def _looks_blocked(html: str) -> bool:
@@ -856,7 +881,7 @@ def _is_index(href: str) -> bool:
 
 def _canonical(href: str) -> str:
     parts = urlsplit(urljoin(HOME, href))
-    return parts._replace(fragment="").geturl()
+    return parts._replace(scheme="https", fragment="").geturl()
 
 
 def _alert_id(url: str) -> str:
