@@ -79,6 +79,7 @@ servers:
     - HINDSIGHT_READ_ONLY=${HINDSIGHT_READ_ONLY}
     - CYBERAU_PROFILE_ROLE=${CYBERAU_PROFILE_ROLE}
     - CYBERAU_DATA_DIR=${CYBERAU_DATA_DIR}
+    - HERMES_HOME=${HERMES_HOME}
     trust: untrusted
     lazy: true
     timeout: 30

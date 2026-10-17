@@ -7,18 +7,42 @@ built into this package.
 
 from __future__ import annotations
 
+import ipaddress
+import re
+import socket
+from collections.abc import Callable
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from cyberau_common import USER_AGENT
-from cyberau_common.envelope import untrusted_text
 from cyberau_common.secrets import lookup, redact
 
 from cyberau_hindsight.constants import BANKS
+from cyberau_hindsight.role import may_retain, untrusted
 
-_LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 _TRUE = {"1", "true", "yes", "on"}
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
+_TOKEN = re.compile(r"[A-Za-z0-9_.:-]{1,100}")
+
+# Ranges Python does not already report as non-global, plus the ones the
+# request-time check refuses by name: 6to4, Teredo, NAT64 and IPv4-compatible.
+_EXTRA_BLOCKED = tuple(
+    ipaddress.ip_network(item)
+    for item in (
+        "192.88.99.0/24",
+        "::/96",
+        "64:ff9b::/96",
+        "64:ff9b:1::/48",
+        "100::/64",
+        "2001::/32",
+        "2001:db8::/32",
+        "2002::/16",
+    )
+)
+
+Resolver = Callable[[str], list]
 
 
 class HindsightError(Exception):
@@ -32,21 +56,29 @@ class HindsightClient:
     read_only: bool
     transport: httpx.BaseTransport | None = None
     timeout: float = 30.0
+    resolver: Resolver | None = None
 
     def __post_init__(self) -> None:
         if self.base_url:
             self.base_url = _check_base(self.base_url)
 
     @classmethod
-    def from_env(cls, transport: httpx.BaseTransport | None = None) -> HindsightClient:
+    def from_env(
+        cls,
+        transport: httpx.BaseTransport | None = None,
+        resolver: Resolver | None = None,
+    ) -> HindsightClient:
         raw = lookup("HINDSIGHT_BASE_URL")
         base = _check_base(raw) if raw else None
         flag = (lookup("HINDSIGHT_READ_ONLY") or "").lower()
+        # The flag is a hint. Retain is allowed only for a role that may retain, so a
+        # missing flag or a wrong role cannot turn a read-only profile into a writer.
         return cls(
             base_url=base,
             api_key=lookup("HINDSIGHT_API_KEY"),
-            read_only=flag in _TRUE,
+            read_only=flag in _TRUE or not may_retain(),
             transport=transport,
+            resolver=resolver,
         )
 
     @property
@@ -75,10 +107,10 @@ class HindsightClient:
                 "retained": 0,
                 "detail": "Hindsight retain is off because this profile is read-only.",
             }
-        text = _plain(content, "content", 100_000)
+        text = self._scrub(_plain(content, "content", 100_000))
         item: dict = {"content": text}
         if context:
-            item["context"] = _plain(context, "context", 2_000)
+            item["context"] = self._scrub(_plain(context, "context", 2_000))
         if document_id:
             item["document_id"] = _plain(document_id, "document_id", 200)
         meta = _metadata(metadata, confirmed)
@@ -87,11 +119,19 @@ class HindsightClient:
         if tags:
             item["tags"] = [_plain(tag, "tag", 80) for tag in tags]
         payload = self._post(f"/v1/default/banks/{bank}/memories", {"items": [item]})
+        count = payload.get("items_count")
+        if (
+            payload.get("success") is not True
+            or isinstance(count, bool)
+            or not isinstance(count, int)
+            or count < 1
+        ):
+            raise HindsightError("Hindsight did not confirm the retain")
         return {
             "enabled": True,
             "read_only": False,
             "bank": bank,
-            "retained": int(payload.get("items_count") or 1),
+            "retained": count,
             "detail": "retained",
         }
 
@@ -100,7 +140,7 @@ class HindsightClient:
         bounded = _limit(limit)
         if not self.enabled:
             return _off()
-        text = _plain(query, "query", 1_000)
+        text = self._scrub(_plain(query, "query", 1_000))
         payload = self._post(
             f"/v1/default/banks/{bank}/memories/recall",
             {"query": text, "budget": "mid", "max_tokens": 2048},
@@ -108,7 +148,7 @@ class HindsightClient:
         rows = payload.get("results")
         if not isinstance(rows, list):
             rows = []
-        records = [_present(bank, row) for row in rows if isinstance(row, dict)]
+        records = [self._present(bank, row) for row in rows if isinstance(row, dict)]
         return {
             "enabled": True,
             "read_only": self.read_only,
@@ -121,24 +161,35 @@ class HindsightClient:
             raise HindsightError("reflect is not implemented")
         if not self.base_url:
             raise HindsightError("Hindsight is off until HINDSIGHT_BASE_URL is set")
-        url = self.base_url + path
+        parts = urlsplit(self.base_url)
+        host = parts.hostname or ""
+        # Resolve and check right before the request, then connect to the address that
+        # was checked. A second lookup at connect time could answer differently.
+        pinned = self._checked_address(host)
+        literal = _literal(host) is not None
+        netloc = f"[{pinned}]" if pinned.version == 6 else str(pinned)
+        if parts.port:
+            netloc = f"{netloc}:{parts.port}"
+        url = urlunsplit((parts.scheme, netloc, path, "", ""))
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
             "user-agent": USER_AGENT,
+            "host": parts.netloc,
         }
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
+        extensions = {} if literal else {"sni_hostname": host}
         try:
             with httpx.Client(
                 transport=self.transport,
                 follow_redirects=False,
                 timeout=self.timeout,
             ) as http:
-                response = http.post(url, json=body, headers=headers)
+                response = http.post(url, json=body, headers=headers, extensions=extensions)
         except Exception as exc:
             raise HindsightError(self._safe(exc)) from None
-        if response.status_code in {301, 302, 303, 307, 308}:
+        if 300 <= response.status_code < 400:
             raise HindsightError("Hindsight redirect was refused")
         if response.status_code >= 400:
             raise HindsightError(f"Hindsight returned HTTP {response.status_code}")
@@ -150,11 +201,48 @@ class HindsightClient:
             raise HindsightError("Hindsight returned an unexpected payload")
         return payload
 
+    def _present(self, bank: str, row: dict) -> dict:
+        confirmed = _confirmed(row)
+        trusted = bank == "org" and confirmed
+        raw = row.get("text")
+        if not isinstance(raw, str):
+            raw = row.get("content") if isinstance(row.get("content"), str) else ""
+        raw = self._scrub(raw)
+        if trusted:
+            text = " ".join(_BIDI.sub("", _CONTROL.sub("", raw)).split())
+        else:
+            text = untrusted(raw, f"hindsight:{bank}")
+        return {
+            "id": _token(row.get("id")),
+            "text": text,
+            "untrusted": not trusted,
+            "confirmed": confirmed,
+            "type": _token(row.get("type")),
+        }
+
+    def _checked_address(self, host: str):
+        literal = _literal(host)
+        try:
+            found = [literal] if literal is not None else (self.resolver or _resolve)(host)
+        except HindsightError:
+            raise
+        except Exception:
+            raise HindsightError("Hindsight host did not resolve") from None
+        if not found:
+            raise HindsightError("Hindsight host did not resolve")
+        for address in found:
+            if _blocked(address):
+                raise HindsightError("Hindsight host resolves to an address that is not allowed")
+        return found[0]
+
     def _safe(self, exc: Exception) -> str:
-        text = redact(str(exc))
+        return self._scrub(str(exc)) or "Hindsight request failed"
+
+    def _scrub(self, text: str) -> str:
+        text = redact(text)
         if self.api_key:
             text = text.replace(self.api_key, "[REDACTED]")
-        return text or "Hindsight request failed"
+        return text
 
 
 def _off() -> dict:
@@ -218,24 +306,48 @@ def _confirmed(row: dict) -> bool:
     return any(str(tag).strip().lower() == "confirmed" for tag in tags)
 
 
-def _present(bank: str, row: dict) -> dict:
-    confirmed = _confirmed(row)
-    trusted = bank == "org" and confirmed
-    raw = row.get("text")
-    if not isinstance(raw, str):
-        raw = row.get("content") if isinstance(row.get("content"), str) else ""
-    text = raw if trusted else untrusted_text(raw, source=f"hindsight:{bank}")
-    return {
-        "id": row.get("id"),
-        "text": text,
-        "untrusted": not trusted,
-        "confirmed": confirmed,
-        "type": row.get("type"),
-    }
+def _token(value: object) -> str | None:
+    """Ids and types come from the server. Keep them to a short plain token."""
+    if isinstance(value, str) and _TOKEN.fullmatch(value):
+        return value
+    return None
+
+
+def _literal(host: str):
+    try:
+        return ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return None
+
+
+def _blocked(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Refuse anything that is not a plain public unicast address."""
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        return True
+    return (
+        not address.is_global
+        or address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+        or any(address in network for network in _EXTRA_BLOCKED)
+    )
+
+
+def _resolve(host: str) -> list:
+    found = []
+    for family, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+        if family in (socket.AF_INET, socket.AF_INET6):
+            found.append(ipaddress.ip_address(sockaddr[0].split("%", 1)[0]))
+    return found
 
 
 def _check_base(url: str) -> str:
-    parts = urlsplit(url.strip())
+    """The server origin over https. The address is checked again on every request."""
+    url = url.strip()
+    parts = urlsplit(url)
     if parts.username or parts.password:
         raise HindsightError("Hindsight URL must not contain userinfo")
     if parts.query or parts.fragment or parts.path not in {"", "/"}:
@@ -243,9 +355,13 @@ def _check_base(url: str) -> str:
     host = parts.hostname
     if not host:
         raise HindsightError("Hindsight URL has no host")
-    scheme = parts.scheme.lower()
-    if scheme == "http" and host in _LOOPBACK:
-        return url.strip().rstrip("/")
-    if scheme == "https":
-        return url.strip().rstrip("/")
-    raise HindsightError("Hindsight URL must be https, or http on a loopback host")
+    if parts.scheme.lower() != "https":
+        raise HindsightError("Hindsight URL must be https")
+    literal = _literal(host)
+    if literal is not None and _blocked(literal):
+        raise HindsightError("Hindsight URL must not name a private, loopback, or reserved address")
+    try:
+        parts.port
+    except ValueError:
+        raise HindsightError("Hindsight URL has a bad port") from None
+    return url.rstrip("/")

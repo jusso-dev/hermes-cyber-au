@@ -16,6 +16,7 @@ from cyberau_hindsight.handoff import (
     list_records,
     post,
 )
+from cyberau_hindsight.role import may_confirm, may_retain
 
 _factory: Callable[[], HindsightClient] | None = None
 
@@ -44,6 +45,16 @@ def hindsight_retain(
     confirmed: bool = False,
 ) -> dict:
     """Retain one memory. Read-only profiles and an unset base URL do not call out."""
+    if not may_retain():
+        return {
+            "enabled": True,
+            "read_only": True,
+            "bank": bank,
+            "retained": 0,
+            "detail": "Hindsight retain is off because this profile role may not retain.",
+        }
+    if confirmed and not may_confirm():
+        raise RuntimeError("only the librarian profile may mark a memory confirmed")
     try:
         return get_client().retain(
             bank,
@@ -98,7 +109,10 @@ def handoff_draft(post_id: str, claim: str, confidence: float, tlp: str = "") ->
 
 def handoff_list() -> dict:
     """List handoffs. Each claim is wrapped as data."""
-    return {"records": [for_agent(item) for item in list_records()]}
+    try:
+        return {"records": [for_agent(item) for item in list_records()]}
+    except HandoffError as exc:
+        raise RuntimeError(str(exc)) from None
 
 
 def connector() -> Connector:

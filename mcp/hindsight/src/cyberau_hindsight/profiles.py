@@ -27,17 +27,30 @@ def apply_overlay(role: str, home: Path, distribution: Path) -> Path:
     overlay = _overlay_dir(distribution, role)
     _validate_overlay(role, overlay)
     home.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(overlay / "SOUL.md", home / "SOUL.md")
     cron = home / "cron"
-    cron.mkdir(parents=True, exist_ok=True)
+    marker = home / "plugin-data" / "cyber-au"
+    targets = (
+        home / "SOUL.md",
+        cron,
+        cron / "jobs.json",
+        home / ".env.EXAMPLE",
+        home / "plugin-data",
+        marker,
+        marker / "profile-role",
+    )
+    # A link here would send the write somewhere else, possibly into a checkout.
+    for target in targets:
+        if target.is_symlink():
+            raise ValueError(f"refusing to write through a link at {target.name}")
     shipped = json.loads((overlay / "cron" / "jobs.json").read_text(encoding="utf-8"))["jobs"]
-    merged = _merge_jobs(home / "cron" / "jobs.json", shipped)
+    shutil.copyfile(overlay / "SOUL.md", home / "SOUL.md")
+    cron.mkdir(parents=True, exist_ok=True)
+    merged = _merge_jobs(cron / "jobs.json", shipped, role)
     (cron / "jobs.json").write_text(
         json.dumps({"jobs": merged}, indent=2) + "\n",
         encoding="utf-8",
     )
     shutil.copyfile(overlay / "env.template", home / ".env.EXAMPLE")
-    marker = home / "plugin-data" / "cyber-au"
     marker.mkdir(parents=True, exist_ok=True)
     (marker / "profile-role").write_text(role + "\n", encoding="utf-8")
     return home
@@ -61,19 +74,25 @@ def _validate_overlay(role: str, overlay: Path) -> None:
     if "\u2014" in soul or "\u2013" in soul:
         raise ValueError(f"{role} SOUL contains a dash character this slice does not use")
     template = (overlay / "env.template").read_text(encoding="utf-8")
-    if f"CYBERAU_PROFILE_ROLE={role}" not in template:
-        raise ValueError(f"{role} env template must name its role")
+    active = _env_assignments(template)
+    if active.get("CYBERAU_PROFILE_ROLE") != role:
+        raise ValueError(f"{role} env template must set its own role and no other")
     for name in CONNECTOR_KEYS:
         present = name in template
         if expected["holds_connector_keys"] and not present:
             raise ValueError(f"watcher env template is missing {name}")
         if not expected["holds_connector_keys"] and present:
             raise ValueError(f"{role} must not carry connector key {name}")
-    read_only_line = "HINDSIGHT_READ_ONLY=1" in template
-    if expected["hindsight_read_only"] and not read_only_line:
+        if not expected["holds_connector_keys"] and name in active:
+            raise ValueError(f"{role} must not set connector key {name}")
+    read_only = active.get("HINDSIGHT_READ_ONLY")
+    if expected["hindsight_read_only"] and read_only != "1":
         raise ValueError(f"{role} must set Hindsight read-only")
-    if not expected["hindsight_read_only"] and read_only_line:
+    if not expected["hindsight_read_only"] and read_only is not None:
         raise ValueError(f"{role} must not set Hindsight read-only")
+    for name in ("HINDSIGHT_BASE_URL", "HINDSIGHT_API_KEY"):
+        if active.get(name):
+            raise ValueError(f"{role} env template must not ship a value for {name}")
     jobs = json.loads((overlay / "cron" / "jobs.json").read_text(encoding="utf-8"))["jobs"]
     if len(jobs) != 1:
         raise ValueError(f"{role} must ship one job")
@@ -91,11 +110,27 @@ def _validate_overlay(role: str, overlay: Path) -> None:
         raise ValueError(f"{role} job prompt must not carry a feed URL")
 
 
-def _merge_jobs(path: Path, shipped: list[dict]) -> list[dict]:
+def _env_assignments(text: str) -> dict[str, str]:
+    """KEY=value lines that are not comments. A commented line does not count."""
+    found: dict[str, str] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        found[key.strip()] = value.strip().strip('"').strip("'")
+    return found
+
+
+def _merge_jobs(path: Path, shipped: list[dict], role: str) -> list[dict]:
     existing: list[dict] = []
     if path.exists():
         loaded = json.loads(path.read_text(encoding="utf-8"))
         existing = [item for item in loaded.get("jobs") or [] if isinstance(item, dict)]
+    # A job another overlay shipped does not stay behind when the role changes. The
+    # briefer job delivers to the owner, so it must not outlive the briefer role.
+    others = tuple(f"org-{other}-" for other in ROLES if other != role)
+    existing = [item for item in existing if not str(item.get("id", "")).startswith(others)]
     prior = {item["id"]: item for item in existing if "id" in item}
     merged = []
     seen = set()

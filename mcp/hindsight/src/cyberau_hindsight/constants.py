@@ -7,6 +7,13 @@ ROLES = ("watcher", "analyst", "skeptic", "briefer", "librarian")
 # Analyst, skeptic and briefer may recall. They must not retain.
 READ_ONLY_ROLES = ("analyst", "skeptic", "briefer")
 
+# Retain needs a role that is named here. A missing or unknown role cannot retain.
+RETAIN_ROLES = tuple(role for role in ROLES if role not in READ_ONLY_ROLES)
+
+# Only the librarian marks a memory confirmed. The watcher reads feed text, so it
+# must not be able to promote that text into trusted org memory.
+CONFIRM_ROLES = ("librarian",)
+
 CONNECTOR_KEYS = (
     "ABUSECH_AUTH_KEY",
     "NVD_API_KEY",

@@ -135,3 +135,62 @@ def test_only_the_briefer_may_deliver_to_the_owner(tmp_path: Path):
     job_path.write_text(json.dumps(job), encoding="utf-8")
     with pytest.raises(ValueError, match="briefer"):
         validate_distribution(dist)
+
+
+def _dist_with_env(tmp_path: Path, role: str, text: str) -> Path:
+    dist = tmp_path / "dist"
+    shutil.copytree(ROOT / "profiles", dist / "profiles")
+    (dist / "profiles" / "overlays" / role / "env.template").write_text(text, encoding="utf-8")
+    return dist
+
+
+def test_a_commented_out_line_does_not_satisfy_the_env_policy(tmp_path: Path):
+    template = (OVERLAYS / "analyst" / "env.template").read_text(encoding="utf-8")
+    commented_ro = template.replace("\nHINDSIGHT_READ_ONLY=1", "\n# HINDSIGHT_READ_ONLY=1")
+    assert commented_ro != template
+    with pytest.raises(ValueError, match="read-only"):
+        validate_distribution(_dist_with_env(tmp_path / "a", "analyst", commented_ro))
+
+    wrong_role = template.replace(
+        "\nCYBERAU_PROFILE_ROLE=analyst", "\n# CYBERAU_PROFILE_ROLE=analyst"
+    )
+    wrong_role += "CYBERAU_PROFILE_ROLE=watcher\n"
+    with pytest.raises(ValueError, match="role"):
+        validate_distribution(_dist_with_env(tmp_path / "b", "analyst", wrong_role))
+
+    with pytest.raises(ValueError, match="connector key"):
+        validate_distribution(
+            _dist_with_env(
+                tmp_path / "c",
+                "skeptic",
+                template.replace("analyst", "skeptic") + "NVD_API_KEY=x\n",
+            )
+        )
+
+    shipped = template + "HINDSIGHT_API_KEY=abc\n"
+    with pytest.raises(ValueError, match="must not ship"):
+        validate_distribution(_dist_with_env(tmp_path / "d", "analyst", shipped))
+
+
+def test_apply_does_not_write_through_a_link(tmp_path: Path):
+    outside = tmp_path / "checkout" / "SOUL.md"
+    outside.parent.mkdir()
+    outside.write_text("keep me", encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "SOUL.md").symlink_to(outside)
+    with pytest.raises(ValueError, match="link"):
+        apply_overlay("watcher", home, ROOT)
+    assert outside.read_text(encoding="utf-8") == "keep me"
+
+
+def test_changing_role_drops_the_job_another_overlay_shipped(tmp_path: Path):
+    home = tmp_path / "home"
+    apply_overlay("briefer", home, ROOT)
+    path = home / "cron" / "jobs.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["jobs"].append({"id": "own-job", "deliver": "local", "paused": True, "enabled": False})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    apply_overlay("analyst", home, ROOT)
+    ids = [job["id"] for job in json.loads(path.read_text(encoding="utf-8"))["jobs"]]
+    assert ids == ["org-analyst-claim", "own-job"]
