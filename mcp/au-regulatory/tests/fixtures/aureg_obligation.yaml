@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.legislation.gov.au/C2024A00098/latest/text
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "<html><p>Synthetic cassette. A ransomware payment report is due within 72 hours.</p></html>"

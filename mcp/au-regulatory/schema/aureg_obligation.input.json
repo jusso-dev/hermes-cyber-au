@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "regime": {
+      "enum": ["ndb", "soci", "ransomware_payment"]
+    },
+    "trigger": {
+      "type": "string",
+      "description": "For example 'critical_incident', 'other_incident', 'suspected_breach'"
+    }
+  },
+  "required": ["regime"]
+}
