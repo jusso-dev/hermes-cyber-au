@@ -55,6 +55,17 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  blueprint:
+    connector: asd-blueprint
+    args:
+    - serve
+    - asd-blueprint
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   nvd:
     connector: nvd
     args:

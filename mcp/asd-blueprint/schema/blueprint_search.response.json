@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["url", "title", "item", "value"],
+  "properties": {
+    "url": {"type": "string"},
+    "title": {"type": "string"},
+    "section": {"type": "string"},
+    "group": {"type": "string"},
+    "item": {"type": "string"},
+    "value": {"type": "string"}
+  }
+}
