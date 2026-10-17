@@ -1,0 +1,65 @@
+{
+  "is_success": true,
+  "message": "Success",
+  "response_code": 200,
+  "data": {
+    "total_pages": 1,
+    "total_records": 4,
+    "alarms": [
+      {
+        "alarm_id": 1001,
+        "alarm_asset": "example.com.au",
+        "alarm_risk_level": "HIGH",
+        "alarm_text": "Synthetic impersonation notice.",
+        "date": "2026-06-01 09:00:00",
+        "status": "OPEN",
+        "alarm_type_details": {
+          "alarm_main_type": "Brand Protection",
+          "alarm_sub_type": "Impersonating Domain"
+        },
+        "alarm_related_assets": [
+          {
+            "key": "domain_name",
+            "value": ["example.com.au"]
+          }
+        ]
+      },
+      {
+        "alarm_id": 1002,
+        "alarm_asset": "203.0.113.10",
+        "alarm_risk_level": "MEDIUM",
+        "alarm_text": "Synthetic attack surface notice.",
+        "date": "2026-06-02 09:00:00",
+        "status": "OPEN",
+        "alarm_type_details": {
+          "alarm_main_type": "Attack Surface Management",
+          "alarm_sub_type": "Synthetic Surface"
+        }
+      },
+      {
+        "alarm_id": 1003,
+        "alarm_asset": "example.com.au",
+        "alarm_risk_level": "LOW",
+        "alarm_text": "Synthetic credential notice.",
+        "date": "2026-06-03 09:00:00",
+        "status": "OPEN",
+        "alarm_type_details": {
+          "alarm_main_type": "Brand Protection",
+          "alarm_sub_type": "Stolen Credential"
+        }
+      },
+      {
+        "alarm_id": 1004,
+        "alarm_asset": "example.com.au",
+        "alarm_risk_level": "INFO",
+        "alarm_text": "UNMAPPED-NOTICE-TEXT",
+        "date": "2026-06-04 09:00:00",
+        "status": "OPEN",
+        "alarm_type_details": {
+          "alarm_main_type": "Synthetic Unmapped",
+          "alarm_sub_type": "Not A Confirmed Type"
+        }
+      }
+    ]
+  }
+}

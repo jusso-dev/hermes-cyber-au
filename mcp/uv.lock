@@ -17,6 +17,7 @@ members = [
     "cyberau-first-epss",
     "cyberau-nvd",
     "cyberau-premium",
+    "cyberau-socradar",
     "cyberau-workspace",
 ]
 
@@ -457,6 +458,21 @@ requires-dist = [
     { name = "cyberau-common", editable = "common" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
+]
+
+[[package]]
+name = "cyberau-socradar"
+version = "0.1.0"
+source = { editable = "socradar" }
+dependencies = [
+    { name = "cyberau-common" },
+    { name = "cyberau-premium" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
 ]
 
 [[package]]
