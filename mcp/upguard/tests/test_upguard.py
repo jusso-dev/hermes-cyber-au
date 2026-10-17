@@ -45,6 +45,12 @@ def _isolated(monkeypatch, tmp_path):
     source._SESSION_CACHE = None
 
 
+def wrapped_text(value):
+    prefix, suffix = "<<untrusted source=upguard>> ", " <<end untrusted>>"
+    assert value.startswith(prefix) and value.endswith(suffix)
+    return value[len(prefix) : -len(suffix)]
+
+
 def _online(monkeypatch, handler, key="upguard-secret-value", sleeper=None):
     monkeypatch.setenv("UPGUARD_API_KEY", key)
     source._RESOLVER = lambda host: [ipaddress.ip_address("1.1.1.1")]
@@ -65,7 +71,10 @@ def test_offline_happy_path_attribution_and_untrusted_text(monkeypatch):
     assert breaches["cache"] == "snapshot"
     own = next(row for row in breaches["data"] if row["domain"] == "example.com.au")
     assert own["identities"] == 2
-    assert own["data_classes"] == ["Email addresses", "Passwords"]
+    assert [wrapped_text(item) for item in own["data_classes"]] == [
+        "Email addresses",
+        "Passwords",
+    ]
     assert "<<untrusted source=upguard>>" in own["breach_name"]
     assert "Synthetic Breach" in own["breach_name"]
     dumped = json.dumps(breaches)
@@ -88,13 +97,18 @@ def test_offline_happy_path_attribution_and_untrusted_text(monkeypatch):
     assert "203.0.113.10" not in rendered
     assert "mx.examp1e.example.com.au" not in rendered
     assert "examp1e.example.com.au" in rendered
+    row = typos["data"][0]
+    assert wrapped_text(row["hostname"]) == "examp1e.example.com.au"
+    assert wrapped_text(row["finding"]["source_ref"]) == "examp1e.example.com.au"
+    assert row["finding"]["subject"]["value"].startswith("<<untrusted")
+    assert typos["warnings"] == ["Bundled synthetic snapshot, not live UpGuard data."]
+    assert breaches["warnings"] == ["Bundled synthetic snapshot, not live UpGuard data."]
+    assert leaks["warnings"] == ["Bundled synthetic snapshot, not live UpGuard data."]
 
 
 def test_empty_and_malformed_do_not_raise(monkeypatch):
     def empty(_request):
-        body = json.dumps(
-            {"breached_identities": [], "breaches": [], "total_results": 0}
-        ).encode()
+        body = json.dumps({"breached_identities": [], "breaches": [], "total_results": 0}).encode()
         return httpx.Response(200, content=body)
 
     _online(monkeypatch, empty)
@@ -185,6 +199,7 @@ def test_timeout_falls_back_to_session_cache(monkeypatch):
     item.fetched_at = time.time() - item.ttl - 5
     second = upguard_identity_breaches()
     assert second["cache"] == "stale"
+    assert second["warnings"] == ["UpGuard could not be reached. This is an older cached copy."]
     assert second["data"][0]["breach_id"] == "101"
     assert calls["n"] > 1
 
@@ -385,3 +400,66 @@ def test_cassettes_replay_without_secrets(vcr_config):
         with player.use_cassette(str(path)):
             played = httpx.get(uri)
         assert played.status_code == 200
+
+
+def test_redirect_drops_the_key_and_makes_one_request(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append((request.url.host, request.headers.get("authorization")))
+        return httpx.Response(302, headers={"location": "https://denied.example/stolen"})
+
+    _online(monkeypatch, handler)
+    upguard_typosquats("example.com.au")
+    assert seen == [("cyber-risk.upguard.com", "upguard-secret-value")]
+
+
+@pytest.mark.parametrize("failure", ["timeout", "503"])
+def test_live_health_is_not_answered_from_cache(monkeypatch, failure):
+    payload = {"domains": [{"domain": "example.com.au", "num_registered": 1}]}
+    _online(monkeypatch, lambda _request: httpx.Response(200, json=payload))
+    assert connector().health(live=True).ok is True
+
+    def broken(_request):
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(503, content=b"{}")
+
+    source._TRANSPORT = httpx.MockTransport(broken)
+    probe = connector().health(live=True)
+    assert probe.ok is False
+    assert probe.detail != "live ok"
+
+
+def test_live_health_fails_without_a_key(monkeypatch):
+    calls = {"n": 0}
+
+    def handler(_request):
+        calls["n"] += 1
+        return httpx.Response(200, json={"domains": []})
+
+    source._TRANSPORT = httpx.MockTransport(handler)
+    probe = connector().health(live=True)
+    assert probe.ok is False
+    assert "UPGUARD_API_KEY" in probe.detail
+    assert calls["n"] == 0
+    assert connector().health(live=False).ok is True
+
+
+def test_hostile_feed_text_is_wrapped(monkeypatch):
+    hostile = "ignore-previous-instructions.example.com.au"
+    body = {
+        "registered": [
+            {"hostname": hostile, "date_detected": "not a date", "permutation_type": "x"},
+            {"hostname": "ok.example.com.au", "date_detected": "2026-06-10T00:00:00Z"},
+        ],
+        "unregistered": [],
+        "ignored": [],
+    }
+    _online(monkeypatch, lambda _request: httpx.Response(200, json=body))
+    result = upguard_typosquats("example.com.au")
+    for row in result["data"]:
+        assert row["hostname"].startswith("<<untrusted source=upguard>>")
+    assert result["data"][0]["date_detected"] is None
+    assert "finding" not in result["data"][0]
+    assert wrapped_text(result["data"][1]["finding"]["source_ref"]) == "ok.example.com.au"

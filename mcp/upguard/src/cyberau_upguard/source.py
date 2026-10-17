@@ -36,6 +36,7 @@ from cyberau_premium.base import (
 )
 from cyberau_premium.caching import cache_for_terms
 from cyberau_premium.catalog import get_vendor
+from cyberau_premium.present import finding_payload
 from cyberau_premium.store import ExposureStore
 from pydantic import Field
 
@@ -54,6 +55,7 @@ _HOST = re.compile(
     r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
 )
+_TOKEN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 _STATUSES = (
     "Disclosed",
     "Acknowledged",
@@ -104,7 +106,7 @@ def upguard_identity_breaches(limit: _Limit = 100) -> dict:
         return _envelope([], cache, (BREACHES_URL,), (warning,))
     records, _findings = _breach_records(payload, watchlist=None, since=None, limit=limit)
     warnings = (warning,) if warning else ()
-    return _envelope(records, cache, (BREACHES_URL,), warnings)
+    return _envelope(records, cache, (BREACHES_URL,), warnings + _served(cache))
 
 
 def upguard_data_leaks(
@@ -133,7 +135,7 @@ def upguard_data_leaks(
         until=_parse_time(until) if until else None,
         statuses=statuses,
     )
-    return _envelope(records, cache, (DISCLOSURES_URL,))
+    return _envelope(records, cache, (DISCLOSURES_URL,), _served(cache))
 
 
 def upguard_typosquats(domain: str) -> dict:
@@ -149,7 +151,7 @@ def upguard_typosquats(domain: str) -> dict:
     if warning:
         return _envelope([], cache, (TYPOSQUAT_DETAILS_URL,), (warning,))
     records = _typosquat_records(payload or {}, domain)
-    return _envelope(records, cache, (TYPOSQUAT_DETAILS_URL,))
+    return _envelope(records, cache, (TYPOSQUAT_DETAILS_URL,), _served(cache))
 
 
 def connector() -> PremiumConnector:
@@ -240,10 +242,12 @@ class _UpGuardConnector(PremiumConnector):
         if not live:
             return Probe(self.key, result.ok, result.detail)
         if not result.configured:
-            return Probe(self.key, True, "not configured")
-        payload, _cache, warning = _fetch(TYPOSQUAT_URL, {}, kind="typosquat", force_live=True)
+            return Probe(self.key, False, "UPGUARD_API_KEY is not set, no live check was made")
+        payload, cache, warning = _fetch(TYPOSQUAT_URL, {}, kind="typosquat", force_live=True)
         if warning:
             return Probe(self.key, False, warning)
+        if cache != "miss":
+            return Probe(self.key, False, f"live check was answered from a {cache} copy")
         problem = schema_problem("typosquat.response.json", payload or {})
         if problem:
             return Probe(self.key, False, problem)
@@ -293,6 +297,15 @@ def _envelope(data, cache: str, urls: tuple[str, ...], warnings: tuple[str, ...]
         warnings=tuple(_scrub(item) for item in warnings),
         attribution=_attribution(),
     )
+
+
+def _served(cache: str) -> tuple[str, ...]:
+    """Say so when a result is not a live answer."""
+    if cache == "snapshot":
+        return ("Bundled synthetic snapshot, not live UpGuard data.",)
+    if cache == "stale":
+        return ("UpGuard could not be reached. This is an older cached copy.",)
+    return ()
 
 
 def _validate_limit(limit: int) -> str:
@@ -401,9 +414,11 @@ def _fetch(
         except EgressDenied as exc:
             return None, "snapshot", _scrub(str(exc))
         except (HttpError, TimeoutError) as exc:
-            cached = cache.get(cache_key)
-            if cached is not None:
-                return _load_body(cached.body), "stale", ""
+            # A live probe must never be answered from a cached copy.
+            cached = None if force_live else cache.get(cache_key)
+            old = _load_body(cached.body) if cached is not None else None
+            if old is not None and schema_problem(_KIND_SCHEMA[kind], old) is None:
+                return old, "stale", ""
             return None, "snapshot", _scrub(str(exc))
     finally:
         client.close()
@@ -442,7 +457,7 @@ def _breach_records(
     grouped: dict[tuple[str, str], dict] = {}
     for identity in payload.get("breached_identities") or []:
         domain = str(identity.get("domain") or "").strip().rstrip(".")
-        if not domain:
+        if _HOST.fullmatch(domain) is None:
             continue
         when = str(identity.get("last_breach_date") or "")
         for breach_id in identity.get("breach_ids") or []:
@@ -488,12 +503,12 @@ def _breach_records(
         records.append(
             {
                 "domain": subject,
-                "breach_id": slot["breach_id"],
+                "breach_id": _plain(slot["breach_id"]),
                 "breach_name": _text(title),
-                "breach_date": slot["when"],
-                "data_classes": classes,
+                "breach_date": observed.isoformat(),
+                "data_classes": [_text(item) for item in classes],
                 "identities": slot["identities"],
-                "finding": finding.model_dump(mode="json"),
+                "finding": finding_payload(finding),
             }
         )
     return records, findings
@@ -546,10 +561,10 @@ def _leak_records(
             if domains is not None:
                 findings.append(finding)
         record = {
-            "id": source_ref,
-            "status": status,
-            "date_disclosed": item.get("date_disclosed"),
-            "host": host,
+            "id": _plain(source_ref),
+            "status": status if status in _STATUSES else _text(status),
+            "date_disclosed": observed.isoformat(),
+            "host": _text(host),
             "watched_domain": subject if domains is not None else None,
             "description": _text(str(item.get("description") or "")),
         }
@@ -559,54 +574,51 @@ def _leak_records(
         if implication:
             record["implication"] = _text(implication)
         if finding is not None:
-            record["finding"] = finding.model_dump(mode="json")
+            record["finding"] = finding_payload(finding)
         records.append(record)
     return records, findings
 
 
-def _typosquat_records(payload: dict, watched: str) -> list[dict]:
-    records = []
+def _typosquat_rows(payload: dict):
     for state in ("registered", "ignored", "unregistered"):
         for item in payload.get(state) or []:
             hostname = str(item.get("hostname") or "").strip().rstrip(".")
-            if not hostname:
-                continue
-            mx = item.get("mx_records") or []
-            record = {
-                "watched_domain": watched,
-                "hostname": hostname,
-                "state": state,
-                "registered": state != "unregistered",
-                "date_detected": item.get("date_detected"),
-                "has_mx": bool(mx),
-            }
-            permutation = str(item.get("permutation_type") or "")
-            if permutation:
-                record["permutation_type"] = _text(permutation)
-            observed = _parse_time(str(item.get("date_detected") or ""))
-            if observed is not None and state != "unregistered":
-                finding = _typosquat_finding(watched, hostname, observed, bool(mx), state)
-                record["finding"] = finding.model_dump(mode="json")
-            records.append(record)
+            if hostname:
+                observed = _parse_time(str(item.get("date_detected") or ""))
+                yield state, hostname, item, observed
+
+
+def _typosquat_records(payload: dict, watched: str) -> list[dict]:
+    records = []
+    for state, hostname, item, observed in _typosquat_rows(payload):
+        mx = item.get("mx_records") or []
+        record = {
+            "watched_domain": watched,
+            "hostname": _text(hostname),
+            "state": state,
+            "registered": state != "unregistered",
+            "date_detected": observed.isoformat() if observed else None,
+            "has_mx": bool(mx),
+        }
+        permutation = str(item.get("permutation_type") or "")
+        if permutation:
+            record["permutation_type"] = _text(permutation)
+        if observed is not None and state != "unregistered":
+            finding = _typosquat_finding(watched, hostname, observed, bool(mx), state)
+            record["finding"] = finding_payload(finding)
+        records.append(record)
     return records
 
 
 def _typosquat_findings(payload: dict, watched: str, *, since: date) -> list[ExposureFinding]:
     findings = []
-    for record in _typosquat_records(payload, watched):
-        if record["state"] == "unregistered" or "finding" not in record:
+    for state, hostname, item, observed in _typosquat_rows(payload):
+        if state == "unregistered" or observed is None:
             continue
-        observed = _parse_time(str(record.get("date_detected") or ""))
-        if observed is None or observed.astimezone(UTC).date() < since:
+        if observed.astimezone(UTC).date() < since:
             continue
         findings.append(
-            _typosquat_finding(
-                watched,
-                record["hostname"],
-                observed,
-                bool(record["has_mx"]),
-                record["state"],
-            )
+            _typosquat_finding(watched, hostname, observed, bool(item.get("mx_records")), state)
         )
     return findings
 
@@ -704,6 +716,11 @@ def _host_of(url: str) -> str:
         return ""
     host = urlsplit(url).hostname or ""
     return host.rstrip(".").lower()
+
+
+def _plain(value: str) -> str:
+    """Keep an opaque feed identifier as is when it is plain, otherwise wrap it."""
+    return value if _TOKEN.fullmatch(value) else _text(value)
 
 
 def _text(value: str) -> str:
