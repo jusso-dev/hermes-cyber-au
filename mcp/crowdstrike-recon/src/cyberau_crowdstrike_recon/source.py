@@ -43,9 +43,9 @@ DEFAULT_BASE = "https://api.crowdstrike.com"
 _RATE = 10.0
 _BURST = 20
 _REDIRECTS = {301, 302, 303, 307, 308}
-_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _DATA = Path(__file__).resolve().parent / "data"
-_Date = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
+_Date = Annotated[str, Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")]
 _Limit = Annotated[int, Field(ge=1, le=500)]
 
 _TRANSPORT = None
@@ -62,8 +62,9 @@ def cs_recon_notifications(since: _Date | None = None, limit: _Limit = 100) -> d
     present, raw, state, warning = _records("notifications", _blank(since), int(limit))
     if warning:
         return _envelope([], state, (warning,), "notifications")
-    _persist(raw, _load_watchlist())
-    return _envelope(present, state, (), "notifications")
+    if state != "snapshot":
+        _persist(raw, _load_watchlist())
+    return _envelope(present, state, _notice(state), "notifications")
 
 
 def cs_recon_rules() -> dict:
@@ -71,7 +72,7 @@ def cs_recon_rules() -> dict:
     present, _raw, state, warning = _records("rules", None, 500)
     if warning:
         return _envelope([], state, (warning,), "rules")
-    return _envelope(present, state, (), "rules")
+    return _envelope(present, state, _notice(state), "rules")
 
 
 def connector() -> PremiumConnector:
@@ -104,8 +105,9 @@ class CrowdStrikeRecon(PremiumConnector):
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
-        _present, raw, _state, warning = _records("notifications", since.isoformat(), 500)
-        if warning or not raw:
+        _present, raw, state, warning = _records("notifications", since.isoformat(), 500)
+        if warning or not raw or state == "snapshot":
+            # A bundled snapshot is synthetic. It must never become a stored finding.
             return []
         return _persist(raw, watchlist)
 
@@ -116,10 +118,15 @@ class CrowdStrikeRecon(PremiumConnector):
                 return Probe(self.key, False, problem)
             if not live:
                 return Probe(self.key, True, "schema ok")
-        if _missing_licence():
+        missing = _missing_licence()
+        if missing:
+            if live:
+                return Probe(self.key, False, f"not configured: {missing}")
             return Probe(self.key, True, "not configured")
         if not live:
             return Probe(self.key, True, "offline ok")
+        if _offline():
+            return Probe(self.key, False, "CYBERAU_OFFLINE is set, live check not run")
         warning = _live_probe()
         if warning:
             return Probe(self.key, False, warning)
@@ -345,7 +352,10 @@ def _live_probe() -> str:
         _result, warning = _interpret(client.query_rules(limit=1))
         return warning
 
-    return _open(run)
+    try:
+        return _open(run)
+    except TimeoutError:
+        return "CrowdStrike request timed out"
 
 
 def _open(fn) -> str:
@@ -770,11 +780,27 @@ def _auth_message(code: int) -> str:
 
 
 def _validate(since: str | None, limit) -> str:
-    if since not in (None, "") and not _DATE.fullmatch(str(since)):
-        return "since must be YYYY-MM-DD in Australia/Sydney"
+    if since not in (None, ""):
+        try:
+            if not _DATE.fullmatch(str(since)):
+                raise ValueError(since)
+            _since_utc(str(since))
+        except (ValueError, OverflowError):
+            return "since must be YYYY-MM-DD in Australia/Sydney"
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
         return "limit must be between 1 and 500"
     return ""
+
+
+def _notice(state: str) -> tuple[str, ...]:
+    if state == "snapshot":
+        return (
+            "Bundled synthetic snapshot, not live CrowdStrike data. "
+            "Nothing here is a real notification or rule.",
+        )
+    if state == "stale":
+        return ("Cached copy from earlier this session, not a fresh CrowdStrike response.",)
+    return ()
 
 
 def _blank(since: str | None) -> str | None:

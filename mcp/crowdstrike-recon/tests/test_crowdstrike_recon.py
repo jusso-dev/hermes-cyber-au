@@ -466,3 +466,72 @@ def test_docs_fixtures_and_tool_contract():
     assert len("mcp__csrecon__cs_recon_rules") == 28
     missing = connector().health(live=False)
     assert missing.detail in {"not configured", "offline ok"}
+
+
+def test_snapshot_and_stale_results_carry_a_warning(tmp_path, monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    snap = cs_recon_notifications(since="2026-06-01")
+    assert snap["cache"] == "snapshot"
+    assert snap["data"]
+    assert any("synthetic" in warning for warning in snap["warnings"])
+    rules = cs_recon_rules()
+    assert rules["cache"] == "snapshot"
+    assert any("synthetic" in warning for warning in rules["warnings"])
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    _transport(_ok_handler([]))
+    assert cs_recon_notifications(limit=10)["warnings"] == []
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    stale = cs_recon_notifications(limit=10)
+    assert stale["cache"] == "stale"
+    assert any("Cached copy" in warning for warning in stale["warnings"])
+
+
+def test_snapshot_never_becomes_a_stored_finding(tmp_path, monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    watch = Watchlist(domains=["example.com.au"])
+    assert connector().exposure_for(watch, date(2026, 6, 1)) == []
+    path = tmp_path / "watchlists"
+    path.mkdir()
+    (path / "org-exposure.yaml").write_text("domains: [example.com.au]\n", encoding="utf-8")
+    assert cs_recon_notifications(since="2026-06-01")["cache"] == "snapshot"
+    intel = tmp_path / "intel.sqlite"
+    if intel.exists():
+        rows = sqlite3.connect(intel).execute("select count(*) from exposures").fetchone()
+        assert rows[0] == 0
+
+
+def test_live_health_is_not_ok_without_a_credential_or_on_timeout(tmp_path, monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("FALCON_CLIENT_SECRET")
+    live = connector().health(live=True)
+    assert live.ok is False
+    assert "FALCON_CLIENT_SECRET" in live.detail
+    assert connector().health(live=False).ok is True
+    _keys(monkeypatch)
+
+    def time_out(_request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("timed out")
+
+    _transport(time_out)
+    timed = connector().health(live=True)
+    assert timed.ok is False
+    assert "timed out" in timed.detail
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _transport(_ok_handler([]))
+    offline = connector().health(live=True)
+    assert offline.ok is False
+
+
+def test_since_must_be_a_real_date(tmp_path, monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    for bad in ("2026-13-45", "0001-01-01", "２０２６-06-01"):
+        found = cs_recon_notifications(since=bad)
+        assert found["data"] == []
+        assert "YYYY-MM-DD" in found["warnings"][0]
