@@ -131,6 +131,10 @@ class HttpCache:
                 (self._now(), key),
             )
 
+    def delete(self, key: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM http_cache WHERE key = ?", (key,))
+
     def fresh(self, item: CachedResponse) -> bool:
         return self._now() - item.fetched_at < item.ttl
 
