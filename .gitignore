@@ -7,6 +7,9 @@ auth.json
 credentials.json
 
 # Runtime databases and state
+# Local keyword index rebuilt by the retired guidance pack. Not source.
+knowledge/index.sqlite
+knowledge/index.sqlite-*
 state.db
 state.db-shm
 state.db-wal

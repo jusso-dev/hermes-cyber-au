@@ -1,0 +1,102 @@
+{
+  "catalog": {
+    "groups": [
+      {
+        "title": "Guidelines for system hardening",
+        "groups": [
+          {
+            "title": "Operating system hardening",
+            "groups": [
+              {
+                "title": "Application control",
+                "controls": [
+                  {
+                    "id": "ism-0843",
+                    "props": [
+                      {"name": "essential-eight-applicability", "value": "ML1"},
+                      {"name": "essential-eight-applicability", "value": "ML2"},
+                      {"name": "updated", "value": "Sep-21"}
+                    ],
+                    "parts": [
+                      {"name": "statement", "prose": "Application control is implemented on workstations."}
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "title": "User application hardening",
+            "groups": [
+              {
+                "title": "Office productivity suites",
+                "controls": [
+                  {
+                    "id": "ism-1671",
+                    "props": [{"name": "essential-eight-applicability", "value": "ML2"}],
+                    "parts": [
+                      {"name": "statement", "prose": "Microsoft Office macros are disabled for human users that do not have a demonstrated business requirement."}
+                    ]
+                  },
+                  {
+                    "id": "ism-1859",
+                    "props": [{"name": "essential-eight-applicability", "value": "ML2"}],
+                    "parts": [
+                      {"name": "statement", "prose": "Office productivity suites are hardened using ASD and vendor hardening guidance."}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for system management",
+        "groups": [
+          {
+            "title": "System maintenance",
+            "groups": [
+              {
+                "title": "Mitigating known vulnerabilities",
+                "controls": [
+                  {
+                    "id": "ism-1876",
+                    "props": [{"name": "essential-eight-applicability", "value": "ML1"}],
+                    "parts": [
+                      {"name": "statement", "prose": "Patches for vulnerabilities in online services are applied within 48 hours."}
+                    ]
+                  },
+                  {
+                    "id": "ism-1877",
+                    "props": [{"name": "essential-eight-applicability", "value": "ML1"}],
+                    "parts": [
+                      {"name": "statement", "prose": "Patches for vulnerabilities in operating systems of internet-facing servers are applied within 48 hours."}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Guidelines for cyber security incidents",
+        "groups": [
+          {
+            "title": "Reporting cyber security incidents",
+            "controls": [
+              {
+                "id": "ism-0123",
+                "props": [{"name": "essential-eight-applicability", "value": "ML2"}],
+                "parts": [
+                  {"name": "statement", "prose": "Cyber security incidents are reported to the chief information security officer."}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

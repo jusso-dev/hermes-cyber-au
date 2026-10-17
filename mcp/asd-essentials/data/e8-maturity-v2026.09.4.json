@@ -1,0 +1,1355 @@
+{
+  "retrieved_on": "2026-10-17",
+  "ism_release": "v2026.09.4",
+  "source_urls": [
+    "https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal/v2026.09.4/ISM_E8_ML1-baseline-resolved-profile_catalog.json",
+    "https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal/v2026.09.4/ISM_E8_ML2-baseline-resolved-profile_catalog.json",
+    "https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal/v2026.09.4/ISM_E8_ML3-baseline-resolved-profile_catalog.json"
+  ],
+  "source_sha256": {
+    "ISM_E8_ML1-baseline-resolved-profile_catalog.json": "11ecf7897a2a50cc1a9986b79bbba33f1a0be2c1ca83b0fa99f7033c5f04a4c0",
+    "ISM_E8_ML2-baseline-resolved-profile_catalog.json": "249370c97831ebb411eeff44bec21f5b777b062c03746d5ca1d09293fdb9e551",
+    "ISM_E8_ML3-baseline-resolved-profile_catalog.json": "2c1d285c1ed93ba9b38295eb0e528e4870ee19f1e93461f8e3e51f52dd7fe072"
+  },
+  "controls": [
+    {
+      "control_id": "ism-1654",
+      "section": "Guidelines for system hardening / Operating system hardening / Hardening operating system configurations",
+      "statement": "Internet Explorer 11 is disabled or removed.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-0843",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control is implemented on workstations.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1870",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control is applied to user profiles and temporary folders used by operating systems, web browsers and email clients.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1657",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control restricts the execution of executables, libraries, scripts, installers, compiled HTML, HTML applications and control panel applets to an organisation-approved set.",
+      "updated": "Sep-25",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1671",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macros are disabled for human users that do not have a demonstrated business requirement.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1488",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macros in files originating from the internet are blocked.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1672",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macro antivirus scanning is enabled.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1489",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macro security settings cannot be changed by human users.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1486",
+      "section": "Guidelines for system hardening / User application hardening / Web browsers",
+      "statement": "Web browsers do not process Java from the internet.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1485",
+      "section": "Guidelines for system hardening / User application hardening / Web browsers",
+      "statement": "Web browsers do not process web advertisements from the internet.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1585",
+      "section": "Guidelines for system hardening / User application hardening / Web browsers",
+      "statement": "Web browser security settings cannot be changed by human users.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1507",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Requests for privileged access to systems and their resources are validated when first requested.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1175",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Privileged user accounts (excluding those explicitly authorised to access online services) are prevented from accessing the internet, email and web services.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1883",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Privileged user accounts explicitly authorised to access online services are strictly limited to only what is required for users to undertake their duties or functions.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-0445",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Privileged human users are assigned a dedicated privileged user account to be used solely for duties requiring privileged access.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1504",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate human users to their organisation’s online services that process, store or communicate their organisation’s sensitive data.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1679",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate human users to third-party online services that process, store or communicate their organisation’s sensitive data.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1680",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication (where available) is used to authenticate human users to third-party online services that process, store or communicate their organisation’s non-sensitive data.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1892",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate human users to their organisation’s online customer services that process, store or communicate their organisation’s sensitive customer data.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1893",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate human users to third-party online customer services that process, store or communicate their organisation’s sensitive customer data.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1681",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate customers to online customer services that process, store or communicate sensitive customer data.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1401",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication uses either: something people have and something people know, or something people have that is unlocked by something people know or are.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1380",
+      "section": "Guidelines for system management / System administration / Separate privileged operating environments",
+      "statement": "Privileged human users use separate privileged and unprivileged operating environments.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1688",
+      "section": "Guidelines for system management / System administration / Separate privileged operating environments",
+      "statement": "Unprivileged user accounts cannot be used to log on to privileged operating environments.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1689",
+      "section": "Guidelines for system management / System administration / Separate privileged operating environments",
+      "statement": "Privileged user accounts (excluding local administrator accounts) cannot be used to log on to unprivileged operating environments.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1876",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in online services are applied within 48 hours of release when vulnerabilities are assessed as critical by vendors or when working exploits exist.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1690",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in online services are applied within two weeks of release when vulnerabilities are assessed as non-critical by vendors and no working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1691",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in office productivity suites, web browsers and their extensions, email clients, PDF applications, and security products are applied within two weeks of release.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        1,
+        2
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1877",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in operating systems of internet-facing servers and internet-facing network devices are applied within 48 hours of release when vulnerabilities are assessed as critical by vendors or when working exploits exist.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1694",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in operating systems of internet-facing servers and internet-facing network devices are applied within two weeks of release when vulnerabilities are assessed as non-critical by vendors and no working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1695",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in operating systems of workstations, non-internet-facing servers and non-internet-facing network devices are applied within one month of release.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1905",
+      "section": "Guidelines for system management / System maintenance / Cessation of support",
+      "statement": "Online services that are no longer supported by vendors are removed.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1704",
+      "section": "Guidelines for system management / System maintenance / Cessation of support",
+      "statement": "Office productivity suites, web browsers and their extensions, email clients, PDF applications, Adobe Flash Player, and security products that are no longer supported by vendors are removed.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1501",
+      "section": "Guidelines for system management / System maintenance / Cessation of support",
+      "statement": "Operating systems that are no longer supported by vendors are replaced.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1511",
+      "section": "Guidelines for system management / Data backup and restoration / Performing and retaining backups",
+      "statement": "Backups of data, applications and settings are performed and retained in accordance with business criticality and business continuity requirements.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1810",
+      "section": "Guidelines for system management / Data backup and restoration / Performing and retaining backups",
+      "statement": "Backups of data, applications and settings are synchronised to enable restoration to a common point in time.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1811",
+      "section": "Guidelines for system management / Data backup and restoration / Performing and retaining backups",
+      "statement": "Backups of data, applications and settings are retained in a secure and resilient manner.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1812",
+      "section": "Guidelines for system management / Data backup and restoration / Backup access",
+      "statement": "Unprivileged user accounts cannot access backups belonging to other user accounts.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1814",
+      "section": "Guidelines for system management / Data backup and restoration / Backup modification and deletion",
+      "statement": "Unprivileged user accounts are prevented from modifying and deleting backups.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1515",
+      "section": "Guidelines for system management / Data backup and restoration / Testing restoration of backups",
+      "statement": "Restoration of data, applications and settings from backups to a common point in time is tested as part of disaster recovery exercises.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1807",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "An automated method of asset discovery is used at least fortnightly to support the detection of assets for subsequent vulnerability scanning activities.",
+      "updated": "Dec-22",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1807",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "An automated method of asset discovery is used at least fortnightly to support the detection of assets for subsequent vulnerability scanning activities.",
+      "updated": "Dec-22",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1808",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner with an up-to-date vulnerability database is used for vulnerability scanning activities.",
+      "updated": "Dec-22",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1808",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner with an up-to-date vulnerability database is used for vulnerability scanning activities.",
+      "updated": "Dec-22",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1698",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least daily to identify missing patches or updates for vulnerabilities in online services.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1699",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least weekly to identify missing patches or updates for vulnerabilities in office productivity suites, web browsers and their extensions, email clients, PDF applications, and security products.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1701",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least daily to identify missing patches or updates for vulnerabilities in operating systems of internet-facing servers and internet-facing network devices.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1702",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least fortnightly to identify missing patches or updates for vulnerabilities in operating systems of workstations, non-internet-facing servers and non-internet-facing network devices.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        1,
+        2,
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1490",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control is implemented on internet-facing servers.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1871",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control is applied to all locations other than user profiles and temporary folders used by operating systems, web browsers and email clients.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1544",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Microsoft’s recommended application blocklist is implemented.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1582",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control rulesets are validated at least annually.",
+      "updated": "Jun-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1660",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Allowed and blocked application control events are centrally logged.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1889",
+      "section": "Guidelines for system hardening / Operating system hardening / Command Shell",
+      "statement": "Command line process creation events are centrally logged.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1623",
+      "section": "Guidelines for system hardening / Operating system hardening / PowerShell",
+      "statement": "PowerShell module logging, script block logging and transcription events are centrally logged.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1859",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Office productivity suites are hardened using ASD and vendor hardening guidance, with the most restrictive guidance taking precedence when conflicts occur.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1667",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office is blocked from creating child processes.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1668",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office is blocked from creating executable content.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1669",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office is blocked from injecting code into other processes.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1542",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office is configured to prevent activation of Object Linking and Embedding packages.",
+      "updated": "Jan-19",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1823",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Office productivity suite security settings cannot be changed by human users.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1673",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macros are blocked from making Win32 API calls.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1670",
+      "section": "Guidelines for system hardening / User application hardening / Portable Document Format applications",
+      "statement": "PDF applications are blocked from creating child processes.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1860",
+      "section": "Guidelines for system hardening / User application hardening / Portable Document Format applications",
+      "statement": "PDF applications are hardened using ASD and vendor hardening guidance, with the most restrictive guidance taking precedence when conflicts occur.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1824",
+      "section": "Guidelines for system hardening / User application hardening / Portable Document Format applications",
+      "statement": "PDF application security settings cannot be changed by human users.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1412",
+      "section": "Guidelines for system hardening / User application hardening / Web browsers",
+      "statement": "Web browsers are hardened using ASD and vendor hardening guidance, with the most restrictive guidance taking precedence when conflicts occur.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1509",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Privileged access events are centrally logged.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1650",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Privileged user account and security group management events are centrally logged.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1648",
+      "section": "Guidelines for system access / Identity and access management / Suspension of access to systems",
+      "statement": "Privileged access to systems and their resources are disabled after 45 days of inactivity.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1647",
+      "section": "Guidelines for system access / Identity and access management / Suspension of access to systems",
+      "statement": "Privileged access to systems and their resources are disabled after 12 months unless revalidated.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1173",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate privileged human users of systems.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-0974",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate unprivileged human users of systems.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1872",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication used for authenticating human users of online services is phishing-resistant.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1873",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication used for authenticating customers of online customer services provides a phishing-resistant option.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1682",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication used for authenticating human users of systems is phishing-resistant.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1683",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Successful and unsuccessful multi-factor authentication events are centrally logged.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1685",
+      "section": "Guidelines for system access / Credential management / Setting credentials for built-in Administrator accounts, break glass accounts, local administrator accounts and service accounts",
+      "statement": "Credentials for break glass accounts, local administrator accounts and service accounts are long, unique, unpredictable and managed.",
+      "updated": "Jun-23",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1687",
+      "section": "Guidelines for system management / System administration / Separate privileged operating environments",
+      "statement": "Privileged operating environments are not virtualised within unprivileged operating environments.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1387",
+      "section": "Guidelines for system management / System administration / Administrative infrastructure",
+      "statement": "Administrative activities are conducted through jump servers.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1693",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in applications other than office productivity suites, web browsers and their extensions, email clients, PDF applications, and security products are applied within one month of release.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1705",
+      "section": "Guidelines for system management / Data backup and restoration / Backup access",
+      "statement": "Privileged user accounts (excluding backup administrator accounts) cannot access backups belonging to other user accounts.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1707",
+      "section": "Guidelines for system management / Data backup and restoration / Backup modification and deletion",
+      "statement": "Privileged user accounts (excluding backup administrator accounts) are prevented from modifying and deleting backups.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1700",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least fortnightly to identify missing patches or updates for vulnerabilities in applications other than office productivity suites, web browsers and their extensions, email clients, PDF applications, and security products.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        2,
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1407",
+      "section": "Guidelines for system hardening / Operating system hardening / Operating system releases and versions",
+      "statement": "The latest release, or the previous release, of operating systems are used.",
+      "updated": "Dec-22",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1655",
+      "section": "Guidelines for system hardening / Operating system hardening / Hardening operating system configurations",
+      "statement": ".NET Framework 3.5 (includes .NET 2.0 and 3.0) is disabled or removed.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1896",
+      "section": "Guidelines for system hardening / Operating system hardening / Hardening operating system configurations",
+      "statement": "Memory integrity functionality is enabled.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1656",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control is implemented on non-internet-facing servers.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1658",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Application control restricts the execution of drivers to an organisation-approved set.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1659",
+      "section": "Guidelines for system hardening / Operating system hardening / Application control",
+      "statement": "Microsoft’s vulnerable driver blocklist is implemented.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "application_control"
+    },
+    {
+      "control_id": "ism-1621",
+      "section": "Guidelines for system hardening / Operating system hardening / PowerShell",
+      "statement": "Windows PowerShell 2.0 is disabled or removed.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1622",
+      "section": "Guidelines for system hardening / Operating system hardening / PowerShell",
+      "statement": "PowerShell is configured to use Constrained Language Mode.",
+      "updated": "Oct-20",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1674",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Only Microsoft Office macros running from within a sandboxed environment, a Trusted Location or that are digitally signed by a trusted publisher are allowed to execute.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1890",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macros are checked to ensure they are free of malicious code before being digitally signed or placed within Trusted Locations.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1487",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Only privileged human users responsible for checking that Microsoft Office macros are free of malicious code can write to and modify content within Trusted Locations.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1675",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macros digitally signed by an untrusted publisher cannot be enabled via the Message Bar or Backstage View.",
+      "updated": "Sep-21",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1891",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office macros digitally signed by signatures other than V3 signatures cannot be enabled via the Message Bar or Backstage View.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_office_macros"
+    },
+    {
+      "control_id": "ism-1676",
+      "section": "Guidelines for system hardening / User application hardening / Office productivity suites",
+      "statement": "Microsoft Office’s list of trusted publishers is validated at least annually.",
+      "updated": "Jun-26",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "user_application_hardening"
+    },
+    {
+      "control_id": "ism-1508",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Privileged access to systems and their resources is limited to only what is required for users to undertake their duties or functions.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1649",
+      "section": "Guidelines for system access / Identity and access management / Privileged access to systems",
+      "statement": "Just-in-time administration is used for the administration of systems and their resources.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1505",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication is used to authenticate human users of data repositories.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1874",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication used for authenticating customers of online customer services is phishing-resistant.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1894",
+      "section": "Guidelines for system access / Identity and access management / Multi-factor authentication",
+      "statement": "Multi-factor authentication used for authenticating human users of data repositories is phishing-resistant.",
+      "updated": "Sep-26",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "multi_factor_authentication"
+    },
+    {
+      "control_id": "ism-1861",
+      "section": "Guidelines for system access / Credential management / Protecting credentials",
+      "statement": "Local Security Authority protection functionality is enabled.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1686",
+      "section": "Guidelines for system access / Credential management / Protecting credentials",
+      "statement": "Credential Guard functionality is enabled.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1897",
+      "section": "Guidelines for system access / Credential management / Protecting credentials",
+      "statement": "Remote Credential Guard functionality is enabled.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1898",
+      "section": "Guidelines for system management / System administration / Separate privileged operating environments",
+      "statement": "Secure Admin Workstations are used in the performance of administrative activities.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "restrict_admin_privileges"
+    },
+    {
+      "control_id": "ism-1692",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in office productivity suites, web browsers and their extensions, email clients, PDF applications, and security products are applied within 48 hours of release when vulnerabilities are assessed as critical by vendors or when working exploits exist.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1901",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in office productivity suites, web browsers and their extensions, email clients, PDF applications, and security products are applied within two weeks of release when vulnerabilities are assessed as non-critical by vendors and no working exploits exist.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1696",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in operating systems of workstations, non-internet-facing servers and non-internet-facing network devices are applied within 48 hours of release when vulnerabilities are assessed as critical by vendors or when working exploits exist.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1902",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in operating systems of workstations, non-internet-facing servers and non-internet-facing network devices are applied within one month of release when vulnerabilities are assessed as non-critical by vendors and no working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1879",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in drivers are applied within 48 hours of release when vulnerabilities are assessed as critical by vendors or when working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1697",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in drivers are applied within one month of release when vulnerabilities are assessed as non-critical by vendors and no working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1903",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in firmware are applied within 48 hours of release when vulnerabilities are assessed as critical by vendors or when working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1904",
+      "section": "Guidelines for system management / System maintenance / Mitigating known vulnerabilities",
+      "statement": "Patches, updates or other vendor mitigations for vulnerabilities in firmware are applied within one month of release when vulnerabilities are assessed as non-critical by vendors and no working exploits exist.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-0304",
+      "section": "Guidelines for system management / System maintenance / Cessation of support",
+      "statement": "Applications other than office productivity suites, web browsers and their extensions, email clients, PDF applications, Adobe Flash Player, and security products that are no longer supported by vendors are removed.",
+      "updated": "Jun-25",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_applications"
+    },
+    {
+      "control_id": "ism-1813",
+      "section": "Guidelines for system management / Data backup and restoration / Backup access",
+      "statement": "Unprivileged user accounts cannot access their own backups.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1706",
+      "section": "Guidelines for system management / Data backup and restoration / Backup access",
+      "statement": "Privileged user accounts (excluding backup administrator accounts) cannot access their own backups.",
+      "updated": "Sep-24",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1708",
+      "section": "Guidelines for system management / Data backup and restoration / Backup modification and deletion",
+      "statement": "Backup administrator accounts are prevented from modifying and deleting backups during their retention period.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "regular_backups"
+    },
+    {
+      "control_id": "ism-1703",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least fortnightly to identify missing patches or updates for vulnerabilities in drivers.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    },
+    {
+      "control_id": "ism-1900",
+      "section": "Guidelines for security assurance / Security assessments / Vulnerability scanning",
+      "statement": "A vulnerability scanner is used at least fortnightly to identify missing patches or updates for vulnerabilities in firmware.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ],
+      "strategy": "patch_operating_systems"
+    }
+  ],
+  "unassigned_control_ids": [
+    "ism-0123",
+    "ism-0140",
+    "ism-1819",
+    "ism-1815",
+    "ism-1906",
+    "ism-1228",
+    "ism-1907",
+    "ism-0109"
+  ],
+  "classification": "Each control is assigned from its ISM section title. Patching controls are split by the subject of the statement (applications and online services, or operating systems, drivers and firmware). Office macro statements stay with restrict_office_macros. Incident-reporting controls that the ISM does not place under one mitigation strategy are listed in unassigned_control_ids and are not copied onto every strategy."
+}
