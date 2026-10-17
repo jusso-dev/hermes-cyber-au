@@ -23,5 +23,13 @@ def _middleware():
 
 
 def register(ctx) -> None:
-    """Register the untrusted-feed middleware and the write guard."""
+    """Register the untrusted-feed middleware, the write guard, and org exposure."""
     _middleware().register(ctx)
+    from cyberau_org_exposure.tool import SCHEMA, handle
+
+    ctx.register_tool(
+        name="cyber_au_org_exposure",
+        toolset="cyber-au",
+        schema=SCHEMA,
+        handler=handle,
+    )

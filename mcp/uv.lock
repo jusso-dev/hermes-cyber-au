@@ -17,6 +17,7 @@ members = [
     "cyberau-datagov-au",
     "cyberau-first-epss",
     "cyberau-nvd",
+    "cyberau-org-exposure",
     "cyberau-workspace",
 ]
 
@@ -446,6 +447,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-nvd"
 version = "0.1.0"
 source = { editable = "nvd" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-org-exposure"
+version = "0.1.0"
+source = { editable = "org-exposure" }
 dependencies = [
     { name = "cyberau-common" },
 ]

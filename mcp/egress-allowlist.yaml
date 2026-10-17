@@ -31,18 +31,9 @@ global_deny_cidrs:
   - "fec0::/10"
   - "ff00::/8"
 connectors:
-  asd-acsc:
+  stub:
     hosts:
-      - www.cyber.gov.au
-  asd-ism:
-    hosts:
-      - api.github.com
-      - raw.githubusercontent.com
-  asd-essentials:
-    hosts:
-      - www.cyber.gov.au
-      - www.asd.gov.au
-      - raw.githubusercontent.com
+      - example.com
   cisa-kev:
     hosts:
       - www.cisa.gov
@@ -51,9 +42,21 @@ connectors:
       - api.first.org
       - www.first.org
       - epss.empiricalsecurity.com
+  asd-ism:
+    hosts:
+      - api.github.com
+      - raw.githubusercontent.com
+  asd-acsc:
+    hosts:
+      - www.cyber.gov.au
   nvd:
     hosts:
       - services.nvd.nist.gov
+  asd-essentials:
+    hosts:
+      - www.cyber.gov.au
+      - www.asd.gov.au
+      - raw.githubusercontent.com
   osv:
     hosts:
       - api.osv.dev
@@ -205,6 +208,8 @@ connectors:
     hosts:
       - api.flare.io
   # In-library connector. It does not call the network.
-  stub:
+  org-exposure:
     hosts:
-      - example.com
+    - abr.business.gov.au
+    allow_ip_literals: false
+    allow_http_loopback: false

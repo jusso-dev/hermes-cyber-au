@@ -42,8 +42,10 @@ def _repo_connectors() -> list[Path]:
     mcp = ROOT / "mcp"
     if not mcp.is_dir():
         return found
+    # org-exposure is the watchlist skill library, not a feed connector.
+    libraries = {"common", "org-exposure"}
     for path in sorted(mcp.glob("*/pyproject.toml")):
-        if path.parent.name != "common":
+        if path.parent.name not in libraries:
             found.append(path.parent)
     return found
 

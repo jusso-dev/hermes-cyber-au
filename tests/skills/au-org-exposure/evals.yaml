@@ -1,0 +1,28 @@
+# Offline cases for au-org-exposure. Subjects live in the test module, not here,
+# so this repository does not ship a watchlist, an ABN or a domain.
+cases:
+  - id: no-findings
+    required:
+      stored: 0
+      groups: 0
+      vendor_called: true
+    forbidden:
+      - password
+  - id: one-infostealer
+    required:
+      stored: 1
+      groups: 1
+      kind: infostealer_credential
+      vendor_called: true
+  - id: excluded-lookalike-leak
+    required:
+      stored: 0
+      groups: 0
+      vendor_called: true
+      absent_lookalike: true
+  - id: third-party
+    required:
+      vendor_called: false
+      confirmation_required: true
+      sent: false
+      discloses_vendor: true
