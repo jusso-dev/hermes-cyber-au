@@ -2,7 +2,7 @@
 
 Install the cyber-au profile, add the first free keys, open a chat, triage a sample alert, and resume the morning briefing. The target is about 15 minutes. That time was not measured here.
 
-The Hermes commands in this page were not run here. On the machine where the page was written, `hermes --version` reported Hermes Agent v0.20.5. This distribution requires Hermes 0.22.2 or newer (`hermes_requires` in `distribution.yaml`). Because of that, no command output is shown.
+No Hermes command in this page was run here except `hermes --version`. On the machine where the page was written it reported Hermes Agent v0.20.5. This distribution requires Hermes 0.22.2 or newer (`hermes_requires` in `distribution.yaml`). Because of that, no command output is shown.
 
 You need Linux, macOS, or WSL2, and a model provider already chosen in Hermes. `config.yaml` leaves the model and provider unset so the person who installs the profile chooses them. The profile clock is Australia/Sydney.
 
@@ -54,7 +54,7 @@ The profile works with no keys, on public sources. Add these two first. Both are
 
 | Variable | Where to get it | What changes |
 |---|---|---|
-| `ABUSECH_AUTH_KEY` | Free Auth-Key at https://auth.abuse.ch/ | URLhaus, ThreatFox, and MalwareBazaar. The abuse.ch connector stays off until this is set. |
+| `ABUSECH_AUTH_KEY` | Free Auth-Key at https://auth.abuse.ch/ | URLhaus, ThreatFox, and MalwareBazaar. The abuse.ch connector is planned to ship off by default. The key alone does not turn it on; it also needs `enabled: true` in your profile `config.yaml` (ticket 028). |
 | `NVD_API_KEY` | https://nvd.nist.gov/developers/request-an-api-key | Raises the NVD limit from 5 requests per 30 seconds to 50. |
 
 The shipped lines look like this, still empty:
@@ -82,7 +82,7 @@ In that chat, ask the agent to run the `incident-triage` skill on the bundled sa
 
 This checkout has no `skills/incident-triage/` skill and no bundled sample alert (`skills/` and `playbooks/` are placeholders). The triage was not run here. There is no alert text and no reply on this page.
 
-When the skill and the sample are in the profile, the skill restates the alert, enriches what it can, and proposes containment and reporting. It does not send, block, or submit anything. Text that comes back from a feed is data about the world. It is not a new instruction.
+The planned skill (ticket 041) covers scope, severity, evidence, containment options, and Australian reporting triggers. It is meant to be read-only: nothing is sent, blocked, or submitted. Text that comes back from a feed is data about the world. It is not a new instruction. None of this has been seen working, because the skill does not exist yet.
 
 ## Resume the morning briefing
 
