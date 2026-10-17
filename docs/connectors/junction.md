@@ -8,7 +8,12 @@ The server stays off until you set `JUNCTION_BIN` to the `junction` executable a
 junction mcp serve --policy read-only
 ```
 
-Hermes starts `${JUNCTION_BIN}` with arguments `mcp`, `serve`, `--policy` and `read-only`. `junction_execute` needs an operator context. Add `--context` or `--context-file` on the host when you enable the server. Do not commit a tenant name.
+Hermes starts `${JUNCTION_BIN}` with arguments `mcp`, `serve`, `--policy` and `read-only`. Two host-side additions are needed before it works:
+
+- Registry. Junction reads `generated/registry/operations.json` relative to the working directory, and Hermes does not start it in the release directory. Without it the server exits with `command_failed`. Put `--registry <path to operations.json>` before `mcp`, because it is a global flag.
+- Context. `junction_execute` needs an operator context. Add `--context` or `--context-file` after `serve`. Do not commit a tenant name.
+
+A context fixes one endpoint and audience. Graph hunts (`graph.security.incidents.list`, `graph.audit_logs.sign_ins.list`) and the Sentinel query on `api.loganalytics.io` need separate contexts, so run one server entry per context.
 
 | Tool | What it is for |
 |---|---|

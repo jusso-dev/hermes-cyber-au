@@ -77,6 +77,8 @@ def test_docs_name_the_hunt_operations_and_the_readme_links_them():
         assert operation in docs
         assert operation in skill
     assert "junction mcp serve --policy read-only" in docs
+    assert "--registry" in docs
+    assert "--registry" in skill
     assert "Junction is MIT and is not affiliated with Microsoft." in docs
     assert "Junction is MIT and is not affiliated with Microsoft." in skill
     assert "[docs/connectors/junction.md](docs/connectors/junction.md)" in row

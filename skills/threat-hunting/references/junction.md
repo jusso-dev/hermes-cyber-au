@@ -2,7 +2,7 @@
 
 Live tenant hunts are optional. They go through Junction's own MCP server, which ships disabled. This repository does not vendor Junction and does not store a Microsoft secret. Each `junction_execute` call needs the user's approval.
 
-Set `JUNCTION_BIN` to the junction executable before enabling the server. Junction v0.1.16 documents the read-only launch as `junction mcp serve --policy read-only`. Hermes uses that argument list. Add `--context` or `--context-file` locally when you enable execution. Do not commit a tenant name.
+Set `JUNCTION_BIN` to the junction executable before enabling the server. Junction v0.1.16 documents the read-only launch as `junction mcp serve --policy read-only`. Hermes uses that argument list. Locally, put `--registry <path to operations.json>` before `mcp` (Junction exits with `command_failed` without it) and add `--context` or `--context-file` after `serve` when you enable execution. A context fixes one endpoint, so Graph and Log Analytics hunts need separate contexts. Do not commit a tenant name.
 
 Included tools: `junction_search`, `junction_describe`, `junction_execute`.
 
