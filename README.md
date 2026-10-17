@@ -141,4 +141,4 @@ This repository used to hold a smaller Hermes skill and plugin pack for Australi
 
 ## Licence
 
-Apache License 2.0. See [LICENSE](LICENSE). Data from each source stays under that source's terms; see the data licensing issue and, once written, `docs/reference/data-sources.md`.
+Apache License 2.0. See [LICENSE](LICENSE). Data from each source stays under that source's terms. See [Data sources, licences and attribution](docs/reference/data-sources.md).
