@@ -133,3 +133,17 @@ def test_cassettes_replay():
             played = httpx.get(uri)
         assert played.status_code == 200
         assert played.json()["data"][0]["cve"] == "CVE-2024-3400"
+
+
+def test_health_response_rejects_a_cached_payload(monkeypatch):
+    payload = json.loads((FIXTURES / "epss_batch.json").read_text(encoding="utf-8"))
+    for state in ("hit", "stale", "snapshot"):
+        monkeypatch.setattr(source, "_fetch", lambda *_a, _s=state, **_k: (payload, _s, ""))
+        result = source.health_response()
+        assert result["ok"] is False
+        assert result["body"] is None
+        assert result["error_class"] == "stale_response"
+    monkeypatch.setattr(source, "_fetch", lambda *_a, **_k: (payload, "miss", ""))
+    live = source.health_response()
+    assert live["ok"] is True
+    assert live["body"] == payload

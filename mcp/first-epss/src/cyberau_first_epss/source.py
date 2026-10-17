@@ -323,4 +323,36 @@ def _allowlist() -> Path:
     return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
+def health_response() -> dict:
+    """One live EPSS payload for the health workflow.
+
+    Unit tests must not call this. They pass fixtures instead.
+    """
+    payload, cache, warning = _fetch({"cve": "CVE-2024-3400"}, force_live=True)
+    if warning or payload is None:
+        return {
+            "ok": False,
+            "status_code": None,
+            "error_class": None,
+            "body": None,
+            "detail": warning or "no response",
+        }
+    if cache != "miss":
+        # A cached or stale payload says nothing about whether the endpoint is up.
+        return {
+            "ok": False,
+            "status_code": None,
+            "error_class": "stale_response",
+            "body": None,
+            "detail": "response came from cache, not a live call",
+        }
+    return {
+        "ok": True,
+        "status_code": 200,
+        "error_class": None,
+        "body": payload,
+        "detail": "live ok",
+    }
+
+
 register_connector("first-epss", connector)
