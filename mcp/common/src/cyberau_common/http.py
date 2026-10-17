@@ -183,6 +183,8 @@ class HttpClient:
         current_method = method
         current_content = content
         while True:
+            # The policy resolves and refuses before this hop. The client
+            # resolves the name again when it connects. See egress.py.
             self.policy.check(current)
             host = httpx.URL(current).host or ""
             self.limiter.acquire(
