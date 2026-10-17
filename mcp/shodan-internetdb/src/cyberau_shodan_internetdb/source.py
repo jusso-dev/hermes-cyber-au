@@ -3,6 +3,8 @@
 import ipaddress
 import json
 import os
+import re
+import time
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -27,12 +29,24 @@ _LISTS = ("hostnames", "cpes", "tags", "vulns")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 _TTL = 24 * 3600
+# Worst case per call stays under the 120 second tool timeout in servers.yaml:
+# up to 7 requests (5 redirects, 1 retry) at 10 seconds each, plus at most 20 seconds of waiting.
+_REQUEST_TIMEOUT = 10
+_MAX_WAIT = 20.0
+_CVE = re.compile(r"^!?CVE-\d{4}-\d{4,}$")
+_CPE = re.compile(r"^cpe:/[A-Za-z0-9:._%~\-]+$")
+_NOT_PUBLIC = "ip must be a public IPv4 or IPv6 address; other addresses are never sent upstream"
+_EMBEDDED_V4 = (ipaddress.ip_network("64:ff9b::/96"), ipaddress.ip_network("::/96"))
+_sleep = time.sleep
 
 
 def internetdb_ip(ip: Annotated[str, Field(description="IPv4 or IPv6 address")]) -> dict:
     address = _parse_ip(ip)
     if address is None:
         return _envelope(None, "snapshot", warnings=("ip must be an IPv4 or IPv6 address",))
+    if not _is_public(address):
+        return _envelope(None, "snapshot", warnings=(_NOT_PUBLIC,))
+    address = _unmapped(address)
     url = _url(address)
     payload, status, cache, warning = _fetch(url)
     if warning:
@@ -53,20 +67,19 @@ def internetdb_ip(ip: Annotated[str, Field(description="IPv4 or IPv6 address")])
             url,
             warnings=("InternetDB has no information for this address",),
         )
+    if status != 200:
+        return _envelope(None, cache, url, warnings=(f"InternetDB returned status {status}",))
     if payload is None:
         return _envelope(None, cache, url, warnings=("InternetDB payload was not usable",))
-    if status >= 400:
-        return _envelope(None, cache, url, warnings=(f"InternetDB returned status {status}",))
     drift = schema_drift(payload)
     if drift:
         return _envelope(None, cache, url, warnings=(drift,))
-    if str(payload.get("ip")) != address:
-        return _envelope(
-            _empty(address),
-            cache,
-            url,
-            warnings=("no matching address in the offline snapshot or cache",),
-        )
+    if _parse_ip(payload["ip"]) != address:
+        warning = "InternetDB returned a record for a different address"
+        if cache == "snapshot":
+            warning = "no matching address in the offline snapshot"
+            return _envelope(_empty(address), cache, url, warnings=(warning,))
+        return _envelope(None, cache, url, warnings=(warning,))
     record = _record(payload)
     _persist(record)
     return _envelope(record, cache, url)
@@ -113,6 +126,8 @@ class _InternetDbConnector(Connector):
         problem = schema_drift(payload)
         if problem:
             return Probe(self.key, False, problem)
+        if _parse_ip(payload["ip"]) != "1.1.1.1":
+            return Probe(self.key, False, "live probe returned a record for a different address")
         record = _record(payload)
         mismatch = _response_problem(record)
         if mismatch:
@@ -181,9 +196,10 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[dict | None, int, str
         rate=1,
         burst=1,
         window="rolling",
-        timeout=30,
+        timeout=_REQUEST_TIMEOUT,
         retries=1,
         transport=_TRANSPORT,
+        sleeper=_bounded_sleep(),
     )
     try:
         response = client.get(url, ttl=_TTL, skip_cache=force_live)
@@ -208,9 +224,9 @@ def _record(payload: dict) -> dict:
         "ip": str(payload["ip"]),
         "ports": [int(port) for port in payload["ports"]],
         "hostnames": [_text(item) for item in payload["hostnames"]],
-        "cpes": [str(item) for item in payload["cpes"]],
+        "cpes": [_identifier(item, _CPE) for item in payload["cpes"]],
         "tags": [_text(item) for item in payload["tags"]],
-        "vulns": [str(item) for item in payload["vulns"]],
+        "vulns": [_identifier(item, _CVE) for item in payload["vulns"]],
     }
 
 
@@ -229,6 +245,27 @@ def _text(value) -> str:
     return untrusted_text(str(value), "shodan-internetdb")
 
 
+def _identifier(value, pattern: re.Pattern) -> str:
+    text = str(value)
+    return text if pattern.fullmatch(text) else _text(text)
+
+
+def _bounded_sleep():
+    waited = 0.0
+
+    def sleep(seconds: float) -> None:
+        nonlocal waited
+        if seconds > _MAX_WAIT - waited:
+            raise HttpError(
+                f"InternetDB rate limited the request (429) and asked for a wait beyond "
+                f"the {_MAX_WAIT:.0f} second limit"
+            )
+        waited += seconds
+        _sleep(seconds)
+
+    return sleep
+
+
 def _parse_ip(value: str) -> str | None:
     if not isinstance(value, str):
         return None
@@ -239,6 +276,28 @@ def _parse_ip(value: str) -> str | None:
         return str(ipaddress.ip_address(text))
     except ValueError:
         return None
+
+
+def _unmapped(text: str) -> str:
+    address = ipaddress.ip_address(text)
+    if address.version == 6 and address.ipv4_mapped is not None:
+        return str(address.ipv4_mapped)
+    return text
+
+
+def _is_public(text: str) -> bool:
+    address = ipaddress.ip_address(text)
+    if getattr(address, "scope_id", None):
+        return False
+    if address.version == 6:
+        if address.ipv4_mapped is not None:
+            return _is_public(str(address.ipv4_mapped))
+        if address.sixtofour is not None:
+            return _is_public(str(address.sixtofour))
+        if any(address in network for network in _EMBEDDED_V4):
+            embedded = ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
+            return _is_public(str(embedded))
+    return address.is_global and not address.is_multicast
 
 
 def _url(address: str) -> str:

@@ -508,3 +508,19 @@ class TestCli:
         assert "ok" in capsys.readouterr().out
         assert main(["health", "missing"]) == 1
         assert main(["refresh"]) == 2
+
+
+def test_retry_after_parsing_never_raises_or_goes_negative():
+    from datetime import UTC, datetime, timedelta
+    from email.utils import format_datetime
+
+    from cyberau_common.http import _retry_after_seconds
+
+    assert _retry_after_seconds("7") == 7.0
+    assert _retry_after_seconds("-5") == -5.0
+    for bad in (None, "", "soon", "nan", "inf"):
+        assert _retry_after_seconds(bad) is None
+    future = format_datetime(datetime.now(UTC) + timedelta(seconds=30), usegmt=True)
+    assert 20 < _retry_after_seconds(future) <= 30
+    past = format_datetime(datetime.now(UTC) - timedelta(seconds=30), usegmt=True)
+    assert _retry_after_seconds(past) < 0

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import email.utils
+import math
 import random
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import httpx
 
@@ -233,15 +235,26 @@ class HttpClient:
         return self._rng() * ceiling
 
     def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
-        header = response.headers.get("retry-after")
-        if header:
-            try:
-                return min(60.0, float(header))
-            except ValueError:
-                parsed = email.utils.parsedate_to_datetime(header)
-                if parsed is not None:
-                    return min(60.0, 1.0)
+        seconds = _retry_after_seconds(response.headers.get("retry-after"))
+        if seconds is not None:
+            return min(60.0, max(0.0, seconds))
         return self._backoff(attempt)
+
+
+def _retry_after_seconds(header: str | None) -> float | None:
+    if not header:
+        return None
+    try:
+        seconds = float(header)
+    except ValueError:
+        try:
+            parsed = email.utils.parsedate_to_datetime(header)
+        except (TypeError, ValueError):
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return (parsed - datetime.now(UTC)).total_seconds()
+    return seconds if math.isfinite(seconds) else None
 
 
 def _json_bytes(body: dict) -> bytes:
