@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name_or_id": {
+      "type": "string"
+    }
+  },
+  "required": ["name_or_id"]
+}

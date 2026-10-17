@@ -27,6 +27,11 @@ connectors:
     - www.cyber.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  mitre-attack:
+    hosts:
+    - raw.githubusercontent.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   nvd:
     hosts:
     - services.nvd.nist.gov

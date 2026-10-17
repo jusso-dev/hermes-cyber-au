@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "source",
+    "retrieved_at",
+    "cache",
+    "data",
+    "untrusted",
+    "attribution"
+  ],
+  "properties": {
+    "source": {
+      "const": "mitre-attack"
+    },
+    "source_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "retrieved_at": {
+      "type": "string"
+    },
+    "data_as_of": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cache": {
+      "enum": [
+        "hit",
+        "miss",
+        "stale",
+        "snapshot"
+      ]
+    },
+    "attribution": {
+      "type": "string",
+      "pattern": "MITRE"
+    },
+    "untrusted": {
+      "const": true
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "id",
+              "name",
+              "aliases",
+              "summary",
+              "domain",
+              "url"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "technique",
+                  "sub-technique",
+                  "group",
+                  "malware",
+                  "tool"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                }
+              },
+              "summary": {
+                "type": "string",
+                "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+              },
+              "domain": {
+                "enum": [
+                  "enterprise",
+                  "mobile",
+                  "ics"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "source",
+    "retrieved_at",
+    "cache",
+    "data",
+    "untrusted",
+    "attribution"
+  ],
+  "properties": {
+    "source": {
+      "const": "mitre-attack"
+    },
+    "source_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "retrieved_at": {
+      "type": "string"
+    },
+    "data_as_of": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cache": {
+      "enum": [
+        "hit",
+        "miss",
+        "stale",
+        "snapshot"
+      ]
+    },
+    "attribution": {
+      "type": "string",
+      "pattern": "MITRE"
+    },
+    "untrusted": {
+      "const": true
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "technique_id",
+            "name",
+            "domain",
+            "is_subtechnique",
+            "parent_id",
+            "description",
+            "tactics",
+            "platforms",
+            "data_sources",
+            "detection",
+            "detection_strategies",
+            "mitigations",
+            "sub_techniques",
+            "url",
+            "version",
+            "modified"
+          ],
+          "properties": {
+            "technique_id": {
+              "type": "string",
+              "pattern": "^T\\d{4}(\\.\\d{3})?$"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+            },
+            "domain": {
+              "enum": [
+                "enterprise",
+                "mobile",
+                "ics"
+              ]
+            },
+            "is_subtechnique": {
+              "type": "boolean"
+            },
+            "parent_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+            },
+            "tactics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "tactic_id",
+                  "shortname",
+                  "name"
+                ],
+                "properties": {
+                  "tactic_id": {
+                    "type": "string"
+                  },
+                  "shortname": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  }
+                }
+              }
+            },
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "data_sources": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+              }
+            },
+            "detection": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                }
+              ]
+            },
+            "detection_strategies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "detection_id",
+                  "name"
+                ],
+                "properties": {
+                  "detection_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  }
+                }
+              }
+            },
+            "mitigations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "mitigation_id",
+                  "name",
+                  "description"
+                ],
+                "properties": {
+                  "mitigation_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  }
+                }
+              }
+            },
+            "sub_techniques": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "technique_id",
+                  "name"
+                ],
+                "properties": {
+                  "technique_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  }
+                }
+              }
+            },
+            "url": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "modified": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

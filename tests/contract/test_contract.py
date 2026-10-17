@@ -66,6 +66,8 @@ def _sample_value(prop: dict):
         return "CVE-2024-3400"
     if "ism-" in pattern:
         return "ism-1173"
+    if pattern.startswith("^T\\d{4}"):
+        return "T1059"
     if pattern.startswith("^") and not pattern.endswith("$"):
         body = pattern[1:]
         if re.fullmatch(r"(?:\\.|[A-Za-z0-9:/.])+", body):

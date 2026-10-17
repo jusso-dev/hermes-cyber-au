@@ -64,7 +64,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | AlienVault OTX | `otx` | Global threat intelligence | `OTX_API_KEY` | on | v0.2 | planned | https://otx.alienvault.com/api |
 | GreyNoise Community | `greynoise` | Global threat intelligence | `GREYNOISE_API_KEY` (optional) | on | v0.2 | planned | https://docs.greynoise.io/ |
 | Shodan InternetDB | `internetdb` | Global threat intelligence | none | on | v0.2 | planned | https://internetdb.shodan.io/ |
-| MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | on | v0.1 MVP | planned | https://github.com/mitre-attack/attack-stix-data |
+| MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | on | v0.1 MVP | planned | [docs/connectors/mitre-attack.md](docs/connectors/mitre-attack.md) |
 | SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | https://github.com/SigmaHQ/sigma |
 | crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | https://crt.sh/ |
 | Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | on | v0.2 | planned | https://www.oaic.gov.au/privacy/notifiable-data-breaches |

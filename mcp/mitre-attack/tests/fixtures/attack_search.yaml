@@ -1,0 +1,26 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/index.json
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"collections":[{"name":"Enterprise ATT&CK","versions":[{"version":"20.0"}]}]}'
+  - request:
+      method: GET
+      uri: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"type":"bundle","objects":[{"type":"attack-pattern","id":"attack-pattern--00000000-0000-4000-8000-000000000001","name":"Phishing","external_references":[{"source_name":"mitre-attack","external_id":"T1566"}]}]}'
