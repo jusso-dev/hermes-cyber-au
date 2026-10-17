@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://www\\.scamwatch\\.gov\\.au/"
+    }
+  },
+  "required": [
+    "url"
+  ]
+}

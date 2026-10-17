@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.scamwatch.gov.au/
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "<!DOCTYPE html><html><body><h2>News and alerts</h2><h3><a href='/about-us/news-and-alerts/example-parcel-fee'>Example alert: parcel fee</a></h3></body></html>"
