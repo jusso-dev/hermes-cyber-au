@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from pathlib import Path
 
 import jsonschema
@@ -25,6 +26,15 @@ ANNOTATIONS = {"readOnlyHint": True, "openWorldHint": True}
 
 _SCHEMA_PATH = Path(__file__).resolve().parent / "schema" / "m365_secure_report.schema.json"
 _SCHEMA: dict | None = None
+_STATUS_LABELS = {
+    "pass": "Pass",
+    "fail": "Fail",
+    "warning": "Warning",
+    "review": "Review",
+    "info": "Info",
+    "unknown": "Unknown",
+    "notlicensed": "Not Licensed",
+}
 _FREE_TEXT = (
     "category",
     "section",
@@ -54,20 +64,27 @@ def evidence_import(path: str) -> dict:
     except (OSError, UnicodeError):
         return _warn("M365-Secure report could not be read")
     try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
+        payload = json.loads(text, parse_constant=_reject_constant)
+    except (ValueError, RecursionError):
         return _warn("M365-Secure report was not valid JSON")
-    problem = schema_drift(payload)
-    if problem:
-        return _warn(problem)
-    summary = payload["summary"]
+    try:
+        problem = schema_drift(payload)
+        if problem:
+            return _warn(problem)
+        data = _normalise(payload)
+    except RecursionError:
+        return _warn("M365-Secure report is nested too deeply to import")
     return envelope(
         SOURCE,
-        _normalise(payload),
+        data,
         cache="snapshot",
-        data_as_of=str(summary.get("timestamp") or ""),
+        data_as_of=payload["summary"]["timestamp"],
         attribution=ATTRIBUTION,
     )
+
+
+def _reject_constant(name: str):
+    raise ValueError(f"{name} is not valid JSON")
 
 
 def schema_drift(payload: object) -> str | None:
@@ -75,11 +92,36 @@ def schema_drift(payload: object) -> str | None:
     if not isinstance(payload, dict):
         return "M365-Secure report was not a JSON object"
     errors = list(jsonschema.Draft202012Validator(_report_schema()).iter_errors(payload))
-    if not errors:
-        return None
-    required = [error for error in errors if error.validator == "required"]
-    chosen = required[0] if required else errors[0]
-    return f"M365-Secure schema drift, {chosen.message}"
+    if errors:
+        required = [error for error in errors if error.validator == "required"]
+        return f"M365-Secure schema drift, {_describe(required[0] if required else errors[0])}"
+    return _inconsistent(payload)
+
+
+def _inconsistent(payload: dict) -> str | None:
+    """Catch a report that is valid JSON but whose summary disagrees with its findings."""
+    findings = payload["findings"]
+    summary = payload["summary"]
+    statuses = Counter(_STATUS_LABELS[item["status"]] for item in findings)
+    severities = Counter(item["severity"].capitalize() for item in findings)
+    if (
+        summary["total_checks"] != len(findings)
+        or {k: v for k, v in summary["status_counts"].items() if v} != dict(statuses)
+        or {k: v for k, v in summary["severity_counts"].items() if v} != dict(severities)
+    ):
+        return "M365-Secure report is incomplete, summary counts do not match the findings"
+    return None
+
+
+def _describe(error: jsonschema.ValidationError) -> str:
+    """Describe a schema error from the schema's own path, never from report text."""
+    rule = [str(part) for part in error.absolute_schema_path]
+    where = ".".join(part for part in rule if part not in {"properties", "items", "$ref", "$defs"})
+    indexes = "".join(f"[{part}]" for part in error.absolute_path if isinstance(part, int))
+    if error.validator == "required":
+        missing = [name for name in error.validator_value if name not in error.instance]
+        return f"missing required field {missing[0]!r} in {where or 'report'}{indexes}"
+    return f"{error.validator} check failed at {where}{indexes}"
 
 
 def _report_schema() -> dict:

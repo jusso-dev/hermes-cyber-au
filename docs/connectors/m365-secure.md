@@ -10,6 +10,8 @@ The tool takes one argument, `path`, the filesystem path of the JSON report. The
 
 The report object follows M365-Secure schema 1.1, confirmed from [jusso-dev/M365-Secure](https://github.com/jusso-dev/M365-Secure) commit `9fae976a0acfda3f55795013d7f78739c86a94a9` (`src/report/json.rs`, `src/assessment/finding.rs`, `src/assessment/severity.rs`, `src/assessment/engine.rs`, `src/compliance/mapping.rs`). The checked shape is in `plugins/cyber-au/evidence/schema/m365_secure_report.schema.json`. Finding `status` and `severity` use serde lowercase (`pass`, `notlicensed`, `high`). Summary `status_counts` and `severity_counts` use the Display labels (`Pass`, `Not Licensed`, `High`).
 
+A report that fails the schema, has timestamps that are not RFC3339, has summary counts that do not match its findings, or is not valid JSON (including `NaN` or nesting too deep to parse) returns an empty `data.records` and a warning. Warnings describe the schema location only and never repeat text from the report. Count keys must be display labels, so a lowercase key is refused.
+
 There is no egress host. A URL is refused. When `CYBERAU_OFFLINE=1` and the file is missing, the envelope warns that the report is unavailable. A file that is present is read either way. Rate limits do not apply. Cache state for a report that was read is `snapshot`.
 
 M365-Secure is published under the MIT licence. This parser is not endorsed by Microsoft.
