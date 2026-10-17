@@ -2,7 +2,7 @@ name: cyber-au
 version: 0.1.0
 manifest_version: 2
 api_version: 1
-description: "In-process intel tools, audit logging, untrusted-content guards, AU org exposure, and the cyber-au doctor."
+description: "In-process intel tools, audit logging, untrusted-content guards, AU org exposure, doctor, and distribution update."
 author: "Justin Middler"
 license: Apache-2.0
 homepage: https://github.com/jusso-dev/hermes-cyber-au

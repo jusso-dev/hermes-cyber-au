@@ -1,23 +1,31 @@
-"""cyber-au doctor command, for Hermes and for a direct invocation."""
+"""cyber-au doctor, update, and store migration commands."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import sys
+from pathlib import Path
 
 from .doctor import execute, format_json, format_text
 
-USAGE = "Usage: hermes cyber-au doctor [--offline] [--json] [--fix]"
+_PLUGIN_DIR = Path(__file__).resolve().parent
+if str(_PLUGIN_DIR) not in sys.path:
+    sys.path.insert(0, str(_PLUGIN_DIR))
+
+import update_path  # noqa: E402
+
+USAGE = "Usage: hermes cyber-au <doctor|update|migrate>"
 
 
 def register(ctx) -> None:
     ctx.register_cli_command(
         name="cyber-au",
-        help="Check the cyber-au profile, connectors, store and routines",
+        help="Check, update, or migrate the cyber-au profile",
         setup_fn=setup_parser,
         handler_fn=handle,
-        description="Report what works, what is missing and how to fix it.",
+        description="Doctor, update, and intel-store migration for the cyber-au profile.",
     )
     ctx.register_command(
         "cyber-au",
@@ -28,49 +36,93 @@ def register(ctx) -> None:
 
 
 def setup_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--profile", default=os.environ.get("CYBERAU_PROFILE", "cyber-au"))
+    parser.add_argument("--profile-home", type=Path, default=None)
     subs = parser.add_subparsers(dest="cyberau_command", required=True)
+
     doctor = subs.add_parser(
         "doctor",
         help="Show what works, what is missing and how to fix it",
     )
-    doctor.add_argument(
-        "--offline",
-        action="store_true",
-        help="Skip live connector probes",
-    )
+    doctor.add_argument("--offline", action="store_true", help="Skip live connector probes")
     doctor.add_argument("--json", action="store_true", help="Print the report as JSON")
     doctor.add_argument(
         "--fix",
         action="store_true",
         help="Create missing directories, chmod 600 .env, and re-run bootstrap",
     )
-    doctor.set_defaults(func=handle)
+
+    update = subs.add_parser("update", help="Refresh this distribution, then bootstrap and doctor")
+    update.add_argument("--source", type=Path, default=None, help="Local checkout to apply")
+    update.add_argument("--to", dest="to_tag", default=None, help="Reinstall this git tag")
+    update.add_argument(
+        "--force-config",
+        action="store_true",
+        help="Replace config.yaml. Local edits are kept when this is omitted",
+    )
+
+    migrate = subs.add_parser("migrate", help="Apply intel store migrations")
+    migrate.add_argument("--migrations", type=Path, default=None)
+    parser.set_defaults(func=handle)
 
 
 def handle(args: argparse.Namespace) -> int:
-    if getattr(args, "cyberau_command", None) != "doctor":
-        print(USAGE, file=sys.stderr)
+    command = getattr(args, "cyberau_command", None) or getattr(args, "command", None)
+    if command == "doctor":
+        report = execute(offline=bool(getattr(args, "offline", False)), fix=bool(getattr(args, "fix", False)))
+        text = format_json(report) if getattr(args, "json", False) else format_text(report)
+        sys.stdout.write(text)
+        return report.exit_code()
+    if command == "migrate":
+        return _migrate(args)
+    if command == "update":
+        return _update(args)
+    print(USAGE, file=sys.stderr)
+    return 2
+
+
+def _migrate(args: argparse.Namespace) -> int:
+    profile = getattr(args, "profile", None) or os.environ.get("CYBERAU_PROFILE", "cyber-au")
+    home = getattr(args, "profile_home", None)
+    if home is None:
+        print("migrate needs --profile-home", file=sys.stderr)
         return 2
-    report = execute(
-        offline=bool(args.offline),
-        fix=bool(args.fix),
-    )
-    text = format_json(report) if args.json else format_text(report)
-    sys.stdout.write(text)
-    return report.exit_code()
+    try:
+        update_path.migrate(home, getattr(args, "migrations", None))
+    except update_path.MigrationFailure:
+        return 1
+    except update_path.UpdateError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
+
+
+def _update(args: argparse.Namespace) -> int:
+    profile = getattr(args, "profile", None) or os.environ.get("CYBERAU_PROFILE", "cyber-au")
+    home = getattr(args, "profile_home", None) or update_path.default_profile_home(profile)
+    try:
+        return update_path.run_update(
+            profile_home=home,
+            profile=profile,
+            source=getattr(args, "source", None),
+            to_tag=getattr(args, "to_tag", None),
+            force_config=bool(getattr(args, "force_config", False)),
+        )
+    except update_path.MigrationFailure:
+        return 1
+    except update_path.UpdateError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
 
 def slash(raw_args: str) -> str:
     try:
         parts = shlex.split(raw_args or "")
     except ValueError:
-        return USAGE.replace("hermes ", "/")
+        return "Usage: /cyber-au doctor [--offline] [--json] [--fix]"
     if not parts or parts[0] != "doctor":
         return "Usage: /cyber-au doctor [--offline] [--json] [--fix]"
-    report = execute(
-        offline="--offline" in parts,
-        fix="--fix" in parts,
-    )
+    report = execute(offline="--offline" in parts, fix="--fix" in parts)
     rendered = format_json(report) if "--json" in parts else format_text(report)
     return rendered.rstrip("\n")
 

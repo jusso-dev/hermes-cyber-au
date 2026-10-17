@@ -5,6 +5,7 @@
 set -eu
 
 PROFILE=cyber-au
+PROFILE_HOME=""
 OFFLINE=0
 NONINTERACTIVE=0
 YES=0
@@ -19,8 +20,9 @@ Prepare an installed cyber-au profile: connector venv, mcp_servers, plugin
 enable, and a local intel store when that command exists.
 
 Options:
-  --profile <name>     Profile name (default: cyber-au)
-  --offline            Do not contact the network (uv sync --offline)
+  --profile <name>       Profile name (default: cyber-au)
+  --profile-home <path>  Profile directory (skips hermes lookup)
+  --offline              Do not contact the network (uv sync --offline)
   --non-interactive    Do not prompt
   --yes                Accepted for callers that pass it through
   -h, --help           Show this help
@@ -43,6 +45,11 @@ while [ $# -gt 0 ]; do
     --profile)
       need_value "$@"
       PROFILE=$2
+      shift 2
+      ;;
+    --profile-home)
+      need_value "$@"
+      PROFILE_HOME=$2
       shift 2
       ;;
     --profile=*)
@@ -90,9 +97,29 @@ profile_home() {
   printf '%s\n' "$HOME/.hermes/profiles/$PROFILE"
 }
 
-PROFILE_HOME=$(profile_home)
-[ -f "$PROFILE_HOME/mcp/pyproject.toml" ] ||
-  die "The profile connector project is missing at $PROFILE_HOME/mcp. Install the profile before bootstrap."
+if [ -z "$PROFILE_HOME" ]; then
+  PROFILE_HOME=$(profile_home)
+fi
+
+python311() {
+  if [ -n "${CYBERAU_PYTHON:-}" ]; then
+    printf '%s\n' "$CYBERAU_PYTHON"
+    return 0
+  fi
+  for candidate in python3 python3.13 python3.12 python3.11; do
+    if command -v "$candidate" >/dev/null 2>&1 &&
+      "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [ ! -f "$PROFILE_HOME/mcp/pyproject.toml" ]; then
+  PYTHON=$(python311) || die "bootstrap.sh needs Python 3.11 or newer on PATH"
+  exec "$PYTHON" "$REPO_ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME"
+fi
 mkdir -p "$PROFILE_HOME/plugin-data/cyber-au"
 
 if [ -f "$PROFILE_HOME/mcp/servers.yaml" ]; then
@@ -195,5 +222,10 @@ run_doctor() {
 }
 
 run_doctor
+
+if PYTHON=$(python311); then
+  "$PYTHON" "$REPO_ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME" ||
+    printf '%s\n' "Store migration was skipped." >&2
+fi
 
 printf '%s\n' "Bootstrap finished for $PROFILE."
