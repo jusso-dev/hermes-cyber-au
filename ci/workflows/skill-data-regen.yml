@@ -18,7 +18,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 defaults:
   run:
@@ -94,23 +93,32 @@ jobs:
         id: parsers
         run: |
           set -uo pipefail
+          rm -f parser-check.json parser-check.err
           set +e
-          uv run --project mcp cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json
+          uv run --project mcp cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json 2> parser-check.err
           status=$?
           set -e
-          if [ "$status" -eq 2 ]; then
+          cat parser-check.err >&2
+          absent=false
+          if [ -s parser-check.json ] && jq -e 'type == "object" and .absent == true' parser-check.json > /dev/null 2>&1; then
+            absent=true
+          elif [ "$status" -eq 2 ] && grep -qF "not part of the shared library yet" parser-check.err; then
+            absent=true
+          fi
+          if [ "$absent" = true ]; then
             echo "parser-check is absent: not part of the shared library yet"
-            if [ ! -f parser-check.json ]; then
+            if [ ! -s parser-check.json ]; then
               printf '%s\n' '{"absent":true,"detail":"parser-check is absent: not part of the shared library yet","results":[]}' > parser-check.json
             fi
             echo "failures=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "$status" -ne 0 ]; then
-            echo "parser-check exited ${status}" >&2
-            exit "$status"
+          if [ ! -s parser-check.json ]; then
+            echo "parser-check exited ${status} without writing parser-check.json" >&2
+            exit 1
           fi
-          echo "failures=$(jq '[.[] | select(.ok == false)] | length' parser-check.json)" >> "$GITHUB_OUTPUT"
+          failures=$(jq 'if type == "object" then (.results // []) else . end | [.[] | select(.ok == false)] | length' parser-check.json)
+          echo "failures=${failures}" >> "$GITHUB_OUTPUT"
       - name: Regression tests on regenerated data
         run: uv run --project mcp pytest -q tests/skills tests/data --block-network
       - name: Collect regenerated paths
@@ -147,6 +155,9 @@ jobs:
     needs: regen
     if: needs.regen.outputs.parser_failures != '0'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -173,7 +184,8 @@ jobs:
       branch_prefix: data/skill-regen
       title: "Regenerate skill data from source"
       body_file: PR_BODY.md
-    secrets: inherit
+    secrets:
+      DATA_PR_TOKEN: ${{ secrets.DATA_PR_TOKEN }}
     permissions:
       contents: write
       pull-requests: write

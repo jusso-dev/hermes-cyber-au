@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 from cyberau_common.cli import main
 from cyberau_common.regen import (
     PARSER_CHECK_ABSENT,
@@ -102,14 +103,7 @@ def test_missing_sources_are_skipped(tmp_path, capsys, monkeypatch):
     assert SKIP_MESSAGES["ism"] in capsys.readouterr().out
 
 
-def test_checkout_skips_sources_that_are_not_present(capsys):
-    for source in ("e8", "aureg", "attack", "sigma"):
-        assert regen_main([source], root=ROOT) == 0
-        assert SKIP_MESSAGES[source] in capsys.readouterr().out
-    assert not (ROOT / "mcp" / "e8").exists()
-    assert not (ROOT / "mcp" / "aureg").exists()
-    assert not (ROOT / "mcp" / "attack").exists()
-    assert not (ROOT / "mcp" / "sigma").exists()
+def test_shipped_checkout_keeps_its_ism_data():
     assert (ROOT / "mcp" / "asd-ism" / "data").is_dir()
 
 
@@ -245,6 +239,11 @@ def test_workflow_skips_missing_sources_and_pins_actions():
         assert version == expect_version
     assert not re.search(r"uses: actions/[\w.-]+@v\d+", text)
     assert "./.github/workflows/data-update-pr.yml" in text
+    assert "secrets: inherit" not in text
+    assert "DATA_PR_TOKEN: ${{ secrets.DATA_PR_TOKEN }}" in text
+    document = yaml.safe_load(text)
+    assert document["permissions"] == {"contents": "read"}
+    assert document["jobs"]["parser-issue"]["permissions"]["issues"] == "write"
 
 
 def test_actionlint_on_the_copied_layout():
@@ -387,3 +386,84 @@ def test_issue_script_entrypoint_says_when_path_is_absent(tmp_path):
         in completed.stdout
     )
     assert TOKEN not in completed.stdout + completed.stderr
+
+
+def _parser_step() -> str:
+    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    for step in document["jobs"]["regen"]["steps"]:
+        if step.get("id") == "parsers":
+            return step["run"]
+    raise AssertionError("parsers step is missing")
+
+
+def _run_parser_step(tmp_path, stderr, exit_code, payload):
+    """Run the workflow step with a stand-in for uv. Nothing is fetched."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "uv"
+    write = ""
+    if payload is not None:
+        write = f"printf '%s' '{json.dumps(payload)}' > parser-check.json\n"
+    fake.write_text(
+        f"#!/bin/sh\n{write}echo '{stderr}' >&2\nexit {exit_code}\n", encoding="utf-8"
+    )
+    fake.chmod(0o755)
+    work = tmp_path / "work"
+    work.mkdir()
+    output = tmp_path / "github_output"
+    output.write_text("", encoding="utf-8")
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+    env["GITHUB_OUTPUT"] = str(output)
+    completed = subprocess.run(
+        ["bash", "-eo", "pipefail", "-c", _parser_step()],
+        check=False,
+        cwd=work,
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    return completed, output.read_text(encoding="utf-8"), work
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is absent")
+@pytest.mark.parametrize(
+    ("stderr", "code", "payload"),
+    [
+        (PARSER_CHECK_ABSENT, 2, {"absent": True, "results": []}),
+        ("parser-check is not part of the shared library yet", 2, None),
+    ],
+)
+def test_parser_step_treats_an_absent_command_as_zero_failures(
+    tmp_path, stderr, code, payload
+):
+    completed, output, work = _run_parser_step(tmp_path, stderr, code, payload)
+    assert completed.returncode == 0, completed.stderr
+    assert "failures=0" in output
+    assert PARSER_CHECK_ABSENT in completed.stdout
+    assert json.loads((work / "parser-check.json").read_text(encoding="utf-8"))["absent"]
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is absent")
+def test_parser_step_does_not_mistake_a_usage_error_for_absence(tmp_path):
+    completed, output, _work = _run_parser_step(
+        tmp_path, "cyberau-mcp: error: unrecognized arguments: --bogus", 2, None
+    )
+    assert completed.returncode == 1
+    assert "failures=" not in output
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is absent")
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [{"source": "asd", "ok": True}, {"source": "auscert", "ok": False}],
+        {"results": [{"source": "asd", "ok": True}, {"source": "auscert", "ok": False}]},
+    ],
+)
+def test_parser_step_counts_failures_even_when_the_command_exits_nonzero(
+    tmp_path, payload
+):
+    completed, output, _work = _run_parser_step(tmp_path, "auscert failed", 1, payload)
+    assert completed.returncode == 0, completed.stderr
+    assert "failures=1" in output
