@@ -61,6 +61,11 @@ def github_output(monkeypatch, tmp_path):
     return path
 
 
+def _absent(args):
+    """What the shared library CLI returns today for refresh and store."""
+    return nightly.CommandResult(2, "", f"{args[0]} {nightly.ABSENT_MARKER}")
+
+
 def _env_without_keys() -> dict[str, str]:
     env = os.environ.copy()
     for name in nightly.KEYED_SECRETS.values():
@@ -99,7 +104,7 @@ def test_absent_commands_are_reported_and_outside_paths_are_refused(capsys, gith
 
     def spy(args):
         calls.append(list(args))
-        return nightly.run_cyberau(args, env)
+        return _absent(args)
 
     code = _run(
         env,
@@ -130,7 +135,7 @@ def test_keyed_sources_run_only_when_their_secret_exists(capsys):
 
     def spy(args):
         calls.append(list(args))
-        return nightly.run_cyberau(args, env)
+        return _absent(args)
 
     code = _run(env, spy, lambda: [])
     captured = capsys.readouterr()
@@ -225,6 +230,107 @@ def test_failed_command_is_not_called_absent_and_does_not_echo_the_secret(capsys
     assert "open_pr=false" in github_output.read_text(encoding="utf-8")
 
 
+def test_shared_library_still_says_the_commands_are_absent():
+    source = (ROOT / "mcp" / "common" / "src" / "cyberau_common" / "cli.py").read_text(
+        encoding="utf-8"
+    )
+    assert nightly.ABSENT_MARKER in source
+
+
+def test_absent_is_reported_as_a_warning_annotation(capsys):
+    _run(_env_without_keys(), _absent, lambda: [])
+    out = capsys.readouterr().out
+    assert f"::warning title=Intel refresh not run::{nightly.REFRESH_ABSENT}" in out
+
+
+def test_bad_flags_on_an_existing_command_are_not_called_absent(capsys, github_output):
+    def runner(args):
+        return nightly.CommandResult(
+            2, "", "usage: cyberau-mcp refresh [-h]\nerror: unrecognized arguments: --summary x"
+        )
+
+    code = _run(_env_without_keys(), runner, lambda: [])
+    captured = capsys.readouterr()
+    assert code == 2
+    assert nightly.ABSENT_MARKER not in captured.out
+    assert "unrecognized arguments" in captured.err
+    assert "open_pr=false" in github_output.read_text(encoding="utf-8")
+
+
+ROOT_PARSER_ERROR = (
+    "usage: cyberau-mcp [-h]\n"
+    "                   {serve,health,new,import,refresh,regen,parser-check,store}\n"
+    "                   ...\n"
+    "cyberau-mcp: error: unrecognized arguments: --sources asd\n"
+)
+
+
+def test_top_level_parser_rejection_of_the_placeholder_command_is_absence():
+    assert nightly.is_absent(nightly.CommandResult(2, "", ROOT_PARSER_ERROR))
+    own_parser = (
+        "usage: cyberau-mcp refresh [-h]\ncyberau-mcp refresh: error: unrecognized arguments: --x"
+    )
+    assert not nightly.is_absent(nightly.CommandResult(2, "", own_parser))
+
+
+def test_real_cli_placeholders_are_reported_as_absent(monkeypatch):
+    source = (ROOT / "mcp" / "common" / "src" / "cyberau_common" / "cli.py").read_text(
+        encoding="utf-8"
+    )
+    if 'for name in ("refresh", "regen", "parser-check", "store"):' not in source:
+        pytest.skip("refresh is implemented; this check would start a live refresh")
+    env = _env_without_keys()
+    refresh = nightly.run_cyberau(
+        nightly.refresh_args(
+            nightly.PUBLIC_SOURCES,
+            [],
+            {
+                "snapshot_dir": "intel/snapshots",
+                "catalogue": "feeds/catalogue.yaml",
+                "summary": "PR_BODY.md",
+            },
+        ),
+        env,
+    )
+    store = nightly.run_cyberau(list(nightly.STORE_ARGS), env)
+    assert nightly.is_absent(refresh)
+    assert nightly.is_absent(store)
+
+
+def test_absent_marker_in_output_of_a_successful_or_failed_run_is_not_absence():
+    marker = nightly.ABSENT_MARKER
+    assert not nightly.is_absent(nightly.CommandResult(0, marker, ""))
+    assert not nightly.is_absent(nightly.CommandResult(1, "", marker))
+    assert nightly.is_absent(nightly.CommandResult(2, "", f"refresh {marker}"))
+
+
+def test_summary_alone_does_not_open_a_pull_request(github_output):
+    def present(args):
+        return nightly.CommandResult(0, "", "")
+
+    code = _run(_env_without_keys(), present, lambda: ["PR_BODY.md"])
+    assert code == 0
+    assert github_output.read_text(encoding="utf-8").strip() == "open_pr=false"
+
+
+def test_secret_values_are_scrubbed_from_the_pr_body(tmp_path):
+    secret = FAKE_KEYS["OTX_API_KEY"]
+    body = tmp_path / "PR_BODY.md"
+    body.write_text(f"Refreshed.\nupstream said {secret}\n", encoding="utf-8")
+    env = _env_without_keys()
+    env["OTX_API_KEY"] = secret
+
+    def present(args):
+        return nightly.CommandResult(0, "", "")
+
+    code = _run(env, present, lambda: ["PR_BODY.md", "feeds/catalogue.yaml"], root=tmp_path)
+    text = body.read_text(encoding="utf-8")
+    assert code == 0
+    assert secret not in text
+    assert "[REDACTED]" in text
+    assert text.startswith("Refreshed.")
+
+
 def test_porcelain_rename_uses_the_new_path():
     blob = "R  old.txt\0feeds/catalogue.yaml\0 M intel/snapshots/a.json\0?? README.md\0"
     assert nightly.parse_porcelain_z(blob) == [
@@ -247,6 +353,7 @@ def test_git_changes_lists_files_in_a_fresh_repository(tmp_path):
 
 def test_main_reports_absent_commands(monkeypatch, capsys, github_output):
     monkeypatch.setattr(nightly, "git_changes", lambda root: [])
+    monkeypatch.setattr(nightly, "run_cyberau", lambda args, env: _absent(args))
     monkeypatch.delenv("NVD_API_KEY", raising=False)
     monkeypatch.delenv("ABUSECH_AUTH_KEY", raising=False)
     monkeypatch.delenv("OTX_API_KEY", raising=False)

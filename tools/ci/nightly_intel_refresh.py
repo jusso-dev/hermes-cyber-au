@@ -35,6 +35,7 @@ KEYED_SECRETS = {
 ABSENT_MARKER = "is not part of the shared library yet"
 REFRESH_ABSENT = f"cyberau-mcp refresh {ABSENT_MARKER}."
 STORE_ABSENT = f"cyberau-mcp store snapshot {ABSENT_MARKER}."
+ROOT_USAGE = "usage: cyberau-mcp [-h]"
 REFUSAL_PREFIX = "Refusing paths outside the data directories:"
 
 STORE_ARGS = ["store", "snapshot", "--public"]
@@ -138,11 +139,17 @@ def git_changes(root: Path) -> list[str]:
 
 
 def is_absent(result: CommandResult) -> bool:
-    """True when this checkout has no implementation for the command."""
-    text = f"{result.stdout}\n{result.stderr}"
-    if ABSENT_MARKER in text:
+    """True only when the shared library has no such command (exit 2).
+
+    The library registers refresh and store as placeholders. Argparse rejects the
+    leading flags at the top level parser, so refresh is absent when that parser
+    complains. A flag error from a command's own parser is a real failure.
+    """
+    if result.code != 2:
+        return False
+    if ABSENT_MARKER in result.stderr:
         return True
-    return result.code == 2 and "unrecognized arguments" in text
+    return "unrecognized arguments" in result.stderr and ROOT_USAGE in result.stderr
 
 
 def scrub(text: str, env: Mapping[str, str]) -> str:
@@ -152,6 +159,20 @@ def scrub(text: str, env: Mapping[str, str]) -> str:
         if len(value) >= 8 and value in cleaned:
             cleaned = cleaned.replace(value, "[REDACTED]")
     return cleaned
+
+
+def scrub_summary(root: Path, summary: str, env: Mapping[str, str]) -> None:
+    """Remove secret values from the PR body in place, if refresh wrote one."""
+    rel = repo_relative(summary)
+    if rel is None:
+        return
+    path = root / rel
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8", errors="replace")
+    cleaned = scrub(text, env)
+    if cleaned != text:
+        path.write_text(cleaned, encoding="utf-8")
 
 
 def refresh_args(
@@ -209,10 +230,11 @@ def execute(
     env: Mapping[str, str] | None = None,
     runner: Callable[[list[str]], CommandResult] | None = None,
     changes: Callable[[], list[str]] | None = None,
+    root: Path = ROOT,
 ) -> int:
     current: Mapping[str, str] = os.environ if env is None else env
     call = runner or (lambda args: run_cyberau(args, current))
-    list_changes = changes or (lambda: git_changes(ROOT))
+    list_changes = changes or (lambda: git_changes(root))
 
     try:
         optional = keyed_sources(split_csv(optional_sources), current)
@@ -236,13 +258,16 @@ def execute(
         (STORE_ABSENT, store_result),
     ):
         if is_absent(result):
-            print(label)
+            print(f"::warning title=Intel refresh not run::{label}")
             continue
         if result.code != 0:
             detail = scrub(result.stderr or result.stdout, current).strip()
             if detail:
                 print(detail, file=sys.stderr)
             exit_code = result.code
+
+    if not bad_outputs:
+        scrub_summary(root, summary, current)
 
     try:
         changed = list_changes()
@@ -259,7 +284,10 @@ def execute(
     if exit_code != 0:
         set_output("open_pr", "false")
         return exit_code
-    set_output("open_pr", "true" if changed else "false")
+    # The PR body is never committed, so it alone is not a data change.
+    summary_path = repo_relative(summary)
+    data_changed = [path for path in changed if repo_relative(path) != summary_path]
+    set_output("open_pr", "true" if data_changed else "false")
     return 0
 
 
