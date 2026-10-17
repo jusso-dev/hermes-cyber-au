@@ -49,6 +49,10 @@ def test_entry_is_pinned_read_only_and_filtered():
         lambda e: e["args"].remove("--read-only"),
         lambda e: e["args"].__setitem__(e["args"].index("security_advisories"), "repos"),
         lambda e: e["args"].extend(["--tools", "create_issue"]),
+        lambda e: e["args"].append("--tools=create_issue"),
+        lambda e: e["args"].append("--dynamic-toolsets=true"),
+        lambda e: e["args"].__setitem__(e["args"].index("--exclude-tools") + 1, "none"),
+        lambda e: e.pop("required_env"),
         lambda e: e["tools"]["include"].append("list_repository_security_advisories"),
         lambda e: e["env"].__setitem__(0, "GITHUB_PERSONAL_ACCESS_TOKEN=literal-value"),
         lambda e: e.__setitem__("trust", "trusted"),
@@ -76,6 +80,12 @@ def test_no_tool_outside_the_two_advisory_tools_registers():
     extras = [{"name": name} for name in ("issue_write", "create_pull_request", "get_file")]
     kept = wrap.filter_tools(recorded + extras)
     assert {tool["name"] for tool in kept} == set(wrap.INCLUDE)
+
+
+def test_excluded_tools_are_the_other_two_in_the_recorded_toolset():
+    recorded = {tool["name"] for tool in _json("tools_list.json")["tools"]}
+    assert recorded == set(wrap.INCLUDE) | set(wrap.EXCLUDE)
+    assert set(wrap.INCLUDE).isdisjoint(wrap.EXCLUDE)
 
 
 def test_every_tool_is_read_only_and_within_the_name_limit():
@@ -160,7 +170,29 @@ def test_empty_result_is_a_warning():
     assert payload["data_as_of"] is None
 
 
-@pytest.mark.parametrize("bad", [None, "boom", 7, {"ghsa_id": "GHSA-w5f2-9q9c-ff4h"}])
+def test_null_list_result_is_an_empty_result_not_a_fault():
+    # The upstream outputSchema is ["null", "array"]; a Go nil slice arrives as null.
+    jsonschema.validate(None, _schema(f"{LIST}.response.json"))
+    payload = wrap.normalise(LIST, None)
+    assert payload["data"] == []
+    assert payload["warnings"] == ["no advisories matched"]
+
+
+def test_null_get_result_warns_and_returns_no_data():
+    payload = wrap.normalise(GET, None)
+    assert payload["data"] is None
+    assert payload["warnings"]
+
+
+def test_oauth_sign_in_reply_names_the_env_var():
+    payload = wrap.error_envelope(
+        "To authorize the GitHub MCP Server, open this URL in your browser: https://github.com/login/oauth/authorize?state=x"
+    )
+    assert wrap.TOKEN_ENV in payload["warnings"][0]
+    assert "oauth" not in payload["warnings"][0].lower()
+
+
+@pytest.mark.parametrize("bad", ["boom", 7, {"ghsa_id": "GHSA-w5f2-9q9c-ff4h"}])
 def test_malformed_payload_warns_without_raising_for_list(bad):
     payload = wrap.normalise(LIST, bad)
     _envelope_ok(payload)

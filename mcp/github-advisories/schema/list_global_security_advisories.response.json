@@ -1,5 +1,8 @@
 {
-  "type": "array",
+  "type": [
+    "null",
+    "array"
+  ],
   "items": {
     "additionalProperties": false,
     "properties": {

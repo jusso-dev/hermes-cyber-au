@@ -77,6 +77,8 @@ servers:
     - --toolsets
     - security_advisories
     - --read-only
+    - --exclude-tools
+    - list_repository_security_advisories,list_org_repository_security_advisories
     env:
     - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_ADVISORY_TOKEN}
     tools:

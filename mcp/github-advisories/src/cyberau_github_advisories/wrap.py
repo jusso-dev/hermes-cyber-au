@@ -25,6 +25,8 @@ TOKEN_ENV = "GITHUB_ADVISORY_TOKEN"
 UPSTREAM_TOKEN_ENV = "GITHUB_PERSONAL_ACCESS_TOKEN"
 TOOLSET = "security_advisories"
 INCLUDE = ("get_global_security_advisory", "list_global_security_advisories")
+# Same toolset, but these two take a repository or organisation and are not wanted.
+EXCLUDE = ("list_org_repository_security_advisories", "list_repository_security_advisories")
 ATTRIBUTION = "GitHub Advisory Database, CC BY 4.0. https://github.com/advisories"
 ADVISORIES_URL = "https://github.com/advisories"
 FREE_TEXT = ("summary", "description")
@@ -62,8 +64,12 @@ def check_entry(entry: dict, lock: dict) -> list[str]:
         problems.append("--read-only is missing")
     if _flag_values(args, "--toolsets") != [TOOLSET]:
         problems.append(f"--toolsets must be exactly {TOOLSET}")
-    if "--tools" in args or "--dynamic-toolsets" in args:
+    if any(arg.split("=", 1)[0] in ("--tools", "--dynamic-toolsets") for arg in args):
         problems.append("--tools and --dynamic-toolsets would widen the tool set")
+    if sorted(_flag_values(args, "--exclude-tools")) != sorted(EXCLUDE):
+        problems.append(f"--exclude-tools must be exactly {','.join(EXCLUDE)}")
+    if list(entry.get("required_env") or []) != [TOKEN_ENV]:
+        problems.append(f"required_env must be exactly [{TOKEN_ENV}]")
     if tuple((entry.get("tools") or {}).get("include") or ()) != INCLUDE:
         problems.append(f"tools.include must be exactly {list(INCLUDE)}")
     if not str(entry.get("command", "")).startswith("<PROFILE_HOME>/mcp/vendor/"):
@@ -128,7 +134,8 @@ def normalise(tool: str, payload, *, cache: str = "miss", retrieved_at: str | No
     """Shape one tool result into the envelope, wrapping free text as untrusted."""
     warnings: list[str] = []
     if tool == "list_global_security_advisories":
-        rows = payload if isinstance(payload, list) else None
+        # The server marshals an empty Go slice as null, which is an empty result, not a fault.
+        rows = payload if isinstance(payload, list) else [] if payload is None else None
     elif tool == "get_global_security_advisory":
         rows = [payload] if isinstance(payload, dict) else None
     else:
@@ -164,7 +171,10 @@ def error_envelope(message: str, *, retry_after: int | None = None) -> dict:
     if "429" in lowered or "rate limit" in lowered:
         wait = f"Retry after {retry_after} seconds." if retry_after else "Retry later."
         warning = f"GitHub rate limit reached. {wait} Setting {TOKEN_ENV} raises the limit."
-    elif any(mark in lowered for mark in ("401", "403", "bad credentials", "authentication")):
+    elif any(
+        mark in lowered
+        for mark in ("401", "403", "bad credentials", "authentication", "authorize the github")
+    ):
         warning = (
             f"GitHub rejected the credentials. Check {TOKEN_ENV}: use a fine-grained token "
             "with no repository permissions."
@@ -208,7 +218,7 @@ async def live_probe(entry: dict, lock: dict, *, timeout: float = 60.0) -> Probe
         return Probe(
             KEY,
             False,
-            f"set {TOKEN_ENV}: the pinned server will not start without a token",
+            f"set {TOKEN_ENV}: without it the pinned server answers each call with an OAuth link",
         )
     command = resolve_command(entry)
     if not command.is_file():
