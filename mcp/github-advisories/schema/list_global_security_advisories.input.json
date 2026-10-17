@@ -1,0 +1,71 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "affects": {
+      "type": "string"
+    },
+    "cveId": {
+      "type": "string",
+      "pattern": "^CVE-\\d{4}-\\d{4,}$"
+    },
+    "cwes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ecosystem": {
+      "type": "string",
+      "enum": [
+        "actions",
+        "composer",
+        "erlang",
+        "go",
+        "maven",
+        "npm",
+        "nuget",
+        "other",
+        "pip",
+        "pub",
+        "rubygems",
+        "rust"
+      ]
+    },
+    "ghsaId": {
+      "type": "string",
+      "pattern": "^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$"
+    },
+    "isWithdrawn": {
+      "type": "boolean"
+    },
+    "modified": {
+      "type": "string"
+    },
+    "published": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "reviewed",
+        "malware",
+        "unreviewed"
+      ]
+    },
+    "updated": {
+      "type": "string"
+    }
+  },
+  "required": []
+}

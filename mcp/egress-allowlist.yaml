@@ -259,3 +259,8 @@ connectors:
     - crt.sh
     allow_ip_literals: false
     allow_http_loopback: false
+  github-advisories:
+    hosts:
+    - api.github.com
+    allow_ip_literals: false
+    allow_http_loopback: false

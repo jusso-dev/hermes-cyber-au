@@ -197,3 +197,26 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  ghsa:
+    connector: github-advisories
+    wrap: true
+    command: <PROFILE_HOME>/mcp/vendor/github-mcp-server/github-mcp-server
+    args:
+    - stdio
+    - --toolsets
+    - security_advisories
+    - --read-only
+    - --exclude-tools
+    - list_repository_security_advisories,list_org_repository_security_advisories
+    env:
+    - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_ADVISORY_TOKEN}
+    tools:
+      include:
+      - get_global_security_advisory
+      - list_global_security_advisories
+    trust: untrusted
+    lazy: true
+    timeout: 60
+    enabled_by_default: true
+    required_env:
+    - GITHUB_ADVISORY_TOKEN

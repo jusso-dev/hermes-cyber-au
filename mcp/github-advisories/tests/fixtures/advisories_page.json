@@ -1,0 +1,64 @@
+[
+  {
+    "cve_id": "CVE-2026-105192",
+    "cwe_ids": [
+      "CWE-306"
+    ],
+    "description": "### Summary\n\nLMCache is vulnerable to Unauthenticated Remote Code Execution via Pickle Deserialization on the Multiprocess ZMQ Transport\n\n\n\n### Details\n\nLMCache multiprocess mode, also called distributed mode, opens an unauthenticated ZeroMQ ROUTER so worker processes can register and share KV cache blocks. The intended clients are sibling LMCache processes. There is no CURVE, ZAP, password, or message authentication on that socket. LMCache used only inside a vLLM process does not open this port. The transport binds to localhost unless the operator sets a routable address with --host, which is",
+    "ghsa_id": "GHSA-w5f2-9q9c-ff4h",
+    "html_url": "https://github.com/advisories/GHSA-w5f2-9q9c-ff4h",
+    "published_at": "2026-10-16T20:08:44Z",
+    "severity": "critical",
+    "source_code_location": "https://github.com/LMCache/LMCache",
+    "state": null,
+    "summary": "LMCache: Remote code execution via unsafe deserialization in multiprocess mode transport",
+    "type": "reviewed",
+    "updated_at": "2026-10-16T20:09:11Z",
+    "vulnerabilities": [
+      {
+        "first_patched_version": "0.5.6",
+        "package": {
+          "ecosystem": "pip",
+          "name": "lmcache"
+        },
+        "patched_versions": null,
+        "severity": null,
+        "vulnerable_functions": [],
+        "vulnerable_version_range": ">= 0.3.9, < 0.5.6"
+      }
+    ],
+    "withdrawn_at": null
+  },
+  {
+    "cve_id": "CVE-2026-96620",
+    "cwe_ids": [
+      "CWE-20",
+      "CWE-78",
+      "CWE-88"
+    ],
+    "description": "The Claude Agent SDK for Python passed the `resume` option to the Claude CLI without validation, allowing a value beginning with `-` to be interpreted as a separate CLI flag. An attacker who controlled the `resume` value could inject an `--mcp-config` flag defining a stdio MCP server, resulting in arbitrary command execution at CLI startup that bypassed the SDK's permission controls. Exploitation required an application to pass untrusted input as the session ID to resume.\n\nUsers are advised to update to the latest version of the claude-agent-sdk package.\n\nThank you to hackerone.com/moamenmahmo",
+    "ghsa_id": "GHSA-h4mw-j7qp-8mwm",
+    "html_url": "https://github.com/advisories/GHSA-h4mw-j7qp-8mwm",
+    "published_at": "2026-10-16T19:44:37Z",
+    "severity": "critical",
+    "source_code_location": "https://github.com/anthropics/claude-agent-sdk-python",
+    "state": null,
+    "summary": "Claude Agent SDK: Argument Injection via resume Option Allows Arbitrary Command Execution",
+    "type": "reviewed",
+    "updated_at": "2026-10-16T19:44:38Z",
+    "vulnerabilities": [
+      {
+        "first_patched_version": "0.2.121",
+        "package": {
+          "ecosystem": "pip",
+          "name": "claude-agent-sdk"
+        },
+        "patched_versions": null,
+        "severity": null,
+        "vulnerable_functions": [],
+        "vulnerable_version_range": "< 0.2.121"
+      }
+    ],
+    "withdrawn_at": null
+  }
+]
