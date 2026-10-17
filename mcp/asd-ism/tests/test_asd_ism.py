@@ -39,7 +39,7 @@ def test_control_ids_normalise_and_attribute():
     assert record["data"]["source_sha256"]
     assert "Multi-factor authentication" in record["data"]["statement"]
     assert "<<untrusted source=ism>>" in record["data"]["statement"]
-    assert record["attribution"].startswith("Information Security Manual")
+    assert record["attribution"].startswith("© Commonwealth of Australia 2024")
     same = ism_get_control("1173")
     assert same["data"]["oscal_id"] == "ism-1173"
     missing = ism_get_control("ISM-9999")

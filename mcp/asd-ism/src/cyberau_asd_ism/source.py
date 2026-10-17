@@ -21,7 +21,8 @@ from pydantic import Field
 RELEASES_API = "https://api.github.com/repos/AustralianCyberSecurityCentre/ism-oscal/releases"
 RAW_ROOT = "https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal"
 ATTRIBUTION = (
-    "Information Security Manual content is published by the Australian Signals Directorate. "
+    "© Commonwealth of Australia 2024. Information Security Manual content is published by "
+    "the Australian Signals Directorate under Creative Commons Attribution 4.0 International. "
     "This connector is not endorsed by ASD."
 )
 BASELINES = (

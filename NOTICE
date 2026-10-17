@@ -6,4 +6,36 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 This project is independent and is not affiliated with or endorsed by the Australian Signals
 Directorate, the Australian Cyber Security Centre, the Office of the Australian Information
 Commissioner, the Cyber and Infrastructure Security Centre, Nous Research, or any data provider.
-Third-party data used by the planned connectors remains subject to each provider's terms.
+Third-party data stays under each provider's terms. Statements, upstream links, and the date
+each page was checked are in docs/reference/data-sources.md.
+
+NIST NVD
+This product uses data from the NVD API but is not endorsed or certified by the NVD.
+https://nvd.nist.gov/developers/terms-of-use
+Checked 17 October 2026.
+
+CISA Known Exploited Vulnerabilities
+The KEV database is distributed under the Creative Commons 0 1.0 licence.
+You may use this data in any legal manner. Third-party links stay under those sites' terms.
+Use of the information does not authorise the CISA logo or the DHS seal, and is not an endorsement.
+https://www.cisa.gov/sites/default/files/licenses/kev/license.txt
+Checked 17 October 2026.
+
+FIRST EPSS
+FIRST EPSS. Cite the model version and the score date.
+Attribution is requested when EPSS data is used in a publication or product.
+https://www.first.org/epss/faq
+Checked 17 October 2026.
+
+ASD ACSC (cyber.gov.au)
+© Commonwealth of Australia 2026.
+Website material is Creative Commons Attribution 4.0 International, except the Commonwealth
+Coat of Arms, the ACSC logo, third-party content, and material the copyright page excludes.
+https://www.cyber.gov.au/about-us/copyright
+Checked 17 October 2026.
+
+Information Security Manual OSCAL
+The ism-oscal README states © Commonwealth of Australia 2024 and Creative Commons Attribution 4.0
+International for that publication, except the Coat of Arms, the ASD logo, and where otherwise stated.
+https://github.com/AustralianCyberSecurityCentre/ism-oscal
+Checked 17 October 2026.

@@ -3,7 +3,7 @@
 - Upstream: https://www.cyber.gov.au/rss/alerts and the advisories, publications, threats and news RSS paths. One directory also lists news under /acsc/view-all-content/news/rss. That alternate path was not verified from this host.
 - Auth: none
 - Rate limit: one feed poll per 10 minutes, with one extra request allowed for the HTTP/1.1 fallback. Item pages at most one request every 5 seconds. Timeout 60 seconds, 3 retries.
-- Terms: Commonwealth of Australia material from ASD's ACSC. The copyright page could not be fetched on 17 October 2026, so the licence wording is not copied here. Confirm https://www.cyber.gov.au/about-us/copyright before reuse. This connector is not endorsed by ASD.
+- Terms: Creative Commons Attribution 4.0 International, except the Coat of Arms, the ACSC logo, third-party content, and other excluded material. Attribute as © Commonwealth of Australia 2026. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
 - Verified: 2026-10-17
 - Egress hosts: www.cyber.gov.au
 

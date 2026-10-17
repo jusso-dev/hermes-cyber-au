@@ -12,6 +12,10 @@ Read-only ASD ACSC alerts, advisories and publications.
 - Egress hosts: www.cyber.gov.au
 - Source: `mcp/asd-acsc/src/cyberau_asd_acsc/source.py`
 
+## Licence
+
+© Commonwealth of Australia 2026. Material from ASD's ACSC (cyber.gov.au), Creative Commons Attribution 4.0 International. Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. This connector is not endorsed by ASD.
+
 ## Authentication
 
 None.

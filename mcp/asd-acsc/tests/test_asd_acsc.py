@@ -36,7 +36,7 @@ def isolated(tmp_path, monkeypatch):
 
 def test_list_newest_first_and_attribution():
     listed = asd_list_items()
-    assert listed["attribution"].startswith("Commonwealth of Australia")
+    assert listed["attribution"].startswith("© Commonwealth of Australia 2026")
     assert listed["data"][0]["link"] == ITEM
     assert listed["data"][0]["published"] == "2026-10-15"
     assert "CVE-2024-3400" in listed["data"][0]["cves"]

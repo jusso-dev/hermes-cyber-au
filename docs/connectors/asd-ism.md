@@ -12,6 +12,10 @@ Read-only Information Security Manual OSCAL catalogue.
 - Egress hosts: api.github.com, raw.githubusercontent.com
 - Source: `mcp/asd-ism/src/cyberau_asd_ism/source.py`
 
+## Licence
+
+© Commonwealth of Australia 2024. Information Security Manual content is published by the Australian Signals Directorate under Creative Commons Attribution 4.0 International. This connector is not endorsed by ASD.
+
 ## Authentication
 
 None. Optional GITHUB_TOKEN for the GitHub releases API.
