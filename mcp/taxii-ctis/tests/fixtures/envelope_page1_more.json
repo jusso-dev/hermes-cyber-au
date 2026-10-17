@@ -1,0 +1,20 @@
+{
+  "more": true,
+  "next": "synthetic-next-token",
+  "objects": [
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--synthetic-ip",
+      "created": "2026-10-01T00:00:00.000Z",
+      "modified": "2026-10-02T00:00:00.000Z",
+      "name": "Synthetic IP indicator",
+      "description": "Invented indicator for tests.",
+      "pattern_type": "stix",
+      "pattern": "[ipv4-addr:value = '203.0.113.10' OR domain-name:value = 'synthetic.example']",
+      "valid_from": "2026-10-01T00:00:00.000Z",
+      "valid_until": "2099-01-01T00:00:00.000Z",
+      "labels": ["tlp:clear"]
+    }
+  ]
+}

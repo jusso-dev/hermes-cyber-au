@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: "https://example.com/taxii2/root/collections/synthetic-collection-alpha/objects/?limit=100&match[type]=indicator"
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"more":false,"objects":[{"type":"indicator","id":"indicator--synthetic-ip","pattern":"[ipv4-addr:value = ''203.0.113.10'']"}]}'

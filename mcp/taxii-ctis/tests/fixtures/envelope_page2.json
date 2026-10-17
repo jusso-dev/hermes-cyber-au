@@ -1,0 +1,40 @@
+{
+  "more": false,
+  "objects": [
+    {
+      "type": "malware",
+      "spec_version": "2.1",
+      "id": "malware--synthetic-demo",
+      "created": "2026-10-01T00:00:00.000Z",
+      "modified": "2026-10-03T00:00:00.000Z",
+      "name": "Synthetic Demo Malware",
+      "description": "Invented malware object.",
+      "is_family": false,
+      "labels": ["tlp:green"]
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--synthetic-link",
+      "created": "2026-10-01T00:00:00.000Z",
+      "modified": "2026-10-03T00:00:00.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--synthetic-ip",
+      "target_ref": "malware--synthetic-demo",
+      "labels": ["tlp:clear"]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--synthetic-hash",
+      "created": "2026-10-01T00:00:00.000Z",
+      "modified": "2026-10-03T00:00:00.000Z",
+      "name": "Synthetic hash indicator",
+      "description": "Invented hash indicator.",
+      "pattern_type": "stix",
+      "pattern": "[file:hashes.'SHA-256' = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef']",
+      "valid_from": "2026-10-01T00:00:00.000Z",
+      "labels": ["tlp:green"]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+version: 1
+interactions: []
+# Stub cassette. Sync status is read from the local store. No auth header values.

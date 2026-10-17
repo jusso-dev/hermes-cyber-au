@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "description", "can_read", "can_write", "media_types"],
+  "properties": {
+    "id": {"type": "string"},
+    "title": {"type": "string"},
+    "description": {"type": "string"},
+    "can_read": {"type": "boolean"},
+    "can_write": {"type": "boolean"},
+    "media_types": {"type": "array", "items": {"type": "string"}}
+  }
+}
