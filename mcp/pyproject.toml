@@ -20,9 +20,11 @@ dev = [
   "pytest-cov>=5,<7",
   "pytest-recording>=0.13,<0.14",
   "ruff>=0.8,<1",
+  "stix2-validator>=3.3.1,<4",
 ]
 
 [tool.pytest.ini_options]
+pythonpath = ["../plugins/cyber-au"]
 testpaths = [
   "common/tests",
   "../tests",
