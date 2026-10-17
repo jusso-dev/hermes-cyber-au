@@ -1,0 +1,21 @@
+{
+  "title": "Synthetic ransomware briefing fixture",
+  "catalogVersion": "briefing-ransom-0",
+  "dateReleased": "2026-10-17",
+  "count": 1,
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2099-3301",
+      "vendorProject": "Example",
+      "product": "ExampleVault",
+      "vulnerabilityName": "Synthetic ExampleVault fixture",
+      "dateAdded": "2026-10-15",
+      "shortDescription": "Synthetic fixture, not a real incident. Claimed victims: Fixture Victim Alpha and Fixture Victim Bravo.",
+      "requiredAction": "No action. This entry is a synthetic fixture.",
+      "dueDate": "2026-11-05",
+      "knownRansomwareCampaignUse": "Known",
+      "notes": "",
+      "cwes": []
+    }
+  ]
+}
