@@ -248,3 +248,8 @@ connectors:
     - abr.business.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  crowdstrike-recon:
+    hosts:
+    - api.crowdstrike.com
+    allow_ip_literals: false
+    allow_http_loopback: false

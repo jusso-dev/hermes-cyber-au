@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "finding_id",
+    "vendor",
+    "kind",
+    "subject",
+    "observed_at",
+    "licence_scope",
+    "confidence"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "description": "sha256(vendor|kind|subject.value|source_ref)"
+    },
+    "vendor": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "infostealer_credential",
+        "breach_credential",
+        "leak_site_claim",
+        "data_leak_disclosure",
+        "dark_web_mention",
+        "typosquat_domain",
+        "brand_impersonation",
+        "attack_surface_issue"
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "enum": ["domain", "abn", "brand", "email_domain", "ip"]
+        },
+        "value": {
+          "type": "string"
+        },
+        "watchlist_entry": {
+          "type": "string",
+          "description": "id of the matching watchlist entry, if any"
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "description": "for example employees, users, third_parties, records",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    },
+    "data_classes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "first_seen": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_ref": {
+      "type": "string",
+      "description": "vendor record id or permalink; never the leaked content"
+    },
+    "confidence": {
+      "enum": ["vendor_confirmed", "vendor_reported", "unverified_claim"]
+    },
+    "licence_scope": {
+      "enum": ["session_only", "store_metadata", "store_full"]
+    },
+    "stix_exportable": {
+      "type": "boolean"
+    },
+    "contains_personal_information": {
+      "type": "boolean"
+    }
+  }
+}

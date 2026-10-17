@@ -526,3 +526,181 @@ servers:
     enabled_by_default: false
     required_env:
     - HINDSIGHT_BASE_URL
+  hudsonrock:
+    connector: hudson-rock
+    args:
+    - serve
+    - hudson-rock
+    env:
+    - HUDSONROCK_API_KEY=${HUDSONROCK_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - HUDSONROCK_API_KEY
+  spycloud:
+    connector: spycloud
+    args:
+    - serve
+    - spycloud
+    env:
+    - SPYCLOUD_API_KEY=${SPYCLOUD_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - SPYCLOUD_API_KEY
+  upguard:
+    connector: upguard
+    args:
+    - serve
+    - upguard
+    env:
+    - UPGUARD_API_KEY=${UPGUARD_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - UPGUARD_API_KEY
+  recordedfuture:
+    connector: recorded-future
+    args:
+    - serve
+    - recorded-future
+    env:
+    - RECORDED_FUTURE_API_TOKEN=${RECORDED_FUTURE_API_TOKEN}
+    - RECORDED_FUTURE_ORG_ID=${RECORDED_FUTURE_ORG_ID}
+    - RECORDED_FUTURE_MCP_CLIENT_ID=${RECORDED_FUTURE_MCP_CLIENT_ID}
+    - RECORDED_FUTURE_MCP_CLIENT_SECRET=${RECORDED_FUTURE_MCP_CLIENT_SECRET}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - RECORDED_FUTURE_API_TOKEN
+  flashpoint:
+    connector: flashpoint
+    args:
+    - serve
+    - flashpoint
+    env:
+    - FLASHPOINT_API_TOKEN=${FLASHPOINT_API_TOKEN}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - FLASHPOINT_API_TOKEN
+  intel471:
+    connector: intel471
+    args:
+    - serve
+    - intel471
+    env:
+    - INTEL471_EMAIL=${INTEL471_EMAIL}
+    - INTEL471_API_KEY=${INTEL471_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - INTEL471_EMAIL
+    - INTEL471_API_KEY
+  gtidtm:
+    connector: google-ti-dtm
+    args:
+    - serve
+    - google-ti-dtm
+    env:
+    - GTI_API_KEY=${GTI_API_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - GTI_API_KEY
+  csrecon:
+    connector: crowdstrike-recon
+    args:
+    - serve
+    - crowdstrike-recon
+    env:
+    - FALCON_CLIENT_ID=${FALCON_CLIENT_ID}
+    - FALCON_CLIENT_SECRET=${FALCON_CLIENT_SECRET}
+    - FALCON_BASE_URL=${FALCON_BASE_URL}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - FALCON_CLIENT_ID
+    - FALCON_CLIENT_SECRET
+  socradar:
+    connector: socradar
+    args:
+    - serve
+    - socradar
+    env:
+    - SOCRADAR_API_KEY=${SOCRADAR_API_KEY}
+    - SOCRADAR_COMPANY_ID=${SOCRADAR_COMPANY_ID}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - SOCRADAR_API_KEY
+    - SOCRADAR_COMPANY_ID
+  darkowl:
+    connector: darkowl
+    args:
+    - serve
+    - darkowl
+    env:
+    - DARKOWL_PUBLIC_KEY=${DARKOWL_PUBLIC_KEY}
+    - DARKOWL_PRIVATE_KEY=${DARKOWL_PRIVATE_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - DARKOWL_PUBLIC_KEY
+    - DARKOWL_PRIVATE_KEY
+  flare:
+    connector: flare
+    args:
+    - serve
+    - flare
+    env:
+    - FLARE_API_KEY=${FLARE_API_KEY}
+    - FLARE_TENANT_ID=${FLARE_TENANT_ID}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    paid: true
+    required_env:
+    - FLARE_API_KEY

@@ -1,0 +1,16 @@
+interactions:
+- request:
+    method: GET
+    uri: https://api.crowdstrike.com/recon/queries/rules/v1?limit=1
+    headers:
+      Authorization: [REDACTED]
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+    body:
+      string: '{"resources":[]}'
+version: 1
