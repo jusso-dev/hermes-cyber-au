@@ -249,3 +249,8 @@ connectors:
     - mcp.cloudflare.com
     allow_ip_literals: false
     allow_http_loopback: false
+  cloudflare-urlscanner:
+    hosts:
+    - api.cloudflare.com
+    allow_ip_literals: false
+    allow_http_loopback: false

@@ -1,0 +1,7 @@
+{
+  "uuid": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+  "api": "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/urlscanner/v2/result/095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+  "visibility": "Unlisted",
+  "url": "https://example.com/login",
+  "message": "Submission successful"
+}

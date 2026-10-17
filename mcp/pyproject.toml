@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["cyberau-common"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert"]
+members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert", "cloudflare-urlscanner"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
@@ -26,10 +26,10 @@ testpaths = [
   "../tests",
   "asd-acsc/tests",
   "asd-ism/tests",
-  "cloudflare-radar/tests",
   "cisa-kev/tests",
   "first-epss/tests",
   "nvd/tests",
+  "cloudflare-radar/tests",
   "datagov-au/tests",
   "org-exposure/tests",
   "abusech/tests",
@@ -38,6 +38,7 @@ testpaths = [
   "asd-blueprint/tests",
   "au-regulatory/tests",
   "auscert/tests",
+  "cloudflare-urlscanner/tests",
 ]
 addopts = "-q"
 
