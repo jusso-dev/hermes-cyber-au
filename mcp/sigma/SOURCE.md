@@ -2,7 +2,7 @@
 
 - Upstream: https://github.com/SigmaHQ/sigma
 - Auth: none. Optional GITHUB_TOKEN for the GitHub API.
-- Rate limit: at most 10 GitHub requests an hour. The release document is cached for 12 hours. Each rule package is downloaded once per release tag.
+- Rate limit: at most 10 GitHub requests an hour. The release document is cached for 12 hours. Each rule package is downloaded once per release tag. Only requests that reach the network count against that limit. GITHUB_TOKEN is sent to api.github.com only, never to the download hosts.
 - Terms: Sigma rules are published under the Detection Rule License (DRL) 1.1. Keep the rule id and author on every rule shown. https://github.com/SigmaHQ/Detection-Rule-License
 - Verified: 2026-10-17
 - Egress hosts: api.github.com, github.com, objects.githubusercontent.com, release-assets.githubusercontent.com

@@ -10,6 +10,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Literal, NamedTuple
 
+import httpx
 import yaml
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
@@ -45,7 +46,9 @@ _UUID = re.compile(
 _TECHNIQUE = re.compile(r"(?i)^(?:attack\.)?(t\d{4}(?:\.\d{3})?)$")
 _ATTACK_TAG = re.compile(r"(?i)^attack\.(t\d{4}(?:\.\d{3})?)$")
 _TAG = re.compile(r"^[A-Za-z0-9._+-]+$")
+_LABEL = re.compile(r"^[A-Za-z0-9._+-]{1,64}$")
 _PACKAGE = Path(__file__).resolve().parents[2]
+_MAX_RULE_BYTES = 1024 * 1024
 _INDEX: dict[str, list[dict]] = {}
 _TRANSPORT = None
 _SLEEP = time.sleep
@@ -320,7 +323,7 @@ def _corpus(*, force_live: bool = False) -> _Loaded:
         return fallback._replace(cache=state, warning=notes)
     blobs, blob_cache, blob_warning = _packages(payload, force_live=force_live)
     notes = warning + blob_warning
-    tag = str(payload.get("tag_name") or "").strip()
+    tag = _safe_tag(str(payload.get("tag_name") or ""))
     if not blobs:
         fallback = _snapshot_corpus()
         notes = notes + fallback.warning
@@ -352,7 +355,7 @@ def _snapshot_corpus() -> _Loaded:
         problem = "Sigma release payload was not usable"
     tag = ""
     if isinstance(payload, dict) and isinstance(payload.get("tag_name"), str):
-        tag = payload["tag_name"].strip()
+        tag = _safe_tag(payload["tag_name"])
     zip_path = root / "rules_subset.zip"
     urls = _urls(payload) if isinstance(payload, dict) else [RELEASES_LATEST]
     if not zip_path.is_file():
@@ -393,7 +396,7 @@ def _release(*, force_live: bool) -> tuple[object, str, tuple[str, ...]]:
         if payload is None:
             return None, "snapshot", ("Sigma release payload was not usable",)
         return payload, "snapshot", ()
-    body, cache, warning = _http(RELEASES_LATEST, api=True, ttl=12 * 3600, skip_cache=force_live)
+    body, cache, warning = _http(RELEASES_LATEST, ttl=12 * 3600, skip_cache=force_live)
     if body is None:
         message = _github_warning(warning or "live fetch failed")
         if force_live:
@@ -437,7 +440,7 @@ def _packages(
         if not isinstance(url, str) or not url.startswith("https://"):
             warnings.append(f"{name} has no download URL")
             continue
-        body, state, warning = _http(url, api=True, ttl=7 * 86400, skip_cache=force_live)
+        body, state, warning = _http(url, ttl=7 * 86400, skip_cache=force_live)
         if body is None or not zipfile.is_zipfile(io.BytesIO(body)):
             if saved is not None:
                 blobs.append((package, saved))
@@ -460,9 +463,10 @@ def _packages(
     return blobs, cache, tuple(warnings)
 
 
-def _http(url: str, *, api: bool, ttl: int, skip_cache: bool) -> tuple[bytes | None, str, str]:
-    secret = lookup("GITHUB_TOKEN") if api else None
-    headers = {"accept": "application/vnd.github+json"} if "api.github.com" in url else {}
+def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[bytes | None, str, str]:
+    is_api = httpx.URL(url).host == "api.github.com"
+    secret = lookup("GITHUB_TOKEN") if is_api else None
+    headers = {"accept": "application/vnd.github+json"} if is_api else {}
     if secret:
         headers["authorization"] = f"Bearer {secret}"
     data_dir = _data_dir()
@@ -472,8 +476,8 @@ def _http(url: str, *, api: bool, ttl: int, skip_cache: bool) -> tuple[bytes | N
         cache=HttpCache(data_dir / "http_cache.sqlite"),
         limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
         user_agent=USER_AGENT,
-        rate=4,
-        burst=20,
+        rate=10 / 3600,
+        burst=10,
         window="rolling",
         timeout=60,
         retries=3,
@@ -482,7 +486,6 @@ def _http(url: str, *, api: bool, ttl: int, skip_cache: bool) -> tuple[bytes | N
         auth_scope="github" if secret else "anonymous",
     )
     try:
-        _acquire()
         response = client.get(
             url,
             headers=headers,
@@ -540,7 +543,7 @@ def _rules_from_zip(blob: bytes, package: str, tag: str) -> list[dict]:
     found: list[dict] = []
     with zipfile.ZipFile(io.BytesIO(blob)) as archive:
         for info in archive.infolist():
-            if not _yaml_name(info.filename):
+            if not _yaml_name(info.filename) or info.file_size > _MAX_RULE_BYTES:
                 continue
             try:
                 text = archive.read(info).decode("utf-8")
@@ -578,7 +581,7 @@ def _rule(item, package: str, tag: str) -> dict | None:
         "title": str(item.get("title") or ""),
         "author": str(item.get("author") or ""),
         "description": str(item.get("description") or ""),
-        "level": str(item.get("level") or "").lower(),
+        "level": _level(item.get("level")),
         "product": str(logsource.get("product") or ""),
         "service": str(logsource.get("service") or ""),
         "category": str(logsource.get("category") or ""),
@@ -637,17 +640,29 @@ def _public(rule: dict, *, include_yaml: bool = False) -> dict:
         "author": untrusted_text(rule["author"], "sigma"),
         "description": untrusted_text(rule["description"], "sigma") if rule["description"] else "",
         "level": rule["level"],
-        "product": rule["product"],
-        "service": rule["service"],
-        "category": rule["category"],
+        "product": _label(rule["product"]),
+        "service": _label(rule["service"]),
+        "category": _label(rule["category"]),
         "techniques": rule["techniques"],
-        "tags": rule["tags"],
+        "tags": [_label(tag) for tag in rule["tags"]],
         "package": rule["package"],
         "release": rule["release"],
     }
     if include_yaml:
         row["yaml"] = untrusted_text(rule["yaml"], "sigma")
     return row
+
+
+def _label(value: str) -> str:
+    """Pass short identifier-like rule labels through and wrap anything free-form."""
+    if not value or _LABEL.fullmatch(value):
+        return value
+    return untrusted_text(value, "sigma")
+
+
+def _level(value) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in LEVELS else ""
 
 
 def _techniques(tags: list[str]) -> list[str]:
@@ -686,11 +701,7 @@ def _yaml_name(name: str) -> bool:
 def _known_package(payload) -> bool:
     if not isinstance(payload, dict):
         return False
-    names = {
-        asset.get("name")
-        for asset in payload.get("assets") or []
-        if isinstance(asset, dict)
-    }
+    names = {asset.get("name") for asset in payload.get("assets") or [] if isinstance(asset, dict)}
     return any(name in names for name, _package in PACKAGES)
 
 
@@ -731,7 +742,7 @@ def _saved_zip(tag: str, name: str) -> bytes | None:
 
 def _safe_tag(tag: str) -> str:
     text = tag.strip()
-    if not _TAG.fullmatch(text):
+    if not _TAG.fullmatch(text) or not text.strip("."):
         return ""
     return text
 
@@ -776,16 +787,6 @@ def _short(exc: Exception) -> str:
     if len(message) > 300:
         message = message[:300]
     return message or exc.__class__.__name__
-
-
-def _acquire() -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
-        "sigma:github",
-        rate=10 / 3600,
-        burst=10,
-        window="rolling",
-        timeout=60,
-    )
 
 
 def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnings=()):
