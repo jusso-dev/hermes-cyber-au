@@ -7,6 +7,7 @@ the untrusted-content middleware, org exposure, and the doctor command.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from .cli import main
@@ -29,8 +30,18 @@ def data_dir() -> Path:
     return root / "plugin-data" / "cyber-au"
 
 
+def _connector_packages() -> None:
+    """Connector libraries are installed in the profile virtualenv."""
+    profile = Path(__file__).resolve().parents[2]
+    for site in sorted(profile.glob("mcp/.venv/lib/python*/site-packages")):
+        entry = str(site)
+        if entry not in sys.path:
+            sys.path.insert(0, entry)
+
+
 def register(ctx) -> None:
     """Register tools, hooks, middleware, and commands."""
+    _connector_packages()
     from cyberau_org_exposure.tool import SCHEMA, handle
 
     from .cli import register as register_doctor
