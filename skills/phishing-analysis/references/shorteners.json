@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "source": "hermes-cyber-au shortener list",
+  "retrieved": "2026-10-17",
+  "hosts": [
+    "bit.ly",
+    "t.co",
+    "tinyurl.com",
+    "ow.ly",
+    "goo.gl",
+    "is.gd",
+    "buff.ly",
+    "rebrand.ly",
+    "cutt.ly",
+    "shorturl.at",
+    "tiny.cc",
+    "rb.gy"
+  ]
+}
