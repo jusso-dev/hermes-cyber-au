@@ -1,0 +1,49 @@
+{
+  "breach_alerts_total_count": 2,
+  "breach_alerts": [
+    {
+      "uid": "breach-synthetic-1",
+      "last_updated": 1719792000000,
+      "activity": {
+        "first": 1719705600000,
+        "last": 1719792000000
+      },
+      "data": {
+        "breach_alert": {
+          "actor_or_group": "Synthetic Group",
+          "released_at": 1719792000000,
+          "date_of_information": 1719792000000,
+          "title": "Synthetic notice for Example Pty Ltd",
+          "victim": {
+            "name": "Example Pty Ltd",
+            "country": "AU",
+            "region": "Oceania",
+            "revenue": "unknown",
+            "industries": [],
+            "urls": ["https://example.com.au"]
+          }
+        }
+      }
+    },
+    {
+      "uid": "breach-synthetic-2",
+      "last_updated": 1719792000000,
+      "data": {
+        "breach_alert": {
+          "actor_or_group": "Synthetic Group",
+          "released_at": 1719792000000,
+          "date_of_information": 1719792000000,
+          "title": "Notice for Other Corp",
+          "victim": {
+            "name": "Other Corp",
+            "country": "AU",
+            "region": "Oceania",
+            "revenue": "unknown",
+            "industries": [],
+            "urls": ["https://other.example"]
+          }
+        }
+      }
+    }
+  ]
+}

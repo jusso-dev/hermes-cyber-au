@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.intel471.com/v1/breachAlerts?breachAlert=example.com.au&count=10
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"breach_alerts_total_count":0,"breach_alerts":[]}'

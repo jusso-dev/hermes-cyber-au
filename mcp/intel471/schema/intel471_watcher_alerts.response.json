@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["uid", "watcher_name", "source_type", "observed_at", "finding"],
+  "properties": {
+    "uid": {"type": "string"},
+    "watcher_name": {"type": "string"},
+    "source_type": {"type": "string"},
+    "observed_at": {"type": "string"},
+    "finding": {"type": "object"}
+  }
+}
