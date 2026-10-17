@@ -18,7 +18,7 @@ from .api import (
     _run,
     rescore_indicator,
 )
-from .db import close_store, open_store, resolve_db_path, upsert_fts
+from .db import SCHEMA_VERSION, close_store, open_store, resolve_db_path, upsert_fts
 from .policy import configured_zone, distribution_root, require_retention_days, retention_days
 from .scoring import score
 from .text import indexable_text
@@ -176,6 +176,7 @@ def restore_backup(backup: str | Path, path: str | Path | None = None) -> dict:
     if source == target:
         raise ValueError("backup and live store are the same file")
     _integrity(source)
+    _require_intel_store(source)
     close_store(target)
     staging = target.with_name(target.name + ".restore")
     _refuse_symlink(staging)
@@ -280,6 +281,22 @@ def _integrity(path: Path) -> None:
         row = conn.execute("PRAGMA integrity_check").fetchone()
         if row is None or row[0] != "ok":
             raise ValueError("backup failed integrity check")
+    finally:
+        conn.close()
+
+
+def _require_intel_store(path: Path) -> None:
+    """Refuse a file that is not an intel store this code can open."""
+    conn = sqlite3.connect(path, timeout=30)
+    try:
+        tables = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        if not {"schema_version", "sources", "indicators", "observations"} <= tables:
+            raise ValueError("backup is not an intel store")
+        row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        if row is None or row[0] is None or row[0] > SCHEMA_VERSION:
+            raise ValueError("backup was written by a newer store schema")
     finally:
         conn.close()
 

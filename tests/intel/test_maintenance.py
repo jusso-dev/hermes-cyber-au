@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pytest
 import zstandard
 from cyberau_common.cli import main
 from store.api import (
@@ -21,7 +22,7 @@ from store.api import (
     upsert_indicator,
     upsert_vulnerability,
 )
-from store.db import close_store, open_store
+from store.db import SCHEMA_VERSION, close_store, open_store
 from store.maintenance import (
     MAX_SNAPSHOT_BYTES,
     apply_retention,
@@ -203,6 +204,55 @@ def test_restore_from_backup_puts_the_earlier_store_back(store_path):
     assert copied_ok(store_path)
     assert lookup("kept.example", type="domain", path=store_path)
     assert lookup("after.example", type="domain", path=store_path) == []
+
+
+def test_restore_refuses_a_file_that_is_not_an_intel_store(store_path, tmp_path):
+    _indicator(store_path, value="live.example")
+    foreign = tmp_path / "foreign.sqlite"
+    conn = sqlite3.connect(foreign)
+    conn.execute("CREATE TABLE t (x)")
+    conn.commit()
+    conn.close()
+    with pytest.raises(ValueError, match="not an intel store"):
+        restore_backup(foreign, store_path)
+    assert lookup("live.example", type="domain", path=store_path)
+
+
+def test_restore_refuses_a_newer_schema(store_path, tmp_path):
+    _indicator(store_path, value="live.example")
+    saved = backup_store(store_path, now=NOW, zone=ZoneInfo("UTC"))
+    conn = sqlite3.connect(saved["path"])
+    conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION + 1,))
+    conn.commit()
+    conn.close()
+    with pytest.raises(ValueError, match="newer store schema"):
+        restore_backup(saved["path"], store_path)
+    assert lookup("live.example", type="domain", path=store_path)
+
+
+def test_reingesting_a_folded_record_does_not_count_it_twice(store_path):
+    record = {"value": "rolling.example", "observed_at": "2026-01-01T00:00:00Z", "raw": b"old"}
+    _indicator(store_path, **record)
+    assert apply_retention(store_path, now=NOW, days=30) == 1
+    _indicator(store_path, **record)
+    assert apply_retention(store_path, now=NOW, days=30) == 0
+    counter = lookup("rolling.example", type="domain", path=store_path)[0]["counters"][0]
+    assert counter["observations"] == 1
+    assert counter["confidence_sum"] == 80
+
+
+def test_a_new_record_outside_the_folded_span_still_counts(store_path):
+    _indicator(store_path, value="rolling.example", observed_at="2026-01-01T00:00:00Z")
+    apply_retention(store_path, now=NOW, days=30)
+    _indicator(
+        store_path,
+        value="rolling.example",
+        observed_at="2026-02-01T00:00:00Z",
+        raw=b"later",
+    )
+    assert apply_retention(store_path, now=NOW, days=30) == 1
+    counter = lookup("rolling.example", type="domain", path=store_path)[0]["counters"][0]
+    assert counter["observations"] == 2
 
 
 def test_cli_restore_and_snapshot_commands(store_path, capsys, tmp_path, monkeypatch):

@@ -160,29 +160,30 @@ def upsert_indicator(
             upsert_fts(conn, "indicator", record_id, indicator_type, body, replace=False)
             return record_id
 
-        conn.execute(
-            """
-            INSERT INTO observations (
-                indicator_id, source_id, source_ref, observed_at, verdict,
-                confidence, tags, raw_sha256
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(indicator_id, source_id, source_ref, raw_sha256) DO UPDATE SET
-                observed_at = excluded.observed_at,
-                verdict = excluded.verdict,
-                confidence = excluded.confidence,
-                tags = excluded.tags
-            """,
-            (
-                existing["id"],
-                source_id,
-                ref,
-                seen,
-                checked_verdict,
-                checked_confidence,
-                tags_json,
-                digest,
-            ),
-        )
+        if not _already_folded(conn, existing["id"], source_id, ref, digest, seen):
+            conn.execute(
+                """
+                INSERT INTO observations (
+                    indicator_id, source_id, source_ref, observed_at, verdict,
+                    confidence, tags, raw_sha256
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(indicator_id, source_id, source_ref, raw_sha256) DO UPDATE SET
+                    observed_at = excluded.observed_at,
+                    verdict = excluded.verdict,
+                    confidence = excluded.confidence,
+                    tags = excluded.tags
+                """,
+                (
+                    existing["id"],
+                    source_id,
+                    ref,
+                    seen,
+                    checked_verdict,
+                    checked_confidence,
+                    tags_json,
+                    digest,
+                ),
+            )
         merged_verdict, merged_confidence = _score_for_indicator(conn, existing["id"])
         first_seen = min(existing["first_seen"], seen)
         last_seen = max(existing["last_seen"], seen)
@@ -640,6 +641,40 @@ def _ensure_source_row(
         default_tlp=default_tlp,
         path=store.path,
     )
+
+
+def _already_folded(
+    conn: sqlite3.Connection,
+    indicator_id: str,
+    source_id: str,
+    source_ref: str,
+    digest: str,
+    observed_at: str,
+) -> bool:
+    """True when a re-ingested record was already folded into a counter.
+
+    Vacuum deletes the folded row, so the unique key no longer catches a rolling
+    feed that serves the same old record again. A record dated inside a span a
+    counter already covers for the same indicator and source is treated as that
+    record, so a counter is never counted twice.
+    """
+    live = conn.execute(
+        """
+        SELECT 1 FROM observations
+        WHERE indicator_id = ? AND source_id = ? AND source_ref = ? AND raw_sha256 = ?
+        """,
+        (indicator_id, source_id, source_ref, digest),
+    ).fetchone()
+    if live is not None:
+        return False
+    covered = conn.execute(
+        """
+        SELECT 1 FROM indicator_counters
+        WHERE indicator_id = ? AND source_id = ? AND first_seen <= ? AND last_seen >= ?
+        """,
+        (indicator_id, source_id, observed_at, observed_at),
+    ).fetchone()
+    return covered is not None
 
 
 def rescore_indicator(conn: sqlite3.Connection, indicator_id: str) -> None:
