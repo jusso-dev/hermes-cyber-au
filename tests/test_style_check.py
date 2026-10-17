@@ -33,9 +33,7 @@ class StyleCheckTest(unittest.TestCase):
 
     def test_em_dash_fails(self):
         with _TempTree() as root:
-            (root / "notes.md").write_text(
-                "A pause \u2014 then more.\n", encoding="utf-8"
-            )
+            (root / "notes.md").write_text("A pause \u2014 then more.\n", encoding="utf-8")
             errors, hints = self.mod.check(root)
         self.assertTrue(any(item.endswith("em dash") for item in errors))
         self.assertEqual(hints, [])
@@ -52,9 +50,7 @@ class StyleCheckTest(unittest.TestCase):
             names = root / "banned.sha256"
             digest = hashlib.sha256(secret.encode("utf-8")).hexdigest()
             names.write_text(digest + "\n", encoding="utf-8")
-            (root / "notes.md").write_text(
-                f"See {secret} for the box.\n", encoding="utf-8"
-            )
+            (root / "notes.md").write_text(f"See {secret} for the box.\n", encoding="utf-8")
             errors, _hints = self.mod.check(root, names_file=names)
         self.assertTrue(any(item.endswith("banned private name") for item in errors))
         for item in errors:
@@ -63,9 +59,7 @@ class StyleCheckTest(unittest.TestCase):
     def test_private_phrase_matches_a_hash(self):
         secret = "private hostname"
         with _TempTree() as root:
-            (root / "notes.md").write_text(
-                "Use the private hostname here.\n", encoding="utf-8"
-            )
+            (root / "notes.md").write_text("Use the private hostname here.\n", encoding="utf-8")
             errors, _hints = self.mod.check(root, extra_names=[secret])
         self.assertTrue(any("banned private name" in item for item in errors))
         for item in errors:
@@ -80,18 +74,14 @@ class StyleCheckTest(unittest.TestCase):
             with _TempTree() as root:
                 (root / "notes.md").write_text(text, encoding="utf-8")
                 errors, _hints = self.mod.check(root, extra_names=[name])
-            self.assertTrue(
-                any(item.endswith("banned private name") for item in errors), text
-            )
+            self.assertTrue(any(item.endswith("banned private name") for item in errors), text)
 
     def test_banned_name_is_found_inside_hostnames_and_identifiers(self):
         for text in ("host git.acme.internal\n", "acme_corp and Acme-Corp\n"):
             with _TempTree() as root:
                 (root / "notes.md").write_text(text, encoding="utf-8")
                 errors, _hints = self.mod.check(root, extra_names=["acme"])
-            self.assertTrue(
-                any(item.endswith("banned private name") for item in errors), text
-            )
+            self.assertTrue(any(item.endswith("banned private name") for item in errors), text)
 
     def test_unrelated_word_is_not_banned(self):
         with _TempTree() as root:
@@ -126,9 +116,7 @@ class StyleCheckTest(unittest.TestCase):
 
     def test_american_spelling_is_a_hint(self):
         with _TempTree() as root:
-            (root / "notes.md").write_text(
-                "Please organize the report.\n", encoding="utf-8"
-            )
+            (root / "notes.md").write_text("Please organize the report.\n", encoding="utf-8")
             errors, hints = self.mod.check(root)
         self.assertEqual(errors, [])
         self.assertTrue(any("organise" in item for item in hints))

@@ -287,7 +287,7 @@ def _catalog_text(tag: str, *, force_live: bool) -> tuple[str | None, str, str]:
         return fetched, cache, ""
     if force_live:
         return None, "snapshot", warning or f"{tag} live fetch failed"
-    shipped = (_PACKAGE / "data" / tag / "ISM_catalog.json")
+    shipped = _PACKAGE / "data" / tag / "ISM_catalog.json"
     if shipped.is_file():
         return (
             shipped.read_text(encoding="utf-8"),

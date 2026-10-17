@@ -31,9 +31,7 @@ class ValidateRepoTest(unittest.TestCase):
 
     def test_workflow_pins_actions_and_has_no_secret(self):
         text = (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn(
-            "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7", text
-        )
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7", text)
         self.assertIn(
             "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
             text,
@@ -122,9 +120,7 @@ class ValidateRepoTest(unittest.TestCase):
 
     def test_allowlist_drift_when_code_uses_another_host(self):
         with self._tree() as root:
-            self._write_connector(
-                root, "cisa-kev", ["www.cisa.gov"], code_hosts=["evil.example"]
-            )
+            self._write_connector(root, "cisa-kev", ["www.cisa.gov"], code_hosts=["evil.example"])
             findings = self.mod.check_allowlist(root)
         self.assertTrue(any("evil.example" in item for item in findings))
 
@@ -157,9 +153,7 @@ class ValidateRepoTest(unittest.TestCase):
             "distribution_owned:",
         ]
         lines.extend(f"  - {item}" for item in owned)
-        (root / "distribution.yaml").write_text(
-            "\n".join(lines) + "\n", encoding="utf-8"
-        )
+        (root / "distribution.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def _write_skill(self, root: Path, directory: str, name: str | None = None) -> None:
         skill = root / "skills" / directory
@@ -221,9 +215,7 @@ class ValidateRepoTest(unittest.TestCase):
             encoding="utf-8",
         )
         used = hosts if code_hosts is None else code_hosts
-        body = "\n".join(
-            f'URL_{index} = "https://{host}/feed"' for index, host in enumerate(used)
-        )
+        body = "\n".join(f'URL_{index} = "https://{host}/feed"' for index, host in enumerate(used))
         (src / "source.py").write_text(body + "\n", encoding="utf-8")
         lines = ["connectors:", f"  {key}:", "    hosts:"]
         lines.extend(f"    - {host}" for host in hosts)

@@ -42,9 +42,7 @@ CATALOGUE_SCHEMA: dict = {
                     "id": {"type": "string"},
                     "connector": {"type": "string"},
                     "url": {"type": "string"},
-                    "format": {
-                        "enum": ["rss", "atom", "json", "csv", "stix", "oscal", "html"]
-                    },
+                    "format": {"enum": ["rss", "atom", "json", "csv", "stix", "oscal", "html"]},
                     "auth": {
                         "type": "object",
                         "properties": {
@@ -74,9 +72,7 @@ CATALOGUE_SCHEMA: dict = {
 _RESERVED_PROFILE_NAMES = {"hermes", "test", "tmp", "root", "sudo"}
 _ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_HOST_NAME = re.compile(
-    r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
-)
+_HOST_NAME = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 _URL_HOST = re.compile(r"https://([A-Za-z0-9.-]+)")
 _EGRESS_LINE = re.compile(r"^[-*]\s+Egress hosts:\s*(.+?)\s*$", re.MULTILINE)
 _DURATION = re.compile(
@@ -96,9 +92,7 @@ _SKILL_REQUIRED = ("name", "description", "version", "author", "license", "platf
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Validate the hermes-cyber-au repository."
-    )
+    parser = argparse.ArgumentParser(description="Validate the hermes-cyber-au repository.")
     parser.add_argument("--root", type=Path, default=Path("."))
     args = parser.parse_args(argv)
     findings = validate(args.root.resolve())
@@ -153,9 +147,7 @@ def check_distribution(root: Path) -> list[str]:
             if not candidate.is_relative_to(root.resolve()) or not candidate.exists():
                 findings.append(f"{rel}: owned path {item} does not exist")
             if Path(item).name in {".env", "auth.json", "credentials.json"}:
-                findings.append(
-                    f"{rel}: owned path {item} looks like a credential file"
-                )
+                findings.append(f"{rel}: owned path {item} looks like a credential file")
 
     env_requires = data.get("env_requires", [])
     if not isinstance(env_requires, list):
@@ -291,9 +283,7 @@ def check_allowlist(root: Path) -> list[str]:
         if not isinstance(spec, dict):
             findings.append(f"{label}: connector entry must be a mapping")
             continue
-        extra = sorted(
-            set(spec) - {"hosts", "allow_ip_literals", "allow_http_loopback"}
-        )
+        extra = sorted(set(spec) - {"hosts", "allow_ip_literals", "allow_http_loopback"})
         if extra:
             findings.append(f"{label}: unexpected keys: {', '.join(extra)}")
         hosts = spec.get("hosts")
@@ -320,9 +310,7 @@ def check_allowlist(root: Path) -> list[str]:
     packages = []
     if mcp.is_dir():
         packages = sorted(
-            child
-            for child in mcp.iterdir()
-            if child.is_dir() and (child / "SOURCE.md").is_file()
+            child for child in mcp.iterdir() if child.is_dir() and (child / "SOURCE.md").is_file()
         )
     package_names = {child.name for child in packages}
     for key in sorted(set(listed) - package_names - _ALLOWLIST_WITHOUT_PACKAGE):
@@ -335,9 +323,7 @@ def check_allowlist(root: Path) -> list[str]:
         if declare_error:
             findings.append(f"{source_rel}: {declare_error}")
         if key not in listed:
-            findings.append(
-                f"{source_rel}: connector {key} is missing from the egress allowlist"
-            )
+            findings.append(f"{source_rel}: connector {key} is missing from the egress allowlist")
             continue
         if declared != listed[key]:
             findings.append(
@@ -384,16 +370,12 @@ def _check_skill(root: Path, path: Path) -> list[str]:
         if not _SKILL_NAME.fullmatch(name):
             findings.append(f"{rel}: name must be a lowercase hyphenated token")
         elif name != directory_name:
-            findings.append(
-                f"{rel}: name {name} does not match directory {directory_name}"
-            )
+            findings.append(f"{rel}: name {name} does not match directory {directory_name}")
     elif "name" in data:
         findings.append(f"{rel}: name must be a string")
 
     description = data.get("description")
-    if isinstance(description, str) and (
-        not description.strip() or len(description) > 1024
-    ):
+    if isinstance(description, str) and (not description.strip() or len(description) > 1024):
         findings.append(f"{rel}: description must be 1 to 1024 characters")
     elif "description" in data and not isinstance(description, str):
         findings.append(f"{rel}: description must be a string")
@@ -458,9 +440,7 @@ def _check_required_env(rel: str, variables: object) -> list[str]:
         if required_for is not None and not (
             isinstance(required_for, str) or _is_str_list(required_for)
         ):
-            findings.append(
-                f"{label} required_for must be a string or a list of strings"
-            )
+            findings.append(f"{label} required_for must be a string or a list of strings")
     return findings
 
 

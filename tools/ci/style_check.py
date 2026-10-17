@@ -193,10 +193,7 @@ def _spelling_hints(rel: str, text: str) -> list[str]:
             continue
         url_spans = [match.span() for match in _URL.finditer(line)]
         for match in _HINT_RE.finditer(line):
-            if any(
-                start <= match.start() and match.end() <= end
-                for start, end in url_spans
-            ):
+            if any(start <= match.start() and match.end() <= end for start, end in url_spans):
                 continue
             # Keep capitalised product and agency names such as "Integration Center".
             american_raw = match.group(1)
@@ -222,16 +219,12 @@ def _load_hashes(root: Path, names_file: Path | None) -> tuple[set[str], list[st
         return set(), [f"{rel}: private name hash list is missing"]
     hashes: set[str] = set()
     errors: list[str] = []
-    for number, raw in enumerate(
-        path.read_text(encoding="utf-8").splitlines(), start=1
-    ):
+    for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         if not re.fullmatch(r"[0-9a-fA-F]{64}", line):
-            errors.append(
-                f"{path.name}:{number}: private name entry must be a SHA-256 hex digest"
-            )
+            errors.append(f"{path.name}:{number}: private name entry must be a SHA-256 hex digest")
             continue
         hashes.add(line.lower())
     return hashes, errors
@@ -255,10 +248,7 @@ def _iter_files(root: Path) -> list[Path]:
         ]
         for name in filenames:
             path = Path(dirpath) / name
-            if (
-                path.suffix.lower() in _TEXT_SUFFIXES
-                or path.name == "private_names.sha256"
-            ):
+            if path.suffix.lower() in _TEXT_SUFFIXES or path.name == "private_names.sha256":
                 found.append(path)
     return sorted(found)
 

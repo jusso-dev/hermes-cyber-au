@@ -18,9 +18,7 @@ from pydantic import Field
 
 CVE_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 HISTORY_API = "https://services.nvd.nist.gov/rest/json/cvehistory/2.0"
-ATTRIBUTION = (
-    "This product uses data from the NVD API but is not endorsed or certified by the NVD."
-)
+ATTRIBUTION = "This product uses data from the NVD API but is not endorsed or certified by the NVD."
 _PACKAGE = Path(__file__).resolve().parents[2]
 _CVE = re.compile(r"^CVE-\d{4}-\d{4,}$")
 _CveId = Annotated[str, Field(pattern=r"^CVE-\d{4}-\d{4,}$")]
@@ -322,9 +320,7 @@ def _cve(cve: dict) -> dict:
         "description": description,
         "cvss": cvss,
         "cwes": cwes,
-        "references": [
-            ref.get("url") for ref in cve.get("references") or [] if ref.get("url")
-        ],
+        "references": [ref.get("url") for ref in cve.get("references") or [] if ref.get("url")],
     }
 
 

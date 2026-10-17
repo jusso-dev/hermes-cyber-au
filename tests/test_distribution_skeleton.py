@@ -55,9 +55,9 @@ class DistributionSkeletonTest(unittest.TestCase):
     def test_manifest_declares_name_version_and_optional_keys(self):
         text = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
         self.assertIn("name: cyber-au\n", text)
-        self.assertIn('version: 0.1.0\n', text)
+        self.assertIn("version: 0.1.0\n", text)
         self.assertIn('hermes_requires: ">=0.22.2"\n', text)
-        self.assertIn("license: \"Apache-2.0\"\n", text)
+        self.assertIn('license: "Apache-2.0"\n', text)
         for rel in OWNED:
             self.assertIn(f"  - {rel}\n", text)
         for name in ENV_NAMES:
@@ -100,9 +100,7 @@ class DistributionSkeletonTest(unittest.TestCase):
         self.assertIn("[]", text)
 
     def test_git_index_has_no_secret_files(self):
-        tracked = subprocess.check_output(
-            ["git", "ls-files"], cwd=ROOT, text=True
-        ).splitlines()
+        tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
         banned_names = {".env", "auth.json", "credentials.json", ".env.EXAMPLE"}
         bad = [
             path
