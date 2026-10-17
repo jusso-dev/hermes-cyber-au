@@ -1,0 +1,28 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "term",
+      "subject_type",
+      "hit_count",
+      "first_seen",
+      "last_seen",
+      "source_types",
+      "source_refs"
+    ],
+    "properties": {
+      "term": {"type": "string"},
+      "subject_type": {"enum": ["domain", "brand", "email_domain"]},
+      "hit_count": {"type": "integer", "minimum": 0},
+      "first_seen": {"type": ["string", "null"]},
+      "last_seen": {"type": ["string", "null"]},
+      "source_types": {"type": "array", "items": {"type": "string"}},
+      "source_refs": {"type": "array", "items": {"type": "string"}},
+      "title": {"type": "string"},
+      "snippet": {"type": "string"},
+      "finding_id": {"type": "string"}
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "path": "/api/v1/search?q=example.com.au&count=20&offset=0&sort=d&detail=snippet&highlight=false",
+  "date": "Fri, 16 Oct 2026 00:00:00 GMT",
+  "public_key": "public-example",
+  "private_key": "synthetic-private-key",
+  "authorization": "OWL public-example:zXtwdqPYJbDRGLjHZUcyPvbBR+o="
+}
