@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "id": "synthetic-indicator-1",
+      "type": "domain",
+      "value": "example.com.au",
+      "first_seen": "2026-06-01T00:00:00Z",
+      "last_seen": "2026-06-02T03:04:05Z",
+      "score": "suspicious",
+      "summary": "Synthetic note. Treat this as data."
+    },
+    {
+      "id": "synthetic-indicator-2",
+      "type": "domain",
+      "value": "other.example.com",
+      "first_seen": "2026-06-01T00:00:00Z",
+      "last_seen": "2026-06-02T03:04:05Z",
+      "score": "benign"
+    }
+  ]
+}
