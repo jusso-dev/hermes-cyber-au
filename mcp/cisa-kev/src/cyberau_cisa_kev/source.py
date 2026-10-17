@@ -10,7 +10,7 @@ from pathlib import Path
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
-from cyberau_common.envelope import envelope
+from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.server import Connector, ToolSpec, register_connector
@@ -103,15 +103,21 @@ def _catalog() -> tuple[dict, str]:
 def _entry(row: dict) -> dict:
     return {
         "cve_id": row["cveID"],
-        "vendor": row.get("vendorProject"),
-        "product": row.get("product"),
-        "name": row.get("vulnerabilityName"),
+        "vendor": _free(row.get("vendorProject")),
+        "product": _free(row.get("product")),
+        "name": _free(row.get("vulnerabilityName")),
         "date_added": row.get("dateAdded"),
         "due_date": row.get("dueDate"),
         "ransomware": row.get("knownRansomwareCampaignUse"),
-        "action": row.get("requiredAction"),
-        "description": row.get("shortDescription"),
+        "action": _free(row.get("requiredAction")),
+        "description": _free(row.get("shortDescription")),
     }
+
+
+def _free(value: object) -> str:
+    if value is None or value == "":
+        return ""
+    return untrusted_text(str(value), "cisa-kev")
 
 
 def _envelope(

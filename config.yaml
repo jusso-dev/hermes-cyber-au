@@ -3,4 +3,7 @@ timezone: Australia/Sydney
 security:
   allow_private_urls: false
   redact_secrets: true
+plugins:
+  enabled:
+    - cyber-au
 mcp_servers: {}

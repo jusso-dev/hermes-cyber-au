@@ -8,13 +8,13 @@ from datetime import UTC, datetime
 from cyberau_common.secrets import redact
 
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
+_INVISIBLE = re.compile("[\u00ad\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]")
 _WS = re.compile(r"\s+")
 
 
 def untrusted_text(value: str, source: str, max_len: int = 4000) -> str:
-    """Strip control and bidi characters, collapse whitespace, and wrap the text."""
-    cleaned = _BIDI.sub("", _CONTROL.sub("", value))
+    """Strip control, bidi, and zero-width characters, then cap and wrap the text."""
+    cleaned = _INVISIBLE.sub("", _CONTROL.sub("", value))
     cleaned = _WS.sub(" ", cleaned).strip()
     if len(cleaned) > max_len:
         cleaned = cleaned[:max_len]
