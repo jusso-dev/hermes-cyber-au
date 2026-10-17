@@ -18,6 +18,7 @@ _CITATION_RE = re.compile(r"^[^,]+, [^,]+, retrieved \d{4}-\d{2}-\d{2}$")
 _WHEN_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z)?$")
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_LIVE_URL_RE = re.compile(r"(?i)\bhttps?://")
 _COLUMNS = (
     "Indicator",
     "Type",
@@ -177,7 +178,11 @@ def _proposal_problems(proposal: object) -> list[str]:
         problems.append("proposal must start with 'Proposal: '")
     if "Nothing has been written." not in proposal:
         problems.append("proposal must say nothing has been written")
-    if _IPV4_RE.search(proposal) or _EMAIL_RE.search(proposal):
+    if (
+        _IPV4_RE.search(proposal)
+        or _EMAIL_RE.search(proposal)
+        or _LIVE_URL_RE.search(proposal)
+    ):
         problems.append("proposal is not defanged")
     return problems
 
@@ -271,10 +276,17 @@ def _display_problems(kind: str, indicator: str) -> list[str]:
     problems = []
     if kind == "ipv4" and _IPV4_RE.search(indicator):
         problems.append("ipv4 indicator is not defanged")
-    if kind in {"domain", "url"} and "." in indicator.replace("[.]", ""):
-        problems.append(f"{kind} indicator is not defanged")
-    if kind == "url" and indicator.startswith(("http://", "https://")):
-        problems.append("url indicator is not defanged")
+    if kind == "domain" and "." in indicator.replace("[.]", ""):
+        problems.append("domain indicator is not defanged")
+    if kind == "url":
+        # Dots in the path and query stay. Only the scheme and host are defanged.
+        host = re.split(r"[/?#]", indicator.split("://", 1)[-1], maxsplit=1)[0]
+        if (
+            "." in host.replace("[.]", "")
+            or _LIVE_URL_RE.match(indicator)
+            or _IPV4_RE.search(indicator)
+        ):
+            problems.append("url indicator is not defanged")
     if kind == "email" and _EMAIL_RE.search(indicator):
         problems.append("email indicator is not defanged")
     if kind in _HASH_LENGTHS and not re.fullmatch(
@@ -295,7 +307,11 @@ def _excerpt_problems(value: object) -> list[str]:
         if not isinstance(item["source"], str) or not isinstance(item["text"], str):
             problems.append("excerpt source and text must be strings")
             continue
-        if _IPV4_RE.search(item["text"]) or _EMAIL_RE.search(item["text"]):
+        if (
+            _IPV4_RE.search(item["text"])
+            or _EMAIL_RE.search(item["text"])
+            or _LIVE_URL_RE.search(item["text"])
+        ):
             problems.append("untrusted excerpt is not defanged")
     return problems
 

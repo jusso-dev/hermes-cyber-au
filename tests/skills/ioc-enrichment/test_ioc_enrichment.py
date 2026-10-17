@@ -98,6 +98,26 @@ def test_address_policy():
     assert private_url.external_lookup is False
 
 
+def test_internal_and_numeric_hosts_are_not_sent_externally():
+    expected = {
+        "http://localhost/a": "single-label hostname",
+        "http://intranet/x": "single-label hostname",
+        "http://2130706433/": "non-standard IPv4 address",
+        "http://127.1/": "non-standard IPv4 address",
+        "http://0x7f.1/": "non-standard IPv4 address",
+        "printer.local": "internal hostname",
+        "https://wiki.corp/page": "internal hostname",
+        "host.home.arpa": "internal hostname",
+    }
+    for value, refusal in expected.items():
+        prepared = normalise.prepare(value)
+        assert prepared.refusal == refusal, value
+        assert prepared.external_lookup is False, value
+    for value in ("updates.example.com", "https://updates.example.com/a.exe"):
+        assert normalise.prepare(value).external_lookup is True, value
+    assert normalise.prepare("localcorp.example").external_lookup is True
+
+
 def test_hashes_domains_email_and_idna():
     digest = reference_cases.SAMPLE_SHA256.upper()
     prepared = normalise.prepare(digest)
@@ -302,6 +322,36 @@ def test_render_rejects_a_raw_address_and_marks_proposals():
             refusal="documentation test",
             citations=["RFC 5737, none, retrieved 2026-10-17"],
         )
+
+
+def test_render_checks_url_host_not_path_and_flags_live_urls():
+    base = {
+        "indicator": "hxxp://evil[.]example/payload.exe",
+        "type": "url",
+        "verdict": "unknown",
+        "confidence": 0,
+        "points": {"malicious": 0, "suspicious": 0, "benign": 0},
+        "sources": [],
+        "context_sources": [],
+        "first_seen": None,
+        "last_seen": None,
+        "tlp": "CLEAR",
+        "external_lookup": True,
+        "from_store": False,
+        "documentation": False,
+        "citations": ["Example, none, retrieved 2026-10-17"],
+    }
+    wrap = {"indicators": [base], "missing_sources": [], "proposals": []}
+    assert render.validate(wrap) == []
+    live = dict(base, indicator="hxxp://evil.example/payload.exe")
+    assert render.validate(dict(wrap, indicators=[live])) != []
+    proposal = "Proposal: store http://evil.example/a. Nothing has been written."
+    assert render.validate(dict(wrap, proposals=[proposal])) != []
+    excerpt = dict(
+        base,
+        untrusted_excerpts=[{"source": "otx", "text": "go to https://evil.example"}],
+    )
+    assert render.validate(dict(wrap, indicators=[excerpt])) != []
 
 
 def test_schema_covers_the_renderer():

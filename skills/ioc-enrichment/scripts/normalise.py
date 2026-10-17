@@ -37,6 +37,18 @@ _DOCUMENTATION = (
     ipaddress.ip_network("2001:db8::/32"),
 )
 _SHARED = ipaddress.ip_network("100.64.0.0/10")
+# Names that only resolve inside a network. Sending one to a third party leaks it.
+_INTERNAL_SUFFIXES = (
+    "local",
+    "localhost",
+    "internal",
+    "intranet",
+    "lan",
+    "corp",
+    "home",
+    "home.arpa",
+)
+_NUMERIC_HOST_RE = re.compile(r"(?i)(?:0x[0-9a-f]+|\d+)(?:\.(?:0x[0-9a-f]+|\d+))*")
 
 
 @dataclass(frozen=True)
@@ -312,6 +324,8 @@ def _from_url(text: str) -> Prepared:
             host_text = host.rstrip(".").encode("idna").decode("ascii")
         except UnicodeError:
             return Prepared(text, text, "unknown", False, False, "invalid domain")
+        refusal = _host_refusal(host_text)
+        allowed = refusal is None
     scheme = parts.scheme.lower()
     default_port = (scheme == "https" and port == 443) or (
         scheme == "http" and port == 80
@@ -344,7 +358,21 @@ def _from_domain(text: str) -> Prepared:
         return Prepared(text, text, "unknown", False, False, "invalid domain")
     if len(normalised) > 253 or not _DOMAIN_RE.fullmatch(normalised):
         return Prepared(text, text, "unknown", False, False, "invalid domain")
-    return Prepared(text, normalised, "domain", True, False, None)
+    refusal = _host_refusal(normalised)
+    return Prepared(text, normalised, "domain", refusal is None, False, refusal)
+
+
+def _host_refusal(host: str) -> str | None:
+    """Refuse a name that is not a public domain: numeric IPv4 forms and internal names."""
+    if _NUMERIC_HOST_RE.fullmatch(host):
+        return "non-standard IPv4 address"
+    if "." not in host:
+        return "single-label hostname"
+    if any(
+        host == suffix or host.endswith("." + suffix) for suffix in _INTERNAL_SUFFIXES
+    ):
+        return "internal hostname"
+    return None
 
 
 def _parse_time(value: str) -> datetime:

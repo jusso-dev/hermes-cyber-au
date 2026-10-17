@@ -186,10 +186,7 @@ def _cloudflare() -> dict:
                 "The local store has no observation in the last 6 hours.",
                 [("hermes-cyber-au local intel store", "none", SESSION)],
             ),
-            (
-                "GreyNoise is disabled, so it was not called.",
-                [("GreyNoise Community", "none", SESSION)],
-            ),
+            ("GreyNoise is disabled, so it was not called.", []),
             (
                 (
                     f"InternetDB returned hostname {hostname.display()} and ports 53, 80 and 443. "
@@ -200,7 +197,8 @@ def _cloudflare() -> dict:
             (
                 (
                     f"Cloudflare Radar returned rank 1000 for {hostname.display()}, "
-                    "inside the top 10000."
+                    "inside the top 10000. The hostname comes from InternetDB reverse DNS "
+                    "and is not forward confirmed."
                 ),
                 [("Cloudflare Radar", "none", SESSION)],
             ),
@@ -235,6 +233,7 @@ def _cloudflare() -> dict:
             hostname.display(),
             "rank 1000",
             "inside the top 10000",
+            "not forward confirmed",
             "CC BY-NC 4.0",
             "Missing sources: greynoise.",
             "Source: Cloudflare Radar, none, retrieved ",

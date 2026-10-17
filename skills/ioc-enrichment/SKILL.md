@@ -67,6 +67,7 @@ Helpers, all local, with no network:
 1. Normalise each token with `scripts/normalise.py`. Split the paste on whitespace and strip a trailing comma. One indicator per call.
    Refang `hxxp`, `[.]`, `(.)`, `[:]`, `[@]` and `[at]`. Lowercase a hash and check the length. Convert a domain with the standard-library IDNA codec.
    Refuse an external lookup for a private, shared, loopback, link-local, multicast, unspecified, reserved or IPv4-mapped address, and name the category.
+   Refuse an external lookup for a single-label hostname, a name under `.local`, `.localhost`, `.internal`, `.intranet`, `.lan`, `.corp`, `.home` or `.home.arpa`, and a host written as a decimal, octal or hex IPv4 form such as `2130706433`. Name the category. This applies to the host of a URL as well.
    Source: RFC 1918, none, retrieved 2026-10-17
    Source: RFC 6598, none, retrieved 2026-10-17
    Documentation prefixes may be looked up. Label them as documentation. A hit is not evidence about a live host.
@@ -126,6 +127,8 @@ An IPv4-mapped IPv6 address is refused. Ask for the IPv4 form. An address with a
 The IDNA codec in the helper is the standard-library codec (IDNA 2003). A later store canonical form may use IDNA 2008. When the two forms differ, keep both in the prose and say they differ.
 
 Lookalike tokens are ASCII. `anz`, `nab`, `ing` and `boq` match a hyphen-separated part, so the heuristic has false positives. A match is a lead. This skill does not score confusable characters. When the only question is a homoglyph, say "I don't know".
+
+A hostname from InternetDB is reverse DNS and is not forward confirmed, so whoever controls the address can set it to a popular name. Say in the answer that the hostname is unconfirmed whenever a Radar rank for it adds benign points.
 
 Do not assume a verdict for a shared resolver address such as `1[.]1[.]1[.]1`. A hostname on a shared address is context. InternetDB does not set the verdict. A Feodo or MalwareBazaar listing still scores on its own points.
 
