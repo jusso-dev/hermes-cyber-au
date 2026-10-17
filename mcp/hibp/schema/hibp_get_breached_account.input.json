@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account": {"type": "string", "maxLength": 254},
+    "domain": {"type": "string", "maxLength": 253},
+    "include_unverified": {"type": "boolean", "default": true},
+    "response_mode": {"enum": ["names", "truncated", "full"], "default": "names"},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 25},
+    "offset": {"type": "integer", "minimum": 0, "default": 0},
+    "approval_token": {"type": "string", "maxLength": 128}
+  },
+  "required": ["account"]
+}

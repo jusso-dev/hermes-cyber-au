@@ -1,0 +1,5 @@
+hibp_list_breaches
+hibp_get_breach
+hibp_get_pwned_passwords_range
+hibp_get_breached_account
+hibp_get_breached_domain

@@ -73,7 +73,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | ThreatSieve | `threatsieve` | Author's public tools | `THREATSIEVE_URL` (optional), `THREATSIEVE_API_KEY` (optional) | on | v1.0 | planned | https://github.com/jusso-dev/ThreatSieve |
 | M365-Secure assessment reports | `(none)` | Author's public tools | none | on | v0.2 | planned | https://github.com/jusso-dev/M365-Secure |
 | VirusTotal via the official VirusTotal MCP server | `virustotal` | Global threat intelligence | `VIRUSTOTAL_API_KEY` | off: non-commercial terms, bring your own key | v0.1 MVP | planned | https://docs.virustotal.com/reference/overview |
-| Have I Been Pwned via the official HIBP MCP server | `hibp` | Global threat intelligence | `HIBP_API_KEY` (optional) | on | v0.1 MVP | planned | https://haveibeenpwned.com/API/v3 |
+| Have I Been Pwned via the official HIBP MCP server | `hibp` | Global threat intelligence | `HIBP_API_KEY` (optional) | on | v0.1 MVP | planned | [docs/connectors/hibp.md](docs/connectors/hibp.md) |
 | GitHub Advisory Database via the GitHub MCP server | `ghsa` | Vulnerability intelligence | `GITHUB_ADVISORY_TOKEN` (optional) | on | v0.1 MVP | planned | https://github.com/advisories |
 | Generic TAXII 2.1 reader for ASD CTIS and other TAXII sources | `taxii` | Australian government | `TAXII_API_ROOT`, `TAXII_COLLECTION_ID`, `TAXII_USERNAME`, `TAXII_PASSWORD` | off: bring your own access | v0.2 | planned | https://www.cyber.gov.au/become-a-partner |
 | NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | Regional government | none | on | v0.2 | planned | https://www.ncsc.govt.nz/alerts/ |

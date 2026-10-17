@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["account_sha256", "breaches"],
+  "properties": {
+    "account_sha256": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+    "breaches": {"type": "array", "items": {"type": "object", "required": ["name"]}},
+    "total_count": {"type": "integer"}
+  }
+}

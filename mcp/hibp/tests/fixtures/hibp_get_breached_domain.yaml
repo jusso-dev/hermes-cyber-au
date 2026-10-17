@@ -1,0 +1,21 @@
+version: 1
+interactions:
+- request:
+    method: POST
+    uri: https://haveibeenpwned.com/mcp
+    body: '{"id":1,"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"domain":"hibp-integration-tests.com","limit":25,"offset":0,"response_format":"json"},"name":"hibp_get_breached_domain"}}'
+    headers: {}
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      content-type:
+      - text/event-stream
+    body:
+      string: 'event: message
+
+        data: {"result":{"content":[{"type":"text","text":"{\"domain\":\"hibp-integration-tests.com\",\"breachesByAlias\":{\"account-exists\":[\"Adobe\"],\"multiple-breaches\":[\"Adobe\",\"Gawker\",\"Stratfor\"]},\"aliasCount\":2,\"totalCount\":2,\"returnedCount\":2,\"offset\":0,\"limit\":25,\"hasMore\":false}"}],"structuredContent":{"domain":"hibp-integration-tests.com","breachesByAlias":{"account-exists":["Adobe"],"multiple-breaches":["Adobe","Gawker","Stratfor"]},"aliasCount":2,"totalCount":2,"returnedCount":2,"offset":0,"limit":25,"hasMore":false},"isError":false},"jsonrpc":"2.0","id":1}
+
+
+        '
