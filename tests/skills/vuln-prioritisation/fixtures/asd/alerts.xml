@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Synthetic ACSC alerts</title>
+    <link>https://www.cyber.gov.au/rss/alerts</link>
+    <description>Synthetic fixture. Not an ASD publication.</description>
+    <item>
+      <title>Synthetic alert for CVE-2024-3400</title>
+      <link>https://www.cyber.gov.au/about-this-advisory</link>
+      <pubDate>Thu, 15 Oct 2026 09:00:00 +1100</pubDate>
+      <description>Synthetic fixture alert. CVE-2024-3400. Not an ASD publication.</description>
+    </item>
+    <item>
+      <title>Synthetic alert for CVE-2099-2201</title>
+      <link>https://www.cyber.gov.au/about-older-alert</link>
+      <pubDate>Wed, 14 Oct 2026 09:00:00 +1100</pubDate>
+      <description>Synthetic fixture alert. CVE-2099-2201. Not an ASD publication.</description>
+    </item>
+  </channel>
+</rss>

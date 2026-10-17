@@ -1,0 +1,21 @@
+{
+  "title": "Synthetic KEV fixture for vulnerability ranking",
+  "catalogVersion": "skill-fixture-1",
+  "dateReleased": "2026-10-17T00:00:00.000Z",
+  "count": 1,
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2024-3400",
+      "vendorProject": "Example",
+      "product": "FixtureGateway",
+      "vulnerabilityName": "Synthetic KEV row for ranking tests",
+      "dateAdded": "2026-10-01",
+      "shortDescription": "Synthetic fixture row. Not the CISA catalogue text.",
+      "requiredAction": "No action. This entry is a test fixture.",
+      "dueDate": "2026-10-22",
+      "knownRansomwareCampaignUse": "Unknown",
+      "notes": "",
+      "cwes": ["CWE-77"]
+    }
+  ]
+}

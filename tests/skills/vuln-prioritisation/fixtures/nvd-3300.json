@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-16T00:00:00.000",
+  "vulnerabilities": [
+    {
+      "cve": {
+        "id": "CVE-2099-3300",
+        "published": "2026-10-01T00:00:00.000",
+        "descriptions": [
+          {"lang": "en", "value": "Synthetic NVD row for an internal-only asset."}
+        ],
+        "metrics": {
+          "cvssMetricV31": [
+            {"cvssData": {"baseScore": 9.8, "baseSeverity": "CRITICAL"}}
+          ]
+        },
+        "weaknesses": [{"description": [{"lang": "en", "value": "CWE-79"}]}],
+        "references": []
+      }
+    }
+  ]
+}

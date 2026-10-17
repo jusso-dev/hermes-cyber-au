@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-16T00:00:00.000",
+  "vulnerabilities": [
+    {
+      "cve": {
+        "id": "CVE-2099-2201",
+        "published": "2026-10-02T00:00:00.000",
+        "descriptions": [
+          {"lang": "en", "value": "Synthetic NVD row for CVE-2099-2201."}
+        ],
+        "metrics": {
+          "cvssMetricV31": [
+            {"cvssData": {"baseScore": 7.5, "baseSeverity": "HIGH"}}
+          ]
+        },
+        "weaknesses": [{"description": [{"lang": "en", "value": "CWE-20"}]}],
+        "references": []
+      }
+    }
+  ]
+}
