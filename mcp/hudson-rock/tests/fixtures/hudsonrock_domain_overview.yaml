@@ -1,0 +1,15 @@
+version: 1
+interactions:
+  - request:
+      method: POST
+      uri: https://api.hudsonrock.com/json/v3/search-by-domain/overview
+      body: '{"domains":["example.com.au"]}'
+      headers:
+        api-key: "[REDACTED]"
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"data":[],"nextCursor":null}'

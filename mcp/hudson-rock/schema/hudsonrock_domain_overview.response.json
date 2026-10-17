@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["data"],
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["domain", "compromised_employees", "compromised_users"],
+        "properties": {
+          "domain": {"type": "string"},
+          "compromised_employees": {"type": "integer", "minimum": 0},
+          "compromised_users": {"type": "integer", "minimum": 0},
+          "last_employee_compromised": {"type": "string"},
+          "last_user_compromised": {"type": "string"},
+          "last_employee_uploaded": {"type": "string"},
+          "last_user_uploaded": {"type": "string"},
+          "sensitive_applications": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "nextCursor": {"type": ["string", "null"]}
+  }
+}
