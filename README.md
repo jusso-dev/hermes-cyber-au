@@ -112,6 +112,26 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 
 Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).
 
+## Dashboard
+
+`dashboard/server.py` is a small read-only web page for a less technical team. It lists each routine with its schedule, delivery target and last recorded status, shows the newest report each routine wrote, lists handoffs, and says whether a chat has been opened. It uses only the Python 3.11+ standard library and never runs a job. The morning briefing is set for 07:30 Australia/Sydney, and jobs do nothing until they are resumed.
+
+```bash
+python3 dashboard/server.py --profile ~/.hermes/profiles/cyber-au
+```
+
+Then open <http://127.0.0.1:8765/>. Without `--profile` it uses `$CYBERAU_PROFILE_HOME`, else `/opt/data/profiles/cyber-au` if that directory exists, else `~/.hermes/profiles/cyber-au`. `--bind` (default `127.0.0.1`) and `--port` (default `8765`) change where it listens. Handoffs come from `<profile>/handoffs.jsonl` or `$CYBERAU_DATA_DIR/handoffs.jsonl`.
+
+The dashboard has no login. Keep it on `127.0.0.1`, or on a homelab publish it only on the LAN or Tailscale address, never the public internet. `dashboard/Dockerfile` builds a container that serves `/opt/data/profiles/cyber-au` on `0.0.0.0:8765` inside the container:
+
+```bash
+docker build -f dashboard/Dockerfile -t cyberau-dashboard .
+docker run -d --name cyberau-dashboard -v /path/to/hermes-data:/opt/data:ro \
+  -p 192.168.1.10:8765:8765 cyberau-dashboard
+```
+
+Replace `192.168.1.10` with the host's LAN or Tailscale address. The container runs as a non-root user, so the mounted data must be readable by other users. Tests: `python3 -m pytest tests/dashboard`.
+
 ## Premium feeds (paid, bring your own licence)
 
 Paid connectors are in this checkout and off by default. They cover Recorded Future, Flare, UpGuard, Hudson Rock, SpyCloud, Flashpoint, Intel 471, Google Threat Intelligence DTM, CrowdStrike Recon, SOCRadar, and DarkOwl. The free ransomware.live tracker adds leak-site claims that name Australian organisations.
