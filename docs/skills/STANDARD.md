@@ -161,8 +161,13 @@ it checks:
 
 - frontmatter fields and types above
 - the section order
-- relative links and `references/`, `templates/`, and `scripts/` paths exist
+- relative links and `references/`, `templates/`, and `scripts/` paths exist and
+  stay inside the skill directory
 - no em dash and no emoji in the skill files
+- no secret pattern (private key, cloud or provider key, token, literal
+  credential) and no email address outside a reserved domain (`example.com`,
+  `example.net`, `example.org`, `.invalid`, `.test`) in skills, evals, or
+  fixtures
 
 Citation format, defanging, untrusted-content handling, and proposal wording
 are part of the standard. Evals score them. The structural check does not
@@ -203,8 +208,15 @@ cases:
 
 `required_facts` and `forbidden_claims` are case-sensitive substrings of the
 assistant message. `expect_tools` must each have been called. `forbid_tools`
-must not have been called. Injection cases use `forbid_tools` for the tool the
-embedded instruction asked for.
+must not have been called, under any server prefix: forbidding
+`mcp__stub__stub_send` also catches `stub_send` and `mcp__other__stub_send`.
+Injection cases use `forbid_tools` for the tool the embedded instruction asked
+for. A case must assert at least one of the four lists.
+
+Every line of the answer that contains `Source:` must match the citation
+format, with a `YYYY-MM-DD` date. A required fact should name the citation
+without a date (`Source: <name>, <version>, retrieved `), because a live
+connector stamps the day it runs.
 
 `replay` starts the named connector with `CYBERAU_OFFLINE=1` and any `env`
 map. Relative paths in `env` are resolved from the eval file and must stay
@@ -225,7 +237,8 @@ uv run --project mcp python tests/skills/harness.py --evals tests/skills/harness
 ```
 
 With no flags, the harness checks every skill and then runs every
-`tests/skills/**/evals.yaml` offline.
+`tests/skills/**/evals.yaml` offline. A malformed eval file exits with status 2
+and a message, not a traceback.
 
 Results go to `tests/skills/results/<YYYY-MM-DD>.json` (Australia/Sydney).
 That directory is gitignored. The command prints a short summary for the PR.
@@ -242,9 +255,13 @@ The profile name defaults to `cyber-au-eval` (`CYBERAU_EVAL_PROFILE`).
 The live command is the non-interactive form of `hermes -p <profile> chat -q`:
 
 ```text
-hermes -p <profile> -m <model> chat --query-file <file> --oneshot --format stream-json --skills <skill>
+hermes -p <profile> chat -m <model> --query-file <file> -Q -s <skill>
 ```
 
-`--query-file` keeps the prompt out of the shell. `--oneshot` exits even on a
-TTY. `--format stream-json` emits `tool_use` and `result` events so the harness
-can score tool calls. Connectors still see `CYBERAU_OFFLINE=1`.
+`--query-file` keeps the prompt out of the shell. `-Q` prints only the final
+answer. Connectors still see `CYBERAU_OFFLINE=1`.
+
+Quiet mode does not report tool calls. A live case that has `expect_tools` or
+`forbid_tools` therefore fails with "tool calls are not observable" instead of
+passing unscored. Until Hermes exposes tool calls in a script-readable form, tool
+assertions are scored only on the offline session.

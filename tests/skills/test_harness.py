@@ -190,24 +190,90 @@ def test_missing_fact_and_forbidden_claim_fail():
 
 def test_hermes_argv_is_the_non_interactive_chat_query():
     argv = harness.hermes_argv("cyber-au-eval", "test-model", "harness-sample", Path("prompt.txt"))
-    assert argv[1:6] == ["-p", "cyber-au-eval", "-m", "test-model", "chat"]
+    assert argv[1:5] == ["-p", "cyber-au-eval", "chat", "-m"]
     assert "--query-file" in argv
-    assert "--oneshot" in argv
-    assert "stream-json" in argv
-    assert argv[-2:] == ["--skills", "harness-sample"]
+    assert "-Q" in argv
+    assert "--oneshot" not in argv
+    assert "--format" not in argv
+    assert argv[-2:] == ["-s", "harness-sample"]
 
 
-def test_parse_stream_json_reads_tool_use_and_result():
-    stdout = "\n".join(
-        [
-            json.dumps({"type": "tool_use", "name": "stub_ping", "input": {"echo": "x"}}),
-            json.dumps({"type": "result", "text": "done x"}),
-        ]
+def test_live_session_cannot_pass_a_tool_assertion_unscored():
+    eval_file = harness.load_eval_file(SAMPLE_EVAL)
+    case = next(item for item in eval_file.cases if item.id == "echo-fixture")
+    message = case.offline.message  # type: ignore[union-attr]
+    failures = harness.score_session(case, harness.Session(message, [], tools_observed=False))
+    assert any("not observable" in item for item in failures)
+
+
+def test_forbid_tools_ignores_the_server_prefix():
+    forbidden = "mcp__stub__stub_send"
+    assert harness.forbidden_tool_called(forbidden, "mcp__other__stub_send")
+    assert harness.forbidden_tool_called(forbidden, "mcp_stub_stub_send")
+    assert harness.forbidden_tool_called(forbidden, "stub_send")
+    assert not harness.forbidden_tool_called(forbidden, "mcp__stub__stub_ping")
+
+
+def test_malformed_citation_fails():
+    case = harness.EvalCase("c", "q", ["x"], [], [], [], [], None)
+    bad = harness.Session("x\nSource: hermes-cyber-au stub, none, retrieved yesterday.")
+    assert any(item.startswith("malformed citation") for item in harness.score_session(case, bad))
+    good = harness.Session("x\nSource: hermes-cyber-au stub, none, retrieved 2026-10-17.")
+    assert harness.score_session(case, good) == []
+
+
+def test_bad_yaml_frontmatter_is_a_problem_not_a_crash(tmp_path: Path):
+    skill = tmp_path / "bad-yaml"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("---\nname: [unclosed\n---\n# Title\n", encoding="utf-8")
+    assert any("not valid YAML" in item for item in harness.check_skill(skill))
+
+
+def test_links_cannot_leave_the_skill_directory(tmp_path: Path):
+    (tmp_path / "outside.md").write_text("x\n", encoding="utf-8")
+    skill = _write_skill(tmp_path, "escape", extra="[up](../outside.md) [abs](/etc/hosts)\n")
+    problems = harness.check_skill(skill)
+    assert sum("outside the skill directory" in item for item in problems) == 2
+
+
+def test_emoji_ranges_cover_enclosed_and_symbol_blocks():
+    for char in ("\U0001f197", "\U0001f170", "\u2b50", "\u2705"):
+        assert harness.EMOJI_RE.search(char)
+
+
+def test_defang_covers_hosts_with_a_port_or_path():
+    assert harness.defang_observable("updates.example.com/login") == "updates[.]example[.]com/login"
+    assert harness.defang_observable("example.com:8080") == "example[.]com:8080"
+    assert harness.defang_observable("hxxps://a[.]example[.]com/x") == "hxxps://a[.]example[.]com/x"
+    assert harness.defang_observable("203[.]0[.]113[.]10") == "203[.]0[.]113[.]10"
+
+
+def test_case_with_no_assertion_is_rejected(tmp_path: Path):
+    path = tmp_path / "evals.yaml"
+    path.write_text('skill: x\ncases:\n  - id: empty\n    input: "q"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="asserts nothing"):
+        harness.load_eval_file(path)
+
+
+def test_fixture_path_escape_is_a_failure_not_a_crash():
+    step = harness.ReplayStep("stub", "stub_ping", {}, {"CYBERAU_FIXTURE": "/etc/passwd"}, None)
+    case = harness.EvalCase("c", "q", ["x"], [], [], [], [step], None)
+    failures = harness.replay_case(case, SAMPLE_EVAL)
+    assert failures and "escapes the repository" in failures[0]
+
+
+def test_fixture_scrub_flags_secrets_and_real_addresses(tmp_path: Path):
+    fixtures = tmp_path / "fixtures"
+    fixtures.mkdir()
+    (fixtures / "a.json").write_text(
+        '{"mail": "someone@corp.com.au", "key": "AKIAABCDEFGHIJKLMNOP"}\n', encoding="utf-8"
     )
-    session = harness.parse_stream_json(stdout)
-    assert session.message == "done x"
-    assert session.tool_calls[0].name == "stub_ping"
-    assert harness.same_tool("mcp__stub__stub_ping", "stub_ping")
+    (fixtures / "ok.json").write_text('{"mail": "a@example.com"}\n', encoding="utf-8")
+    problems = harness.check_fixtures([tmp_path])
+    assert any("non-reserved domain" in item for item in problems)
+    assert any("AWS access key id" in item for item in problems)
+    assert not any("ok.json" in item for item in problems)
+    assert harness.check_fixtures() == []
 
 
 def test_results_directory_is_gitignored():

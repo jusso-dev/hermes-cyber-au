@@ -75,7 +75,7 @@ NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 EM_DASH = "\u2014"
-EMOJI_RE = re.compile("[\U0001f1e6-\U0001f1ff\U0001f300-\U0001faff\u2600-\u27bf\u2300-\u23ff]")
+EMOJI_RE = re.compile("[\U0001f000-\U0001faff\u2600-\u27bf\u2300-\u23ff\u2b00-\u2bff]")
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 PATH_RE = re.compile(
     r"(?<![\w./])((?:references|templates|scripts)/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+)"
@@ -83,7 +83,25 @@ PATH_RE = re.compile(
 URL_RE = re.compile(r"\b(https?)://([^\s/]+)(\S*)", re.IGNORECASE)
 EMAIL_RE = re.compile(r"\b([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b")
 IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-HOST_RE = re.compile(r"(?i)^[a-z0-9.-]+\.[a-z]{2,}$")
+HOST_RE = re.compile(r"(?i)^((?:[a-z0-9-]+\.)+[a-z]{2,})((?::\d+)?(?:[/?#].*)?)$")
+CITATION_RE = re.compile(r"Source: [^,]+, [^,]+, retrieved \d{4}-\d{2}-\d{2}\b")
+SECRET_PATTERNS = {
+    "private key": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    "AWS access key id": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    "GitHub token": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})\b"),
+    "provider key": re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"),
+    "Slack token": re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
+    "JWT": re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
+    "bearer token": re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]{20,}"),
+    "literal credential": re.compile(
+        r"(?i)\b(?:api[_-]?key|token|secret|password)\b['\"]?\s*[:=]\s*['\"]?"
+        r"(?!\$\{)[A-Za-z0-9/+_-]{16,}"
+    ),
+}
+RESERVED_MAIL_DOMAIN = re.compile(
+    r"(?i)(?:^|\.)example\.(?:com|net|org)$|\.(?:invalid|test|example|localhost)$"
+)
+SCRUB_SUFFIXES = {".md", ".txt", ".yaml", ".yml", ".json", ".jsonl", ".csv", ".xml", ".html"}
 CASE_FIELDS = {
     "id",
     "input",
@@ -106,6 +124,7 @@ class ToolCall:
 class Session:
     message: str
     tool_calls: list[ToolCall] = field(default_factory=list)
+    tools_observed: bool = True
 
 
 @dataclass
@@ -147,8 +166,9 @@ def sydney_today() -> str:
 def defang_observable(value: str) -> str:
     """Defang one observable for display. Tool arguments stay raw."""
     text = value.strip()
-    if HOST_RE.fullmatch(text) and not IPV4_RE.fullmatch(text):
-        return text.replace(".", "[.]")
+    bare = HOST_RE.fullmatch(text)
+    if bare:
+        return bare.group(1).replace(".", "[.]") + bare.group(2)
 
     def url_sub(match: re.Match[str]) -> str:
         scheme = "hxxps" if match.group(1).lower() == "https" else "hxxp"
@@ -175,54 +195,21 @@ def eval_models() -> list[str]:
 
 
 def hermes_argv(profile: str, model: str, skill: str, query_file: Path) -> list[str]:
-    """Non-interactive equivalent of ``hermes -p <profile> chat -q``."""
+    """Non-interactive ``hermes -p <profile> chat`` with the prompt read from a file."""
     hermes = shutil.which("hermes") or "hermes"
     return [
         hermes,
         "-p",
         profile,
+        "chat",
         "-m",
         model,
-        "chat",
         "--query-file",
         str(query_file),
-        "--oneshot",
-        "--format",
-        "stream-json",
-        "--skills",
+        "-Q",
+        "-s",
         skill,
     ]
-
-
-def parse_stream_json(stdout: str) -> Session:
-    """Read Hermes ``--format stream-json`` events into a session."""
-    parts: list[str] = []
-    calls: list[ToolCall] = []
-    result_text = ""
-    for line in stdout.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            event = json.loads(stripped)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(event, dict):
-            continue
-        kind = event.get("type")
-        if kind == "tool_use":
-            arguments = event.get("input")
-            calls.append(
-                ToolCall(
-                    str(event.get("name") or ""),
-                    arguments if isinstance(arguments, dict) else {},
-                )
-            )
-        elif kind == "text":
-            parts.append(str(event.get("text") or ""))
-        elif kind == "result":
-            result_text = str(event.get("text") or "")
-    return Session(result_text or "".join(parts), calls)
 
 
 def same_tool(expected: str, actual: str) -> bool:
@@ -236,6 +223,12 @@ def same_tool(expected: str, actual: str) -> bool:
     return expected_leaf == actual_leaf and bool(expected_leaf)
 
 
+def forbidden_tool_called(forbidden: str, actual: str) -> bool:
+    """Match a forbidden tool whatever the server prefix, so a rename cannot hide a call."""
+    leaf = forbidden.rsplit("__", 1)[-1]
+    return actual == forbidden or actual == leaf or actual.endswith(f"_{leaf}")
+
+
 def score_session(case: EvalCase, session: Session) -> list[str]:
     """Score required facts, forbidden claims, and tool calls."""
     failures: list[str] = []
@@ -245,12 +238,19 @@ def score_session(case: EvalCase, session: Session) -> list[str]:
     for claim in case.forbidden_claims:
         if claim in session.message:
             failures.append(f"forbidden claim: {claim}")
+    for line in session.message.splitlines():
+        if "Source:" in line and not CITATION_RE.search(line):
+            failures.append(f"malformed citation: {line.strip()}")
+    if not session.tools_observed and (case.expect_tools or case.forbid_tools):
+        failures.append(
+            "tool calls are not observable in this run, so tool assertions are unscored"
+        )
     called = [call.name for call in session.tool_calls]
     for tool in case.expect_tools:
         if not any(same_tool(tool, actual) for actual in called):
             failures.append(f"expected tool not called: {tool}")
     for tool in case.forbid_tools:
-        if any(same_tool(tool, actual) for actual in called):
+        if any(forbidden_tool_called(tool, actual) for actual in called):
             failures.append(f"forbidden tool called: {tool}")
     return failures
 
@@ -268,6 +268,33 @@ def check_skills(skills_root: Path | None = None) -> list[str]:
         problems.extend(check_skill(path))
     if not found:
         problems.append(f"{root}: no skill directories")
+    return problems
+
+
+def check_fixtures(roots: Sequence[Path] | None = None) -> list[str]:
+    """Flag secrets and real-looking email addresses in skills, evals and fixtures."""
+    problems: list[str] = []
+    for root in roots or (SKILLS_ROOT, EVALS_ROOT):
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in SCRUB_SUFFIXES:
+                continue
+            if "results" in path.relative_to(root).parts:
+                continue
+            label = _display_path(path)
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeError:
+                problems.append(f"{label}: not UTF-8 text")
+                continue
+            for number, line in enumerate(text.splitlines(), start=1):
+                for kind, pattern in SECRET_PATTERNS.items():
+                    if pattern.search(line):
+                        problems.append(f"{label}: possible {kind} on line {number}")
+                for match in EMAIL_RE.finditer(line):
+                    if not RESERVED_MAIL_DOMAIN.search(match.group(2)):
+                        problems.append(f"{label}: email on a non-reserved domain on line {number}")
     return problems
 
 
@@ -310,7 +337,10 @@ def split_frontmatter(text: str) -> tuple[dict, str]:
     end = normalised.find("\n---\n", 4)
     if end == -1:
         raise ValueError("frontmatter is not closed")
-    loaded = yaml.safe_load(normalised[4:end])
+    try:
+        loaded = yaml.safe_load(normalised[4:end])
+    except yaml.YAMLError as exc:
+        raise ValueError(f"frontmatter is not valid YAML: {exc}") from exc
     if not isinstance(loaded, dict):
         raise ValueError("frontmatter must be a mapping")
     return loaded, normalised[end + 5 :]
@@ -453,8 +483,12 @@ def _reference_problems(skill_dir: Path, body: str) -> list[str]:
         if target in seen:
             continue
         seen.add(target)
-        if not (skill_dir / target).is_file():
-            problems.append(f"skills/{skill_dir.name}/{target}: linked reference does not exist")
+        resolved = (skill_dir / target).resolve()
+        label = f"skills/{skill_dir.name}/{target}"
+        if not resolved.is_relative_to(skill_dir.resolve()):
+            problems.append(f"{label}: linked reference is outside the skill directory")
+        elif not resolved.is_file():
+            problems.append(f"{label}: linked reference does not exist")
     return problems
 
 
@@ -486,7 +520,10 @@ def _text_problems(prefix: str, text: str) -> list[str]:
 
 
 def load_eval_file(path: Path) -> EvalFile:
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{path}: not valid YAML: {exc}") from exc
     if not isinstance(loaded, dict):
         raise ValueError(f"{path}: eval file must be a mapping")
     skill = loaded.get("skill")
@@ -510,6 +547,11 @@ def _load_case(path: Path, raw: object) -> EvalCase:
         raise ValueError(f"{path}: case id is required")
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError(f"{path}: case {case_id} input is required")
+    if not any(
+        raw.get(key)
+        for key in ("required_facts", "forbidden_claims", "expect_tools", "forbid_tools")
+    ):
+        raise ValueError(f"{path}: case {case_id} asserts nothing")
     return EvalCase(
         id=case_id,
         input=prompt,
@@ -605,9 +647,9 @@ def replay_case(case: EvalCase, eval_path: Path) -> list[str]:
     failures: list[str] = []
     for step in case.replay:
         env = {"CYBERAU_OFFLINE": "1"}
-        for key, value in step.env.items():
-            env[key] = _resolve_env_value(eval_path.parent, value)
         try:
+            for key, value in step.env.items():
+                env[key] = _resolve_env_value(eval_path.parent, value)
             payload = _call_connector(step.connector, step.tool, step.arguments, env)
         except Exception as exc:
             cause = f" ({exc.__cause__})" if exc.__cause__ else ""
@@ -722,7 +764,8 @@ def run_hermes(
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()
         raise RuntimeError(f"hermes exited {completed.returncode}: {detail[:500]}")
-    return parse_stream_json(completed.stdout)
+    # Quiet chat mode prints only the final answer, so tool calls cannot be read back.
+    return Session(completed.stdout.strip(), [], tools_observed=False)
 
 
 def run_eval_file(
@@ -831,7 +874,7 @@ def build_report(
     live: bool = False,
     profile: str | None = None,
 ) -> dict:
-    structural = check_skills(skills_root)
+    structural = check_skills(skills_root) + (check_fixtures() if skills_root is None else [])
     paths = list(eval_paths) if eval_paths is not None else discover_eval_files()
     eval_runs = [run_eval_file(path, live=live, profile=profile) for path in paths]
     summary = summarise(structural, eval_runs)
@@ -869,7 +912,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         eval_paths = [args.evals if args.evals.is_absolute() else ROOT / args.evals]
     else:
         eval_paths = None
-    report = build_report(eval_paths=eval_paths, live=args.live, profile=args.profile)
+    try:
+        report = build_report(eval_paths=eval_paths, live=args.live, profile=args.profile)
+    except ValueError as exc:
+        print(f"Eval file error: {exc}", file=sys.stderr)
+        return 2
     results_path = write_results(args.results_dir, report)
     print(report["summary"])
     if results_path.is_relative_to(ROOT):
