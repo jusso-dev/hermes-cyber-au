@@ -1,0 +1,55 @@
+name: Bug
+description: A defect in a connector, skill, the shared library, or the docs
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, tokens, customer data, or internal hostnames.
+        If this is a vulnerability, stop and use a GitHub Security Advisory:
+        https://github.com/jusso-dev/hermes-cyber-au/security/advisories/new
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Connector
+        - Skill
+        - Shared library
+        - Install or distribution
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: distribution.yaml version, git commit, or "default branch".
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: How to reproduce this. Use variable names such as NVD_API_KEY, never values.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This report contains no secrets, tokens, customer data, or internal hostnames.
+          required: true
+        - label: This is not a vulnerability report. Vulnerabilities go through a GitHub Security Advisory.
+          required: true

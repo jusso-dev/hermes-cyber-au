@@ -1,0 +1,62 @@
+name: Skill request
+description: Ask for a new analyst workflow, or a change to one
+title: "skill: "
+labels: ["type:feature", "area:skills"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Skills propose actions. A person submits, blocks, or sends anything.
+        Write the request in plain Australian English. Do not paste secrets or customer data.
+  - type: input
+    id: name
+    attributes:
+      label: Skill name
+      description: Short hyphenated name, such as incident-triage or vuln-prioritisation.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - New skill
+        - Change an existing skill
+    validations:
+      required: true
+  - type: textarea
+    id: when
+    attributes:
+      label: When an analyst would use it
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs
+      description: What the person provides. Note any personal or customer data, and that it stays in the profile.
+    validations:
+      required: true
+  - type: textarea
+    id: outputs
+    attributes:
+      label: Outputs
+      description: The briefing, assessment, or list the skill should produce. Say which sources it must cite.
+    validations:
+      required: true
+  - type: textarea
+    id: connectors
+    attributes:
+      label: Connectors
+      description: Which feeds it needs. Use connector keys if you know them.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: Any step that would send, submit, block, or post is a proposal for a person, not an automatic action.
+          required: true
+        - label: This request contains no secrets, tokens, customer data, or internal hostnames.
+          required: true

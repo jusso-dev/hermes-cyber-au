@@ -1,0 +1,83 @@
+name: Connector request
+description: Ask for a read-only feed or API connector
+title: "connector: "
+labels: ["type:feature", "area:connectors"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Connectors are read-only. They fetch public or licensed data and return it
+        inside a result envelope. They do not submit, block, delete, or post.
+        Name environment variables only. Do not paste keys.
+  - type: input
+    id: key
+    attributes:
+      label: Proposed key
+      description: Lowercase words separated by hyphens, 2 to 31 characters. Example first-epss.
+      placeholder: example-feed
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: Upstream documentation URL
+      description: Public docs for the API or feed. No internal hostnames.
+      placeholder: https://example.com/docs
+    validations:
+      required: true
+  - type: textarea
+    id: reads
+    attributes:
+      label: What it should read
+      description: The questions an analyst would ask, and the fields the answer needs.
+    validations:
+      required: true
+  - type: input
+    id: auth
+    attributes:
+      label: Auth
+      description: 'Write "none", or the environment variable name only, such as NVD_API_KEY.'
+      placeholder: none
+    validations:
+      required: true
+  - type: input
+    id: hosts
+    attributes:
+      label: Egress hosts
+      description: Public hostnames the connector must be allowed to call, comma-separated.
+      placeholder: api.example.com
+    validations:
+      required: true
+  - type: input
+    id: terms
+    attributes:
+      label: Licence or terms URL
+      description: Link to the upstream terms, and any attribution line they require.
+    validations:
+      required: true
+  - type: dropdown
+    id: default
+    attributes:
+      label: Suggested default
+      options:
+        - "On: public source, no key required"
+        - "Off: bring your own key or licence"
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it belongs here
+      description: Australian relevance, or the gap it fills next to the connectors already planned.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This connector would be read-only. A person still approves anything that sends, blocks, or submits.
+          required: true
+        - label: This request contains no secrets, tokens, customer data, or internal hostnames.
+          required: true

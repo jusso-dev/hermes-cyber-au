@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/jusso-dev/hermes-cyber-au/security/advisories/new
+    about: Privately report a security vulnerability through GitHub Security Advisories. Do not open a public issue.
