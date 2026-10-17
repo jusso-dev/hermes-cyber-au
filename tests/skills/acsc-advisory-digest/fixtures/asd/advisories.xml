@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Synthetic ACSC advisories</title>
+    <link>https://www.cyber.gov.au/rss/advisories</link>
+    <description>Synthetic fixture. Not an ASD publication.</description>
+    <item>
+      <title>Synthetic library advisory</title>
+      <link>https://www.cyber.gov.au/about-library-advisory</link>
+      <pubDate>Mon, 12 Oct 2026 11:00:00 +1100</pubDate>
+      <description>Synthetic advisory for Example Library.</description>
+    </item>
+  </channel>
+</rss>

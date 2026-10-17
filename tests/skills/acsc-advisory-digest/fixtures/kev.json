@@ -1,0 +1,21 @@
+{
+  "title": "Synthetic KEV fixture for the ACSC digest eval",
+  "catalogVersion": "digest-0",
+  "dateReleased": "2026-10-17",
+  "count": 1,
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2099-0140",
+      "vendorProject": "Example",
+      "product": "Example EdgeRouter",
+      "vulnerabilityName": "Synthetic edge router vulnerability",
+      "dateAdded": "2026-10-01",
+      "shortDescription": "Synthetic fixture entry, not a real vulnerability.",
+      "requiredAction": "Apply the vendor update. This entry is a synthetic fixture.",
+      "dueDate": "2026-10-22",
+      "knownRansomwareCampaignUse": "Unknown",
+      "notes": "",
+      "cwes": []
+    }
+  ]
+}
