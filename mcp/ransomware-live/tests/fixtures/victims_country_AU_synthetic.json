@@ -1,0 +1,32 @@
+[
+  {
+    "victim": "Wattle Sample Pty Ltd",
+    "group": "samplegroup",
+    "country": "AU",
+    "activity": "Education",
+    "website": "wattlesample.example",
+    "discovered": "2026-10-15",
+    "attackdate": "2026-10-12",
+    "description": "Synthetic leak-site claim for tests."
+  },
+  {
+    "victim": "Harbour Sample Council",
+    "group": "othergroup",
+    "country": "AU",
+    "activity": "Government",
+    "website": "harboursample.example",
+    "discovered": "2026-09-01",
+    "attackdate": "2026-08-20",
+    "description": "Older synthetic claim for tests."
+  },
+  {
+    "victim": "Foreign Sample LLC",
+    "group": "samplegroup",
+    "country": "US",
+    "activity": "Retail",
+    "website": "foreignsample.example",
+    "discovered": "2026-10-16",
+    "attackdate": "2026-10-16",
+    "description": "Synthetic non-Australian claim for tests."
+  }
+]

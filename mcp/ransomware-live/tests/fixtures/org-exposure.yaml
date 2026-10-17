@@ -1,0 +1,11 @@
+organisation: Wattle Sample Pty Ltd
+domains:
+  - wattlesample.example
+brands:
+  - Wattle Sample
+subsidiaries:
+  - name: Harbour Sample Council
+    domains:
+      - harboursample.example
+exclude:
+  - Generic

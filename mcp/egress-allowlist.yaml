@@ -269,3 +269,9 @@ connectors:
     - www.protectivesecurity.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  ransomware-live:
+    hosts:
+    - api-pro.ransomware.live
+    - api.ransomware.live
+    allow_ip_literals: false
+    allow_http_loopback: false
