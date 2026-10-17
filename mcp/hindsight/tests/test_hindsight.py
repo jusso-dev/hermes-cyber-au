@@ -224,13 +224,17 @@ def test_tool_uses_the_injected_client():
     assert get_client() is not None
 
 
-BLOCKED = [
-    "127.0.0.1",
+HOMELAB = [
     "10.1.2.3",
     "172.16.0.9",
-    "192.168.1.1",
+    "192.168.1.19",
+    "100.95.43.17",
+    "fd7a:115c:a1e0::53",
+]
+
+BLOCKED = [
+    "127.0.0.1",
     "169.254.169.254",
-    "100.64.0.1",
     "0.0.0.0",
     "224.0.0.1",
     "240.0.0.1",
@@ -246,6 +250,20 @@ BLOCKED = [
     "64:ff9b::808:808",
     "2001::1",
 ]
+
+
+@pytest.mark.parametrize("address", HOMELAB)
+def test_a_homelab_address_is_allowed_and_the_request_is_pinned_to_it(address):
+    host = f"[{address}]" if ":" in address else address
+    fake = FakeHindsight()
+    client = HindsightClient(
+        base_url=f"https://{host}",
+        api_key=None,
+        read_only=False,
+        transport=httpx.MockTransport(fake),
+    )
+    client.recall("intel", "x")
+    assert fake.calls[0].url.host == address
 
 
 @pytest.mark.parametrize("address", BLOCKED)
@@ -268,7 +286,7 @@ def test_a_dns_answer_in_a_blocked_range_is_refused_before_any_request(address):
 
 def test_one_bad_dns_answer_among_good_ones_refuses_the_host():
     fake = FakeHindsight()
-    bad = ipaddress.ip_address("10.0.0.1")
+    bad = ipaddress.ip_address("169.254.169.254")
     client = _client(fake, resolver=lambda _h: [PUBLIC, bad])
     with pytest.raises(HindsightError):
         client.recall("intel", "anything")

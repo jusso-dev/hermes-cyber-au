@@ -26,6 +26,18 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
 _TOKEN = re.compile(r"[A-Za-z0-9_.:-]{1,100}")
 
+# Homelab LAN (RFC 1918) and Tailscale. Loopback and link-local stay refused.
+_HOMELAB = tuple(
+    ipaddress.ip_network(item)
+    for item in (
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "100.64.0.0/10",
+        "fd7a:115c:a1e0::/48",
+    )
+)
+
 # Ranges Python does not already report as non-global, plus the ones the
 # request-time check refuses by name: 6to4, Teredo, NAT64 and IPv4-compatible.
 _EXTRA_BLOCKED = tuple(
@@ -320,10 +332,16 @@ def _literal(host: str):
         return None
 
 
+def _homelab(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return any(address in network for network in _HOMELAB)
+
+
 def _blocked(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """Refuse anything that is not a plain public unicast address."""
+    """Refuse anything outside the public internet and the homelab ranges."""
     if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
         return True
+    if _homelab(address):
+        return False
     return (
         not address.is_global
         or address.is_private
@@ -359,7 +377,7 @@ def _check_base(url: str) -> str:
         raise HindsightError("Hindsight URL must be https")
     literal = _literal(host)
     if literal is not None and _blocked(literal):
-        raise HindsightError("Hindsight URL must not name a private, loopback, or reserved address")
+        raise HindsightError("Hindsight URL names an address that is not allowed")
     try:
         parts.port
     except ValueError:
