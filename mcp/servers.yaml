@@ -55,6 +55,17 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  attack:
+    connector: mitre-attack
+    args:
+    - serve
+    - mitre-attack
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   nvd:
     connector: nvd
     args:

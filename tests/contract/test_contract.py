@@ -71,6 +71,8 @@ def _sample_value(prop: dict):
         return "GHSA-w5f2-9q9c-ff4h"
     if "ism-" in pattern:
         return "ism-1173"
+    if pattern.startswith("^T\\d{4}"):
+        return "T1059"
     if pattern.startswith("^") and not pattern.endswith("$"):
         body = pattern[1:]
         if re.fullmatch(r"(?:\\.|[A-Za-z0-9:/.])+", body):

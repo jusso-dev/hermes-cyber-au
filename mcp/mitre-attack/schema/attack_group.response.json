@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "source",
+    "retrieved_at",
+    "cache",
+    "data",
+    "untrusted",
+    "attribution"
+  ],
+  "properties": {
+    "source": {
+      "const": "mitre-attack"
+    },
+    "source_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "retrieved_at": {
+      "type": "string"
+    },
+    "data_as_of": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cache": {
+      "enum": [
+        "hit",
+        "miss",
+        "stale",
+        "snapshot"
+      ]
+    },
+    "attribution": {
+      "type": "string",
+      "pattern": "MITRE"
+    },
+    "untrusted": {
+      "const": true
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "group_id",
+            "name",
+            "aliases",
+            "description",
+            "techniques",
+            "software",
+            "domain",
+            "url",
+            "version",
+            "modified"
+          ],
+          "properties": {
+            "group_id": {
+              "type": "string",
+              "pattern": "^G\\d{4}$"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+            },
+            "aliases": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+              }
+            },
+            "description": {
+              "type": "string",
+              "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+            },
+            "techniques": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "technique_id",
+                  "name",
+                  "usage"
+                ],
+                "properties": {
+                  "technique_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  },
+                  "usage": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  }
+                }
+              }
+            },
+            "software": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "software_id",
+                  "name",
+                  "type"
+                ],
+                "properties": {
+                  "software_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^<<untrusted source=attack>> .* <<end untrusted>>$"
+                  },
+                  "type": {
+                    "enum": [
+                      "malware",
+                      "tool"
+                    ]
+                  }
+                }
+              }
+            },
+            "domain": {
+              "enum": [
+                "enterprise",
+                "mobile",
+                "ics"
+              ]
+            },
+            "url": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "modified": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

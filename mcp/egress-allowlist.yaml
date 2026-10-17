@@ -190,6 +190,8 @@ connectors:
       - openphish.com
   misp:
     hosts: []
+    allow_ip_literals: false
+    allow_http_loopback: false
   opencti:
     hosts: []
   hudson-rock:
@@ -234,9 +236,5 @@ connectors:
   org-exposure:
     hosts:
     - abr.business.gov.au
-    allow_ip_literals: false
-    allow_http_loopback: false
-  misp:
-    hosts: []
     allow_ip_literals: false
     allow_http_loopback: false
