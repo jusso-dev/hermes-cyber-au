@@ -1,16 +1,13 @@
 import pytest
+from cyberau_common.secrets import FILTER_HEADERS, install_cassette_scrubber
 
 
 @pytest.fixture(scope="session")
 def vcr_config():
-    return {
-        "filter_headers": [
-            "authorization",
-            "auth-key",
-            "x-otx-api-key",
-            "x-api-key",
-            "api-key",
-            "apiKey",
-            "apikey",
-        ]
-    }
+    return {"filter_headers": list(FILTER_HEADERS)}
+
+
+def pytest_recording_configure(config, vcr):
+    """Post-record scrubber for cassettes opened by pytest-recording."""
+    del config
+    install_cassette_scrubber(vcr)

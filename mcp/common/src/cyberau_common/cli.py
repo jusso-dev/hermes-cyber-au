@@ -9,7 +9,12 @@ import sys
 from pathlib import Path
 
 from cyberau_common.health import run_health
-from cyberau_common.secrets import RedactFilter
+from cyberau_common.secrets import (
+    RedactFilter,
+    check_env_mode,
+    format_doctor,
+    install_log_redaction,
+)
 from cyberau_common.server import build_server, get_connector
 
 
@@ -40,8 +45,15 @@ def main(argv: list[str] | None = None) -> int:
         command = sub.add_parser(name)
         command.add_argument("rest", nargs=argparse.REMAINDER)
 
+    doctor = sub.add_parser("doctor", help="Warn when .env is not mode 600")
+    doctor.add_argument("--env", default="", help="Profile .env path")
+
     args = parser.parse_args(argv)
     _configure_logging()
+    if args.command == "doctor":
+        target = Path(args.env) if args.env else Path.cwd() / ".env"
+        print(format_doctor(check_env_mode(target)))
+        return 0
     if args.command == "new":
         from cyberau_common.scaffold import generate
 
@@ -87,6 +99,7 @@ def _configure_logging() -> None:
     handler = logging.StreamHandler(sys.stderr)
     handler.addFilter(RedactFilter())
     logging.basicConfig(level=level, handlers=[handler], force=True)
+    install_log_redaction()
 
 
 if __name__ == "__main__":

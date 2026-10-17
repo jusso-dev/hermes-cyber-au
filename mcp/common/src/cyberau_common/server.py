@@ -11,7 +11,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from cyberau_common.envelope import envelope
-from cyberau_common.secrets import redact
+from cyberau_common.secrets import install_log_redaction, record_tool_audit, redact_data
 
 _REGISTRY: dict[str, Callable[[], Connector]] = {}
 
@@ -66,6 +66,7 @@ def get_connector(key: str) -> Connector:
 
 
 def build_server(connector: Connector) -> FastMCP:
+    install_log_redaction()
     mcp = FastMCP(connector.server_name)
     for spec in connector.tools:
         mcp.add_tool(
@@ -82,26 +83,33 @@ def build_server(connector: Connector) -> FastMCP:
     return mcp
 
 
-def _wrap(connector: Connector, spec: ToolSpec) -> Callable:
-    def wrapper(*args, **kwargs):
-        try:
-            data = spec.fn(*args, **kwargs)
-        except Exception as exc:
-            return envelope(
-                connector.key,
-                None,
-                cache="snapshot",
-                warnings=(redact(str(exc)),),
-                attribution=connector.attribution,
-            )
-        if isinstance(data, dict) and data.get("untrusted") is True and "source" in data:
-            return data
+def invoke_tool(connector: Connector, spec: ToolSpec, *args, **kwargs):
+    """Run one tool. Exceptions, envelopes, and the audit line are redacted."""
+    try:
+        data = spec.fn(*args, **kwargs)
+    except Exception as exc:
+        record_tool_audit(spec.name, args, kwargs, str(exc))
         return envelope(
             connector.key,
-            data,
+            None,
             cache="snapshot",
+            warnings=(str(exc),),
             attribution=connector.attribution,
         )
+    record_tool_audit(spec.name, args, kwargs, None)
+    if isinstance(data, dict) and data.get("untrusted") is True and "source" in data:
+        return redact_data(data)
+    return envelope(
+        connector.key,
+        data,
+        cache="snapshot",
+        attribution=connector.attribution,
+    )
+
+
+def _wrap(connector: Connector, spec: ToolSpec) -> Callable:
+    def wrapper(*args, **kwargs):
+        return invoke_tool(connector, spec, *args, **kwargs)
 
     wrapper.__signature__ = inspect.signature(spec.fn)
     wrapper.__name__ = spec.name

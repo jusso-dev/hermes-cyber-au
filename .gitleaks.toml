@@ -1,0 +1,11 @@
+title = "hermes-cyber-au"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ticket frontmatter uses key for a slug, not a credential"
+condition = "AND"
+paths = ['''^tickets/.*\.md$''']
+regexTarget = "line"
+regexes = ['''(?m)^key:\s+"[a-z0-9-]+"\s*$''']

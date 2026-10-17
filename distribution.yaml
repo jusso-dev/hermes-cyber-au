@@ -32,3 +32,6 @@ env_requires:
   - name: GREYNOISE_API_KEY
     description: "Optional GreyNoise community key."
     required: false
+  - name: GITHUB_TOKEN
+    description: "Optional GitHub token. Raises the GitHub API limit from 60 to 5,000 requests an hour for the ISM connector."
+    required: false
