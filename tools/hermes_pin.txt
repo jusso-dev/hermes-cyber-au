@@ -1,0 +1,4 @@
+# Pinned Hermes release. tools/hermes_pin.py is the only writer.
+# Consumers: distribution.yaml hermes_requires, docker/Dockerfile HERMES_VERSION,
+# and HERMES_IMAGE in ci/workflows/ci.yml and .github/workflows/ci.yml.
+v0.22.2
