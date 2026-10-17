@@ -38,6 +38,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && if [ -f /opt/cyber-au/src/install/bootstrap.sh ]; then \
          sh /opt/cyber-au/src/install/bootstrap.sh --profile cyber-au --non-interactive; \
        fi \
+    && /opt/hermes/.venv/bin/python -m pip install --disable-pip-version-check 'pyyaml>=6,<7' 'stix2>=3,<4' \
     && rm -rf /opt/cyber-au/profile \
     && cp -a /opt/data/profiles/cyber-au /opt/cyber-au/profile \
     && find /opt/data -mindepth 1 -maxdepth 1 \

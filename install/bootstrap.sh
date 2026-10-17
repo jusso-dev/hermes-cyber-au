@@ -148,9 +148,9 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 if [ "$OFFLINE" -eq 1 ]; then
-  uv sync --project "$PROFILE_HOME/mcp" --frozen --offline
+  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen --offline
 else
-  uv sync --project "$PROFILE_HOME/mcp" --frozen
+  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen
 fi
 
 PYTHON=${CYBERAU_PYTHON:-}
