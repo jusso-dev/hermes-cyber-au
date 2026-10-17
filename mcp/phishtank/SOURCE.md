@@ -2,7 +2,7 @@
 
 - Upstream: https://phishtank.org/developer_info.php
 - Auth: optional `PHISHTANK_APP_KEY`, sent only as a path segment on the database URL. Never logged, stored in the envelope, or written into fixtures.
-- Rate limit: one database download an hour. A 429 waits for `Retry-After` inside that same download. Without an application key, PhishTank allows only a few downloads a day.
+- Rate limit: one database download an hour. A 429 is retried once, and only when `Retry-After` is 60 seconds or less. A longer wait is reported as a rate limit, with a cached copy served (labelled stale) when one exists. The download never blocks waiting for the hourly limit. Without an application key, PhishTank allows only a few downloads a day.
 - Terms: Licence not confirmed. Cite PhishTank. This connector is not endorsed by PhishTank or Cisco Talos.
 - Verified: 2026-10-17
 - Egress hosts: data.phishtank.com, cdn.phishtank.com
@@ -12,3 +12,5 @@ The developer page lists the database as HTTP. This connector uses HTTPS. On 17 
 `phishtank_check_url` compares the URL with the cached verified-online set. It does not request that URL.
 
 Records are stored in `$CYBERAU_DATA_DIR/phishtank.sqlite` (table `phish`, id `phish_id`) until the shared intel store exists. Rows are not deleted when they leave the hourly online-valid set.
+
+The bundled `data/online-valid.json` is synthetic. It is served only offline with no cache, with `cache: snapshot` and a warning, and is never written to the intel store. A cached copy older than an hour, or one served after a failed or rate-limited download, carries a warning.

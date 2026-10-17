@@ -11,8 +11,10 @@ import logging
 import os
 import re
 import sqlite3
+import tempfile
 import time
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -39,6 +41,14 @@ REQUIRED = ("phish_id", "url", "verified", "online")
 _KEY = re.compile(r"[A-Za-z0-9_-]{4,128}")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _HOUR = 3600
+_MAX_RETRY_WAIT = 60
+_SNAPSHOT_WARNING = (
+    "Served from the bundled synthetic snapshot, not live PhishTank data. "
+    "A match or a miss here says nothing about real phishing URLs."
+)
+_PLAIN_URL = re.compile(r"https?://\S{1,2048}")
+_PLAIN_FLAG = re.compile(r"yes|no")
+_PLAIN_STAMP = re.compile(r"[0-9T:+\-.Z ]{1,40}")
 _MAX_BYTES = 80 * 1024 * 1024
 _TRANSPORT = None
 _SLEEP = None
@@ -59,8 +69,10 @@ def phishtank_check_url(url: str) -> dict:
     warnings: list[str] = []
     if warning:
         warnings.append(warning)
-    elif not matched and cache == "snapshot":
-        warnings.append("no matching URL in the offline snapshot")
+    if not rows and cache != "snapshot":
+        warnings.append(
+            "PhishTank database held no entries. Treat the result as unknown, not clean."
+        )
     return _envelope(matched, cache, warnings=tuple(warnings), as_of=_as_of(rows))
 
 
@@ -92,9 +104,11 @@ class _PhishtankConnector(Connector):
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        rows, _cache, warning = _feed(force_live=True)
+        rows, cache, warning = _feed(force_live=True)
         if warning or rows is None:
             return Probe(self.key, False, warning or "live fetch failed")
+        if cache != "miss":
+            return Probe(self.key, False, f"live probe was not a fresh download ({cache})")
         if not rows:
             return Probe(self.key, False, "live probe returned no entries")
         problem = schema_drift(rows)
@@ -125,7 +139,7 @@ def _feed(*, force_live: bool) -> tuple[list | None, str, str]:
     pinned = bool(os.environ.get("CYBERAU_PHISHTANK_SNAPSHOT")) and not force_live
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     if pinned:
-        return _from_text(_snapshot_text(), "snapshot")
+        return _snapshot()
     data_dir = _data_dir()
     http_cache = HttpCache(data_dir / "http_cache.sqlite")
     target = _request_target()
@@ -136,54 +150,41 @@ def _feed(*, force_live: bool) -> tuple[list | None, str, str]:
         cache_key = http_cache.key("GET", url, None, b"", scope)
         cached = http_cache.get(cache_key)
         if cached and not force_live and (offline or http_cache.fresh(cached)):
-            state = "hit" if http_cache.fresh(cached) else "stale"
-            return _from_body(cached.body, state)
+            if http_cache.fresh(cached):
+                return _from_body(cached.body, "hit")
+            return _stale(cached, "Offline mode, serving a cached copy older than one hour.")
     if offline:
-        return _from_text(_snapshot_text(), "snapshot")
+        return _snapshot()
     if target is None:
         return None, "snapshot", _key_problem()
     url, scope = target
+    fallback = cached if not force_live else None
     try:
         _hourly_limit()
     except RateLimited:
-        if cached is not None and not force_live:
-            return _from_body(cached.body, "stale")
+        if fallback is not None:
+            return _stale(
+                fallback, "PhishTank download is limited to once an hour, serving a cached copy."
+            )
+        if force_live:
+            return (
+                None,
+                "snapshot",
+                "PhishTank download is limited to once an hour and one ran too recently.",
+            )
         return (
             None,
             "snapshot",
             "PhishTank download is limited to once an hour and no cached copy is available.",
         )
-    httpx_log = logging.getLogger("httpx")
-    httpcore_log = logging.getLogger("httpcore")
-    previous_levels = (httpx_log.level, httpcore_log.level)
-    httpx_log.setLevel(logging.WARNING)
-    httpcore_log.setLevel(logging.WARNING)
-    client = HttpClient(
-        "phishtank",
-        policy=EgressPolicy(_allowlist(), "phishtank"),
-        cache=http_cache,
-        limiter=_limiter(),
-        user_agent=_USER_AGENT,
-        rate=1,
-        burst=4,
-        window="rolling",
-        timeout=60,
-        retries=1,
-        transport=_TRANSPORT,
-        sleeper=_SLEEP,
-        auth_scope=scope,
-        max_bytes=_MAX_BYTES,
-    )
     try:
-        response = client.get(_fresh_url(url), ttl=_HOUR, skip_cache=True)
-    except (HttpError, EgressDenied, TimeoutError) as exc:
-        if cached is not None and not force_live:
-            return _from_body(cached.body, "stale")
+        response = _download(url, scope, http_cache)
+    except (HttpError, EgressDenied, RateLimited, TimeoutError) as exc:
+        if fallback is not None:
+            return _stale(
+                fallback, f"PhishTank download failed ({_clean(exc)}), serving a cached copy."
+            )
         return None, "snapshot", _clean(exc)
-    finally:
-        client.close()
-        httpx_log.setLevel(previous_levels[0])
-        httpcore_log.setLevel(previous_levels[1])
     if response.status in (401, 403):
         return (
             None,
@@ -192,18 +193,17 @@ def _feed(*, force_live: bool) -> tuple[list | None, str, str]:
             "Set PHISHTANK_APP_KEY to an application key.",
         )
     if response.status == 429:
-        if cached is not None and not force_live:
-            return _from_body(cached.body, "stale")
-        return (
-            None,
-            "miss",
-            "PhishTank rate limited the download. The Retry-After wait was not enough.",
-        )
+        wait = response.headers.get("retry-after")
+        detail = f" Retry-After was {wait}." if wait else ""
+        message = f"PhishTank rate limited the download (HTTP 429).{detail}"
+        if fallback is not None:
+            return _stale(fallback, message + " Serving a cached copy.")
+        return None, "miss", message
     if response.status >= 400:
         return None, response.cache, f"PhishTank upstream status {response.status}"
-    if response.cache == "stale" and cached is not None:
-        return _from_body(response.body or cached.body, "stale")
-    if cache_key and response.body:
+    rows, cache, warning = _from_body(response.body, "miss")
+    if rows and cache_key:
+        # A bad or empty payload must not replace a good cached copy.
         http_cache.put(
             cache_key,
             status=200,
@@ -211,7 +211,77 @@ def _feed(*, force_live: bool) -> tuple[list | None, str, str]:
             body=response.body,
             ttl=_HOUR,
         )
-    return _from_body(response.body, "miss")
+    return rows, cache, warning
+
+
+def _download(url: str, scope: str, http_cache: HttpCache):
+    """One database download. A 429 is retried once, and only when Retry-After is short."""
+    httpx_log = logging.getLogger("httpx")
+    httpcore_log = logging.getLogger("httpcore")
+    previous_levels = (httpx_log.level, httpcore_log.level)
+    httpx_log.setLevel(logging.WARNING)
+    httpcore_log.setLevel(logging.WARNING)
+    sleeper = _SLEEP or time.sleep
+    try:
+        # HttpClient stores every response under a key derived from the nonce URL.
+        # Give it a throwaway cache so those entries never pile up in the real one.
+        with tempfile.TemporaryDirectory(prefix="phishtank-") as scratch:
+            client = HttpClient(
+                "phishtank",
+                policy=EgressPolicy(_allowlist(), "phishtank"),
+                cache=HttpCache(Path(scratch) / "scratch.sqlite"),
+                limiter=_limiter(),
+                user_agent=_USER_AGENT,
+                rate=1,
+                burst=4,
+                window="rolling",
+                timeout=60,
+                retries=0,
+                transport=_TRANSPORT,
+                sleeper=_SLEEP,
+                auth_scope=scope,
+                max_bytes=_MAX_BYTES,
+            )
+            try:
+                response = client.get(_fresh_url(url), ttl=_HOUR, skip_cache=True)
+                wait = _retry_after(response.headers) if response.status == 429 else None
+                if wait is not None and wait <= _MAX_RETRY_WAIT:
+                    sleeper(wait)
+                    response = client.get(_fresh_url(url), ttl=_HOUR, skip_cache=True)
+                return response
+            finally:
+                client.close()
+    finally:
+        httpx_log.setLevel(previous_levels[0])
+        httpcore_log.setLevel(previous_levels[1])
+
+
+def _retry_after(headers: dict[str, str]) -> float | None:
+    value = headers.get("retry-after")
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, (when - datetime.now(UTC)).total_seconds())
+
+
+def _stale(cached, reason: str) -> tuple[list | None, str, str]:
+    rows, cache, warning = _from_body(cached.body, "stale")
+    return rows, cache, (reason if rows is not None else warning)
+
+
+def _snapshot() -> tuple[list | None, str, str]:
+    text = _snapshot_text()
+    if text is None:
+        return _from_text(None, "snapshot")
+    rows, cache, warning = _from_text(text, "snapshot", persist=False)
+    return rows, cache, (_SNAPSHOT_WARNING if rows is not None else warning)
 
 
 def _fresh_url(url: str) -> str:
@@ -243,7 +313,7 @@ def _hourly_limit() -> None:
         rate=1 / _HOUR,
         burst=1,
         window="rolling",
-        timeout=60,
+        timeout=0,
     )
 
 
@@ -261,10 +331,12 @@ def _from_body(body: bytes, cache: str) -> tuple[list | None, str, str]:
         text = body.decode("utf-8")
     except UnicodeDecodeError:
         return None, cache, "PhishTank payload was not UTF-8"
-    return _from_text(text, cache)
+    return _from_text(text, cache, persist=cache == "miss")
 
 
-def _from_text(text: str | None, cache: str) -> tuple[list | None, str, str]:
+def _from_text(
+    text: str | None, cache: str, *, persist: bool = True
+) -> tuple[list | None, str, str]:
     global _PARSED
     if text is None:
         return (
@@ -274,12 +346,14 @@ def _from_text(text: str | None, cache: str) -> tuple[list | None, str, str]:
         )
     digest = hashlib.sha256(text.encode()).hexdigest()
     if _PARSED is not None and _PARSED[0] == digest:
-        return _PARSED[1], cache, ""
-    rows, warning = _parse(text)
-    if warning:
-        return None, cache, warning
-    _PARSED = (digest, rows)
-    _persist(rows, digest)
+        rows = _PARSED[1]
+    else:
+        rows, warning = _parse(text)
+        if warning:
+            return None, cache, warning
+        _PARSED = (digest, rows)
+    if persist:
+        _persist(rows, digest)
     return rows, cache, ""
 
 
@@ -338,14 +412,22 @@ def _normalise(row: dict) -> dict:
         target = untrusted_text(str(row.get("target")), "phishtank")
     return {
         "phish_id": _identifier(row.get("phish_id")),
-        "url": str(row.get("url") or ""),
-        "phish_detail_url": str(row.get("phish_detail_url") or ""),
-        "submission_time": str(row.get("submission_time") or ""),
-        "verified": str(row.get("verified") or ""),
-        "verification_time": str(row.get("verification_time") or ""),
-        "online": str(row.get("online") or ""),
+        "url": _plain(row.get("url"), _PLAIN_URL),
+        "phish_detail_url": _plain(row.get("phish_detail_url"), _PLAIN_URL),
+        "submission_time": _plain(row.get("submission_time"), _PLAIN_STAMP),
+        "verified": _plain(row.get("verified"), _PLAIN_FLAG),
+        "verification_time": _plain(row.get("verification_time"), _PLAIN_STAMP),
+        "online": _plain(row.get("online"), _PLAIN_FLAG),
         "target": target,
     }
+
+
+def _plain(value, shape: re.Pattern) -> str:
+    """Pass a feed value through only when it has the expected shape, else wrap it."""
+    text = str(value or "")
+    if not text or shape.fullmatch(text):
+        return text
+    return untrusted_text(text, "phishtank")
 
 
 def _identifier(value) -> str:
@@ -401,9 +483,9 @@ def _split(url: str) -> tuple[str, str, str, str] | None:
 
 def _host(hostname: str) -> str:
     try:
-        return idna.encode(hostname).decode("ascii")
+        return idna.encode(hostname.rstrip(".")).decode("ascii")
     except idna.IDNAError:
-        return hostname.lower()
+        return hostname.rstrip(".").lower()
 
 
 def _validate_url(url: str) -> str:
