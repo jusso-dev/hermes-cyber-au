@@ -1,0 +1,8 @@
+{
+  "ip": "1.1.1.1",
+  "open_ports": [80],
+  "hostnames": ["one.one.one.one"],
+  "cpes": [],
+  "tags": [],
+  "vulns": []
+}

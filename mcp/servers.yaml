@@ -412,3 +412,14 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  internetdb:
+    connector: shodan-internetdb
+    args:
+    - serve
+    - shodan-internetdb
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

@@ -280,3 +280,8 @@ connectors:
     - www.scamwatch.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  shodan-internetdb:
+    hosts:
+    - internetdb.shodan.io
+    allow_ip_literals: false
+    allow_http_loopback: false
