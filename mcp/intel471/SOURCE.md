@@ -8,3 +8,5 @@
 - Egress hosts: api.intel471.com
 
 Reads alerts, breach alerts and credential occurrence counts only. It does not create or edit watchers, and it never sends `markAsRead=true`.
+
+Live health makes real calls, bypassing the cache, and fails on a cached or snapshot answer or a missing key.

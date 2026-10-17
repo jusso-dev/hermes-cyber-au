@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import yaml
 from cyberau_common import USER_AGENT
+from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
@@ -39,7 +40,8 @@ _ALERTS = f"{_API}/alerts"
 _BREACH = f"{_API}/breachAlerts"
 _CREDENTIALS = f"{_API}/credentials/occurrences"
 _SYDNEY = ZoneInfo("Australia/Sydney")
-_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+_UID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 _PACKAGE = Path(__file__).resolve().parents[2]
 # Titan does not publish a quota. Stay slow and honour Retry-After on 429.
 _RATE = 4.0
@@ -118,7 +120,7 @@ def intel471_watcher_alerts(
     records, cache, warning = _watcher_records(watchlist, since, watcher_group, limit)
     if warning:
         return _envelope([], cache, (_ALERTS,), (warning,))
-    return _envelope(records, cache, (_ALERTS,))
+    return _envelope(records, cache, (_ALERTS,), _origin_notes(cache))
 
 
 def intel471_breach_alerts(query: _Query, since: _Date | None = None) -> dict:
@@ -144,7 +146,7 @@ def intel471_breach_alerts(query: _Query, since: _Date | None = None) -> dict:
     records, cache, warning = _breach_records(watchlist, allowed, since)
     if warning:
         return _envelope([], cache, (_BREACH,), (warning,))
-    return _envelope(records, cache, (_BREACH,))
+    return _envelope(records, cache, (_BREACH,), _origin_notes(cache))
 
 
 def intel471_credential_exposure(domain: _Domain, since: _Date | None = None) -> dict:
@@ -170,7 +172,7 @@ def intel471_credential_exposure(domain: _Domain, since: _Date | None = None) ->
     records, cache, warning = _credential_records(watchlist, allowed, since)
     if warning:
         return _envelope([], cache, (_CREDENTIALS,), (warning,))
-    return _envelope(records, cache, (_CREDENTIALS,))
+    return _envelope(records, cache, (_CREDENTIALS,), _origin_notes(cache))
 
 
 class Intel471Connector(PremiumConnector):
@@ -229,6 +231,9 @@ class Intel471Connector(PremiumConnector):
             return Probe(self.key, True, "schema ok")
         result = self.health_result(live=False)
         if not result.configured:
+            if live:
+                missing = ", ".join(name for name in self.licence_env if lookup(name) is None)
+                return Probe(self.key, False, f"not configured: set {missing}")
             return Probe(self.key, result.ok, result.detail)
         if not live:
             return Probe(self.key, True, "offline ok")
@@ -239,12 +244,20 @@ class Intel471Connector(PremiumConnector):
             probes.append(("breach", _BREACH, {"count": "1", "breachAlert": domain}))
             probes.append(("credentials", _CREDENTIALS, {"count": "1", "domain": domain}))
         for kind, url, params in probes:
-            payload, _cache, warning = _fetch(kind, url, params, force_live=True)
+            payload, cache, warning = _fetch(kind, url, params, force_live=True)
             if warning:
                 return Probe(self.key, False, warning)
+            if cache != "miss":
+                return Probe(self.key, False, f"{kind} check was answered from {cache}, not live")
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
+        if not domain:
+            return Probe(
+                self.key,
+                True,
+                "live ok (alerts only: no watchlist domain to probe breach alerts and credentials)",
+            )
         return Probe(self.key, True, "live ok")
 
 
@@ -429,7 +442,7 @@ def _alert_record(
     subject_value = _match_any(_alert_candidates(item, groups), watchlist)
     if subject_value is None:
         return None
-    uid = str(item.get("uid") or "")
+    uid = _uid(item)
     if not uid:
         return None
     source_type = _source_type(item)
@@ -459,7 +472,7 @@ def _breach_record(item: dict, watchlist: Watchlist, since: str | None) -> dict 
     subject_value = _match_any(_breach_candidates(item), watchlist)
     if subject_value is None:
         return None
-    uid = str(item.get("uid") or "")
+    uid = _uid(item)
     if not uid:
         return None
     victim = _victim_name(item)
@@ -473,7 +486,9 @@ def _breach_record(item: dict, watchlist: Watchlist, since: str | None) -> dict 
         personal=bool(victim),
         data_classes=["breach alert"],
     )
-    _remember(finding, watchlist)
+    # A watchlist entry spelt like the victim would put the name in the store as the subject.
+    if subject_value.casefold() != victim.casefold():
+        _remember(finding, watchlist)
     record = {
         "uid": uid,
         "observed_at": _iso(moment),
@@ -582,6 +597,9 @@ def _public_finding(finding: ExposureFinding) -> dict:
 
 
 def _remember(finding: ExposureFinding, watchlist: Watchlist) -> None:
+    if _snapshot_active():
+        # A snapshot is a fixture, not an observation. It never becomes history.
+        return
     store = ExposureStore(_data_root() / "intel.sqlite")
     store.write(finding, terms=_terms(), watchlist=watchlist)
 
@@ -612,7 +630,7 @@ def _fetch(
             ("Intel 471 is not configured. Set INTEL471_EMAIL and INTEL471_API_KEY."),
         )
     root = _data_root()
-    cache = _session_cache(root)
+    cache = _cache_for(root, kind)
     cache_key = cache.key("GET", url, params, b"", _scope())
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     if offline:
@@ -629,9 +647,18 @@ def _fetch(
     client = _client(root, cache)
     try:
         _acquire(root)
-        response = client.get(url, params=params, headers=_auth_headers(), ttl=900)
-    except (HttpError, EgressDenied, TimeoutError, RateLimited) as exc:
-        cached = cache.get(cache_key)
+        response = client.get(
+            url,
+            params=params,
+            headers=_auth_headers(),
+            ttl=900,
+            skip_cache=force_live,
+        )
+    except EgressDenied as exc:
+        # A refused host is a policy stop. A cached copy must not hide it.
+        return None, "snapshot", _scrub(str(exc))
+    except (HttpError, TimeoutError, RateLimited) as exc:
+        cached = None if force_live else cache.get(cache_key)
         if cached is not None:
             payload = _load(cached.body.decode("utf-8"))
             return payload, "stale", ""
@@ -731,6 +758,14 @@ def _scrub(message: str) -> str:
     if key:
         message = message.replace(key, "[REDACTED]")
     return redact(message)
+
+
+def _cache_for(root: Path, kind: str):
+    if kind == "credentials":
+        # Occurrence rows can carry logins and passwords. Only counts leave this module,
+        # so the raw body is never kept.
+        return HttpCache(root / "http_cache.sqlite", persistence="none")
+    return _session_cache(root)
 
 
 def _session_cache(root: Path):
@@ -1151,8 +1186,13 @@ def _iso(moment: datetime) -> str:
 def _check_since(since: str | None) -> str:
     if since is None or since == "":
         return ""
-    if not _DATE.fullmatch(since):
-        return "since must be YYYY-MM-DD in Australia/Sydney"
+    message = "since must be YYYY-MM-DD in Australia/Sydney"
+    if not isinstance(since, str) or not _DATE.fullmatch(since):
+        return message
+    try:
+        datetime.strptime(since, "%Y-%m-%d")
+    except ValueError:
+        return message
     return ""
 
 
@@ -1174,6 +1214,26 @@ def _check_domain(domain: str) -> str:
     if "://" in domain or "/" in domain or len(domain) > 253:
         return "domain must be a hostname"
     return ""
+
+
+def _uid(item: dict) -> str:
+    raw = item.get("uid")
+    if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+        return ""
+    text = str(raw)
+    # The uid is feed text that is returned unwrapped and kept as source_ref.
+    return text if _UID.fullmatch(text) else ""
+
+
+def _origin_notes(cache: str) -> tuple[str, ...]:
+    if cache == "snapshot" and _snapshot_active():
+        return (
+            "Served from a local snapshot (CYBERAU_INTEL471_SNAPSHOT), not a live "
+            "Intel 471 result. Nothing was stored.",
+        )
+    if cache == "stale":
+        return ("Served from a cached copy that has expired. Intel 471 was not reached.",)
+    return ()
 
 
 def _envelope(data, cache: str, urls: tuple[str, ...], warnings: tuple[str, ...] = ()) -> dict:

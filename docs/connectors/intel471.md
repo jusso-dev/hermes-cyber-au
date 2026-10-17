@@ -22,6 +22,6 @@ The flags and the quota note are also in [the premium terms page](../premium/ter
 
 ## What it will not do
 
-Watchers are configured in Titan. This connector only reads alerts, breach alerts and credential counts. It does not create, edit or delete watchers, and it does not mark alerts as read. Credential passwords and logins are not requested and are not returned. A query that is not on your org-exposure watchlist is not sent.
+Watchers are configured in Titan. This connector only reads alerts, breach alerts and credential counts. It does not create, edit or delete watchers, and it does not mark alerts as read. Credential passwords and logins are not requested, not returned and not cached: credential responses skip the session cache, so they are unavailable offline. A result served from a local snapshot or an expired cached copy carries a warning, and a snapshot is never written to the metadata store. A query that is not on your org-exposure watchlist is not sent.
 
 Upstream: <https://github.com/intel471/titan-client-python>. API host: `api.intel471.com`.
