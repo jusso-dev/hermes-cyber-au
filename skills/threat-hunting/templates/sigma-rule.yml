@@ -1,0 +1,20 @@
+title: Replace this title
+id: 00000000-0000-4000-8000-000000000001  # Replace this id for every draft.
+status: experimental
+author: draft  # Replace with the person or team before review.
+description: Draft for a person to review. Not a SigmaHQ rule.
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    Image|endswith: '\powershell.exe'
+    CommandLine|contains: '-enc'
+  condition: selection
+level: medium
+tags:
+  - attack.t1059.001
+falsepositives:
+  - An administrator running an encoded management script
+# A new draft is a proposal. Keep the author and the id.
+# Do not reuse this id. Do not present this file as a SigmaHQ rule.

@@ -1,0 +1,33 @@
+{
+  "table": "DeviceFileEvents",
+  "product": "Microsoft Defender XDR advanced hunting",
+  "source_name": "Microsoft Learn DeviceFileEvents table",
+  "source_url": "https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-devicefileevents-table",
+  "version": "none",
+  "retrieved": "2026-10-17",
+  "page_updated": "2026-06-22",
+  "partial": true,
+  "time_column": "Timestamp",
+  "columns": {
+    "Timestamp": "datetime",
+    "DeviceId": "string",
+    "DeviceName": "string",
+    "ActionType": "string",
+    "FileName": "string",
+    "FolderPath": "string",
+    "SHA1": "string",
+    "SHA256": "string",
+    "MD5": "string",
+    "FileOriginUrl": "string",
+    "FileOriginReferrerUrl": "string",
+    "FileOriginIP": "string",
+    "PreviousFolderPath": "string",
+    "PreviousFileName": "string",
+    "FileSize": "long",
+    "InitiatingProcessVersionInfoFileDescription": "string",
+    "InitiatingProcessId": "long",
+    "InitiatingProcessCommandLine": "string",
+    "InitiatingProcessCreationTime": "datetime",
+    "InitiatingProcessIntegrityLevel": "string"
+  }
+}

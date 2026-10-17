@@ -1,0 +1,16 @@
+source_name: pySigma Kusto backend
+version: "1.0.1"
+retrieved: "2026-10-17"
+upstream: https://github.com/AttackIQ/pySigma-backend-kusto
+upstream_file: sigma/backends/kusto/kusto.py
+note: >
+  Supported modifiers are those with an expression in that file at version 1.0.1.
+  A modifier that is not in this list is treated as unsupported for a hunt draft.
+  This file does not convert Sigma to KQL.
+supported:
+  - contains
+  - startswith
+  - endswith
+  - re
+  - cidr
+  - exists
