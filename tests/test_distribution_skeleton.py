@@ -28,6 +28,8 @@ ENV_NAMES = [
     "OTX_API_KEY",
     "CLOUDFLARE_RADAR_API_TOKEN",
     "GREYNOISE_API_KEY",
+    "THREATSIEVE_URL",
+    "THREATSIEVE_API_KEY",
 ]
 
 # Phrases the Hermes context-file scanner treats as injection or secret access.

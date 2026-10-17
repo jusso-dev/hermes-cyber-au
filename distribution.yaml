@@ -32,3 +32,9 @@ env_requires:
   - name: GREYNOISE_API_KEY
     description: "Optional GreyNoise community key."
     required: false
+  - name: THREATSIEVE_URL
+    description: "Optional ThreatSieve origin. Defaults to http://127.0.0.1:8787 when unset."
+    required: false
+  - name: THREATSIEVE_API_KEY
+    description: "Optional ThreatSieve scoped API key for POST /v1/assess."
+    required: false

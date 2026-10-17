@@ -104,6 +104,7 @@ class HttpClient:
         ttl: int,
         cache_key_extra: str = "",
         stale_if_error: int = 86400,
+        skip_cache: bool = False,
     ) -> Response:
         encoded = _json_bytes(body)
         key_body = encoded + b"\n" + cache_key_extra.encode()
@@ -117,6 +118,7 @@ class HttpClient:
             ttl=ttl,
             stale_if_error=stale_if_error,
             key_body=key_body,
+            skip_cache=skip_cache,
         )
 
     def _fetch(
