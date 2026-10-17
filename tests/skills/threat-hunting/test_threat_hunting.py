@@ -145,6 +145,60 @@ def test_unknown_table_and_management_commands_are_not_ready():
     assert any("externaldata" in item for item in external["errors"])
 
 
+def test_url_in_a_string_does_not_hide_externaldata():
+    schemas = check_kql.load_schemas(check_kql.schema_dir())
+    result = check_kql.check_query(
+        "DeviceProcessEvents\n| where Timestamp > ago(1d)\n"
+        '| where ProcessCommandLine has "http://a"'
+        ' | join kind=inner externaldata(x:string)["https://example.com/a"] on x',
+        schemas,
+    )
+    assert result["ready"] is False
+    assert any("externaldata" in item for item in result["errors"])
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        ".append DeviceProcessEvents <| DeviceProcessEvents | where Timestamp > ago(1d)",
+        ".alter table DeviceProcessEvents (Timestamp:datetime)",
+        ".purge table DeviceProcessEvents records",
+        "DeviceProcessEvents | where Timestamp > ago(1d) | evaluate http_request('https://example.com')",
+    ],
+)
+def test_other_management_commands_and_outbound_plugins_are_not_ready(query: str):
+    schemas = check_kql.load_schemas(check_kql.schema_dir())
+    result = check_kql.check_query(query, schemas)
+    assert result["ready"] is False
+    assert any("is not a hunt" in item for item in result["errors"])
+
+
+def test_column_used_only_as_a_function_argument_is_checked():
+    schemas = check_kql.load_schemas(check_kql.schema_dir())
+    result = check_kql.check_query(
+        "DeviceProcessEvents | where Timestamp > ago(1d) | where isnotempty(FakeColumn)",
+        schemas,
+    )
+    assert result["ready"] is False
+    assert any("FakeColumn" in item for item in result["errors"])
+
+
+def test_aliases_summarize_and_comments_are_not_false_positives():
+    schemas = check_kql.load_schemas(check_kql.schema_dir())
+    query = """
+let lookback = 7d;
+DeviceProcessEvents
+| where Timestamp >= ago(lookback) // see http://example.com
+| where FileName in~ ("powershell.exe", "pwsh.exe")
+| extend Short = substring(ProcessCommandLine, 0, 40)
+| summarize Hits = count(), Last = max(Timestamp) by DeviceName, bin(Timestamp, 1h)
+| project-rename Host = DeviceName
+| top 10 by Hits desc
+"""
+    result = check_kql.check_query(query, schemas)
+    assert result["ready"], result["errors"]
+
+
 def test_query_without_a_time_bound_is_not_ready():
     schemas = check_kql.load_schemas(check_kql.schema_dir())
     result = check_kql.check_query(
@@ -176,6 +230,14 @@ def test_base64offset_is_a_graceful_unsupported_modifier():
         for item in result["errors"]
     )
     assert any("not ready" in item for item in result["errors"])
+
+
+def test_condition_list_is_accepted_and_still_checks_modifiers():
+    support = sigma_lint.load_support(sigma_lint.support_path())
+    text = OFFSET_RULE.replace("condition: selection", "condition:\n    - selection")
+    result = sigma_lint.lint_text(text, support)
+    assert not any("condition" in item for item in result["errors"])
+    assert "base64offset" in result["unsupported"]
 
 
 def test_malformed_sigma_yaml_does_not_raise():
@@ -237,6 +299,14 @@ def test_eval_file_forbids_create_and_run_tools():
     assert "mcp__junction__sentinel_run_hunt" in refused["forbid_tools"]
     web = next(case for case in loaded["cases"] if case["id"] == "asd-web-shell")
     assert web["replay"][0]["connector"] == "asd-acsc"
+    for name in ("mcp__attack__attack_technique", "mcp__sigma__sigma_search"):
+        assert name in web["expect_tools"]
+        assert name in [call["name"] for call in web["offline"]["tool_calls"]]
+    modifier = next(
+        case for case in loaded["cases"] if case["id"] == "unsupported-modifier"
+    )
+    assert "mcp__sigma__sigma_convert" in modifier["forbid_tools"]
+    assert modifier["offline"]["tool_calls"] == []
     assert "untrusted" in web["offline"]["message"]
 
 

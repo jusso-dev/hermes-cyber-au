@@ -49,7 +49,7 @@ Do not call `mcp__junction__sentinel_create_analytics_rule` or `mcp__junction__s
    Source: pySigma Kusto backend, 1.0.1, retrieved 2026-10-17.
    When the modifiers are in the list, call `mcp__sigma__sigma_convert` with target `kusto`. Show the Sigma and the KQL the tool returns. If convert is missing or returns an error, report that text as content from the tool. Do not invent a translation for an unsupported modifier. A hand-written KQL draft is allowed only when every modifier is in the support list and convert did not return a query. Label that KQL as a hand draft, not as pySigma output. [sigma_lint.py](scripts/sigma_lint.py) never emits KQL.
 
-4. Run [check_kql.py](scripts/check_kql.py) on the KQL before you call it ready. The script checks the query against [the bundled schemas](references/schemas/readme.md). The same rules apply if you cannot run the script: the table name must appear in the query, each column must be in that table's bundled file, the table's time column must be compared, and `.set`, `.drop`, `.create`, `.delete`, `.ingest`, and `externaldata` are refused. If the checker reports an error, show the error and stop. Drop a rejected column and check again, or leave the query not ready. Do not override the checker from memory. A missing column is not confirmed. Do not say the vendor table lacks it.
+4. Run [check_kql.py](scripts/check_kql.py) on the KQL before you call it ready. The script checks the query against [the bundled schemas](references/schemas/readme.md). The same rules apply if you cannot run the script: the table name must appear in the query, each column must be in that table's bundled file, the table's time column must be compared, and any management command (a statement that starts with a dot), `externaldata`, and the outbound `evaluate` plugins such as `http_request` are refused. If the checker reports an error, show the error and stop. Drop a rejected column and check again, or leave the query not ready. Do not override the checker from memory. A missing column is not confirmed. Do not say the vendor table lacks it.
    Cite the schema file's `source_name`, `version`, and `retrieved` date on the KQL you show.
 
 5. Add one true positive and one false positive, using synthetic observables, and short tuning notes a person can apply after review. Defang observables in the pack. The rules are in [defang.md](references/defang.md). Do not defang a tool argument. Do not invent a price, a retention figure, or a tenant name.
@@ -74,7 +74,7 @@ The bundled schemas are a partial extract. Blog column names are not a schema. I
 
 `base64offset` is not in the bundled Kusto support list. A rule that uses it is not ready, and the error is the modifier name plus "No KQL was produced." Do not paste a guessed query.
 
-Management commands (`.set`, `.drop`, `.create`, `.delete`, `.ingest`, and `externaldata`) are not a hunt.
+Management commands (any statement that starts with a dot, such as `.set`, `.append`, `.alter`, or `.purge`), `externaldata`, and `evaluate http_request` are not a hunt.
 
 This skill is not the public `sentinel-expert` skill. Do not cite an ISM control from memory, and do not claim a detection meets a control.
 

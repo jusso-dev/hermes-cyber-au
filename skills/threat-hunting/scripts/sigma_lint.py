@@ -113,8 +113,14 @@ def _structure_errors(rule: dict) -> list[str]:
     ):
         errors.append("logsource needs a category, product, or service")
     detection = rule.get("detection")
-    if not isinstance(detection, dict) or not isinstance(
-        detection.get("condition"), str
+    condition = detection.get("condition") if isinstance(detection, dict) else None
+    if not (
+        isinstance(condition, str)
+        or (
+            isinstance(condition, list)
+            and condition
+            and all(isinstance(item, str) for item in condition)
+        )
     ):
         errors.append("detection.condition is required")
     level = rule.get("level")

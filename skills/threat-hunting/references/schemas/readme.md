@@ -14,7 +14,7 @@ Each file records `source_name`, `version`, and `retrieved`. Cite a column or ta
 
 `DeviceFileEvents` page text stated it was last updated on 2026-06-22. That date is `page_updated` on the file. The other two pages were read on the `retrieved` date. Their page-updated dates were not copied.
 
-The checker in `scripts/check_kql.py` is the reference. It requires the table name in the query, a comparison on that table's `time_column`, and columns from the bundled file. It refuses `.set`, `.drop`, `.create`, `.delete`, `.ingest`, and `externaldata`. It does not run the query.
+The checker in `scripts/check_kql.py` is the reference. It requires the table name in the query, a comparison on that table's `time_column`, and columns from the bundled file. It refuses any statement that starts with a dot (a management command), `externaldata`, and the outbound `evaluate` plugins such as `http_request`. It checks every bare identifier, not only those in a comparison. It does not run the query.
 
 Source: Microsoft Learn DeviceProcessEvents table, none, retrieved 2026-10-17.
 Source: Microsoft Learn DeviceFileEvents table, none, retrieved 2026-10-17.

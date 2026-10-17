@@ -14,10 +14,18 @@ import re
 import sys
 from pathlib import Path
 
-_COMMENT = re.compile(r"/\*.*?\*/|//.*?$", re.DOTALL | re.MULTILINE)
-_STRING = re.compile(r"@?\"(?:\\.|[^\"])*\"|'(?:\\.|[^'])*'")
+# KQL has no block comments. Strings are matched first so a "//" inside a
+# string literal is not read as the start of a comment.
+_TOKEN = re.compile(
+    r"@\"(?:[^\"]|\"\")*\"|@'(?:[^']|'')*'"
+    r"|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'"
+    r"|//[^\n]*"
+)
+# Any statement that starts with a dot is a management command.
+_MANAGEMENT = re.compile(r"(?:^|;)\s*(\.[A-Za-z][A-Za-z0-9_-]*)")
 _FORBIDDEN = re.compile(
-    r"(?i)(?:\.(?:set|drop|create|delete|ingest)\b|\bexternaldata\b)"
+    r"(?i)\b(?:externaldata|evaluate\s+(?:http_request|http_request_post|"
+    r"sql_request|mysql_request|postgresql_request|azure_digital_twins_query_request))\b"
 )
 _TABLE_OP = (
     "has_any|has_all|has_cs|!has|!contains|!startswith|!endswith|"
@@ -28,17 +36,10 @@ _COLUMN_OP = re.compile(
     rf"\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:{_TABLE_OP})(?!\w)",
     re.IGNORECASE,
 )
-_PROJECT = re.compile(
-    r"\b(project-away|project-keep|project-rename|project)\b\s+([^|]+)",
-    re.IGNORECASE,
-)
-_BY = re.compile(
-    r"\bby\s+([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)",
-    re.IGNORECASE,
-)
-_EXTEND = re.compile(r"\bextend\s+([^|]+)", re.IGNORECASE)
-_LET = re.compile(r"\blet\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.IGNORECASE)
-_IDENT = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+_OPERATOR = re.compile(r"\|\s*[A-Za-z][A-Za-z0-9_-]*")
+_ALIAS = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*=(?![=~])")
+_TYPED = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[A-Za-z_]")
+_IDENT = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*")
 
 _FUNCTIONS = {
     "abs",
@@ -107,6 +108,42 @@ _FUNCTIONS = {
     "true",
     "union",
     "where",
+    # keywords, operators and types that appear bare in a query
+    "bool",
+    "datetime",
+    "decimal",
+    "dynamic",
+    "fullouter",
+    "guid",
+    "hasprefix",
+    "hassuffix",
+    "inner",
+    "innerunique",
+    "int",
+    "leftanti",
+    "leftouter",
+    "leftsemi",
+    "left",
+    "long",
+    "null",
+    "nulls",
+    "real",
+    "right",
+    "rightanti",
+    "rightouter",
+    "rightsemi",
+    "string",
+    "timespan",
+    "with",
+    "first",
+    "last",
+    "contains",
+    "contains_cs",
+    "endswith_cs",
+    "startswith_cs",
+    "hint",
+    "isfuzzy",
+    "let",
 }
 
 
@@ -149,27 +186,32 @@ def check_query(query: str, schemas: dict[str, dict]) -> dict:
     stripped = _strip(query)
     if not stripped.strip():
         return _result(False, [], ["query is empty"], schemas)
+    management = _MANAGEMENT.search(stripped)
+    if management:
+        errors.append(
+            f"management command {management.group(1)} is not a hunt. The query is not ready."
+        )
     forbidden = _FORBIDDEN.search(stripped)
     if forbidden:
         errors.append(
-            f"management command {forbidden.group(0)} is not a hunt. The query is not ready."
+            f"{forbidden.group(0)} is not a hunt. The query is not ready."
         )
+    if '"' in stripped or "'" in stripped:
+        errors.append("unterminated string literal. The query is not ready.")
     tables = [
         name for name in schemas if re.search(rf"\b{re.escape(name)}\b", stripped)
     ]
     if not tables and not errors:
         errors.append("no bundled table name found. Put the table name in the query.")
     known = _known_columns(schemas, tables)
-    let_names = {match.group(1) for match in _LET.finditer(stripped)}
-    used = _columns_used(stripped, let_names)
-    for column in sorted(used):
-        if column not in known:
-            where = ", ".join(tables) if tables else "the bundled schemas"
-            errors.append(
-                f"column {column} is not confirmed in the bundled schema for {where}. "
-                "The bundled schema is a partial extract. Drop the column or stop. "
-                "Do not say the column is absent from the vendor table."
-            )
+    table_names = set(schemas)
+    for column in sorted(_columns_used(stripped) - known - table_names):
+        where = ", ".join(tables) if tables else "the bundled schemas"
+        errors.append(
+            f"column {column} is not confirmed in the bundled schema for {where}. "
+            "The bundled schema is a partial extract. Drop the column or stop. "
+            "Do not say the column is absent from the vendor table."
+        )
     for name in tables:
         time_column = schemas[name]["time_column"]
         if time_column not in _compared_columns(stripped):
@@ -195,8 +237,7 @@ def _result(
 
 
 def _strip(query: str) -> str:
-    without_comments = _COMMENT.sub(" ", query)
-    return _STRING.sub('""', without_comments)
+    return _TOKEN.sub(lambda m: " " if m.group(0).startswith("//") else " 0 ", query)
 
 
 def _known_columns(schemas: dict[str, dict], tables: list[str]) -> set[str]:
@@ -210,66 +251,23 @@ def _compared_columns(text: str) -> set[str]:
     return {match.group(1) for match in _COLUMN_OP.finditer(text)}
 
 
-def _columns_used(text: str, let_names: set[str]) -> set[str]:
-    used = _compared_columns(text)
-    used.update(_project_columns(text))
-    used.update(_by_columns(text))
-    used.update(_extend_columns(text))
-    return {
-        name
-        for name in used
-        if name not in let_names and name.lower() not in _FUNCTIONS
-    }
-
-
-def _project_columns(text: str) -> set[str]:
-    found: set[str] = set()
-    for match in _PROJECT.finditer(text):
-        kind = match.group(1).lower()
-        for item in match.group(2).split(","):
-            piece = item.strip()
-            if not piece or piece == "*":
-                continue
-            if kind == "project-rename" and "=" in piece:
-                left = piece.split("=", 1)[0].strip()
-                ident = _first_ident(left)
-            elif "=" in piece:
-                ident = _first_ident(piece.split("=", 1)[0])
-            else:
-                ident = _first_ident(piece)
-            if ident:
-                found.add(ident)
-    return found
-
-
-def _by_columns(text: str) -> set[str]:
-    found: set[str] = set()
-    for match in _BY.finditer(text):
-        for part in match.group(1).split(","):
-            ident = part.strip()
-            if ident:
-                found.add(ident)
-    return found
-
-
-def _extend_columns(text: str) -> set[str]:
-    found: set[str] = set()
-    for match in _EXTEND.finditer(text):
-        for item in match.group(1).split(","):
-            if "=" not in item:
-                continue
-            _left, right = item.split("=", 1)
-            for ident in _IDENT.findall(right):
-                if ident.lower() not in _FUNCTIONS:
-                    found.add(ident)
-    return found
-
-
-def _first_ident(text: str) -> str | None:
-    match = _IDENT.search(text)
-    if match is None:
-        return None
-    return match.group(0)
+def _columns_used(text: str) -> set[str]:
+    """Return every bare identifier that is not a keyword, call, alias or member."""
+    body = _OPERATOR.sub(" ", text)
+    defined = {match.group(1) for match in _ALIAS.finditer(body)}
+    defined.update(match.group(1) for match in _TYPED.finditer(body))
+    used: set[str] = set()
+    for match in _IDENT.finditer(body):
+        name = match.group(0)
+        start, end = match.span()
+        if start > 0 and body[start - 1] == ".":
+            continue
+        if body[end:].lstrip().startswith("("):
+            continue
+        if name in defined or name.lower() in _FUNCTIONS:
+            continue
+        used.add(name)
+    return used
 
 
 def main(argv: list[str] | None = None) -> int:
