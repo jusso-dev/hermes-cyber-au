@@ -1,0 +1,23 @@
+{
+  "query_status": "ok",
+  "md5_hash": "e6927c307527f5434837e8851020de6f",
+  "sha256_hash": "737129eeecfedbbe38dede426b7383d72c58aaa856de5c4f23bf4b1068fcca6b",
+  "file_type": "sh",
+  "file_size": "1024",
+  "signature": "SyntheticFamily",
+  "firstseen": "2026-10-15 03:15:00 UTC",
+  "lastseen": "2026-10-16 01:00:00 UTC",
+  "url_count": "1",
+  "urlhaus_download": "https://urlhaus-api.abuse.ch/v1/download/737129eeecfedbbe38dede426b7383d72c58aaa856de5c4f23bf4b1068fcca6b/",
+  "urls": [
+    {
+      "url_id": "9001",
+      "url": "http://malware.example.test/bin/payload.sh",
+      "url_status": "online",
+      "filename": "payload.sh",
+      "firstseen": "2026-10-15 03:12:44 UTC",
+      "lastseen": "2026-10-16 01:00:00 UTC",
+      "urlhaus_reference": "https://urlhaus.abuse.ch/url/9001/"
+    }
+  ]
+}

@@ -79,3 +79,19 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  abusech:
+    connector: abusech
+    args:
+    - serve
+    - abusech
+    env:
+    - ABUSECH_AUTH_KEY=${ABUSECH_AUTH_KEY}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    default_enabled: false
+    off_reason: licence terms
+    terms_doc: docs/connectors/abusech.md
+    required_env:
+    - ABUSECH_AUTH_KEY

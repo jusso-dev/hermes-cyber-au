@@ -531,6 +531,26 @@ class TestHttp:
         assert response.cache == "miss"
         client.close()
 
+    def test_post_form_and_skip_cache(self, tmp_path: Path):
+        seen = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append((request.headers["content-type"], request.content))
+            return httpx.Response(200, content=b'{"ok":true}')
+
+        client = _client(tmp_path, handler)
+        url = "https://example.com/a"
+        first = client.post_form(url, {"url": "http://a.test/x?y=1", "q": "b"}, ttl=60)
+        again = client.post_form(url, {"q": "b", "url": "http://a.test/x?y=1"}, ttl=60)
+        fresh = client.post_form(
+            url, {"q": "b", "url": "http://a.test/x?y=1"}, ttl=60, skip_cache=True
+        )
+        assert [first.cache, again.cache, fresh.cache] == ["miss", "hit", "miss"]
+        assert len(seen) == 2
+        assert seen[0][0] == "application/x-www-form-urlencoded"
+        assert seen[0][1] == b"q=b&url=http%3A%2F%2Fa.test%2Fx%3Fy%3D1"
+        client.close()
+
     def test_upstream_errors_and_bare_redirect(self, tmp_path: Path):
         def five_hundred(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500)
