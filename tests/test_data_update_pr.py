@@ -319,6 +319,38 @@ def test_rename_out_of_a_data_directory_is_refused(tmp_path: Path):
     assert _remote_heads(work, env) == {"main"}
 
 
+def test_symlink_inside_a_data_directory_is_refused(tmp_path: Path):
+    work, bare, env = _repo(tmp_path)
+    _install_gh(tmp_path, env)
+    main_sha = _rev(bare, "main", env)
+    (work / "feeds" / "link").symlink_to("../.github")
+    (work / "PR_BODY.md").write_text("body\n", encoding="utf-8")
+    refused = _run(work, env, "refuse")
+    opened = _run(work, env, "open")
+    for result in (refused, opened):
+        assert result.returncode == 1
+        assert "feeds/link" in result.stderr
+        assert data_update_pr.REFUSE in result.stderr
+    assert _rev(bare, "main", env) == main_sha
+    assert _remote_heads(work, env) == {"main"}
+
+
+@pytest.mark.parametrize("spelling", ["feeds//body.md", "feeds/./body.md", "./feeds/body.md"])
+def test_body_file_is_never_committed_under_any_spelling(
+    tmp_path: Path, spelling: str
+):
+    work, _bare, env = _repo(tmp_path)
+    _install_gh(tmp_path, env)
+    env["BODY_FILE"] = spelling
+    (work / "feeds" / "body.md").write_text("body\n", encoding="utf-8")
+    (work / "feeds" / "catalogue.yaml").write_text("new\n", encoding="utf-8")
+    result = _run(work, env, "open")
+    assert result.returncode == 0, result.stderr
+    files = _git(work, env, "ls-tree", "-r", "--name-only", "HEAD").stdout
+    assert "feeds/body.md" not in files
+    assert "feeds/catalogue.yaml" in files
+
+
 def test_caller_allowed_paths_override(tmp_path: Path):
     work, bare, env = _repo(tmp_path)
     _install_gh(tmp_path, env)

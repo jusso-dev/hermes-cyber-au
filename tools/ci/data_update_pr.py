@@ -4,7 +4,8 @@
 workflow into ``.github/workflows/`` by hand, because the token for this
 repository cannot push files under ``.github/workflows/``.
 
-Paths outside the caller's allowed data directories are refused. The script
+Paths outside the caller's allowed data directories are refused, as are
+symlinks and other non-regular entries inside them. The script
 never pushes to main or master. Git hooks are taken from an empty directory so
 a data artifact cannot plant ``.git/hooks`` and run them during the commit or
 the push.
@@ -14,11 +15,12 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zoneinfo import ZoneInfo
 
 DEFAULT_ALLOWED = (
@@ -169,7 +171,7 @@ def parse_labels(raw: str) -> list[str]:
 
 
 def parse_body_file(repo: Path, raw: str) -> str:
-    relative = raw.removeprefix("./")
+    relative = raw
     parts = relative.split("/")
     if (
         not relative
@@ -182,12 +184,14 @@ def parse_body_file(repo: Path, raw: str) -> str:
     root = repo.resolve()
     if path != root and root not in path.parents:
         raise DataPrError("BODY_FILE must stay inside the repository.")
-    return relative
+    # Compare against git's own spelling of the path, so "feeds//b.md" and
+    # "./feeds/b.md" are still left out of the commit.
+    return PurePosixPath(relative).as_posix()
 
 
 def refuse() -> int:
     repo = repo_root()
-    rejected = reject_unexpected(changed_paths(repo), allowed_from_env())
+    rejected = reject_unexpected(changed_paths(repo), allowed_from_env(), repo)
     return 0 if rejected is None else rejected
 
 
@@ -199,7 +203,7 @@ def open_pr() -> int:
     labels = parse_labels(os.environ.get("LABELS", ""))
     body_rel = parse_body_file(repo, os.environ.get("BODY_FILE", ""))
     paths = changed_paths(repo)
-    rejected = reject_unexpected(paths, pattern)
+    rejected = reject_unexpected(paths, pattern, repo)
     if rejected is not None:
         return rejected
     committable = [path for path in paths if path != body_rel]
@@ -281,8 +285,24 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
-def reject_unexpected(paths: list[str], pattern: re.Pattern[str]) -> int | None:
-    bad = [path for path in paths if not is_allowed(path, pattern)]
+def is_plain_file(repo: Path, path: str) -> bool:
+    """A deleted path is plain. A symlink or other special entry is not."""
+    try:
+        mode = (repo / path).lstat().st_mode
+    except FileNotFoundError:
+        return True
+    return stat.S_ISREG(mode)
+
+
+def reject_unexpected(
+    paths: list[str], pattern: re.Pattern[str], repo: Path | None = None
+) -> int | None:
+    bad = [
+        path
+        for path in paths
+        if not is_allowed(path, pattern)
+        or (repo is not None and not is_plain_file(repo, path))
+    ]
     if not bad:
         return None
     return _refuse_paths(bad)
