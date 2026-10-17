@@ -3,6 +3,7 @@
 import ipaddress
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -25,15 +26,23 @@ _TRANSPORT = None
 _SLEEP = time.sleep
 _LIMIT_SLEEP = time.sleep
 _CLOCK = time.monotonic
-_RETRIES = 3
+# One retry keeps a daily-quota 429 with a long Retry-After near 60 s, under the 120 s tool timeout.
+_RETRIES = 1
 _TTL = 24 * 3600
+_CLASSIFICATIONS = {"benign", "malicious", "unknown"}
+_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_LINK = re.compile(r"https://viz\.greynoise\.io/[A-Za-z0-9._~:/-]*")
+_NON_PUBLIC = tuple(
+    ipaddress.ip_network(item)
+    for item in ("10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7")
+)
 
 
 def greynoise_ip(ip: str) -> dict:
     problem = _validate_ip(ip)
     if problem:
         return _envelope(None, "snapshot", warnings=(problem,))
-    address = ipaddress.ip_address(ip.strip()).compressed
+    address = _parse_ip(ip).compressed
     payload, cache, warning = _fetch(address)
     if warning:
         return _envelope(None, cache, warnings=(warning,))
@@ -166,7 +175,9 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
             f"GreyNoise refused the request ({response.status}). Check GREYNOISE_API_KEY.",
         )
     if response.status == 429:
-        return None, response.cache, "GreyNoise rate limit reached."
+        wait = response.headers.get("retry-after", "").strip()
+        hint = f" Retry after {wait} seconds." if wait.isdigit() else ""
+        return None, response.cache, "GreyNoise rate limit reached." + hint
     if response.status >= 400 and response.status != 404:
         return None, response.cache, f"GreyNoise upstream status {response.status}"
     payload = _load(response.body.decode("utf-8"))
@@ -187,15 +198,25 @@ def _record(payload: dict) -> dict:
     name = str(payload.get("name") or "")
     message = str(payload.get("message") or "")
     return {
-        "ip": str(payload.get("ip") or ""),
+        "ip": _checked(payload.get("ip"), lambda text: _parse_ip(text) is not None),
         "noise": bool(payload["noise"]),
         "riot": bool(payload["riot"]),
-        "classification": str(payload.get("classification") or ""),
+        "classification": _checked(
+            payload.get("classification"), lambda text: text in _CLASSIFICATIONS
+        ),
         "name": untrusted_text(name, "greynoise") if name else "",
-        "link": str(payload.get("link") or ""),
-        "last_seen": str(payload.get("last_seen") or ""),
+        "link": _checked(payload.get("link"), lambda text: bool(_LINK.fullmatch(text))),
+        "last_seen": _checked(payload.get("last_seen"), lambda text: bool(_DATE.fullmatch(text))),
         "message": untrusted_text(message, "greynoise") if message else "",
     }
+
+
+def _checked(value, expected) -> str:
+    """Pass a value that has the expected shape, wrap anything else as untrusted text."""
+    text = str(value or "")
+    if not text or expected(text):
+        return text
+    return untrusted_text(text, "greynoise")
 
 
 def _not_observed(payload: dict) -> bool:
@@ -232,13 +253,29 @@ def _persist(record: dict) -> None:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
+def _parse_ip(text: str):
+    try:
+        address = ipaddress.ip_address(text.strip())
+    except ValueError:
+        return None
+    return None if getattr(address, "scope_id", None) else address
+
+
 def _validate_ip(ip: str) -> str:
     if not isinstance(ip, str) or not ip.strip():
         return "ip must be an IPv4 or IPv6 address"
-    try:
-        ipaddress.ip_address(ip.strip())
-    except ValueError:
+    address = _parse_ip(ip)
+    if address is None:
         return "ip must be an IPv4 or IPv6 address"
+    checked = getattr(address, "ipv4_mapped", None) or address
+    if (
+        checked.is_loopback
+        or checked.is_link_local
+        or checked.is_multicast
+        or checked.is_unspecified
+        or any(checked in network for network in _NON_PUBLIC)
+    ):
+        return "ip must be a public address. GreyNoise only classifies internet hosts"
     return ""
 
 
@@ -289,7 +326,7 @@ def _envelope(
     warnings: tuple[str, ...] = (),
 ) -> dict:
     as_of = None
-    if payload and payload.get("last_seen"):
+    if payload and _DATE.fullmatch(str(payload.get("last_seen") or "")):
         as_of = str(payload["last_seen"])
     return envelope(
         "greynoise",
