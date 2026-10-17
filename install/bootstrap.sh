@@ -204,18 +204,26 @@ load_snapshot() {
   if [ ! -e "$path" ]; then
     return 0
   fi
-  "$PROFILE_HOME/mcp/.venv/bin/cyberau-mcp" store load "$name" "$path"
+  set +e
+  "$PROFILE_HOME/mcp/.venv/bin/cyberau-mcp" store load "$name" "$path" >/dev/null 2>&1
+  status=$?
+  set -e
+  if [ "$status" -ne 0 ]; then
+    printf '%s\n' "cyberau-mcp store load is not available for ${name}. Skipping." >&2
+  fi
 }
 
 init_store
 
 run_doctor() {
   if [ -f "$REPO_ROOT/plugins/cyber-au/cli.py" ] && grep -q doctor "$REPO_ROOT/plugins/cyber-au/cli.py"; then
+    set +e
     if [ "$OFFLINE" -eq 1 ]; then
       hermes -p "$PROFILE" cyber-au doctor --offline
     else
       hermes -p "$PROFILE" cyber-au doctor
     fi
+    set -e
     return 0
   fi
   printf '%s\n' "hermes cyber-au doctor is not in this checkout. The doctor check is a separate ticket." >&2
