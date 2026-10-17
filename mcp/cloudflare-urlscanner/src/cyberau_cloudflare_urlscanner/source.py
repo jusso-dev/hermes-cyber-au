@@ -1,6 +1,7 @@
 """Cloudflare URL Scanner. Submits are Unlisted and approval-gated."""
 
 import hashlib
+import ipaddress
 import json
 import os
 import random
@@ -30,11 +31,11 @@ ATTRIBUTION = (
 )
 _VISIBILITY = "Unlisted"
 _PACKAGE = Path(__file__).resolve().parents[2]
-_UUID = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
+_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 _ACCOUNT = re.compile(r"^[0-9a-fA-F]{32}$")
 _LABEL = re.compile(r"[A-Za-z]{1,20}")
+_ASN = re.compile(r"(?i)(?:AS)?[0-9]{1,10}")
+_PLAIN_URL = re.compile(r"https?://[^\s\x00-\x1f\x7f]+")
 PROBE_SCAN_ID = "00000000-0000-4000-8000-000000000001"
 RATE = 1 / 10
 BURST = 4
@@ -118,7 +119,7 @@ def render_mcp_enabled(previous: bool | None) -> bool:
     lookup("CLOUDFLARE_ACCOUNT_ID")
     if previous is None:
         return False
-    return bool(previous)
+    return previous is True
 
 
 def connector() -> Connector:
@@ -173,6 +174,10 @@ class _CfscanConnector(Connector):
             return Probe(self.key, False, warning or _auth_message(status))
         if status is None:
             return Probe(self.key, False, warning or "live probe failed")
+        if status == 200 and not isinstance(payload, dict):
+            return Probe(
+                self.key, False, warning or "Cloudflare URL Scanner payload was not usable"
+            )
         if status == 200 and isinstance(payload, dict):
             problem = schema_drift(payload)
             if problem:
@@ -311,9 +316,9 @@ def _finish_submit(url: str, payload: dict, cache: str, token: str) -> dict:
     message = str(payload.get("message") or "")
     record = {
         "scan_id": scan_id,
-        "url": str(payload.get("url") or url),
+        "url": url,
         "visibility": "Unlisted",
-        "api": str(payload.get("api") or ""),
+        "api": _api_link(payload.get("api")),
         "message": _public_text(message, token) if message else "",
     }
     problem = _check_records("urlscan_submit_unlisted", [record])
@@ -361,13 +366,13 @@ def _result_record(scan_id: str, payload: dict, token: str) -> dict:
         verdict = "benign"
     else:
         verdict = "unknown"
-    ips = _strings(lists.get("ips"))
-    page_ip = str(page.get("ip") or "")
-    if page_ip and page_ip not in ips:
-        ips.append(page_ip)
-    asns = _strings(lists.get("asns"))
-    page_asn = str(page.get("asn") or "")
-    if page_asn and page_asn not in asns:
+    ips = _addresses(_strings(lists.get("ips")))
+    for page_ip in _addresses([str(page.get("ip") or "").strip()]):
+        if page_ip not in ips:
+            ips.append(page_ip)
+    asns = [item for item in _strings(lists.get("asns")) if _ASN.fullmatch(item)]
+    page_asn = str(page.get("asn") or "").strip()
+    if _ASN.fullmatch(page_asn) and page_asn not in asns:
         asns.append(page_asn)
     title = str(page.get("title") or "")
     categories = _strings(overall.get("categories"))
@@ -375,7 +380,7 @@ def _result_record(scan_id: str, payload: dict, token: str) -> dict:
         "scan_id": scan_id,
         "status": "finished",
         "verdict": verdict,
-        "final_url": str(page.get("url") or ""),
+        "final_url": _page_url(page.get("url"), token),
         "ips": ips,
         "asns": asns,
         "title": _public_text(title, token) if title else "",
@@ -478,7 +483,11 @@ def _approval_status(url: str, token: str, *, consume: bool) -> str:
         return _APPROVAL
     digest = hashlib.sha256(token.encode()).hexdigest()
     now = time.time()
-    with _approvals() as conn:
+    try:
+        store = _approvals()
+    except RuntimeError as exc:
+        return str(exc)
+    with store as conn:
         row = conn.execute(
             "SELECT url, expires_at, used FROM approvals WHERE token_hash = ?",
             (digest,),
@@ -497,7 +506,10 @@ def _approval_status(url: str, token: str, *, consume: bool) -> str:
 
 
 def _approvals() -> sqlite3.Connection:
-    path = _data_dir() / "cfscan-approvals.sqlite"
+    directory = _data_dir()
+    if hasattr(os, "getuid") and directory.stat().st_uid != os.getuid():
+        raise RuntimeError("approval store directory is not owned by the current user")
+    path = directory / "cfscan-approvals.sqlite"
     conn = sqlite3.connect(path, timeout=5)
     conn.execute(
         """
@@ -509,6 +521,7 @@ def _approvals() -> sqlite3.Connection:
         )
         """
     )
+    os.chmod(path, 0o600)
     return conn
 
 
@@ -663,6 +676,30 @@ def _safe(text: str, token: str) -> str:
     if token and token in cleaned:
         cleaned = cleaned.replace(token, "[REDACTED]")
     return cleaned
+
+
+def _addresses(values: list[str]) -> list[str]:
+    found = []
+    for item in values:
+        try:
+            found.append(ipaddress.ip_address(item).compressed)
+        except ValueError:
+            continue
+    return found
+
+
+def _page_url(value, token: str) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    if _PLAIN_URL.fullmatch(text):
+        return text
+    return _public_text(text, token)
+
+
+def _api_link(value) -> str:
+    text = str(value or "")
+    return text if text.startswith(API_ROOT + "/") and _PLAIN_URL.fullmatch(text) else ""
 
 
 def _strings(value) -> list[str]:
