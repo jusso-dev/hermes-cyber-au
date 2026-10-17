@@ -273,3 +273,8 @@ connectors:
     - www.virustotal.com
     allow_ip_literals: false
     allow_http_loopback: false
+  hudson-rock:
+    hosts:
+    - api.hudsonrock.com
+    allow_ip_literals: false
+    allow_http_loopback: false

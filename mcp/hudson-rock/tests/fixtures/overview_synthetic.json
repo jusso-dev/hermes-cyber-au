@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "_id": "synthetic-overview-1",
+      "domain": "example.com.au",
+      "compromised_employees": 2,
+      "compromised_users": 4,
+      "last_employee_compromised": "2026-01-15T00:00:00.000Z",
+      "last_user_compromised": "2026-02-01T00:00:00.000Z",
+      "last_employee_uploaded": "2026-01-16T00:00:00.000Z",
+      "last_user_uploaded": "2026-02-02T00:00:00.000Z",
+      "sensitive_applications": ["vpn.example.com.au"]
+    }
+  ],
+  "nextCursor": null
+}

@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "_id": "synthetic-stealer-1",
+      "stealer_family": "ExampleStealer",
+      "date_compromised": "2026-01-15T00:00:00.000Z",
+      "date_uploaded": "2026-01-16T00:00:00.000Z",
+      "credentials": [
+        {"domain": "example.com.au", "type": "employee"},
+        {"domain": "example.com.au", "type": "user"},
+        {"domain": "partner.example.com.au", "type": "third_party"}
+      ]
+    }
+  ],
+  "nextCursor": null
+}
