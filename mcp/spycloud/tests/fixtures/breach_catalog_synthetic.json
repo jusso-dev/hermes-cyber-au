@@ -1,0 +1,15 @@
+{
+  "id": 4242,
+  "title": "Example catalogue entry",
+  "description": "Synthetic breach metadata for example.com.au. No real victim.",
+  "spycloud_publish_date": "2026-05-01T00:00:00Z",
+  "num_records": 2,
+  "assets": {
+    "email": 2,
+    "password": 1,
+    "username": 1
+  },
+  "confidence": 2,
+  "type": "public",
+  "breach_category": "infostealer"
+}

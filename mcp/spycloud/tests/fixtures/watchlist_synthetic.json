@@ -1,0 +1,29 @@
+{
+  "cursor": "",
+  "hits": 2,
+  "results": [
+    {
+      "document_id": "doc-example-1",
+      "source_id": 4242,
+      "spycloud_publish_date": "2026-06-02T01:00:00Z",
+      "severity": 20,
+      "email": "ada@example.com.au",
+      "domain": "example.com.au",
+      "password": "synthetic-password",
+      "password_plaintext": "synthetic-password",
+      "password_type": "plaintext",
+      "target_domain": "example.com.au",
+      "infected_machine_id": "machine-example-1"
+    },
+    {
+      "document_id": "doc-example-2",
+      "source_id": 4242,
+      "spycloud_publish_date": "2026-06-03T01:00:00Z",
+      "severity": 5,
+      "email": "bob@example.com.au",
+      "domain": "example.com.au",
+      "username": "bob",
+      "target_url": "https://example.com.au/login"
+    }
+  ]
+}

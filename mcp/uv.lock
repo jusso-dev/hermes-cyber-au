@@ -17,6 +17,7 @@ members = [
     "cyberau-first-epss",
     "cyberau-nvd",
     "cyberau-premium",
+    "cyberau-spycloud",
     "cyberau-workspace",
 ]
 
@@ -456,6 +457,23 @@ dependencies = [
 requires-dist = [
     { name = "cyberau-common", editable = "common" },
     { name = "pydantic", specifier = ">=2,<3" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
+
+[[package]]
+name = "cyberau-spycloud"
+version = "0.1.0"
+source = { editable = "spycloud" }
+dependencies = [
+    { name = "cyberau-common" },
+    { name = "cyberau-premium" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
     { name = "pyyaml", specifier = ">=6,<7" },
 ]
 
