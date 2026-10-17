@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -34,6 +35,8 @@ _FILES = {
     "drop_v6": "drop_v6.json",
     "asn_drop": "asndrop.json",
 }
+_SBL_ID = re.compile(r"SBL\d{1,12}")
+_COUNTRY = re.compile(r"[A-Za-z]{2}")
 _NET_FIELDS = ("cidr", "sblid", "rir")
 _ASN_FIELDS = ("asn", "rir")
 ATTRIBUTION = (
@@ -134,24 +137,27 @@ class _DropConnector(Connector):
             return Probe(self.key, True, "offline ok")
         try:
             _allow_refresh()
-            text, warning = _live_drop_v4()
+            probed = _live_probe()
         except RateLimited:
             return Probe(self.key, False, _LIMITED)
         except Exception as exc:
-            return Probe(self.key, False, redact(str(exc)) or _UNAVAILABLE)
-        if warning:
-            return Probe(self.key, False, warning)
-        problem = schema_drift(text or "", "drop_v4")
-        if problem:
-            return Probe(self.key, False, problem)
-        rows, parse_problem = _parse_lines(text or "")
-        if parse_problem or not rows:
-            return Probe(self.key, False, parse_problem or "live probe returned no DROP entries")
-        record = _net_record("drop_v4", rows[0])
-        try:
-            jsonschema.validate(record, _response_schema("drop_check_ip"))
-        except jsonschema.ValidationError as exc:
-            return Probe(self.key, False, exc.message)
+            return Probe(self.key, False, _failure(exc))
+        for name, text, warning in probed:
+            if warning:
+                return Probe(self.key, False, f"{name}: {warning}")
+            problem = schema_drift(text or "", name)
+            if problem:
+                return Probe(self.key, False, f"{name}: {problem}")
+            rows, parse_problem = _parse_lines(text or "")
+            record = _probe_record(name, rows or [])
+            if parse_problem or record is None:
+                reason = parse_problem or "live probe returned no DROP entries"
+                return Probe(self.key, False, f"{name}: {reason}")
+            tool = "drop_check_asn" if name == "asn_drop" else "drop_check_ip"
+            try:
+                jsonschema.validate(record, _response_schema(tool))
+            except jsonschema.ValidationError as exc:
+                return Probe(self.key, False, f"{name}: {exc.message}")
         return Probe(self.key, True, "live ok")
 
 
@@ -246,7 +252,7 @@ def _load(*, force_live: bool = False) -> _Bundle:
     except RateLimited:
         return _fallback(cache, _LIMITED)
     except Exception as exc:
-        return _fallback(cache, redact(str(exc)) or _UNAVAILABLE)
+        return _fallback(cache, _failure(exc))
 
 
 def _from_network(cache: HttpCache, *, force_live: bool) -> _Bundle:
@@ -277,7 +283,7 @@ def _get(client: HttpClient, url: str, *, force_live: bool):
     except RateLimited:
         raise
     except Exception as exc:
-        return None, "snapshot", redact(str(exc)) or _UNAVAILABLE, None
+        return None, "snapshot", _failure(exc), None
     if response.status in (401, 403):
         return None, "snapshot", _denied(response.status), None
     if response.status == 429:
@@ -296,14 +302,29 @@ def _get(client: HttpClient, url: str, *, force_live: bool):
     return text, response.cache, "", when
 
 
-def _live_drop_v4() -> tuple[str | None, str]:
+def _live_probe() -> list[tuple[str, str | None, str]]:
     cache = HttpCache(_data_dir() / "http_cache.sqlite")
     client = _client(cache)
+    probed = []
     try:
-        text, _state, warning, _when = _get(client, DROP_V4, force_live=True)
+        for name, url in LISTS:
+            text, _state, warning, _when = _get(client, url, force_live=True)
+            probed.append((name, text, warning))
     finally:
         client.close()
-    return text, warning
+    return probed
+
+
+def _probe_record(name: str, rows: list[dict]) -> dict | None:
+    required = _ASN_FIELDS if name == "asn_drop" else _NET_FIELDS
+    for row in rows:
+        if any(field_name not in row for field_name in required):
+            continue
+        if name == "asn_drop":
+            number = _asn_number(row.get("asn"))
+            return None if number is None else _asn_record(row, number)
+        return _net_record(name, row)
+    return None
 
 
 def _from_http_cache(cache: HttpCache, *, allow_stale: bool) -> _Bundle | None:
@@ -380,8 +401,8 @@ def _build(
         bundle.counts[name] = len(added)
         if when:
             bundle.times[name] = when
-        if added:
-            _persist(name, added, when or _now(), bundle.warnings)
+        if added and when:
+            _persist(name, added, when, bundle.warnings)
     bundle.warnings = _unique(bundle.warnings)
     return bundle
 
@@ -488,8 +509,8 @@ def _persist(kind: str, rows: list[dict], seen_at: str, warnings: list[str]) -> 
 def _net_record(kind: str, row: dict) -> dict:
     return {
         "list": kind,
-        "cidr": str(row["cidr"]),
-        "sbl_id": str(row["sblid"]),
+        "cidr": _cidr(row["cidr"]),
+        "sbl_id": _token(row["sblid"], _SBL_ID),
         "rir": _text(row.get("rir", "")),
     }
 
@@ -500,9 +521,30 @@ def _asn_record(row: dict, number: int) -> dict:
         "asn": number,
         "rir": _text(row.get("rir", "")),
         "domain": _text(row.get("domain", "")),
-        "cc": str(row.get("cc") or ""),
+        "cc": _token(row.get("cc"), _COUNTRY),
         "asname": _text(row.get("asname", "")),
     }
+
+
+def _token(value: object, shape: re.Pattern) -> str:
+    """Return a short identifier as is when it has the expected shape, else wrapped."""
+    raw = "" if value is None else str(value).strip()
+    if shape.fullmatch(raw):
+        return raw
+    return _text(raw)
+
+
+def _cidr(value: object) -> str:
+    try:
+        return str(ip_network(str(value), strict=False))
+    except ValueError:
+        return _text(value)
+
+
+def _failure(exc: Exception) -> str:
+    """Exception text can carry upstream hosts or bodies, so it is wrapped."""
+    detail = redact(str(exc)).strip()
+    return untrusted_text(detail, "spamhaus-drop") if detail else _UNAVAILABLE
 
 
 def _text(value: object) -> str:

@@ -8,7 +8,7 @@ Read-only checks against the Spamhaus Don't Route Or Peer lists: DROP (IPv4), DR
 | `drop_check_asn` | Whether an autonomous system number is on ASN-DROP |
 | `drop_list_status` | Last fetch time and entry counts for each list |
 
-Public feeds, with no API key. The three lists are cached for 24 hours and refreshed at most once an hour. Registry names, AS names and domains come back as untrusted text.
+Public feeds, with no API key. The three lists are cached for 24 hours and refreshed at most once an hour. Registry names, AS names and domains come back as untrusted text. An SBL id or country code that does not match its expected shape is wrapped too, as is any upstream error text. Live health probes all three lists.
 
 Attribute Spamhaus. The lists are provided free of charge. Formal licence text was not confirmed.
 
