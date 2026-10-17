@@ -45,7 +45,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
-from cyberau_common.secrets import redact
+from cyberau_common.secrets import is_plain_config_name, redact
 
 logger = logging.getLogger("cyberau.audit")
 
@@ -353,6 +353,8 @@ def secret_values() -> tuple[str, ...]:
     seen: set[str] = set()
     for name, value in os.environ.items():
         if name not in names and _SECRET_ENV.search(name) is None:
+            continue
+        if is_plain_config_name(name) and _SECRET_ENV.search(name) is None:
             continue
         if len(value) < 8 or value == "[REDACTED]" or value in seen:
             continue

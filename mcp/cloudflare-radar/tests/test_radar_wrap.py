@@ -25,7 +25,7 @@ TOKEN = "CLOUDFLARE_RADAR_API_TOKEN"
 
 
 def _policy() -> EgressPolicy:
-    public = [ipaddress.ip_address("198.51.100.7")]
+    public = [ipaddress.ip_address("1.1.1.1")]
     allowlist = MCP / "egress-allowlist.yaml"
     return EgressPolicy(allowlist, "cloudflare-radar", resolver=lambda _: public)
 

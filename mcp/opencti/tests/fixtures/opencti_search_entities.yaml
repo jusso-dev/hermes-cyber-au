@@ -5,7 +5,7 @@ interactions:
       uri: https://opencti.example/graphql
       body: ""
       headers:
-        authorization: [REDACTED]
+        authorization: '[REDACTED]'
     response:
       status:
         code: 200

@@ -48,7 +48,7 @@ def _isolate(monkeypatch, tmp_path):
     source._TRANSPORT = None
     source._SLEEPER = None
     source._RNG = None
-    source._RESOLVER = lambda _host: [ipaddress.ip_address("203.0.113.10")]
+    source._RESOLVER = lambda _host: [ipaddress.ip_address("1.1.1.1")]
     source._CACHES.clear()
     yield
     source._TRANSPORT = None
