@@ -76,8 +76,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/src:ro" --entrypoint bash "$HERMES_IMAGE" -lc '
             set -euo pipefail
-            hermes profile install /src --name cyber-au-ci --yes
-            /src/install/bootstrap.sh --profile cyber-au-ci --non-interactive --offline
+            /src/install/install.sh --profile cyber-au-ci --offline --no-hermes-install --non-interactive --yes --allow-root
             hermes -p cyber-au-ci cyber-au doctor --offline --json'
 
   secrets:

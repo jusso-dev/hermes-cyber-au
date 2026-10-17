@@ -1,3 +1,7 @@
+# Launch metadata for install/render_config.py.
+# env values are ${VAR} placeholders. A name in required_env that is unset or
+# blank in the profile .env is rendered with enabled: false.
+# enabled_by_default: false stays disabled even when its variable is set.
 servers:
   stub:
     connector: stub
