@@ -57,6 +57,14 @@ def notes_since_ref(repo: Path, ref: str, *, version: str | None = None) -> str:
 
 def snapshot_ref(repo: Path, ref: str, dest: Path) -> None:
     """Copy SOUL.md, skills and cron/jobs.json from a git ref."""
+    known = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+    )
+    if known.returncode != 0:
+        raise ValueError(f"baseline is not a commit in this repository: {ref}")
     dest.mkdir(parents=True, exist_ok=True)
     _git_file(repo, ref, "SOUL.md", dest / "SOUL.md")
     _git_file(repo, ref, "cron/jobs.json", dest / "cron" / "jobs.json")

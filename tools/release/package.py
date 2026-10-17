@@ -78,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     commit = _git_commit(root)
     if commit:
         provenance["git_commit"] = commit
+        provenance["git_dirty"] = _git_dirty(root)
     if baseline_name:
         provenance["notes_baseline"] = baseline_name
     provenance_path = out / "provenance.json"
@@ -124,20 +125,42 @@ def _previous_tag(root: Path) -> str | None:
     return tag or None
 
 
+def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
+
+
+def _is_checkout_root(root: Path) -> bool:
+    """True when ``root`` is itself the top of a git checkout, not a folder inside one."""
+    top = _git(root, "rev-parse", "--show-toplevel")
+    return top.returncode == 0 and Path(top.stdout.strip()).resolve() == root.resolve()
+
+
 def _git_commit(root: Path) -> str | None:
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    if not _is_checkout_root(root):
+        return None
+    result = _git(root, "rev-parse", "HEAD")
     if result.returncode != 0:
         return None
     sha = result.stdout.strip()
     if re.fullmatch(r"[0-9a-f]{40}", sha):
         return sha
     return None
+
+
+def _git_dirty(root: Path) -> bool:
+    """True when a tracked file differs from the recorded commit."""
+    status = _git(root, "status", "--porcelain", "--untracked-files=no")
+    return status.returncode != 0 or bool(status.stdout.strip())
+
+
+def _tracked(root: Path) -> set[Path] | None:
+    """Files git tracks, or None when ``root`` is not a git checkout."""
+    if not _is_checkout_root(root):
+        return None
+    listing = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, check=False)
+    if listing.returncode != 0:
+        return None
+    return {root / name for name in listing.stdout.decode("utf-8").split("\0") if name}
 
 
 def _distribution_version(root: Path) -> str:
@@ -168,24 +191,29 @@ def _skip(path: Path, root: Path) -> bool:
     if any(part in _SKIP_DIRS or part.endswith(".egg-info") for part in rel_parts):
         return True
     name = path.name
+    if name == ".env.template":
+        return False
     if name in _SKIP_FILES or name.startswith(".env"):
         return True
     return path.suffix in {".pem", ".key"}
 
 
 def _owned_files(root: Path) -> list[Path]:
+    """Distribution-owned files. In a git checkout only tracked files ship, so
+    local caches and untracked scraps cannot enter a release."""
+    tracked = _tracked(root)
     files: list[Path] = []
     for rel in _owned(root):
         path = root / rel
         if not path.exists() or path.is_symlink():
             continue
-        if path.is_file():
-            if not _skip(path, root):
-                files.append(path)
-            continue
-        for file in sorted(path.rglob("*")):
-            if file.is_file() and not file.is_symlink() and not _skip(file, root):
-                files.append(file)
+        candidates = [path] if path.is_file() else sorted(path.rglob("*"))
+        for file in candidates:
+            if not file.is_file() or file.is_symlink() or _skip(file, root):
+                continue
+            if tracked is not None and file not in tracked:
+                continue
+            files.append(file)
     return files
 
 

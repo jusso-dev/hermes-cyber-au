@@ -257,3 +257,99 @@ def test_package_writes_tarball_sbom_and_notes_without_a_signature(tmp_path: Pat
         item for item in sbom.runtime_packages(ROOT / "mcp" / "uv.lock") if item not in found
     ]
     assert missing == []
+
+
+def _git_repo(path: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update(
+        {
+            "GIT_AUTHOR_NAME": "Supply Chain Test",
+            "GIT_AUTHOR_EMAIL": "supply-chain-test@example.com",
+            "GIT_COMMITTER_NAME": "Supply Chain Test",
+            "GIT_COMMITTER_EMAIL": "supply-chain-test@example.com",
+        }
+    )
+    subprocess.run(["git", "init"], cwd=path, check=True, env=env, capture_output=True)
+    return env
+
+
+def test_tarball_ships_tracked_files_only_and_keeps_env_template(tmp_path: Path):
+    repo = tmp_path / "repo"
+    _write(
+        repo / "distribution.yaml",
+        "name: cyber-au\nversion: 0.1.0\ndistribution_owned:\n  - SOUL.md\n"
+        "  - .env.template\n  - mcp\n",
+    )
+    _write(repo / "SOUL.md", "Soul\n")
+    _write(repo / ".env.template", "# KEY=\n")
+    _write(repo / "mcp" / "uv.lock", "version = 1\n")
+    _write(repo / "mcp" / "kept.py", "x = 1\n")
+    env = _git_repo(repo)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, env=env, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "base"], cwd=repo, check=True, env=env, capture_output=True
+    )
+    _write(repo / "mcp" / ".hypothesis" / "scrap", "local cache\n")
+    _write(repo / "mcp" / "untracked.py", "y = 2\n")
+    _write(repo / ".env", "SECRET=1\n")
+
+    archive_path = tmp_path / "out.tar.gz"
+    package._write_archive(repo.resolve(), archive_path, "p", {})
+    with tarfile.open(archive_path, "r:gz") as archive:
+        names = set(archive.getnames())
+    assert names == {"p/SOUL.md", "p/.env.template", "p/mcp/uv.lock", "p/mcp/kept.py"}
+
+
+def test_provenance_commit_is_this_checkout_and_flags_a_dirty_tree(tmp_path: Path):
+    outer = tmp_path / "outer"
+    inner = outer / "inner"
+    inner.mkdir(parents=True)
+    env = _git_repo(outer)
+    _write(outer / "file.txt", "x\n")
+    subprocess.run(["git", "add", "."], cwd=outer, check=True, env=env, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "base"], cwd=outer, check=True, env=env, capture_output=True
+    )
+
+    assert package._git_commit(inner.resolve()) is None
+    assert package._git_commit(outer.resolve()) is not None
+    assert package._git_dirty(outer.resolve()) is False
+    _write(outer / "file.txt", "changed\n")
+    assert package._git_dirty(outer.resolve()) is True
+
+
+def test_package_provenance_records_commit_and_lock_hash(tmp_path: Path):
+    import hashlib
+
+    out = tmp_path / "dist"
+    package.main(["--version", "2026.10.17", "--out", str(out), "--baseline", "none"])
+    provenance = json.loads((out / "provenance.json").read_text(encoding="utf-8"))
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert provenance["git_commit"] == head
+    assert isinstance(provenance["git_dirty"], bool)
+    lock = (ROOT / "mcp" / "uv.lock").read_bytes()
+    assert provenance["lock_sha256"] == hashlib.sha256(lock).hexdigest()
+
+
+def test_unknown_baseline_is_an_error_not_an_empty_diff(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    env = _git_repo(repo)
+    _write(repo / "SOUL.md", "x\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, env=env, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "base"], cwd=repo, check=True, env=env, capture_output=True
+    )
+    try:
+        notes.notes_since_ref(repo, "no-such-tag", version="1")
+    except ValueError as error:
+        assert "no-such-tag" in str(error)
+    else:
+        raise AssertionError("an unknown baseline produced notes")
+
+
+def test_image_steps_wait_for_a_dockerfile():
+    text = (ROOT / "ci" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
+    assert text.count("hashFiles('docker/Dockerfile') != ''") == 2

@@ -59,7 +59,7 @@ jobs:
           subject-path: dist/*
       - name: Build and push image
         id: image
-        if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true
+        if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true && hashFiles('docker/Dockerfile') != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -77,7 +77,7 @@ jobs:
           echo "name=ghcr.io/${{ github.repository }}" >> "$GITHUB_OUTPUT"
       # Attest the image only after the push returns its registry digest.
       - name: Attest image
-        if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true
+        if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true && hashFiles('docker/Dockerfile') != ''
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ steps.image.outputs.name }}

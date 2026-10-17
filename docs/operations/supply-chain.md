@@ -20,13 +20,13 @@ Direct dependencies in `mcp/pyproject.toml` carry an upper bound. Dependabot ope
 
 ## SBOM
 
-`tools/release/package.py` exports the locked runtime requirements (`uv export --frozen`, development dependencies omitted) and runs `cyclonedx-py requirements` on that export. The CycloneDX JSON it writes is `cyber-au-<version>.cdx.json`. The release workflow attaches that file, the tarball, the notes and `provenance.json` to the GitHub release.
+`tools/release/package.py` exports the locked runtime requirements (`uv export --frozen`, development dependencies omitted) and runs `cyclonedx-py requirements` on that export. The CycloneDX JSON it writes is `cyber-au-<version>.cdx.json`. The release workflow attaches that file, the tarball, the notes, `provenance.json` and `SHA256SUMS` to the GitHub release. In a git checkout the tarball holds only tracked files, so local caches and untracked files cannot enter a release.
 
-`provenance.json` records the release version, the distribution version, the git commit when the tree is a git checkout, and the SHA-256 of `mcp/uv.lock`. It also records the `cyclonedx-py` version that wrote the SBOM.
+`provenance.json` records the release version, the distribution version, the git commit when the tree is a git checkout, whether a tracked file differs from that commit (`git_dirty`), and the SHA-256 of `mcp/uv.lock`. It also records the `cyclonedx-py` version that wrote the SBOM.
 
 ## Attestation
 
-`ci/workflows/weekly-release.yml` is the release job. A maintainer copies it to `.github/workflows/` before GitHub will run it. When it runs, `actions/attest-build-provenance` attests the files in `dist/` after the packaging step has written them. When the run pushes the container image, the same action attests that image using the digest from `docker push`.
+`ci/workflows/weekly-release.yml` is the release job. A maintainer copies it to `.github/workflows/` before GitHub will run it. When it runs, `actions/attest-build-provenance` attests the files in `dist/` after the packaging step has written them. The image is built, pushed and attested only when `docker/Dockerfile` exists, which it does not yet. When the run pushes the container image, the same action attests that image using the digest from `docker push`.
 
 GitHub Actions produces the attestation from the workflow identity. This repository does not contain a signing key.
 
