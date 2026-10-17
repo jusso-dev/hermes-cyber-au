@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "approval_token": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "approval_token"
+  ]
+}

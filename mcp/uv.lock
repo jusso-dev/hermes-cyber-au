@@ -13,6 +13,7 @@ members = [
     "cyberau-asd-acsc",
     "cyberau-asd-ism",
     "cyberau-cisa-kev",
+    "cyberau-cloudflare-urlscanner",
     "cyberau-common",
     "cyberau-first-epss",
     "cyberau-nvd",
@@ -389,6 +390,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-cisa-kev"
 version = "0.1.0"
 source = { editable = "cisa-kev" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-cloudflare-urlscanner"
+version = "0.1.0"
+source = { editable = "cloudflare-urlscanner" }
 dependencies = [
     { name = "cyberau-common" },
 ]

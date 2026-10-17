@@ -68,3 +68,20 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  cfscan:
+    connector: cloudflare-urlscanner
+    args:
+    - serve
+    - cloudflare-urlscanner
+    env:
+    - CLOUDFLARE_URLSCAN_API_TOKEN=${CLOUDFLARE_URLSCAN_API_TOKEN}
+    - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    supports_parallel_tool_calls: true
+    enabled_by_default: false
+    default_enabled: false
+    required_env:
+    - CLOUDFLARE_URLSCAN_API_TOKEN
+    - CLOUDFLARE_ACCOUNT_ID

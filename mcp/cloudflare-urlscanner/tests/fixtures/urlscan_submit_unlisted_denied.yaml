@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: POST
+      uri: https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/urlscanner/v2/scan
+      body: '{"url": "https://example.com/login", "visibility": "Unlisted"}'
+      headers: {}
+    response:
+      status:
+        code: 401
+        message: Unauthorized
+      headers: {}
+      body:
+        string: '{"success":false,"errors":[{"message":"Authentication error"}]}'

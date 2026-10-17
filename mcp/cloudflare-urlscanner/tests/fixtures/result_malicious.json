@@ -1,0 +1,27 @@
+{
+  "task": {
+    "uuid": "095be615-a8ad-4c33-8e9c-c7612fbf6c9f",
+    "url": "https://example.com/login",
+    "visibility": "unlisted",
+    "time": "2026-10-16T01:02:03.000Z"
+  },
+  "page": {
+    "url": "https://example.com/login/final",
+    "ip": "203.0.113.10",
+    "asn": "AS64500",
+    "asnname": "EXAMPLE-NET",
+    "title": "Example \u202elogin",
+    "status": "200"
+  },
+  "lists": {
+    "ips": ["203.0.113.10", "203.0.113.11"],
+    "asns": ["AS64500", "AS64501"]
+  },
+  "verdicts": {
+    "overall": {
+      "malicious": true,
+      "categories": ["phishing"],
+      "hasVerdicts": true
+    }
+  }
+}

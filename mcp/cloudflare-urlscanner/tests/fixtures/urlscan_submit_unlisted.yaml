@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: POST
+      uri: https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/urlscanner/v2/scan
+      body: '{"url": "https://example.com/login", "visibility": "Unlisted"}'
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"uuid":"095be615-a8ad-4c33-8e9c-c7612fbf6c9f","visibility":"Unlisted","url":"https://example.com/login","message":"Submission successful"}'

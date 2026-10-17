@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "scan_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "scan_id"
+  ]
+}

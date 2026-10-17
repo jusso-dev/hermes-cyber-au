@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scan_id",
+    "status",
+    "verdict",
+    "final_url",
+    "ips",
+    "asns",
+    "title",
+    "categories"
+  ],
+  "properties": {
+    "scan_id": {"type": "string"},
+    "status": {"enum": ["finished", "in_progress"]},
+    "verdict": {"enum": ["malicious", "benign", "unknown"]},
+    "final_url": {"type": "string"},
+    "ips": {"type": "array", "items": {"type": "string"}},
+    "asns": {"type": "array", "items": {"type": "string"}},
+    "title": {"type": "string"},
+    "categories": {"type": "string"}
+  }
+}

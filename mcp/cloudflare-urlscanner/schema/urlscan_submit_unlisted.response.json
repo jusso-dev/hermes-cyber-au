@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scan_id", "url", "visibility", "api", "message"],
+  "properties": {
+    "scan_id": {"type": "string"},
+    "url": {"type": "string"},
+    "visibility": {"const": "Unlisted"},
+    "api": {"type": "string"},
+    "message": {"type": "string"}
+  }
+}
