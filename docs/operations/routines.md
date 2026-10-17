@@ -256,7 +256,15 @@ Ingest refreshes the keyless sources `asd`, `kev`, `epss`, `auscert`, and `feodo
 
 To suppress delivery when there is nothing to report, change the prompt so the no-match reply is only `[SILENT]`. Hermes then skips the chat message and still saves the output under the profile's `cron/output/` directory. A failed run is still delivered.
 
-That is how you set quiet hours for a routine. A successful reply of only `[SILENT]` does not ping the channel, including through the night if the check still runs. To stop the job from firing in those hours, change its schedule as above. The hour follows `timezone: Australia/Sydney`.
+That is how you set quiet hours for a routine. A successful reply of only `[SILENT]` does not ping the channel, including through the night if the check still runs.
+
+To stop the job from running in those hours, it needs a cron schedule. `cyberau-kev-watch` ships as `every 360m`, an interval, and an interval cannot exclude hours. Replace it with a cron expression that lists only the hours you want. The hours follow `timezone: Australia/Sydney`. For example, to check at 08:00, 14:00, and 20:00 and stay quiet overnight:
+
+```bash
+hermes -p cyber-au cron edit cyberau-kev-watch --schedule "0 8,14,20 * * *"
+```
+
+Jobs that already use a cron expression, such as `cyberau-morning-brief`, only need the hour changed as in "Change the time".
 
 ```bash
 hermes -p cyber-au cron edit cyberau-kev-watch --prompt 'Check new KEV entries and EPSS jumps above 0.5 against the asset inventory in plugin-data/cyber-au/assets.yaml. Report only matches. If nothing matches, reply with only [SILENT].'
