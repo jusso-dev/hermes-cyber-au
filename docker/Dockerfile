@@ -45,6 +45,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
          -exec rm -rf {} + \
     && rm -rf /opt/cyber-au/src/tickets /opt/cyber-au/src/docs \
     && find /opt/cyber-au/src /opt/cyber-au/profile \
+         \( -path '*/.venv/*' -o -path '*/site-packages/*' \) -prune -o \
          \( -name .env -o -name auth.json -o -name credentials.json -o -name '*.pem' -o -name '*.key' \) \
          -print > /tmp/credential-files \
     && if [ -s /tmp/credential-files ]; then \
