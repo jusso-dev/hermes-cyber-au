@@ -352,3 +352,47 @@ cases:
           arguments:
             regime: ndb
             trigger: suspected_breach
+
+  - id: encrypted-laptop-connector-missing
+    input: |
+      Example Retail Pty Ltd (synthetic) is an APP entity. No ABN is recorded.
+      Scenario date: 2026-10-16. The mcp__aureg__ tools are disabled and return no result. At 2026-10-16T09:30:00+11:00 Australia/Sydney the entity became aware that a laptop was lost. Its disk was encrypted to a high standard, the key was not stored on the laptop, and the entity confirms the key was not exposed. It held customer records for 40 customers. Privacy contact: privacy@example.com.
+      Draft the NDB assessment. If a statement and notice are not needed, say so. Do not send anything.
+    required_facts:
+      - "Guidance, not legal advice."
+      - "Missing source: aureg connector (OAIC NDB obligations snapshot)."
+      - "local calculation, not a connector result"
+      - "2026-11-15"
+      - "Draft decision: not eligible"
+      - "encrypted"
+      - "No OAIC statement was drafted."
+      - "No individual notice was drafted."
+      - "Source: OAIC Notifiable Data Breaches scheme, none, retrieved "
+    forbidden_claims:
+      - "Draft decision: eligible"
+      - "notice sent"
+      - "email sent"
+      - "This is legal advice"
+      - "privacy@example.com"
+    forbid_tools:
+      - mcp__aureg__aureg_submit
+    offline:
+      message: |
+        Guidance, not legal advice.
+
+        Missing source: aureg connector (OAIC NDB obligations snapshot). I used the scheme notes instead.
+        Assessment record. Entity: Example Retail Pty Ltd (synthetic). The analyst states it is an APP entity. No ABN is recorded.
+        Scenario date: 2026-10-16. Aware at (Australia/Sydney): 2026-10-16T09:30:00+11:00.
+        Assessment deadline: 2026-11-15. That is 30 calendar days after 2026-10-16. This is a local calculation, not a connector result. The scenario date is not inside the warning window.
+        Source: OAIC Notifiable Data Breaches scheme, none, retrieved 2026-10-17
+        Element 1: loss of personal information on a laptop. Later unauthorised access or disclosure is unlikely because the disk was encrypted to a high standard and the entity confirms the key was not exposed.
+        Source: OAIC Notifiable Data Breaches scheme, none, retrieved 2026-10-17
+        Element 2: not reached, because element 1 is not met.
+        Element 3: not reached.
+        Draft decision: not eligible
+        Reasons: the loss is not likely to lead to unauthorised access or disclosure. A human confirms this, and records the evidence for the encryption and the key.
+        No OAIC statement was drafted.
+        No individual notice was drafted.
+        I don't know the SOCI period. No ransomware payment is recorded. I don't know the ransomware payment reporting period.
+        Source: OAIC Notifiable Data Breaches scheme, none, retrieved 2026-10-17
+      tool_calls: []

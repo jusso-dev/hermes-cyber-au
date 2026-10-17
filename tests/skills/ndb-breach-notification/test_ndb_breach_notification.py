@@ -56,6 +56,42 @@ def test_assessment_window_is_thirty_sydney_days_after_awareness():
     assert on_midnight["aware_on"] == "2026-09-22"
 
 
+def test_deadline_is_calendar_arithmetic_across_daylight_saving():
+    # Sydney daylight saving starts 2026-10-04. Thirty 24 hour days from this
+    # instant would land on 2026-10-23, one calendar day late.
+    spring = deadline.assessment_window("2026-09-22T23:30:00+10:00", "2026-10-01")
+    assert spring["aware_on"] == "2026-09-22"
+    assert spring["deadline_on"] == "2026-10-22"
+
+    # It ends 2026-04-05. Thirty 24 hour days would land on 2026-05-03.
+    autumn = deadline.assessment_window("2026-04-04T00:30:00+11:00", "2026-04-10")
+    assert autumn["aware_on"] == "2026-04-04"
+    assert autumn["deadline_on"] == "2026-05-04"
+
+
+def test_sydney_day_rolls_over_at_local_midnight_on_both_sides_of_a_transition():
+    cases = {
+        "2026-10-03T13:59:00Z": "2026-10-03",
+        "2026-10-03T14:00:00Z": "2026-10-04",
+        "2026-10-04T12:59:00Z": "2026-10-04",
+        "2026-10-04T13:00:00Z": "2026-10-05",
+        "2026-04-04T12:59:00Z": "2026-04-04",
+        "2026-04-04T13:00:00Z": "2026-04-05",
+        "2026-04-05T13:59:00Z": "2026-04-05",
+        "2026-04-05T14:00:00Z": "2026-04-06",
+    }
+    for aware_at, day in cases.items():
+        assert deadline.sydney_day(aware_at, "aware_at").isoformat() == day, aware_at
+
+
+def test_empty_as_of_and_future_awareness_are_rejected():
+    with pytest.raises(deadline.DeadlineError, match="as_of is empty"):
+        deadline.assessment_window("2026-09-22", "")
+    with pytest.raises(deadline.DeadlineError, match="after as_of"):
+        deadline.assessment_window("2027-09-22", "2026-10-17")
+    assert deadline.main(["2026-09-22", ""]) == 2
+
+
 def test_warning_starts_at_seven_days_and_overdue_is_after_the_deadline():
     assert deadline.assessment_window("2026-09-22", "2026-10-14")["warning"] is False
     assert deadline.assessment_window("2026-09-22", "2026-10-14")["days_remaining"] == 8
@@ -102,6 +138,7 @@ def test_eval_cases_score_offline_and_forbid_the_send_tool():
         "ransomware-exfiltration",
         "discovered-25-days-ago",
         "untrusted-do-not-send",
+        "encrypted-laptop-connector-missing",
     ]
     send_case = next(
         case for case in eval_file.cases if case.id == "untrusted-do-not-send"
@@ -121,6 +158,10 @@ def test_deadlines_in_the_recorded_answers_match_the_helper():
         "misdirected-tfn-email": ("2026-10-17T11:00:00+11:00", "2026-10-17"),
         "ransomware-exfiltration": ("2026-10-15T14:00:00+11:00", "2026-10-15"),
         "discovered-25-days-ago": ("2026-09-22T09:00:00+10:00", "2026-10-17"),
+        "encrypted-laptop-connector-missing": (
+            "2026-10-16T09:30:00+11:00",
+            "2026-10-16",
+        ),
     }
     for case in eval_file.cases:
         if case.id not in expected:

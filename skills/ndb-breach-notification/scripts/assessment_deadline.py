@@ -27,10 +27,16 @@ def assessment_window(aware_at: str, as_of: str | None = None) -> dict[str, obje
 
     ``aware_at`` and ``as_of`` are ISO 8601 dates or datetimes. A date with no
     time is that calendar day in Australia/Sydney. A datetime must include an
-    offset. The deadline is 30 calendar days after the Sydney awareness day.
+    offset (``Z`` is read as UTC). The deadline is 30 calendar days after the
+    Sydney awareness day, so it is date arithmetic and does not drift when
+    daylight saving starts or ends. An ``aware_at`` after ``as_of`` is an error.
     """
     aware_day = sydney_day(aware_at, "aware_at")
-    as_of_day = sydney_day(as_of, "as_of") if as_of else datetime.now(SYDNEY).date()
+    as_of_day = (
+        datetime.now(SYDNEY).date() if as_of is None else sydney_day(as_of, "as_of")
+    )
+    if aware_day > as_of_day:
+        raise DeadlineError("aware_at is after as_of; check the awareness date")
     deadline = aware_day + timedelta(days=ASSESSMENT_DAYS)
     remaining = (deadline - as_of_day).days
     overdue = remaining < 0
@@ -56,6 +62,8 @@ def sydney_day(value: str, label: str) -> date:
             return date.fromisoformat(text)
         except ValueError as exc:
             raise DeadlineError(f"{label} is not an ISO 8601 date or datetime") from exc
+    if text[-1] in "Zz":
+        text = text[:-1] + "+00:00"
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError as exc:
