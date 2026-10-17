@@ -31,7 +31,7 @@ Export is a separate path. `export_records` and `cyberau-mcp store export` omit 
 
 Vulnerabilities have no marking column. Catalogue rows are treated as `CLEAR`. An advisory uses the `default_tlp` of its source.
 
-STIX export, DuckDB export and retention are separate work and are not part of this store.
+STIX 2.1 export is described in `docs/intel/stix.md`. DuckDB export and retention are separate work.
 
 ## Worked examples
 

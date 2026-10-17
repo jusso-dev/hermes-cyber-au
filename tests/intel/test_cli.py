@@ -22,7 +22,7 @@ def test_store_help_and_missing_command(capsys):
     help_text = capsys.readouterr().out
     assert "add-observation" in help_text
     assert "ingest-kev" in help_text
-    assert "stix" not in help_text.lower()
+    assert "stix21" in help_text.lower()
     assert "duckdb" not in help_text.lower()
     assert main(["store"]) == 2
 

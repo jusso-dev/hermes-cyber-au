@@ -1,7 +1,8 @@
 """In-process intel tools.
 
-``intel_search``, ``intel_get`` and ``intel_add_observation`` are the tool
-surface for this store. Feed text stays inside the result envelope.
+``intel_search``, ``intel_get``, ``intel_add_observation`` and
+``intel_export_stix`` are the tool surface for this store. Feed text stays
+inside the result envelope.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from .api import KINDS, ensure_source, lookup, search, upsert_indicator
 from .canonical import require_tlp, utc_now
+from .stix import export_stix
 from .text import clean_untrusted
 
 
@@ -86,6 +88,50 @@ def intel_add_observation(
         path=path,
     )
     return _envelope(lookup(record_id, path=path))
+
+
+def intel_export_stix(
+    since: str | None = None,
+    kinds: Sequence[str] | None = None,
+    max_tlp: str | None = None,
+    path: str | None = None,
+    *,
+    store: str | Path | None = None,
+) -> dict:
+    """Export a STIX 2.1 bundle. ``max_tlp`` defaults to CLEAR.
+
+    ``path``, when set, is a ``.json`` file under ``plugin-data/cyber-au/exports/``.
+    ``AMBER`` is included only when ``max_tlp`` is ``AMBER``. ``AMBER+STRICT``
+    and ``RED`` are never included.
+    """
+    result = export_stix(
+        since=since,
+        kinds=kinds,
+        max_tlp=max_tlp,
+        output=path,
+        store=store,
+    )
+    payload = _envelope(
+        {
+            "bundle": result["bundle"],
+            "explicit_max_tlp": result["explicit_max_tlp"],
+            "format": "stix21",
+            "max_tlp": result["max_tlp"],
+            "object_count": result["object_count"],
+            "omitted_above_tlp": result["omitted_above_tlp"],
+            "omitted_unsupported": result["omitted_unsupported"],
+            "path": result["output"],
+        }
+    )
+    if result["omitted_above_tlp"]:
+        payload["warnings"].append(
+            f"omitted {result['omitted_above_tlp']} records above max_tlp {result['max_tlp']}"
+        )
+    if result["omitted_unsupported"]:
+        payload["warnings"].append(
+            f"omitted {result['omitted_unsupported']} asn or cidr indicators"
+        )
+    return payload
 
 
 def _envelope(data: object) -> dict:

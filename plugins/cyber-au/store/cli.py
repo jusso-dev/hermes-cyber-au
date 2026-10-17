@@ -17,6 +17,7 @@ from .api import (
     upsert_vulnerability,
 )
 from .db import open_store, resolve_db_path
+from .stix import export_stix, import_stix_file
 from .tools import intel_add_observation, intel_get, intel_search
 
 
@@ -120,11 +121,30 @@ def build_parser() -> argparse.ArgumentParser:
     export = sub.add_parser(
         "export",
         parents=[common],
-        help="Export records. AMBER and above stay unless --max-tlp is set",
+        help="Export records or a STIX 2.1 bundle (stix21)",
+    )
+    export.add_argument(
+        "--format",
+        choices=("records", "stix21"),
+        default="records",
+        help="records (default) or stix21",
     )
     export.add_argument("--max-tlp")
     export.add_argument("--kind", action="append", dest="kinds")
+    export.add_argument("--since", help="STIX export: records on or after this date")
+    export.add_argument(
+        "--output",
+        help="STIX bundle .json file under plugin-data/cyber-au/exports/",
+    )
     export.set_defaults(func=_cmd_export)
+
+    imported = sub.add_parser(
+        "import-stix",
+        parents=[common],
+        help="Import a STIX 2.1 bundle into the store",
+    )
+    imported.add_argument("file")
+    imported.set_defaults(func=_cmd_import_stix)
 
     ingest = sub.add_parser(
         "ingest-kev", parents=[common], help="Load a CISA KEV catalogue JSON file"
@@ -236,6 +256,18 @@ def _cmd_add(args: argparse.Namespace) -> int:
 
 
 def _cmd_export(args: argparse.Namespace) -> int:
+    if args.format == "stix21":
+        result = export_stix(
+            since=args.since,
+            kinds=args.kinds,
+            max_tlp=args.max_tlp,
+            output=args.output,
+            store=args.path,
+        )
+        sys.stdout.write(result["text"])
+        return 0
+    if args.output or args.since:
+        raise ValueError("--output and --since are only valid with --format stix21")
     kinds = args.kinds if args.kinds else ("indicator", "advisory", "vulnerability")
     records = export_records(kinds=kinds, max_tlp=args.max_tlp, path=args.path)
     _emit(
@@ -246,6 +278,11 @@ def _cmd_export(args: argparse.Namespace) -> int:
             "records": records,
         }
     )
+    return 0
+
+
+def _cmd_import_stix(args: argparse.Namespace) -> int:
+    _emit(import_stix_file(args.file, path=args.path))
     return 0
 
 
