@@ -1,0 +1,4 @@
+get_file_report
+get_url_report
+get_domain_report
+get_ip_report

@@ -32,3 +32,9 @@ connectors:
     - services.nvd.nist.gov
     allow_ip_literals: false
     allow_http_loopback: false
+  virustotal:
+    hosts:
+    - ai.virustotal.com
+    - www.virustotal.com
+    allow_ip_literals: false
+    allow_http_loopback: false

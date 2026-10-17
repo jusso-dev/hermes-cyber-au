@@ -68,3 +68,29 @@ servers:
     enabled_by_default: true
     required_env:
     - NVD_API_KEY
+  virustotal:
+    wrap: true
+    command: <PROFILE_HOME>/mcp/vendor/virustotal-mcp/bin/vt-mcp
+    lock: vendor/virustotal-mcp.lock
+    args: []
+    env:
+    - VTAI_TOKEN=${VTAI_TOKEN}
+    tools:
+      include:
+      - get_file_report
+      - get_url_report
+      - get_domain_report
+      - get_ip_report
+    expected_tools: virustotal/expected_tools.txt
+    rate_limit:
+      per_minute: 4
+      per_day: 500
+    cache_ttl_hours: 24
+    trust: untrusted
+    lazy: true
+    timeout: 60
+    enabled_by_default: false
+    disabled_reason: licence terms
+    docs: docs/connectors/virustotal.md
+    required_env:
+    - VTAI_TOKEN

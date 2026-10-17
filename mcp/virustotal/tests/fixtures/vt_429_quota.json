@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "The VTAI or upstream quota is exhausted. Retry later.",
+    "retryable": true,
+    "http_status": 429,
+    "retry_after_seconds": 42,
+    "quota_source": "actor"
+  }
+}

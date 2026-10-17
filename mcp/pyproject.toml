@@ -29,6 +29,7 @@ testpaths = [
   "cisa-kev/tests",
   "first-epss/tests",
   "nvd/tests",
+  "virustotal/tests",
 ]
 addopts = "-q"
 

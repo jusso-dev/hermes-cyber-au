@@ -1,0 +1,18 @@
+{
+  "status": "found",
+  "source": "VirusTotal via VTAI",
+  "retrieved_at": "2026-10-17T00:00:00+00:00",
+  "analysis_date": "2026-10-16T21:10:00Z",
+  "report_url": "https://www.virustotal.com/gui/domain/example.org",
+  "coverage": {"engines": 90, "categories": ["harmless", "undetected"]},
+  "data": {
+    "id": "example.org",
+    "type": "domain",
+    "domain": "example.org",
+    "source": "VirusTotal",
+    "analysis_date": "2026-10-16T21:10:00Z",
+    "report_url": "https://www.virustotal.com/gui/domain/example.org",
+    "last_analysis_stats": {"malicious": 0, "suspicious": 0, "undetected": 25, "harmless": 65},
+    "detections": []
+  }
+}

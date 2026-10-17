@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "access_denied",
+    "message": "VTAI rejected this request. Check the VTAI credential and access.",
+    "retryable": false,
+    "http_status": 401,
+    "retry_after_seconds": null
+  }
+}
