@@ -107,6 +107,19 @@ class DistributionSkeletonTest(unittest.TestCase):
         self.assertNotIn('"paused_at"', text)
         self.assertNotIn("\u2014", text)
 
+    def test_jobs_file_names_the_shipped_routines(self):
+        text = (ROOT / "cron/jobs.json").read_text(encoding="utf-8")
+        self.assertIn('"jobs"', text)
+        self.assertNotIn('"jobs": []', text)
+        for job_id in (
+            "cyberau-ingest-public",
+            "cyberau-morning-brief",
+            "cyberau-kev-watch",
+            "cyberau-weekly-exec",
+            "cyberau-store-maintenance",
+        ):
+            self.assertIn(f'"id": "{job_id}"', text)
+
     def test_git_index_has_no_secret_files(self):
         tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
         banned_names = {".env", "auth.json", "credentials.json", ".env.EXAMPLE"}

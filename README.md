@@ -30,7 +30,7 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 | Connectors | `mcp/<source>/` | Read-only stdio MCP servers on a shared HTTP client with an egress allowlist, caching and rate limiting |
 | Plugin | `plugins/cyber-au/` | Intel store tools, audit log hooks, untrusted-content guards, the `cyber-au` command |
 | Intel store | `plugin-data/cyber-au/intel.sqlite` | SQLite with canonical dedupe and STIX 2.1 export |
-| Routines | `cron/jobs.json`, `scripts/` | Scheduled jobs, shipped paused |
+| Routines | `cron/jobs.json`, `scripts/` | Scheduled jobs, shipped paused. See [docs/operations/routines.md](docs/operations/routines.md). |
 | Automation | `ci/workflows/` | Proposed GitHub Actions: CI, nightly intel refresh, skill data regeneration, connector health, dependency and Hermes bumps, weekly releases |
 
 The Hermes details behind this design (manifest fields, what an update replaces, MCP config, plugin hooks, cron rules) are written up with sources in [docs/research/hermes-structure.md](docs/research/hermes-structure.md).

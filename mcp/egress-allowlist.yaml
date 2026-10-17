@@ -96,9 +96,12 @@ connectors:
       - raw.githubusercontent.com
   sigma:
     hosts:
-      - api.github.com
-      - github.com
-      - objects.githubusercontent.com
+    - api.github.com
+    - github.com
+    - objects.githubusercontent.com
+    - release-assets.githubusercontent.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   crtsh:
     hosts:
     - crt.sh
@@ -185,10 +188,16 @@ connectors:
       - blueprint.asd.gov.au
   phishtank:
     hosts:
-      - data.phishtank.com
+    - data.phishtank.com
+    - cdn.phishtank.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   openphish:
     hosts:
-      - openphish.com
+    - openphish.com
+    - raw.githubusercontent.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   misp:
     hosts: []
     allow_ip_literals: false
@@ -239,73 +248,3 @@ connectors:
     - abr.business.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
-  ncsc-nz:
-    hosts:
-    - www.ncsc.govt.nz
-    allow_ip_literals: false
-    allow_http_loopback: false
-  opencti:
-    hosts: []
-    allow_ip_literals: false
-    allow_http_loopback: false
-  openphish:
-    hosts:
-    - openphish.com
-    - raw.githubusercontent.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  osv:
-    hosts:
-    - api.osv.dev
-    allow_ip_literals: false
-    allow_http_loopback: false
-  phishtank:
-    hosts:
-    - data.phishtank.com
-    - cdn.phishtank.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  pspf:
-    hosts:
-    - www.protectivesecurity.gov.au
-    allow_ip_literals: false
-    allow_http_loopback: false
-  ransomware-live:
-    hosts:
-    - api-pro.ransomware.live
-    - api.ransomware.live
-    allow_ip_literals: false
-    allow_http_loopback: false
-  scamwatch:
-    hosts:
-    - www.scamwatch.gov.au
-    allow_ip_literals: false
-    allow_http_loopback: false
-  shodan-internetdb:
-    hosts:
-    - internetdb.shodan.io
-    allow_ip_literals: false
-    allow_http_loopback: false
-  sigma:
-    hosts:
-    - api.github.com
-    - github.com
-    - objects.githubusercontent.com
-    - release-assets.githubusercontent.com
-    allow_ip_literals: false
-    allow_http_loopback: false
-  spamhaus-drop:
-    hosts:
-    - www.spamhaus.org
-    allow_ip_literals: false
-    allow_http_loopback: false
-  taxii-ctis:
-    hosts: []
-    allow_ip_literals: false
-    allow_http_loopback: false
-  threatsieve:
-    hosts:
-    - 127.0.0.1
-    - localhost
-    allow_ip_literals: true
-    allow_http_loopback: true
