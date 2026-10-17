@@ -423,3 +423,15 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  sigma:
+    connector: sigma
+    args:
+    - serve
+    - sigma
+    env:
+    - GITHUB_TOKEN=${GITHUB_TOKEN}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []

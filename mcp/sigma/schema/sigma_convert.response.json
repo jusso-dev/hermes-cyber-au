@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "author", "target", "queries", "release"],
+  "properties": {
+    "id": {"type": "string"},
+    "author": {"type": "string"},
+    "target": {"enum": ["kusto", "splunk", "elasticsearch"]},
+    "queries": {"type": "array", "items": {"type": "string"}},
+    "release": {"type": ["string", "null"]}
+  }
+}

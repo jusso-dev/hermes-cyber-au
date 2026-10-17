@@ -65,7 +65,7 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | GreyNoise Community | `greynoise` | Global threat intelligence | `GREYNOISE_API_KEY` (optional) | on | v0.2 | planned | [docs/connectors/greynoise.md](docs/connectors/greynoise.md) |
 | Shodan InternetDB | `internetdb` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/shodan-internetdb.md](docs/connectors/shodan-internetdb.md) |
 | MITRE ATT&CK (STIX 2.1) | `attack` | Frameworks | none | on | v0.1 MVP | planned | [docs/connectors/mitre-attack.md](docs/connectors/mitre-attack.md) |
-| SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | https://github.com/SigmaHQ/sigma |
+| SigmaHQ detection rules | `sigma` | Frameworks | `GITHUB_TOKEN` (optional) | on | v0.2 | planned | [docs/connectors/sigma.md](docs/connectors/sigma.md) |
 | crt.sh certificate transparency | `crtsh` | Global threat intelligence | none | on | v0.2 | planned | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
 | Australian reporting obligations (OAIC NDB, SOCI, ransomware payments) | `aureg` | Australian government | none | on | v0.2 | planned | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
 | Junction (Microsoft Graph, Defender, Sentinel) | `junction` | Author's public tools | `JUNCTION_BIN` (optional) | off | v0.2 | planned | [docs/connectors/junction.md](docs/connectors/junction.md) |

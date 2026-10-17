@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "rule_id"
+  ]
+}
