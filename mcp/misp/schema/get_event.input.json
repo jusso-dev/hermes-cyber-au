@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 64}
+  },
+  "required": ["event_id"]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "required": ["id", "info", "attributes", "galaxies"],
+  "properties": {
+    "id": {"type": "string"},
+    "uuid": {"type": "string"},
+    "info": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "published": {"type": "boolean"},
+    "org": {"type": "string"},
+    "tlp": {"type": ["string", "null"]},
+    "distribution": {"type": "string"},
+    "sharing_group": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "attributes": {"type": "array"},
+    "galaxies": {"type": "array"}
+  }
+}

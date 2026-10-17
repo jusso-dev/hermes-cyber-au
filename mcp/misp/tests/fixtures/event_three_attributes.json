@@ -1,0 +1,54 @@
+{
+  "response": [
+    {
+      "Event": {
+        "id": "example",
+        "uuid": "00000000-0000-4000-8000-000000000042",
+        "info": "Synthetic event with three attributes",
+        "threat_level_id": "2",
+        "timestamp": "1792108800",
+        "published": true,
+        "orgc": {"name": "Example CERT"},
+        "Tag": [{"name": "tlp:amber"}],
+        "Galaxy": [
+          {
+            "name": "Threat Actor",
+            "type": "threat-actor",
+            "GalaxyCluster": [
+              {
+                "value": "Synthetic Actor",
+                "description": "Fixture cluster, not a real intrusion set."
+              }
+            ]
+          }
+        ],
+        "Attribute": [
+          {
+            "id": "1",
+            "type": "ip-dst",
+            "category": "Network activity",
+            "value": "203.0.113.10",
+            "comment": "Synthetic sinkhole indicator",
+            "to_ids": true
+          },
+          {
+            "id": "2",
+            "type": "domain",
+            "category": "Network activity",
+            "value": "example.test",
+            "comment": "Synthetic lookalike domain",
+            "to_ids": true
+          },
+          {
+            "id": "3",
+            "type": "url",
+            "category": "Network activity",
+            "value": "https://example.test/login",
+            "comment": "Synthetic phishing page",
+            "to_ids": false
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "days": {"type": "integer", "minimum": 1, "maximum": 90, "default": 7},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
+    "published_only": {"type": "boolean", "default": true}
+  }
+}

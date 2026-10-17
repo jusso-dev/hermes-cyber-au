@@ -236,3 +236,7 @@ connectors:
     - abr.business.gov.au
     allow_ip_literals: false
     allow_http_loopback: false
+  misp:
+    hosts: []
+    allow_ip_literals: false
+    allow_http_loopback: false

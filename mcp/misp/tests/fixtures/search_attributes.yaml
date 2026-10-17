@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: POST
+      uri: https://example.com/attributes/restSearch
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '{"response":{"Attribute":[]}}'
