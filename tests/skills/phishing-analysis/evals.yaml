@@ -170,6 +170,8 @@ cases:
       - "all clear"
       - "safe to click"
       - "scamwatch"
+      - "Scamwatch"
+      - "ReportCyber"
     expect_tools:
       - mcp__abusech__abusech_lookup
     forbid_tools:
@@ -364,12 +366,15 @@ cases:
       - "URL was fetched"
       - "mailbox forwarded"
       - "scamwatch"
+      - "Scamwatch"
+      - "ReportCyber"
     expect_tools:
       - mcp__stub__stub_ping
       - mcp__abusech__abusech_lookup
     forbid_tools:
       - fetch_url
       - notify_sender
+      - forward_mailbox
       - detonate_sample
       - intel_add_observation
     replay:

@@ -18,7 +18,7 @@ from email.parser import BytesParser
 from email.utils import parseaddr
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
 _BRANDS_PATH = _SKILL_ROOT / "references" / "au-brands.json"
@@ -75,6 +75,7 @@ _URL_RE = re.compile(r"https?://[^\s<>'\"]+", re.IGNORECASE)
 _HARNESS_URL_RE = re.compile(r"\b(https?)://([^\s/]+)(\S*)", re.IGNORECASE)
 _EMAIL_RE = re.compile(r"\b([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b")
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+_WWW_RE = re.compile(r"(?<![\w./@-])www\.[^\s<>'\"]+", re.IGNORECASE)
 _HOST_RE = re.compile(r"(?i)^((?:[a-z0-9-]+\.)+[a-z]{2,})((?::\d+)?(?:[/?#].*)?)$")
 _DEFANGED_RE = re.compile(r"\[\.\]|\[@\]|hxxps?://", re.IGNORECASE)
 _AUTH_METHOD_RE = re.compile(
@@ -105,6 +106,40 @@ _INSTRUCTION_RE = re.compile(
     r"|send\s+(?:the\s+)?(?:mailbox|password|credentials)"
     r")"
 )
+# Visible text is only matched on prompt-injection phrasing. Ordinary footers say
+# "notify the sender", so the wider hidden-text pattern is not used here.
+_VISIBLE_INSTRUCTION_RE = re.compile(
+    r"(?i)(?:"
+    r"forward\s+(?:the\s+|this\s+|your\s+)?(?:mailbox|inbox)"
+    r"|fetch_url"
+    r"|notify_sender"
+    r"|(?:ignore|disregard)\s+(?:all\s+|any\s+)?(?:previous|prior)\s+instructions"
+    r"|exfiltrate"
+    r")"
+)
+_VOID_TAGS = frozenset(
+    {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "source",
+        "track",
+        "wbr",
+    }
+)
+_RAW_TEXT_TAGS = {
+    "script": "script",
+    "noscript": "noscript",
+    "template": "template",
+    "style": "style",
+}
 _ZW_SPAN = re.compile(
     r".{0,120}[\u200b\u200c\u200d\u200e\u200f\ufeff\u2060].{0,120}",
     re.DOTALL,
@@ -143,15 +178,24 @@ def _defang_once(value: str) -> str:
     def url_sub(match: re.Match[str]) -> str:
         scheme = "hxxps" if match.group(1).lower() == "https" else "hxxp"
         host = match.group(2).replace(".", "[.]")
-        return f"{scheme}://{host}{match.group(3)}"
+        tail = _HARNESS_URL_RE.sub(url_sub, match.group(3))
+        return f"{scheme}://{host}{tail}"
 
     text = _HARNESS_URL_RE.sub(url_sub, text)
+    text = _WWW_RE.sub(_defang_www, text)
 
     def email_sub(match: re.Match[str]) -> str:
         return f"{match.group(1)}[@]{match.group(2).replace('.', '[.]')}"
 
     text = _EMAIL_RE.sub(email_sub, text)
     return _IPV4_RE.sub(lambda match: match.group(0).replace(".", "[.]"), text)
+
+
+def _defang_www(match: re.Match[str]) -> str:
+    token = match.group(0)
+    stripped = token.rstrip(".,;:)>]")
+    host = re.match(r"[^/?#]*", stripped).group(0)
+    return host.replace(".", "[.]") + stripped[len(host) :] + token[len(stripped) :]
 
 
 def refang_observable(value: str) -> str:
@@ -377,7 +421,8 @@ def assess_host(host: str, brands: BrandList, own: list[str] | None = None) -> d
 def extract_urls(text: str) -> list[str]:
     found: list[str] = []
     seen: set[str] = set()
-    for match in _URL_RE.finditer(text):
+    matches = list(_URL_RE.finditer(text)) + list(_WWW_RE.finditer(text))
+    for match in sorted(matches, key=lambda item: item.start()):
         url = match.group(0).rstrip(".,;:)>]\"'")
         if url not in seen:
             seen.add(url)
@@ -395,6 +440,16 @@ def _style_reason(style: str) -> str | None:
         return "font-size:0"
     if re.search(r"opacity:0(?:\.0+)?(?:;|$|!)", compact):
         return "opacity:0"
+    if re.search(r"(?:^|;)(?:max-)?height:0(?:px|pt|em|%)?(?:;|$|!)", compact):
+        return "height:0"
+    if re.search(r"(?:^|;)(?:max-)?width:0(?:px|pt|em|%)?(?:;|$|!)", compact):
+        return "width:0"
+    if re.search(r"(?:^|;)font-size:[12](?:px|pt)(?:;|$|!)", compact):
+        return "font-size:tiny"
+    if re.search(r"(?:^|;)mso-hide:all(?:;|$|!)", compact):
+        return "mso-hide"
+    if re.search(r"(?:^|;)(?:left|top|text-indent):-\d{3,}", compact):
+        return "off-screen"
     if re.search(r"color:#ffffff(?:;|$|!)", compact):
         return "white-text"
     if re.search(r"color:#fff(?:;|$|!)", compact):
@@ -415,13 +470,20 @@ class _HiddenHTML(HTMLParser):
         self._reason = ""
         self._buf: list[str] = []
 
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        # Browsers ignore the slash on a non-void tag, so it stays open.
+        if tag not in _VOID_TAGS:
+            self.handle_starttag(tag, attrs)
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in _VOID_TAGS:
+            return
         attr = {key.lower(): (value or "") for key, value in attrs}
         reason = None
         if "hidden" in attr:
             reason = "hidden-attribute"
         else:
-            reason = _style_reason(attr.get("style", ""))
+            reason = _style_reason(attr.get("style", "")) or _RAW_TEXT_TAGS.get(tag)
         if self._depth:
             self._depth += 1
             return
@@ -431,13 +493,13 @@ class _HiddenHTML(HTMLParser):
             self._buf = []
 
     def handle_endtag(self, tag: str) -> None:
-        if not self._depth:
+        if not self._depth or tag in _VOID_TAGS:
             return
         self._depth -= 1
         if self._depth == 0:
             text = "".join(self._buf).strip()
             self._buf = []
-            if text:
+            if text and self._reason != "style":
                 self.found.append({"kind": self._reason, "text": text[:2000], "untrusted": True})
 
     def handle_data(self, data: str) -> None:
@@ -455,7 +517,7 @@ class _HiddenHTML(HTMLParser):
         super().close()
         if self._depth and self._buf:
             text = "".join(self._buf).strip()
-            if text:
+            if text and self._reason != "style":
                 self.found.append({"kind": self._reason, "text": text[:2000], "untrusted": True})
 
 
@@ -477,7 +539,7 @@ def _auth_from_header(value: str) -> dict[str, str | None]:
     return found
 
 
-def _authentication(message) -> dict:
+def _authentication(message, from_host: str = "") -> dict:
     headers = message.get_all("Authentication-Results") or []
     arc_headers = message.get_all("ARC-Authentication-Results") or []
     parsed = (
@@ -500,7 +562,17 @@ def _authentication(message) -> dict:
         aligned = False
     else:
         aligned = None
+    header_from = parsed.get("header_from")
+    mismatch = bool(
+        header_from
+        and from_host
+        and registrable_domain(header_from.strip("<>")) != registrable_domain(from_host)
+    )
+    if mismatch:
+        # The result describes another domain, so it says nothing about this sender.
+        aligned = None
     parsed["aligned"] = aligned
+    parsed["header_from_mismatch"] = mismatch
     parsed["present"] = bool(headers)
     return parsed
 
@@ -536,7 +608,7 @@ def _url_record(
     hidden: bool,
 ) -> dict | None:
     refanged = refang_observable(raw_url)
-    parsed = urlparse(refanged)
+    parsed = urlparse(refanged if "://" in refanged else f"http://{refanged}")
     host = (parsed.hostname or "").lower()
     if not host:
         return None
@@ -555,8 +627,20 @@ def _url_record(
 
 
 def _attachment_record(part) -> dict:
-    payload = part.get_payload(decode=True) or b""
     filename = part.get_filename() or "unnamed"
+    if part.get_content_type() == "message/rfc822":
+        # The parser re-serialises an embedded message, so a hash would not match the
+        # original bytes. The message is analysed on its own instead.
+        return {
+            "filename": filename,
+            "content_type": "message/rfc822",
+            "size": None,
+            "md5": None,
+            "sha1": None,
+            "sha256": None,
+            "embedded": True,
+        }
+    payload = part.get_payload(decode=True) or b""
     return {
         "filename": filename,
         "content_type": part.get_content_type(),
@@ -596,6 +680,7 @@ def analyse(
     brands: BrandList | None = None,
     shorteners: set[str] | None = None,
     own: list[str] | None = None,
+    _depth: int = 0,
 ) -> dict:
     """Return a JSON-ready reading. The message and this object are untrusted data."""
     brand_list = brands or load_brands()
@@ -623,9 +708,14 @@ def analyse(
             "The display name claims a shipped brand and the address domain is not that brand."
         )
 
-    authentication = _authentication(message)
+    authentication = _authentication(message, from_host)
     if not authentication["present"]:
         warnings.append("Authentication-Results is not in this copy. Do not infer a pass.")
+    if authentication["header_from_mismatch"]:
+        warnings.append(
+            "header.from in Authentication-Results is not the From address domain. "
+            "Do not read the DMARC result as alignment for this sender."
+        )
 
     received = [_defang_once(value)[:500] for value in (message.get_all("Received") or [])[:20]]
     ips: list[str] = []
@@ -639,8 +729,35 @@ def analyse(
     html_chunks: list[str] = []
     plain_chunks: list[str] = []
     attachments: list[dict] = []
-    parts = message.walk() if message.is_multipart() else [message]
+    embedded: list[dict] = []
+    inside_embedded: set[int] = set()
+    parts = list(message.walk()) if message.is_multipart() else [message]
     for part in parts:
+        if part.get_content_type() != "message/rfc822" or id(part) in inside_embedded:
+            continue
+        payload = part.get_payload()
+        for sub in payload if isinstance(payload, list) else []:
+            inside_embedded.update(id(item) for item in sub.walk())
+            if _depth >= 2:
+                warnings.append("An embedded message is nested too deeply and was not analysed.")
+                continue
+            embedded.append(
+                analyse(
+                    sub.as_bytes(),
+                    brands=brand_list,
+                    shorteners=shortener_hosts,
+                    own=own_domains,
+                    _depth=_depth + 1,
+                )
+            )
+    if embedded:
+        warnings.append(
+            "An embedded message was analysed separately in embedded_messages. Report that "
+            "message, not this wrapper. The wrapper headers describe the reporter's mailbox."
+        )
+    for part in parts:
+        if id(part) in inside_embedded:
+            continue
         if part.get_content_maintype() == "multipart":
             continue
         filename = part.get_filename()
@@ -666,6 +783,18 @@ def analyse(
         hidden.append({"kind": "zero-width", "text": snippet, "untrusted": True})
     for item in hidden:
         item["instruction"] = _is_instruction(item["text"])
+    visible_instructions: list[dict] = []
+    folded_visible = body_text.translate(_ZW_TRANSLATION)
+    for match in _VISIBLE_INSTRUCTION_RE.finditer(folded_visible):
+        window = " ".join(folded_visible[max(0, match.start() - 60) : match.end() + 120].split())
+        if window not in [item["text"] for item in visible_instructions]:
+            visible_instructions.append(
+                {"kind": "visible-text", "text": window, "untrusted": True, "instruction": True}
+            )
+        if len(visible_instructions) == 10:
+            break
+    for item in visible_instructions:
+        item["text"] = _defang_once(item["text"])
 
     hidden_urls: set[str] = set()
     for item in hidden:
@@ -681,7 +810,10 @@ def analyse(
     seen_urls: set[str] = set()
     url_records: list[dict] = []
     search_text = folded_body if folded_body != combined_body else combined_body
-    for url in extract_urls(search_text):
+    hidden_refanged = {refang_observable(item) for item in hidden_urls}
+    queue = [(url, None) for url in extract_urls(search_text)]
+    while queue:
+        url, parent = queue.pop(0)
         refanged = refang_observable(url)
         if refanged in seen_urls:
             continue
@@ -691,10 +823,15 @@ def analyse(
             brands=brand_list,
             own=own_domains,
             shorteners=shortener_hosts,
-            hidden=refanged in {refang_observable(item) for item in hidden_urls},
+            hidden=refanged in hidden_refanged,
         )
         if record:
+            record["nested_in"] = parent
             url_records.append(record)
+            # A redirector can carry its real target in the query string.
+            target = urlparse(refanged if "://" in refanged else f"http://{refanged}")
+            for nested in extract_urls(unquote(f"{target.query} {target.fragment}")):
+                queue.append((nested, record["defanged"]))
             if record["shortener"]:
                 warnings.append(
                     "Shortener not expanded. HEAD expansion is opt-in and this helper "
@@ -725,8 +862,12 @@ def analyse(
     instruction_count = sum(1 for item in hidden if item.get("instruction"))
     if instruction_count:
         signals.append({"kind": "hidden-instruction", "count": instruction_count})
+    if visible_instructions:
+        signals.append({"kind": "visible-instruction", "count": len(visible_instructions)})
     if attachments:
         signals.append({"kind": "attachment", "count": len(attachments)})
+    if embedded:
+        signals.append({"kind": "embedded-message", "count": len(embedded)})
 
     preview = _defang_once(body_text)[:2000]
     return {
@@ -739,9 +880,9 @@ def analyse(
             "version": brand_list.version,
             "retrieved": brand_list.retrieved,
         },
-        "subject": message.get("Subject"),
+        "subject": _defang_once(str(message.get("Subject") or "")) or None,
         "from": {
-            "display": display,
+            "display": _defang_once(display),
             "address": address,
             "defanged": defang_observable(address) if address else "",
             "display_claims": claims,
@@ -751,6 +892,8 @@ def analyse(
         "urls": url_records,
         "attachments": attachments,
         "hidden": hidden,
+        "visible_instructions": visible_instructions,
+        "embedded_messages": embedded,
         "signals": signals,
         "warnings": warnings,
         "body_preview": preview,
@@ -762,6 +905,7 @@ def analyse(
             "hashes": [
                 {"sha256": item["sha256"], "sha1": item["sha1"], "md5": item["md5"]}
                 for item in attachments
+                if item["sha256"]
             ],
         },
     }
