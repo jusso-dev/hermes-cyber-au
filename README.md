@@ -1,12 +1,12 @@
 # hermes-cyber-au
 
-A planned [Hermes Agent](https://github.com/NousResearch/hermes-agent) distribution for Australian cyber security teams.
+A [Hermes Agent](https://github.com/NousResearch/hermes-agent) distribution for Australian cyber security teams.
 
-Install it once and you get an analyst assistant that knows the ISM, the Essential Eight and the new ASD Essentials, reads ASD's ACSC and AusCERT as they publish, pulls in global threat intel, keeps a local intel store, and writes you a briefing before you've finished your coffee. It proposes actions. It doesn't take them.
+Install it once and you get an analyst assistant that knows the ISM, the Essential Eight and ASD Essentials, reads ASD's ACSC and AusCERT, pulls in global threat intel, keeps a local intel store, and can write a briefing. It proposes actions. It does not take them.
 
-> **Status: planned.** Nothing is implemented yet. This repository holds the design and the build plan as GitHub issues. Start with the roadmap issue, then the epics.
+`main` contains the connectors, skills, intel store, plugin, routines, and Docker image recipe. There is no release tag yet. Choose a model in Hermes before a chat or a briefing can run. Scheduled jobs arrive paused. Hindsight stays off until `HINDSIGHT_BASE_URL` is set.
 
-## What it will do
+## What it does
 
 - **Triage incidents** with Australian context: ASD's ACSC categorisation, ATT&CK mapping, containment proposals, and a check for NDB, SOCI and ransomware payment reporting triggers.
 - **Enrich indicators** across abuse.ch, OTX, GreyNoise, Shodan InternetDB, crt.sh and Cloudflare Radar, deduplicated into one verdict with sources.
@@ -26,27 +26,30 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 | Piece | Where | What it is |
 |---|---|---|
 | Profile distribution | `distribution.yaml`, `SOUL.md`, `config.yaml` | Installed with `hermes profile install`, updated with `hermes profile update` |
-| Skills | `skills/<name>/SKILL.md` | The eleven workflows above |
+| Skills | `skills/<name>/SKILL.md` | Triage, enrichment, essentials, ISM lookup, vulnerability priority, ACSC digest, phishing, hunting, NDB, SOCI, executive briefing, daily briefing, and AU org exposure |
 | Connectors | `mcp/<source>/` | Read-only stdio MCP servers on a shared HTTP client with an egress allowlist, caching and rate limiting |
-| Plugin | `plugins/cyber-au/` | Intel store tools, audit log hooks, untrusted-content guards, the `cyber-au` command |
-| Intel store | `plugin-data/cyber-au/intel.sqlite` | SQLite with canonical dedupe and STIX 2.1 export |
-| Routines | `cron/jobs.json`, `scripts/` | Scheduled jobs, shipped paused. See [docs/operations/routines.md](docs/operations/routines.md). |
-| Automation | `ci/workflows/` | Proposed GitHub Actions: CI, nightly intel refresh, skill data regeneration, connector health, dependency and Hermes bumps, weekly releases |
+| Plugin | `plugins/cyber-au/` | Intel store tools, audit log hooks, untrusted-content guards, `cyber-au doctor`, update, and migrate |
+| Intel store | `plugin-data/cyber-au/intel.sqlite` | SQLite with canonical dedupe, retention, and STIX 2.1 export |
+| Roles | `profiles/overlays/` | Watcher, analyst, skeptic, briefer, and librarian. Hermes installs one home, so each role is a separate install plus an overlay. See [profiles/README.md](profiles/README.md). |
+| Routines | `cron/jobs.json`, `scripts/` | Scheduled jobs. Hermes pauses them on install. See [docs/operations/routines.md](docs/operations/routines.md). |
+| Image | `docker/` | `nousresearch/hermes-agent` with this profile installed. See [docker/README.md](docker/README.md). |
+| Automation | `.github/workflows/`, `ci/workflows/` | Checks run on push to `main`. Nightly refresh, connector health, skill data regeneration, dependency bumps, and weekly release files are proposed under `ci/workflows/` until they are copied into `.github/workflows/`. |
 
 The Hermes details behind this design (manifest fields, what an update replaces, MCP config, plugin hooks, cron rules) are written up with sources in [docs/research/hermes-structure.md](docs/research/hermes-structure.md).
 
-## Planned install
+## Install
 
-Use `install.sh --ref <tag>` when a release tag exists. The branch `main` is not a release. The tag is the commit the release notes, SBOM and attestation refer to. How to check them is in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
+`install/install.sh` installs Hermes if needed, then this profile. `main` is not a release tag. Pass `--ref` when you want a tag or commit. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
 
 ```bash
-# Once a release tag exists.
-bash install/install.sh --ref <tag>
+bash install/install.sh
 cp ~/.hermes/profiles/cyber-au/.env.EXAMPLE ~/.hermes/profiles/cyber-au/.env
-cyber-au chat
+hermes -p cyber-au model
+hermes -p cyber-au cyber-au doctor --offline
+hermes -p cyber-au cron resume cyberau-morning-brief
 ```
 
-It works with no API keys using public sources. Each free key you add (abuse.ch, NVD, OTX, GreyNoise, a Cloudflare Radar read token) turns on more sources.
+Public sources answer with no keys. A free key (abuse.ch, NVD, OTX, GreyNoise, or a Cloudflare Radar read token) raises limits or turns on a source that ships disabled. The profile still needs a model before `chat` or a briefing job can run. The morning briefing, KEV watch, and weekly summary deliver to `origin`, which is the chat you are in, or the job's last output when no channel is configured. `hermes -p cyber-au cron list` shows that output. Details are in [docs/operations/routines.md](docs/operations/routines.md).
 
 ## Connectors
 
@@ -111,7 +114,7 @@ Full detail, including what was verified and when: [docs/research/connectors.md]
 
 ## Premium feeds (paid, bring your own licence)
 
-Teams that already pay for commercial intel can plug it in. First up in v0.2 are Recorded Future (identity exposure, dark web and ransomware brand alerts, domain abuse) and Flare (leaked credentials, stealer logs, leak and ransomware sites), both with optional use of the vendor's own MCP server, plus UpGuard (identity breaches, data leaks and typosquats; an Australian vendor). Later connectors cover infostealer and breach exposure (Hudson Rock, SpyCloud) and more threat intel platforms with dark web and leak site monitoring (Flashpoint, Intel 471, Google Threat Intelligence DTM, CrowdStrike Recon, SOCRadar, DarkOwl). The free ransomware.live tracker adds leak site claims naming Australian organisations.
+Paid connectors are in this checkout and off by default. They cover Recorded Future, Flare, UpGuard, Hudson Rock, SpyCloud, Flashpoint, Intel 471, Google Threat Intelligence DTM, CrowdStrike Recon, SOCRadar, and DarkOwl. The free ransomware.live tracker adds leak-site claims that name Australian organisations.
 
 - Every premium connector is off by default. You bring your own licence key through the profile `.env`; nothing is bundled.
 - Each vendor has terms flags: what may be cached, stored, exported as STIX or shared. Defaults are conservative until your contract says otherwise.
@@ -119,7 +122,7 @@ Teams that already pay for commercial intel can plug it in. First up in v0.2 are
 - Exposure data can contain personal information. It is redacted, kept for 90 days by default, and never sent anywhere automatically. Nothing contacts the OAIC, ASD, victims or vendors for you.
 - An "AU org exposure" skill and a paused alert routine match findings against a watchlist of your own domains, ABNs and brands.
 
-The paid connectors described in this section are tracked in [docs/research/connectors.md](docs/research/connectors.md) until each one has a connector directory in this checkout.
+Pages for those connectors are in the table above. Terms flags are under [docs/premium/README.md](docs/premium/README.md).
 
 ## Safety
 
