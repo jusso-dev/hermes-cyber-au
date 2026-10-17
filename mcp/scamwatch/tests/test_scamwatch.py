@@ -357,7 +357,7 @@ def _live(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(source, "_SLEEP", lambda _seconds: None)
     monkeypatch.setattr(
         "cyberau_common.egress._resolve",
-        lambda _host: [ipaddress.ip_address("203.0.113.10")],
+        lambda _host: [ipaddress.ip_address("1.1.1.1")],
     )
 
 

@@ -93,6 +93,18 @@ def lookup(name: str) -> str | None:
     return value
 
 
+# Names in distribution.yaml that configure a connector but carry no credential.
+# Their values are ordinary identifiers and addresses, so they must reach tool
+# answers. Redacting them would blank the collection id, or any other row field
+# that happens to match.
+_PLAIN_CONFIG_SUFFIXES = ("_URL", "_BASE_URL", "_API_ROOT", "_COLLECTION_ID")
+
+
+def is_plain_config_name(name: str) -> bool:
+    """True for a distribution env name that holds configuration, not a secret."""
+    return name.upper().endswith(_PLAIN_CONFIG_SUFFIXES)
+
+
 def distribution_env_names(path: Path | None = None) -> tuple[str, ...]:
     """Names declared in distribution.yaml. Values are not read."""
     global _NAME_CACHE
@@ -144,7 +156,13 @@ def redact_data(value):
     if isinstance(value, dict):
         cleaned = {}
         for key, item in value.items():
-            if isinstance(key, str) and key.lower() in SECRET_HEADER_NAMES:
+            # A number or flag under a secret-looking field name is a count or a
+            # switch (for example a tally of "authorization" rows), not a credential.
+            if (
+                isinstance(key, str)
+                and key.lower() in SECRET_HEADER_NAMES
+                and not isinstance(item, (int, float, bool, type(None)))
+            ):
                 cleaned[key] = "[REDACTED]"
             else:
                 cleaned[key] = redact_data(item)
@@ -507,6 +525,8 @@ def _distribution_path() -> Path | None:
 def _secret_values() -> list[str]:
     found: list[str] = []
     for name in distribution_env_names():
+        if is_plain_config_name(name):
+            continue
         value = os.environ.get(name)
         if value:
             found.append(value)
@@ -593,6 +613,11 @@ def _cassette_file_findings(path: Path) -> list[str]:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError:
+        # Fixture folders also hold other YAML, such as multi-document rule files.
+        # Only a file that claims to be a cassette has to parse.
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"(?m)^interactions:", text) is None:
+            return []
         return [f"{path}: cassette is not valid YAML"]
     if not isinstance(data, dict):
         return []

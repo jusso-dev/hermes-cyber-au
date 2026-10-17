@@ -3,7 +3,7 @@ interactions:
     method: POST
     uri: https://api.flare.io/tokens/generate
     headers:
-      Authorization: [REDACTED]
+      Authorization: '[REDACTED]'
   response:
     status:
       code: 200

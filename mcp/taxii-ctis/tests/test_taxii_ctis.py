@@ -72,7 +72,7 @@ def _arm(monkeypatch, tmp_path: Path, root: str = "https://example.com/taxii2/ro
         encoding="utf-8",
     )
     monkeypatch.setenv("CYBERAU_EGRESS_ALLOWLIST", str(allow))
-    source._RESOLVER = lambda _host: [ipaddress.ip_address("203.0.113.50")]
+    source._RESOLVER = lambda _host: [ipaddress.ip_address("1.1.1.1")]
     source._SLEEP = lambda _seconds: None
 
 

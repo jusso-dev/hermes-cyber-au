@@ -34,7 +34,7 @@ from cyberau_recorded_future.source import (
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 ROOT = Path(__file__).resolve().parents[3]
 TOKEN = "rf-test-token"
-PUBLIC = ipaddress.ip_address("203.0.113.10")
+PUBLIC = ipaddress.ip_address("1.1.1.1")
 WATCH = """
 organisation: Example Pty Ltd
 domains:

@@ -251,7 +251,7 @@ def test_abr_lookup_uses_the_json_service_and_hides_the_guid(env, monkeypatch):
     names = lookup_names(
         number,
         transport=httpx.MockTransport(handler),
-        resolver=lambda _host: [ipaddress.ip_address("192.0.2.1")],
+        resolver=lambda _host: [ipaddress.ip_address("1.1.1.1")],
     )
     assert names == ["Registered Fixture", "Fixture Trading"]
     assert seen["host"] == "abr.business.gov.au"
@@ -267,7 +267,7 @@ def test_abr_lookup_uses_the_json_service_and_hides_the_guid(env, monkeypatch):
         lookup_names(
             number,
             transport=httpx.MockTransport(fail),
-            resolver=lambda _host: [ipaddress.ip_address("192.0.2.1")],
+            resolver=lambda _host: [ipaddress.ip_address("1.1.1.1")],
         )
     assert guid not in str(caught.value)
 

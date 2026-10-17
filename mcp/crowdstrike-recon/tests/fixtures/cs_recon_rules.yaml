@@ -3,7 +3,7 @@ interactions:
     method: GET
     uri: https://api.crowdstrike.com/recon/queries/rules/v1?limit=1
     headers:
-      Authorization: [REDACTED]
+      Authorization: '[REDACTED]'
   response:
     status:
       code: 200

@@ -40,7 +40,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_NCSC_SNAPSHOT", str(FIXTURES))
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     source._SLEEP = lambda _seconds: None
-    source._RESOLVER = lambda _host: [ipaddress.ip_address("203.0.113.10")]
+    source._RESOLVER = lambda _host: [ipaddress.ip_address("1.1.1.1")]
     source._TRANSPORT = None
     yield
     source._TRANSPORT = None
