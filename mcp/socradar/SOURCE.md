@@ -58,3 +58,11 @@ Read from the XSOAR parser for this endpoint: `data.alarms`, `alarm_id`, `date`,
 `alarm_text` is redacted and returned only inside `untrusted_text`. It is not written to the intel store. Alarm content objects, mitigation text and mailbox local-parts are not copied. An asset that contains `@` keeps only the domain, as `email_domain`.
 
 Findings that match `watchlist.yaml` in the profile data directory are written to the intel store as metadata. The file is not a vendor parameter.
+
+## Fixtures, snapshots and health
+
+Every file under `mcp/socradar/tests/fixtures/` is synthetic. Nothing was recorded from SOCRadar, because no portal access was available. `socradar_incidents.yaml` is an empty placeholder, not a recorded cassette. Field names and shapes follow the XSOAR parser above and are not confirmed against the live service.
+
+`CYBERAU_SOCRADAR_SNAPSHOT` points the tool at a local JSON file. A result served from it has `cache: snapshot` and a warning that says it is not live. It is never written to the intel store, and `exposure_for` refuses it. A copy served from an expired cache entry has `cache: stale` and a warning.
+
+`cyberau-mcp health socradar --live` makes one uncached request and reports ok only for a live response that passes the schema. It reports not ok when the key or company id is missing, when the fetch fails, and when the answer came from a cache or a snapshot. Without `--live` a missing key reports `not configured` as ok.

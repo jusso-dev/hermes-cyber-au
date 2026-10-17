@@ -359,8 +359,16 @@ def test_paging_stops_at_catalogue_ceiling(monkeypatch):
     assert any("max_pages" in item for item in found["warnings"])
 
 
+def _serve_synthetic():
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=SYNTHETIC.read_bytes())
+    )
+
+
 def test_watchlist_store_keeps_metadata_only(tmp_path, monkeypatch):
     _enable(monkeypatch)
+    monkeypatch.delenv("CYBERAU_SOCRADAR_SNAPSHOT", raising=False)
+    _serve_synthetic()
     (tmp_path / "watchlist.yaml").write_text("domains:\n  - example.com.au\n", encoding="utf-8")
     found = socradar_incidents(since="2026-06-01", until="2026-06-04")
     assert any(row["kind"] == "attack_surface_issue" for row in found["data"])
@@ -405,3 +413,102 @@ def test_numeric_company_id(monkeypatch):
     probe = connector().health(live=False)
     assert probe.ok is False
     assert "SOCRADAR_COMPANY_ID" in probe.detail
+
+
+def test_snapshot_is_warned_and_never_stored(tmp_path, monkeypatch):
+    _enable(monkeypatch)
+    (tmp_path / "watchlist.yaml").write_text("domains:\n  - example.com.au\n", encoding="utf-8")
+    found = socradar_incidents(since="2026-06-01", until="2026-06-04")
+    assert found["cache"] == "snapshot"
+    assert found["data"]
+    assert any("not a live SOCRadar result" in item for item in found["warnings"])
+    assert not (tmp_path / "intel.sqlite").exists()
+    with pytest.raises(ValueError, match="Snapshot copy"):
+        connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1))
+    assert not (tmp_path / "intel.sqlite").exists()
+
+
+def test_failed_fetch_is_not_an_empty_exposure_list(monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.delenv("CYBERAU_SOCRADAR_SNAPSHOT", raising=False)
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(401, content=(FIXTURES / "socradar_401.json").read_bytes())
+    )
+    with pytest.raises(ValueError, match="SOCRADAR_API_KEY"):
+        connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1))
+
+
+def test_stale_copy_is_warned(monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.delenv("CYBERAU_SOCRADAR_SNAPSHOT", raising=False)
+    _serve_synthetic()
+    assert socradar_incidents()["data"]
+    for item in next(iter(source._CACHES.values()))._memory.values():
+        item.fetched_at -= item.ttl + 10
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    found = socradar_incidents()
+    assert found["cache"] == "stale"
+    assert any("expired cache copy" in item for item in found["warnings"])
+
+
+def test_offline_cached_failure_body_is_not_mapped(monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.delenv("CYBERAU_SOCRADAR_SNAPSHOT", raising=False)
+    payload = json.loads(SYNTHETIC.read_text(encoding="utf-8"))
+    payload["is_success"] = False
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(200, json=payload))
+    assert socradar_incidents()["data"] == []
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    found = socradar_incidents()
+    assert found["data"] == []
+    assert any("unsuccessful" in item for item in found["warnings"])
+
+
+def test_live_health_fails_without_key_or_on_snapshot_or_cache(monkeypatch):
+    missing = connector().health(live=True)
+    assert missing.ok is False
+    assert missing.detail == "not configured"
+    assert connector().health(live=False).ok is True
+    _enable(monkeypatch)
+    _serve_synthetic()
+    assert connector().health(live=True).ok is True
+    # A snapshot in the environment must not answer a live probe.
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(500))
+    broken = connector().health(live=True)
+    assert broken.ok is False
+    # A warm session cache must not answer a live probe.
+    _serve_synthetic()
+    monkeypatch.delenv("CYBERAU_SOCRADAR_SNAPSHOT", raising=False)
+    assert socradar_incidents()["data"]
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(500))
+    assert connector().health(live=True).ok is False
+
+
+def test_redirect_off_allowlist_sends_nothing_and_same_host_drops_key(monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.delenv("CYBERAU_SOCRADAR_SNAPSHOT", raising=False)
+    seen: list[tuple[str, str | None]] = []
+
+    def off_list(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.host, request.headers.get("api-key")))
+        return httpx.Response(302, headers={"location": "https://evil.example/stolen"})
+
+    source._TRANSPORT = httpx.MockTransport(off_list)
+    refused = socradar_incidents()
+    assert refused["data"] == []
+    assert seen == [("platform.socradar.com", KEY)]
+    assert KEY not in json.dumps(refused)
+
+    seen.clear()
+
+    def same_host(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.path, request.headers.get("api-key")))
+        if len(seen) == 1:
+            return httpx.Response(302, headers={"location": "/elsewhere"})
+        return httpx.Response(200, content=SYNTHETIC.read_bytes())
+
+    source._CACHES.clear()
+    source._TRANSPORT = httpx.MockTransport(same_host)
+    socradar_incidents()
+    assert seen[0][1] == KEY
+    assert seen[1] == ("/elsewhere", None)

@@ -64,6 +64,11 @@ _REF = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _SYNTHETIC = _PACKAGE / "tests" / "fixtures" / "incidents_v4_synthetic.json"
 _RESPONSE_SCHEMA = _PACKAGE / "schema" / "socradar_incidents.response.json"
+_SNAPSHOT_WARNING = (
+    "Snapshot copy from CYBERAU_SOCRADAR_SNAPSHOT, not a live SOCRadar result. "
+    "It is not written to the intel store."
+)
+_STALE_WARNING = "Served from an expired cache copy because SOCRadar was not reached."
 _CACHE_RANK = {"hit": 0, "miss": 1, "stale": 2, "snapshot": 3}
 
 _TRANSPORT = None
@@ -89,7 +94,7 @@ def socradar_incidents(
     if config:
         return _envelope([], "snapshot", (config,))
     watch, watch_problem = _load_watchlist()
-    rows, cache, warnings = _collect(
+    rows, cache, warnings, _failed = _collect(
         since=since or None,
         until=until or None,
         severity=_severity(severity),
@@ -98,7 +103,7 @@ def socradar_incidents(
     )
     if watch_problem:
         warnings.append(watch_problem)
-    if watch is not None and rows:
+    if watch is not None and rows and cache != "snapshot":
         _store([row.finding for row in rows], watch)
     return _envelope([_record(row) for row in rows], cache, tuple(warnings))
 
@@ -135,13 +140,18 @@ class SocradarConnector(PremiumConnector):
         problem = _config_error()
         if problem:
             raise ValueError(problem)
-        rows, _cache, _warnings = _collect(
+        if os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT"):
+            raise ValueError(_SNAPSHOT_WARNING)
+        rows, _cache, warnings, failed = _collect(
             since=since.isoformat(),
             until=None,
             severity=None,
             limit=500,
             watchlist=watchlist,
         )
+        if failed:
+            # An empty list would read as "no exposure". A failed fetch must not.
+            raise ValueError(_safe(warnings[0] if warnings else "SOCRadar fetch failed"))
         matched: list[ExposureFinding] = []
         known = watchlist.known_subjects()
         for row in rows:
@@ -160,13 +170,13 @@ class SocradarConnector(PremiumConnector):
             if not live:
                 return Probe(self.key, True, "schema ok")
         if lookup("SOCRADAR_API_KEY") is None or lookup("SOCRADAR_COMPANY_ID") is None:
-            return Probe(self.key, True, "not configured")
+            return Probe(self.key, not live, "not configured")
         if _company_id() is None:
             return Probe(self.key, False, "SOCRADAR_COMPANY_ID must be a numeric company id")
         if not live:
             return Probe(self.key, True, "offline ok")
         yesterday = (datetime.now(_SYDNEY).date() - timedelta(days=1)).isoformat()
-        payload, _cache, warning = _fetch_page(
+        payload, cache, warning = _fetch_page(
             since=yesterday,
             until=None,
             severity=None,
@@ -176,6 +186,8 @@ class SocradarConnector(PremiumConnector):
         )
         if warning:
             return Probe(self.key, False, warning)
+        if cache != "miss":
+            return Probe(self.key, False, f"not a live response (cache {cache})")
         problem = schema_problem(payload or {})
         if problem:
             return Probe(self.key, False, problem)
@@ -227,25 +239,24 @@ def _collect(
     limit: int,
     watchlist: Watchlist | None,
     force_live: bool = False,
-) -> tuple[list[_Row], str, list[str]]:
+) -> tuple[list[_Row], str, list[str], bool]:
     problem = _config_error()
     if problem:
-        return [], "snapshot", [problem]
+        return [], "snapshot", [problem], True
     if os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT") and not force_live:
         payload, cache, warning = _read_snapshot()
         if warning or payload is None:
-            return [], cache, [warning or "SOCRadar payload was not usable"]
-        if payload.get("is_success") is False:
-            return [], "snapshot", ["SOCRadar reported an unsuccessful response"]
-        drifted = schema_drift(payload)
-        if drifted:
-            return [], "snapshot", [drifted]
+            return [], cache, [warning or "SOCRadar payload was not usable"], True
+        unusable = _unusable(payload)
+        if unusable:
+            return [], "snapshot", [unusable], True
         rows, notes = _map_payload(payload, since, until, severity, watchlist)
-        return rows[:limit], "snapshot", notes
+        return rows[:limit], "snapshot", [_SNAPSHOT_WARNING, *notes], False
     spec = get_vendor("socradar")
     rows: list[_Row] = []
     warnings: list[str] = []
     cache = "hit"
+    failed = False
     for page in range(1, spec.max_pages + 1):
         payload, page_cache, warning = _fetch_page(
             since=since,
@@ -258,9 +269,11 @@ def _collect(
         cache = _weaker(cache, page_cache)
         if warning:
             warnings.append(warning)
+            failed = True
             break
         if payload is None:
             warnings.append("SOCRadar payload was not usable")
+            failed = True
             break
         page_rows, notes = _map_payload(payload, since, until, severity, watchlist)
         warnings.extend(notes)
@@ -281,7 +294,9 @@ def _collect(
             warnings.append(
                 f"Stopped at {spec.max_pages} pages. The catalogue max_pages ceiling was reached."
             )
-    return rows[:limit], cache, warnings
+    if cache == "stale":
+        warnings.append(_STALE_WARNING)
+    return rows[:limit], cache, warnings, failed
 
 
 def _fetch_page(
@@ -307,7 +322,9 @@ def _fetch_page(
         if cached is None:
             return None, "snapshot", "unavailable"
         state = "hit" if cache.fresh(cached) else "stale"
-        return _load(cached.body.decode("utf-8", "replace")), state, ""
+        payload = _load(cached.body.decode("utf-8", "replace"))
+        unusable = _unusable(payload)
+        return (None if unusable else payload), state, unusable
     client = _client(cache, offline=False)
     try:
         response = client.get(
@@ -332,14 +349,19 @@ def _fetch_page(
     if response.status >= 400:
         return None, response.cache, f"SOCRadar returned HTTP {response.status}"
     payload = _load(response.body.decode("utf-8", "replace"))
-    if payload is None:
-        return None, response.cache, "SOCRadar payload was not usable"
-    if payload.get("is_success") is False:
-        return None, response.cache, "SOCRadar reported an unsuccessful response"
-    problem = schema_drift(payload)
-    if problem:
-        return None, response.cache, problem
+    unusable = _unusable(payload)
+    if unusable:
+        return None, response.cache, unusable
     return payload, response.cache, ""
+
+
+def _unusable(payload: dict | None) -> str:
+    """Return why a decoded payload cannot be mapped, or an empty string."""
+    if payload is None:
+        return "SOCRadar payload was not usable"
+    if payload.get("is_success") is False:
+        return "SOCRadar reported an unsuccessful response"
+    return schema_drift(payload) or ""
 
 
 def _map_payload(

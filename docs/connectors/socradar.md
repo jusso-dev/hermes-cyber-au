@@ -28,6 +28,8 @@ Doctor lists the server as off until you enable it. Quota calls per day and per 
 
 Free text from the feed is wrapped as untrusted text. Credential values are not stored.
 
+A result with `cache: snapshot` comes from a local file, not SOCRadar. It carries a warning, is never stored, and is refused by `exposure_for`. Test fixtures are synthetic. `health --live` reports not ok when the key is missing, the fetch fails, or the answer is cached.
+
 ## Dates and severity
 
 `since` and `until` are `YYYY-MM-DD` calendar dates in Australia/Sydney. They are sent as `start_date` and `end_date`. `severity` must be one of `INFO`, `LOW`, `MEDIUM`, `HIGH` or `CRITICAL` and is sent as `severities`.
