@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "breach_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "breach_id"
+  ]
+}

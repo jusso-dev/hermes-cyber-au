@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "required": ["id", "title", "spycloud_publish_date", "num_records"],
+  "properties": {
+    "id": {"type": ["integer", "string"]},
+    "title": {"type": "string"},
+    "spycloud_publish_date": {"type": "string"},
+    "num_records": {"type": "integer"},
+    "description": {"type": "string"},
+    "assets": {"type": "object"}
+  }
+}

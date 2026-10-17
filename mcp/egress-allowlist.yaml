@@ -294,3 +294,8 @@ connectors:
     - platform.socradar.com
     allow_ip_literals: false
     allow_http_loopback: false
+  spycloud:
+    hosts:
+    - api.spycloud.io
+    allow_ip_literals: false
+    allow_http_loopback: false
