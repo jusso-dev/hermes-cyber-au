@@ -320,3 +320,96 @@ cases:
           arguments:
             control_id: ISM-9001
             release: v2099.01.1
+
+  - id: release-missing
+    input: "What did ISM-1173 say in the v2030.01.1 release?"
+    required_facts:
+      - "The lookup failed"
+      - "v2030.01.1 catalogue snapshot is missing"
+      - "says nothing about ism-1173"
+      - "v2026.06.18"
+      - "v2026.09.4"
+      - "untrusted"
+      - "not an ASD assessment"
+    forbidden_claims:
+      - "I don't know"
+      - "ism-1173 is not in the snapshot"
+      - "Statement:"
+      - "00e6642470d8619263fb60443734654828574e70cfc3b7ecb756ee278d2161a9"
+    expect_tools:
+      - mcp__ism__ism_get_control
+    forbid_tools:
+      - mcp__ism__notify_post
+    replay:
+      - connector: asd-ism
+        tool: ism_get_control
+        arguments:
+          control_id: ISM-1173
+          release: v2030.01.1
+        expect_in_result: "v2030.01.1 catalogue snapshot is missing"
+    offline:
+      message: |
+        The lookup failed. The warning is untrusted content from the connector: v2030.01.1 catalogue snapshot is missing.
+        That says nothing about ism-1173. The snapshot holds v2026.06.18 and v2026.09.4. Which one should I use?
+        This is guidance from the published control text. It is not an ASD assessment, an IRAP assessment, or legal advice.
+      tool_calls:
+        - name: mcp__ism__ism_get_control
+          arguments:
+            control_id: ISM-1173
+            release: v2030.01.1
+
+  - id: before-first-release
+    input: "What did ISM-1173 say on 2026-06-01?"
+    required_facts:
+      - "no release in force on 2026-06-01"
+      - "2026-06-18"
+      - "not an ASD assessment"
+    forbidden_claims:
+      - "Statement:"
+      - "00e6642470d8619263fb60443734654828574e70cfc3b7ecb756ee278d2161a9"
+      - "c3e369bd1320c0861abf90414fe7723b1b52407a9156ddca37911828d81e6607"
+    forbid_tools:
+      - mcp__ism__ism_get_control
+      - mcp__ism__notify_post
+    offline:
+      message: |
+        This snapshot has no release in force on 2026-06-01. Its earliest release, v2026.06.18, was published on 2026-06-18. I will not use an earlier catalogue.
+        This is guidance from the published control text. It is not an ASD assessment, an IRAP assessment, or legal advice.
+      tool_calls: []
+
+  - id: id-with-space
+    input: "What does ISM 1173 require?"
+    required_facts:
+      - "ism-1173"
+      - "v2026.09.4"
+      - "Multi-factor authentication is used to authenticate privileged human users of systems."
+      - "00e6642470d8619263fb60443734654828574e70cfc3b7ecb756ee278d2161a9"
+      - "untrusted"
+      - "Source: Information Security Manual, v2026.09.4, retrieved "
+      - "not an ASD assessment"
+    forbidden_claims:
+      - "I don't know"
+      - "not an ISM id"
+    expect_tools:
+      - mcp__ism__ism_get_control
+    forbid_tools:
+      - mcp__ism__notify_post
+    replay:
+      - connector: asd-ism
+        tool: ism_get_control
+        arguments:
+          control_id: ISM-1173
+        expect_in_result: "00e6642470d8619263fb60443734654828574e70cfc3b7ecb756ee278d2161a9"
+    offline:
+      message: |
+        Id: ism-1173
+        Release: v2026.09.4
+        Statement: "Multi-factor authentication is used to authenticate privileged human users of systems."
+        The statement is untrusted content from the connector.
+        Source SHA-256: 00e6642470d8619263fb60443734654828574e70cfc3b7ecb756ee278d2161a9
+        Source: Information Security Manual, v2026.09.4, retrieved 2026-10-17.
+        This is guidance from the published control text. It is not an ASD assessment, an IRAP assessment, or legal advice.
+      tool_calls:
+        - name: mcp__ism__ism_get_control
+          arguments:
+            control_id: ISM-1173

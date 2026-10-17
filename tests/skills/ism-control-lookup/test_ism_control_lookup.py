@@ -113,4 +113,7 @@ def test_eval_scores_offline_without_a_provider_key(tmp_path: Path, monkeypatch)
         "june-september-2026",
         "in-force-2026-08-01",
         "injection-not-acted-on",
+        "release-missing",
+        "before-first-release",
+        "id-with-space",
     ]

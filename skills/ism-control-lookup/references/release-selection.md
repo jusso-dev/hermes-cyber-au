@@ -11,4 +11,6 @@ The release in force on a calendar date is the latest release whose published da
 
 If the date is before 2026-06-18, this snapshot has no release in force. Say so. Do not guess an earlier catalogue.
 
+If the date is after the newest release in the table, use that release and say the snapshot may not hold a newer one.
+
 `scripts/release_in_force.py` reads the release list and the date, then prints the tag or `none`. It does not use the network.
