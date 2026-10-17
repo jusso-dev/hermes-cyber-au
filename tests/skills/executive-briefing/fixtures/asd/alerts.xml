@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Synthetic ACSC alerts for a briefing fixture</title>
+    <link>https://www.cyber.gov.au/rss/alerts</link>
+    <description>Synthetic fixture. Not an ASD publication.</description>
+    <item>
+      <title>Synthetic alert: ExampleWidget remote code execution</title>
+      <link>https://www.cyber.gov.au/about-briefing-fixture</link>
+      <pubDate>Fri, 16 Oct 2026 09:00:00 +1100</pubDate>
+      <description>Synthetic fixture alert for a briefing drill. CVE-2099-2201. Not an ASD publication.</description>
+    </item>
+  </channel>
+</rss>
