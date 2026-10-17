@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["url", "source", "listed", "detail"],
+  "properties": {
+    "url": {"type": "string"},
+    "source": {
+      "type": "string",
+      "enum": ["openphish", "phishtank", "urlhaus"]
+    },
+    "listed": {"type": "boolean"},
+    "detail": {"type": "string"}
+  }
+}

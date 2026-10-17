@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://openphish.com/feed.txt
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "https://phish.example/login\nhttps://phish.example/reset\nhttp://phish.example/pay\n"
