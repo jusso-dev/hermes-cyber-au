@@ -1,0 +1,181 @@
+title: Encoded PowerShell execution
+id: 11111111-1111-4111-8111-111111111111
+status: test
+description: "Fixture rule for encoded PowerShell\u202e"
+author: Ada Fixture
+date: 2026-10-17
+tags:
+    - attack.execution
+    - attack.t1059.001
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains: '-enc'
+    condition: selection
+level: high
+---
+title: Linux cron persistence
+id: 22222222-2222-4222-8222-222222222222
+status: test
+description: Fixture rule for crontab modification
+author: Ada Fixture
+date: 2026-10-17
+tags:
+    - attack.persistence
+    - attack.t1053.003
+logsource:
+    category: process_creation
+    product: linux
+detection:
+    selection:
+        Image|contains: cron
+    condition: selection
+level: medium
+---
+title: Azure sign-in from a proxy
+id: 33333333-3333-4333-8333-333333333333
+status: test
+description: Fixture rule for an unusual Azure sign-in
+author: Bryn Fixture
+date: 2026-10-17
+tags:
+    - attack.initial-access
+    - attack.t1078
+logsource:
+    product: azure
+    service: signinlogs
+detection:
+    selection:
+        ResultType|contains: failed
+    condition: selection
+level: low
+---
+title: Cisco logging disabled
+id: 44444444-4444-4444-8444-444444444444
+status: test
+description: Fixture rule for disabled Cisco logging
+author: Bryn Fixture
+date: 2026-10-17
+tags:
+    - attack.defense-impairment
+    - attack.t1562.001
+logsource:
+    product: cisco
+    service: aaa
+detection:
+    selection:
+        CommandLine|contains: 'no logging'
+    condition: selection
+level: high
+---
+title: Informational process start
+id: 55555555-5555-4555-8555-555555555555
+status: test
+description: Fixture rule for a process listing
+author: Cy Fixture
+date: 2026-10-17
+tags:
+    - attack.discovery
+    - attack.t1057
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains: tasklist
+    condition: selection
+level: informational
+---
+title: Critical LSASS access
+id: 66666666-6666-4666-8666-666666666666
+status: test
+description: Fixture rule for LSASS memory access
+author: Cy Fixture
+date: 2026-10-17
+tags:
+    - attack.credential-access
+    - attack.t1003.001
+logsource:
+    category: process_access
+    product: windows
+detection:
+    selection:
+        TargetImage|contains: lsass
+    condition: selection
+level: critical
+---
+title: DNS tunnel query
+id: 77777777-7777-4777-8777-777777777777
+status: test
+description: Fixture rule for a long DNS query
+author: Ada Fixture
+date: 2026-10-17
+tags:
+    - attack.command-and-control
+    - attack.t1071.004
+logsource:
+    category: dns_query
+    product: windows
+    service: dns
+detection:
+    selection:
+        QueryName|contains: tunnel
+    condition: selection
+level: high
+---
+title: Okta session reuse
+id: 88888888-8888-4888-8888-888888888888
+status: test
+description: Fixture rule for a reused Okta session
+author: Bryn Fixture
+date: 2026-10-17
+tags:
+    - attack.lateral-movement
+    - attack.t1550.004
+logsource:
+    product: okta
+    service: okta
+detection:
+    selection:
+        EventType|contains: session
+    condition: selection
+level: medium
+---
+title: macOS launch agent
+id: 99999999-9999-4999-8999-999999999991
+status: test
+description: Fixture rule for a launch agent plist
+author: Cy Fixture
+date: 2026-10-17
+tags:
+    - attack.persistence
+    - attack.t1543.001
+logsource:
+    category: file_event
+    product: macos
+detection:
+    selection:
+        TargetFilename|contains: LaunchAgents
+    condition: selection
+level: medium
+---
+title: Proxy malware user agent
+id: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+status: test
+description: Fixture rule for a malware user agent
+author: Ada Fixture
+date: 2026-10-17
+tags:
+    - attack.command-and-control
+    - attack.t1071.001
+logsource:
+    category: proxy
+    product: windows
+    service: proxy
+detection:
+    selection:
+        UserAgent|contains: malware-fixture
+    condition: selection
+level: low

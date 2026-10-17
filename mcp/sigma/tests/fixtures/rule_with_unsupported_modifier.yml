@@ -1,0 +1,14 @@
+title: Unsupported modifier fixture
+id: 99999999-9999-4999-8999-999999999999
+status: test
+description: Fixture rule whose cased modifier is not supported by the query backends
+author: Cyber AU fixture
+date: 2026-10-17
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|cased: powershell
+    condition: selection
+level: medium

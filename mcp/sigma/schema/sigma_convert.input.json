@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rule_id": {
+      "type": "string"
+    },
+    "rule_yaml": {
+      "type": "string",
+      "maxLength": 20000
+    },
+    "target": {
+      "enum": [
+        "kusto",
+        "splunk",
+        "elasticsearch"
+      ]
+    }
+  },
+  "required": [
+    "target"
+  ]
+}
