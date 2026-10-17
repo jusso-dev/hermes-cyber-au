@@ -1,0 +1,45 @@
+{
+  "type": "object",
+  "required": ["source", "retrieved_at", "cache", "attribution", "untrusted", "warnings", "data"],
+  "properties": {
+    "source": {"const": "auscert"},
+    "source_urls": {"type": "array", "items": {"type": "string"}},
+    "retrieved_at": {"type": "string"},
+    "data_as_of": {"type": ["string", "null"]},
+    "cache": {"enum": ["hit", "miss", "stale", "snapshot"]},
+    "attribution": {"type": "string", "minLength": 1},
+    "untrusted": {"const": true},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "bulletin_id",
+          "kind",
+          "title",
+          "link",
+          "published",
+          "summary",
+          "cvss_max",
+          "cves",
+          "cve_count"
+        ],
+        "properties": {
+          "bulletin_id": {"type": "string", "pattern": "^[A-Z]{3}-\\d{4}\\.\\d+(\\.\\d+)?$"},
+          "kind": {"type": "string"},
+          "title": {"type": "string", "pattern": "^<<untrusted source=auscert>> "},
+          "link": {"type": "string", "pattern": "^https://portal\\.auscert\\.org\\.au/"},
+          "published": {"type": "string"},
+          "summary": {"type": "string"},
+          "cvss_max": {"type": ["number", "null"]},
+          "cves": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^CVE-\\d{4}-\\d{4,}$"}
+          },
+          "cve_count": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@ resolution-markers = [
 members = [
     "cyberau-asd-acsc",
     "cyberau-asd-ism",
+    "cyberau-auscert",
     "cyberau-cisa-kev",
     "cyberau-common",
     "cyberau-first-epss",
@@ -378,6 +379,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-asd-ism"
 version = "0.1.0"
 source = { editable = "asd-ism" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-auscert"
+version = "0.1.0"
+source = { editable = "auscert" }
 dependencies = [
     { name = "cyberau-common" },
 ]
