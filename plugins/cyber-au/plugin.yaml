@@ -1,0 +1,9 @@
+name: cyber-au
+version: "0.1.0"
+manifest_version: 2
+description: "Reports what works, what is missing and how to fix it for the cyber-au profile."
+author: "Justin Middler"
+license: Apache-2.0
+homepage: https://github.com/jusso-dev/hermes-cyber-au
+python_dependencies:
+  - "pyyaml>=6,<7"
