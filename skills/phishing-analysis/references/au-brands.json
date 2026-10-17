@@ -1,0 +1,93 @@
+{
+  "version": "0.1.0",
+  "source": "hermes-cyber-au phishing brand list",
+  "retrieved": "2026-10-17",
+  "note": "Shipped comparison list of public brand domains. Not an official register.",
+  "brands": [
+    {
+      "name": "Australian Taxation Office",
+      "domains": ["ato.gov.au"],
+      "labels": ["ato"]
+    },
+    {
+      "name": "myGov",
+      "domains": ["my.gov.au"],
+      "labels": ["mygov"]
+    },
+    {
+      "name": "Services Australia",
+      "domains": ["servicesaustralia.gov.au"],
+      "labels": ["servicesaustralia"]
+    },
+    {
+      "name": "Australia Post",
+      "domains": ["auspost.com.au"],
+      "labels": ["auspost"]
+    },
+    {
+      "name": "Commonwealth Bank",
+      "domains": ["commbank.com.au", "netbank.com.au"],
+      "labels": ["commbank", "netbank"]
+    },
+    {
+      "name": "Westpac",
+      "domains": ["westpac.com.au"],
+      "labels": ["westpac"]
+    },
+    {
+      "name": "St.George",
+      "domains": ["stgeorge.com.au"],
+      "labels": ["stgeorge"]
+    },
+    {
+      "name": "ANZ",
+      "domains": ["anz.com.au"],
+      "labels": ["anz"]
+    },
+    {
+      "name": "NAB",
+      "domains": ["nab.com.au"],
+      "labels": ["nab"]
+    },
+    {
+      "name": "Macquarie",
+      "domains": ["macquarie.com", "macquarie.com.au"],
+      "labels": ["macquarie"]
+    },
+    {
+      "name": "Bendigo Bank",
+      "domains": ["bendigobank.com.au"],
+      "labels": ["bendigo", "bendigobank"]
+    },
+    {
+      "name": "Bank of Queensland",
+      "domains": ["boq.com.au"],
+      "labels": ["boq"]
+    },
+    {
+      "name": "Suncorp",
+      "domains": ["suncorp.com.au"],
+      "labels": ["suncorp"]
+    },
+    {
+      "name": "ING",
+      "domains": ["ing.com.au"],
+      "labels": ["ing"]
+    },
+    {
+      "name": "Bankwest",
+      "domains": ["bankwest.com.au"],
+      "labels": ["bankwest"]
+    },
+    {
+      "name": "ME Bank",
+      "domains": ["mebank.com.au"],
+      "labels": ["mebank"]
+    },
+    {
+      "name": "ubank",
+      "domains": ["ubank.com.au"],
+      "labels": ["ubank"]
+    }
+  ]
+}
