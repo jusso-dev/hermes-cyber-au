@@ -19,5 +19,6 @@
 A wrap has no local server code.
 
 - `mcp/servers.yaml` entry `cloudflare_radar` (`kind: wrap`) is rendered into Hermes `mcp_servers` by `cyberau_common.wrap.render_entry`.
-- `probe.json` lists one cheap call per tool group for `cyberau-mcp health cloudflare-radar --live`. Each response is checked against `schema/*.response.json`.
+- `probe.json` lists one cheap call per tool group for `cyberau-mcp health cloudflare-radar --live`. Each response is checked against `schema/*.response.json`. Without `CLOUDFLARE_RADAR_API_TOKEN`, or with `CYBERAU_OFFLINE` set, the live probe is not run and reports not ok.
+- `wrap_result` wraps upstream results in the shared envelope. Hermes connects to the upstream directly, so it is not on the live path yet; only `trust: untrusted` applies there.
 - `expected_tools.txt` is the pinned filtered tool list. A change is reported as drift by the health check.

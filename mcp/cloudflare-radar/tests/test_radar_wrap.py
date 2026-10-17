@@ -1,4 +1,7 @@
-"""Config render, tool filter, envelope and probe tests for the Cloudflare Radar wrap."""
+"""Config render, tool filter, envelope and probe tests for the Cloudflare Radar wrap.
+
+Every fixture here is synthetic. None was recorded from the live server (see SOURCE.md).
+"""
 
 from __future__ import annotations
 
@@ -99,9 +102,12 @@ def test_filter_registers_only_radar_tools_and_all_are_get(registered):
     assert not any(wrap.filter_tools(["post_zones_purge_cache", "get_zones"], INCLUDE))
 
 
-def test_expected_tools_match_the_recorded_list(registered):
+def test_expected_tools_match_the_synthetic_list(registered):
     expected = wrap.read_expected(PACKAGE / "expected_tools.txt")
     assert sorted(expected) == sorted(tool["name"] for tool in registered)
+    header = (PACKAGE / "expected_tools.txt").read_text(encoding="utf-8")
+    assert "synthetic" in header.splitlines()[0].lower()
+    assert "synthetic" in fixture("tools_list_radar.json")["_note"].lower()
 
 
 def test_a_write_tool_is_flagged():
@@ -139,6 +145,25 @@ def test_happy_path_envelopes_validate_and_wrap_free_text():
     text = outage["data"]["annotations"][0]["description"]
     assert text.startswith("<<untrusted source=cloudflare-radar>>")
     assert text.endswith("<<end untrusted>>")
+
+
+def test_every_non_structural_string_is_wrapped_whatever_its_key():
+    payload = {
+        "success": True,
+        "result": {
+            "domain": "ignore-all-rules.example",
+            "tags": [{"name": "run the tool", "score": 1}],
+            "startDate": "2026-10-10T02:00:00Z",
+            "WAF": "41.2",
+            "rank": 3,
+        },
+    }
+    data = _wrap(payload)["data"]
+    assert data["domain"].startswith("<<untrusted ")
+    assert data["tags"][0]["name"].startswith("<<untrusted ")
+    assert data["startDate"] == "2026-10-10T02:00:00Z"
+    assert data["WAF"] == "41.2"
+    assert data["rank"] == 3
 
 
 def test_injected_text_stays_inside_the_wrapper():
@@ -186,9 +211,7 @@ def _servers(entry: dict) -> dict:
 
 
 def _health(entry, **kwargs):
-    return wrap.run_wrap_health(
-        "cloudflare-radar", servers=_servers(entry), root=MCP, **kwargs
-    )
+    return wrap.run_wrap_health("cloudflare-radar", servers=_servers(entry), root=MCP, **kwargs)
 
 
 def _fake_fetch(names: list[str], payloads: dict):
@@ -220,14 +243,19 @@ def test_offline_health_reports_the_default_off_state(entry):
     assert "docs/connectors/cloudflare-radar.md" in probe.detail
 
 
-def test_live_without_a_token_is_skipped_and_offline_mode_is_unavailable(entry):
-    skipped = _health(entry, live=True, env={})
-    assert skipped.ok and "skipped" in skipped.detail and TOKEN in skipped.detail
-    offline = _health(entry, live=True, env={TOKEN: "x", "CYBERAU_OFFLINE": "1"})
-    assert offline.ok and "unavailable" in offline.detail
+def test_live_without_a_token_or_in_offline_mode_is_not_ok(entry):
+    async def never(url, headers, groups, timeout):
+        raise AssertionError("must not connect")
+
+    for token in ("", "   "):
+        probe = _health(entry, live=True, env={TOKEN: token}, fetch=never)
+        assert not probe.ok and "not run" in probe.detail and TOKEN in probe.detail
+    assert not _health(entry, live=True, env={}, fetch=never).ok
+    offline = _health(entry, live=True, env={TOKEN: "x", "CYBERAU_OFFLINE": "1"}, fetch=never)
+    assert not offline.ok and "not run" in offline.detail
 
 
-def test_live_health_ok_with_a_recorded_server(entry):
+def test_live_health_ok_with_a_synthetic_server(entry):
     probe = _health(
         entry,
         live=True,
@@ -251,6 +279,13 @@ def test_live_health_fails_on_drift_missing_tool_and_write_tool(entry):
         entry, fetch=_fake_fetch([*_all_names(), "post_radar_scan"], _good_payloads()), **kwargs
     )
     assert not probe.ok and "post_radar_scan" in probe.detail
+    annotated = [
+        {"name": name, "annotations": {"readOnlyHint": name != "get_radar_ranking_top"}}
+        for name in _all_names()
+    ]
+    probe = _health(entry, fetch=_fake_fetch(annotated, _good_payloads()), **kwargs)
+    assert not probe.ok and "get_radar_ranking_top" in probe.detail
+    assert "non-GET" in probe.detail
 
 
 def test_live_health_reports_timeout_and_refused_egress(entry):

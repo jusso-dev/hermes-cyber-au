@@ -1,3 +1,4 @@
+# Synthetic pin: names are guessed from the Radar API, not recorded from the live server.
 # Pinned Radar tool list. Regenerate from a live tools/list with a real token.
 # connector-health opens a drift issue when the live filtered list stops matching.
 get_radar_annotations_outages

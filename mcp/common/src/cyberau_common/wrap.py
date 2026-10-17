@@ -12,6 +12,7 @@ import asyncio
 import fnmatch
 import json
 import os
+import re
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from pathlib import Path
 
@@ -25,10 +26,16 @@ from cyberau_common.secrets import redact
 from cyberau_common.server import Probe
 
 MCP_DIR = Path(__file__).resolve().parents[3]
-FREE_TEXT_KEYS = frozenset({"description", "title", "notes", "comment"})
+# Upstream strings pass through untouched only when they are a number or a timestamp. Every
+# other string is wrapped, whatever its key, so an unlisted free text field cannot slip through.
+_STRUCTURAL = re.compile(
+    r"-?\d+(?:\.\d+)?"
+    r"|\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
+)
 
-# Returns the upstream tool names and one payload per probe group.
-Fetcher = Callable[[str, dict[str, str], list[dict], float], Awaitable[tuple[list[str], dict]]]
+# Returns the upstream tools (a name, or a mapping with ``name`` and ``annotations``) and one
+# payload per probe group.
+Fetcher = Callable[[str, dict[str, str], list[dict], float], Awaitable[tuple[list, dict]]]
 
 
 def load_servers(path: Path | None = None) -> dict:
@@ -131,14 +138,11 @@ def wrap_result(
 
 def _wrap_text(value, source: str):
     if isinstance(value, dict):
-        return {
-            key: untrusted_text(item, source)
-            if key in FREE_TEXT_KEYS and isinstance(item, str)
-            else _wrap_text(item, source)
-            for key, item in value.items()
-        }
+        return {key: _wrap_text(item, source) for key, item in value.items()}
     if isinstance(value, list):
         return [_wrap_text(item, source) for item in value]
+    if isinstance(value, str) and not _STRUCTURAL.fullmatch(value):
+        return untrusted_text(value, source)
     return value
 
 
@@ -185,14 +189,14 @@ def run_wrap_health(
         return Probe(connector, True, f"{state}; offline ok")
     environ = os.environ if env is None else env
     if str(environ.get("CYBERAU_OFFLINE") or "").strip() in {"1", "true"}:
-        return Probe(connector, True, f"{state}; unavailable: CYBERAU_OFFLINE is set")
+        return Probe(connector, False, f"{state}; live probe not run: CYBERAU_OFFLINE is set")
     token_env = entry["token_env"]
     token = str(environ.get(token_env) or "").strip()
     if not token:
-        return Probe(connector, True, f"{state}; live probe skipped: {token_env} is not set")
+        return Probe(connector, False, f"{state}; live probe not run: {token_env} is not set")
     try:
         (policy or _default_policy(connector)).check(entry["url"])
-        names, payloads = asyncio.run(
+        listed, payloads = asyncio.run(
             asyncio.wait_for(
                 (fetch or _mcp_fetch)(
                     entry["url"],
@@ -209,12 +213,13 @@ def run_wrap_health(
         return Probe(connector, False, f"{state}; unavailable: upstream timed out")
     except Exception as exc:  # noqa: BLE001 - probe reports every failure as text
         return Probe(connector, False, f"{state}; {_describe(exc, token_env)}")
-    registered = filter_tools(names, entry["tools"]["include"])
+    tools = [{"name": item} if isinstance(item, str) else dict(item) for item in listed]
+    registered = filter_tools((str(tool.get("name")) for tool in tools), entry["tools"]["include"])
     if not registered:
         return Probe(connector, False, f"{state}; upstream listed no tools matching the filter")
     expected = read_expected(package / "expected_tools.txt")
     missing = sorted(set(expected) - set(registered))
-    unsafe = unsafe_tools({"name": n} for n in registered)
+    unsafe = unsafe_tools(tool for tool in tools if tool.get("name") in registered)
     if unsafe:
         return Probe(connector, False, f"{state}; non-GET tools matched: {', '.join(unsafe)}")
     errors = []
@@ -259,10 +264,20 @@ async def _mcp_fetch(
             for group in groups:
                 result = await session.call_tool(group["tool"], group["arguments"])
                 payloads[group["name"]] = _parse_call(result)
-    return [tool.name for tool in listed.tools], payloads
+    tools = [
+        {
+            "name": tool.name,
+            "annotations": tool.annotations.model_dump() if tool.annotations else {},
+        }
+        for tool in listed.tools
+    ]
+    return tools, payloads
 
 
 def _parse_call(result):
+    if getattr(result, "isError", False):
+        texts = [getattr(item, "text", "") for item in getattr(result, "content", None) or []]
+        raise RuntimeError(f"upstream tool call failed: {' '.join(texts)[:200]}")
     structured = getattr(result, "structuredContent", None)
     if isinstance(structured, dict):
         return structured
