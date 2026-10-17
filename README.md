@@ -103,6 +103,11 @@ It works with no API keys using public sources. Each free key you add (abuse.ch,
 | SOCRadar (company incidents: dark web, leaks, brand and attack surface) | `socradar` | Dark web and leak monitoring | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off: paid, bring your own licence | v1.0 | planned | https://socradar.io/socradar-apis/ |
 | DarkOwl Vision (dark web search) | `darkowl` | Dark web and leak monitoring | `DARKOWL_PUBLIC_KEY`, `DARKOWL_PRIVATE_KEY` | off: paid, bring your own licence | v1.0 | planned | https://support.darkowl.com/knowledge-base/search-api-documentation |
 | Flare threat exposure management (leaked credentials, stealer logs, leak and ransomware sites, dark web, official MCP) | `flare` | Dark web and leak monitoring | `FLARE_API_KEY`, `FLARE_TENANT_ID` (optional) | off: paid, bring your own licence | v0.2 | planned | https://api.docs.flare.io/introduction/getting-started |
+| ASD ACSC alerts, advisories and publications | `asd` | none | on | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
+| Information Security Manual OSCAL catalogue | `ism` | `GITHUB_TOKEN` (optional) | on | [docs/connectors/asd-ism.md](docs/connectors/asd-ism.md) |
+| CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [docs/connectors/cisa-kev.md](docs/connectors/cisa-kev.md) |
+| FIRST EPSS scores | `epss` | none | on | [docs/connectors/first-epss.md](docs/connectors/first-epss.md) |
+| NIST National Vulnerability Database CVE API | `nvd` | `NVD_API_KEY` (optional) | on | [docs/connectors/nvd.md](docs/connectors/nvd.md) |
 <!-- connectors:end -->
 
 Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).
@@ -117,7 +122,7 @@ Teams that already pay for commercial intel can plug it in. First up in v0.2 are
 - Exposure data can contain personal information. It is redacted, kept for 90 days by default, and never sent anywhere automatically. Nothing contacts the OAIC, ASD, victims or vendors for you.
 - An "AU org exposure" skill and a paused alert routine match findings against a watchlist of your own domains, ABNs and brands.
 
-The rows marked "paid, bring your own licence" in the table above are these connectors.
+The paid connectors described in this section are tracked in [docs/research/connectors.md](docs/research/connectors.md) until each one has a connector directory in this checkout.
 
 ## Safety
 
