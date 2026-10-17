@@ -1,0 +1,30 @@
+name: cyber-au
+version: 0.1.0
+manifest_version: 2
+api_version: 1
+description: "In-process tools, audit logging and untrusted-content guards for the cyber-au distribution."
+author: "Justin Middler"
+license: "Apache-2.0"
+homepage: https://github.com/jusso-dev/hermes-cyber-au
+provides_tools:
+  - intel_search
+  - intel_get
+  - intel_add_observation
+  - intel_export_stix
+  - evidence_import
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - on_session_start
+  - on_session_end
+python_dependencies:
+  - "stix2>=3,<4"
+config_schema:
+  audit_log_path:
+    type: str
+    default: ""
+    description: "Override audit log path"
+  untrusted_banner:
+    type: bool
+    default: true
+    description: "Wrap feed content in an untrusted banner"
