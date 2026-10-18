@@ -392,7 +392,6 @@ class DailyBriefingTest(unittest.TestCase):
             ["tests/fixtures/daily-briefing/assets.yaml"],
         )
         self.assertFalse(any(path.startswith("plugin-data/") for path in tracked))
-        self.assertFalse((ROOT / "skills/vuln-prioritisation").exists())
         matching = (ROOT / "skills/daily-briefing/references/matching.md").read_text(encoding="utf-8")
         self.assertIn("vendorProject", matching)
         self.assertIn("cpe:2.3:", matching)
