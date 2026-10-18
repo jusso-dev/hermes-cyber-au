@@ -71,6 +71,7 @@ JOB_DEFINITION_FIELDS = frozenset(
 
 PAUSED_REASON = "Installed from a profile distribution; review it, then resume."
 _MIGRATION_RE = re.compile(r"^(\d{4})_.*\.sql$")
+_STORE_OWNED_RE = re.compile(r"[\"'](\d{4}_[^\"'/]*\.sql)[\"']")
 _TRANSACTION_WORDS = frozenset({"BEGIN", "COMMIT", "ROLLBACK", "END"})
 _LEADING_COMMENTS_RE = re.compile(r"\A(?:\s+|--[^\n]*(?:\n|\Z)|/\*.*?\*/)+", re.DOTALL)
 
@@ -135,10 +136,27 @@ def resolve_migrations(profile: Path, override: Path | None = None) -> Path:
 def list_migrations(directory: Path) -> list[Path]:
     if not directory.is_dir():
         return []
+    owned = _store_owned_migrations(directory)
     found = [
-        path for path in directory.iterdir() if path.is_file() and _MIGRATION_RE.match(path.name)
+        path
+        for path in directory.iterdir()
+        if path.is_file() and _MIGRATION_RE.match(path.name) and path.name not in owned
     ]
     return sorted(found, key=lambda path: path.name)
+
+
+def _store_owned_migrations(directory: Path) -> set[str]:
+    """Names the intel store applies itself when it opens the database.
+
+    ``store/db.py`` lists its own schema files and tracks them in
+    ``schema_version``. They share this directory but are not ours to run: they
+    create tables that already exist and set connection pragmas such as WAL,
+    which SQLite refuses inside a migration transaction.
+    """
+    runner = directory.parent / "db.py"
+    if directory.name != "migrations" or not runner.is_file():
+        return set()
+    return set(_STORE_OWNED_RE.findall(runner.read_text(encoding="utf-8")))
 
 
 def migration_id(name: str) -> str:
