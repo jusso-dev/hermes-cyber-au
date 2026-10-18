@@ -1,6 +1,6 @@
 # STIX 2.1 export
 
-`intel_export_stix` and `cyberau-mcp store export --format stix21` write one STIX 2.1 bundle from the local intel store. The record export (`--format records`, the default) is unchanged and still uses a GREEN ceiling. This page is only the STIX path.
+`intel_export_stix` and `cyberau-mcp store export --format stix21` write one STIX 2.1 bundle from the local intel store. The record export (`--format records`, the default) is unchanged and still uses a GREEN ceiling. This page is only the STIX path. The DuckDB analytics export is described in `docs/intel/duckdb.md`.
 
 Import the same bundle with `cyberau-mcp store import-stix FILE`. Import replays observations into the store. Run it against an empty store to reproduce the exported indicators and verdicts.
 

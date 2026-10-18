@@ -31,7 +31,7 @@ Export is a separate path. `export_records` and `cyberau-mcp store export` omit 
 
 Vulnerabilities have no marking column. Catalogue rows are treated as `CLEAR`. An advisory uses the `default_tlp` of its source.
 
-STIX 2.1 export is described in `docs/intel/stix.md`. DuckDB export is separate work.
+STIX 2.1 export is described in `docs/intel/stix.md`. The DuckDB analytics export (`--format duckdb`, an optional extra) uses the same `GREEN` default ceiling and is described in `docs/intel/duckdb.md`.
 
 ## Retention, backup and public snapshots
 
