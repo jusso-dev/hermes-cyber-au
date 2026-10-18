@@ -104,9 +104,6 @@ env_requires:
   - name: RANSOMWARE_LIVE_API_KEY
     description: "Optional free ransomware.live PRO key. The connector ships disabled."
     required: false
-  - name: CLOUDFLARE_RADAR_API_TOKEN
-    description: "Cloudflare custom token with Account > Radar > Read only."
-    required: false
   - name: HUDSONROCK_API_KEY
     description: "Premium, bring your own licence. Hudson Rock Cavalier API key."
     required: false
