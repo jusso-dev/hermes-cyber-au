@@ -22,7 +22,7 @@ from cyberau_common.regen import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / "ci" / "workflows" / "skill-data-regen.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "skill-data-regen.yml"
 TOKEN = "ghp_supersecretvalue123456"
 
 PINS = {
@@ -223,7 +223,7 @@ def test_workflow_skips_missing_sources_and_pins_actions():
         "cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json"
         in text
     )
-    assert not (ROOT / ".github" / "workflows" / "skill-data-regen.yml").exists()
+    assert WORKFLOW == ROOT / ".github" / "workflows" / "skill-data-regen.yml"
     assert text.count("${{ github.token }}") == 1
     assert "GH_TOKEN: ${{ github.token }}" in text
     for banned in (
@@ -264,7 +264,7 @@ def test_actionlint_on_the_copied_layout():
     workflow_dir.mkdir(parents=True)
     shutil.copy(WORKFLOW, workflow_dir / "skill-data-regen.yml")
     shutil.copy(
-        ROOT / "ci" / "workflows" / "data-update-pr.yml",
+        ROOT / ".github" / "workflows" / "data-update-pr.yml",
         workflow_dir / "data-update-pr.yml",
     )
     completed = subprocess.run(

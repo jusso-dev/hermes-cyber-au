@@ -33,7 +33,7 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 | Roles | `profiles/overlays/` | Watcher, analyst, skeptic, briefer, and librarian. Hermes installs one home, so each role is a separate install plus an overlay. See [profiles/README.md](profiles/README.md). |
 | Routines | `cron/jobs.json`, `scripts/` | Scheduled jobs. Hermes pauses them on install. See [docs/operations/routines.md](docs/operations/routines.md). |
 | Image | `docker/` | `nousresearch/hermes-agent` with this profile installed. See [docker/README.md](docker/README.md). |
-| Automation | `.github/workflows/`, `ci/workflows/` | Checks run on push to `main`. Nightly refresh, connector health, skill data regeneration, dependency bumps, and weekly release files are proposed under `ci/workflows/` until they are copied into `.github/workflows/`. |
+| Automation | `.github/workflows/` | Checks run on every pull request and push to `main`. Nightly intel refresh, connector health, skill data regeneration, weekly dependency and Hermes bumps, and weekly releases run on schedules; data changes arrive as pull requests. |
 
 The Hermes details behind this design (manifest fields, what an update replaces, MCP config, plugin hooks, cron rules) are written up with sources in [docs/research/hermes-structure.md](docs/research/hermes-structure.md).
 

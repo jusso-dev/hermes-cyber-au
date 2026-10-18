@@ -73,7 +73,6 @@ jobs:
             distribution.yaml
             docker/Dockerfile
             tools/hermes_pin.txt
-            ci/workflows/ci.yml
             .github/workflows/ci.yml
             PR_BODY.md
 
@@ -91,7 +90,7 @@ jobs:
       body_file: PR_BODY.md
       labels: "type:task,area:ci,area:release"
       # changed.txt is the scratch list data-update-pr.yml writes before it filters paths.
-      allowed_paths: '^(mcp/uv\.lock|distribution\.yaml|docker/Dockerfile|tools/hermes_pin\.txt|ci/workflows/ci\.yml|\.github/workflows/ci\.yml|PR_BODY\.md|changed\.txt)$'
+      allowed_paths: '^(mcp/uv\.lock|distribution\.yaml|docker/Dockerfile|tools/hermes_pin\.txt|\.github/workflows/ci\.yml|PR_BODY\.md|changed\.txt)$'
     secrets: inherit
     permissions:
       contents: write

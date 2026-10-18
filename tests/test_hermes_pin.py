@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / "ci" / "workflows" / "deps-and-hermes-bump.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "deps-and-hermes-bump.yml"
 PIN_PATH = ROOT / "tools" / "hermes_pin.py"
 
 SHA_PINS = {
@@ -26,7 +26,6 @@ CARRIED = (
     "distribution.yaml",
     "docker/Dockerfile",
     "tools/hermes_pin.txt",
-    "ci/workflows/ci.yml",
     ".github/workflows/ci.yml",
     "PR_BODY.md",
 )
@@ -63,7 +62,7 @@ def _fixture(
         )
     if ci:
         _write(
-            tmp_path / "ci" / "workflows" / "ci.yml",
+            tmp_path / ".github" / "workflows" / "ci.yml",
             "env:\n  HERMES_IMAGE: nousresearch/hermes-agent:v0.22.2   # bumped by deps-and-hermes-bump.yml\n",
         )
     if github_ci:
@@ -77,7 +76,7 @@ def _fixture(
 def test_repository_pin_is_the_current_release():
     assert pin.read_pin(ROOT) == "v0.22.2"
     distribution = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
-    ci = (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'hermes_requires: ">=0.22.2"\n' in distribution
     assert "nousresearch/hermes-agent:v0.22.2" in ci
 
@@ -98,11 +97,11 @@ def test_get_prints_only_the_tag(tmp_path: Path):
 def test_set_updates_every_consumer_and_keeps_the_comment(tmp_path: Path):
     root = _fixture(tmp_path, github_ci=True)
     real_distribution = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
-    real_ci = (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    real_ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     pin.set_pin(root, "v9.9.9")
 
     assert (ROOT / "distribution.yaml").read_text(encoding="utf-8") == real_distribution
-    assert (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8") == real_ci
+    assert (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8") == real_ci
     assert "v9.9.9" not in real_distribution
     assert "v9.9.9" not in real_ci
 
@@ -115,7 +114,7 @@ def test_set_updates_every_consumer_and_keeps_the_comment(tmp_path: Path):
     dockerfile = (root / "docker" / "Dockerfile").read_text(encoding="utf-8")
     assert "ARG HERMES_VERSION=v9.9.9\n" in dockerfile
     assert "FROM nousresearch/hermes-agent:${HERMES_VERSION}\n" in dockerfile
-    for rel in ("ci/workflows/ci.yml", ".github/workflows/ci.yml"):
+    for rel in (".github/workflows/ci.yml",):
         updated = (root / rel).read_text(encoding="utf-8")
         assert (
             "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml"
@@ -131,7 +130,7 @@ def test_set_is_idempotent_for_the_same_tag(tmp_path: Path):
             "tools/hermes_pin.txt",
             "distribution.yaml",
             "docker/Dockerfile",
-            "ci/workflows/ci.yml",
+            ".github/workflows/ci.yml",
         )
     }
     pin.set_pin(root, "v0.22.2")
@@ -142,13 +141,13 @@ def test_set_is_idempotent_for_the_same_tag(tmp_path: Path):
 def test_set_accepts_the_real_distribution_and_ci_formats(tmp_path: Path):
     root = _fixture(tmp_path, dockerfile=True, ci=False)
     shutil.copy(ROOT / "distribution.yaml", root / "distribution.yaml")
-    (root / "ci" / "workflows").mkdir(parents=True)
+    (root / ".github" / "workflows").mkdir(parents=True)
     shutil.copy(
-        ROOT / "ci" / "workflows" / "ci.yml", root / "ci" / "workflows" / "ci.yml"
+        ROOT / ".github" / "workflows" / "ci.yml", root / ".github" / "workflows" / "ci.yml"
     )
     pin.set_pin(root, "v9.9.9")
     distribution = (root / "distribution.yaml").read_text(encoding="utf-8")
-    ci = (root / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    ci = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'hermes_requires: ">=9.9.9"\n' in distribution
     assert "name: cyber-au\n" in distribution
     assert (
@@ -253,7 +252,7 @@ def test_actionlint_is_clean_when_called_workflows_are_present():
         dest = work / ".github" / "workflows"
         dest.mkdir(parents=True)
         for name in ("deps-and-hermes-bump.yml", "ci.yml", "data-update-pr.yml"):
-            source = ROOT / "ci" / "workflows" / name
+            source = ROOT / ".github" / "workflows" / name
             (dest / name).write_text(
                 source.read_text(encoding="utf-8"), encoding="utf-8"
             )
@@ -270,7 +269,7 @@ def test_actionlint_is_clean_when_called_workflows_are_present():
 
 
 def test_no_change_guard_ignores_the_pr_body_so_a_quiet_week_exits_cleanly():
-    text = (ROOT / "ci" / "workflows" / "data-update-pr.yml").read_text(
+    text = (ROOT / ".github" / "workflows" / "data-update-pr.yml").read_text(
         encoding="utf-8"
     )
     # The no-change guard lives in tools/ci/data_update_pr.py, which leaves the

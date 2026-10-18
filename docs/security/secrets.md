@@ -30,4 +30,4 @@ Recorded HTTP cassettes use pytest-recording `filter_headers` for those header n
 
 ## CI
 
-`ci/workflows/ci.yml` runs gitleaks over the full git history. `.gitleaks.toml` allowlists a ticket frontmatter line of the form `key: "slug"`, which is an identifier. A unit test rejects literal credentials in `mcp/servers.yaml`, `config.yaml`, and the rendered config.
+`.github/workflows/ci.yml` runs gitleaks over the full git history. `.gitleaks.toml` allowlists a ticket frontmatter line of the form `key: "slug"`, which is an identifier. A unit test rejects literal credentials in `mcp/servers.yaml`, `config.yaml`, and the rendered config.

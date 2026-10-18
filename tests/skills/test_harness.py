@@ -14,7 +14,7 @@ import harness  # noqa: E402
 
 ROOT = harness.ROOT
 SAMPLE_EVAL = ROOT / "tests" / "skills" / "harness-sample" / "evals.yaml"
-CI = ROOT / "ci" / "workflows" / "ci.yml"
+CI = ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _write_skill(directory: Path, name: str = "sample-skill", **replacements: str) -> Path:

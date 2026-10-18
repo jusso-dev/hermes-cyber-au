@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / "ci" / "workflows" / "nightly-intel-refresh.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "nightly-intel-refresh.yml"
 SCRIPT = ROOT / "tools" / "ci" / "nightly_intel_refresh.py"
 
 _SPEC = importlib.util.spec_from_file_location("nightly_intel_refresh", SCRIPT)

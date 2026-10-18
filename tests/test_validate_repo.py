@@ -30,7 +30,7 @@ class ValidateRepoTest(unittest.TestCase):
         self.assertEqual(self.mod.main(["--root", str(ROOT)]), 0)
 
     def test_workflow_pins_actions_and_has_no_secret(self):
-        text = (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7", text)
         self.assertIn(
             "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
@@ -48,16 +48,18 @@ class ValidateRepoTest(unittest.TestCase):
     def test_workflow_pins_every_action_to_a_full_sha(self):
         import re
 
-        text = (ROOT / "ci" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.MULTILINE)
         self.assertTrue(uses)
         for ref in uses:
             self.assertRegex(ref, r"^[\w./-]+@[0-9a-f]{40}$", ref)
         self.assertNotIn("CYBERAU_PRIVATE_NAMES", text)
 
-    def test_workflow_stays_out_of_github_workflows(self):
-        self.assertTrue((ROOT / "ci" / "workflows" / "ci.yml").is_file())
-        self.assertFalse((ROOT / ".github" / "workflows" / "ci.yml").exists())
+    def test_workflows_live_in_github_workflows(self):
+        self.assertTrue((ROOT / ".github" / "workflows" / "ci.yml").is_file())
+        self.assertFalse((ROOT / "ci" / "workflows").exists())
+        for legacy in ("daily-refresh.yml", "pr.yml"):
+            self.assertFalse((ROOT / ".github" / "workflows" / legacy).exists())
 
     def test_distribution_rejects_a_missing_owned_path(self):
         with self._tree() as root:

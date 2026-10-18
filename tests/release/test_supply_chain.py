@@ -156,7 +156,7 @@ def test_lock_hashes_and_frozen_installs():
     gaps = sbom.registry_hash_gaps(ROOT / "mcp" / "uv.lock")
     assert gaps == []
     offenders = []
-    for directory in (ROOT / ".github" / "workflows", ROOT / "ci" / "workflows"):
+    for directory in (ROOT / ".github" / "workflows", ROOT / ".github" / "workflows"):
         for path in directory.glob("*.yml"):
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
                 if "uv sync" in line and "--frozen" not in line:
@@ -205,7 +205,7 @@ def test_docs_recommend_install_ref_over_main():
 
 
 def test_release_workflow_attests_files_and_image():
-    text = (ROOT / "ci" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
+    text = (ROOT / ".github" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
     pinned = "actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2"
     assert text.count(pinned) == 2
     assert "subject-path: dist/*" in text
@@ -352,5 +352,5 @@ def test_unknown_baseline_is_an_error_not_an_empty_diff(tmp_path: Path):
 
 
 def test_image_steps_wait_for_a_dockerfile():
-    text = (ROOT / "ci" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
+    text = (ROOT / ".github" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
     assert text.count("hashFiles('docker/Dockerfile') != ''") == 2

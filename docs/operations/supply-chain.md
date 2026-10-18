@@ -26,7 +26,7 @@ Direct dependencies in `mcp/pyproject.toml` carry an upper bound. Dependabot ope
 
 ## Attestation
 
-`ci/workflows/weekly-release.yml` is the release job. A maintainer copies it to `.github/workflows/` before GitHub will run it. When it runs, `actions/attest-build-provenance` attests the files in `dist/` after the packaging step has written them. The image is built, pushed and attested only when `docker/Dockerfile` exists, which it does not yet. When the run pushes the container image, the same action attests that image using the digest from `docker push`.
+`.github/workflows/weekly-release.yml` is the release job. When it runs, `actions/attest-build-provenance` attests the files in `dist/` after the packaging step has written them. The image is built, pushed and attested only when `docker/Dockerfile` exists, which it does not yet. When the run pushes the container image, the same action attests that image using the digest from `docker push`.
 
 GitHub Actions produces the attestation from the workflow identity. This repository does not contain a signing key.
 
