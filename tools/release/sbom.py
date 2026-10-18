@@ -93,8 +93,8 @@ def write_sbom(root: Path, dest: Path) -> dict:
                 "--no-dev",
                 "--no-emit-workspace",
                 "--no-header",
-                "--format",
-                "requirements.txt",
+                # No --format: uv 0.6 spells it requirements-txt and later releases
+                # requirements.txt, but every release defaults to that format.
                 "-o",
                 str(requirements),
             ],

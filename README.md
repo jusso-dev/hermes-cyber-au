@@ -39,7 +39,7 @@ The Hermes details behind this design (manifest fields, what an update replaces,
 
 ## Install
 
-`install/install.sh` installs Hermes if needed, then this profile. `main` is not a release tag. Pass `--ref` when you want a tag or commit. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
+`install/install.sh` installs Hermes if needed, then this profile. `main` is not a release tag. For a pinned install, prefer `bash install/install.sh --ref <tag>` with a release tag or commit. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
 
 ```bash
 bash install/install.sh
