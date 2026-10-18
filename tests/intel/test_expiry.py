@@ -124,7 +124,7 @@ def test_aged_feed_advisories_and_epss_history_expire(store_path):
 
     expired = expire_by_age(path=store_path, now=NOW, days=180)
 
-    assert expired == {"advisories": 1, "epss_history": 1}
+    assert expired == {"advisories": 1, "epss_history": 1, "indicators": 0}
     assert _ids(store_path, "advisories") == {"asd:new", "analyst:old"}
     assert "asd:old" not in _ids(store_path, "fts", "ref")
     assert _ids(store_path, "vulnerabilities", "cve_id") == set()
@@ -138,3 +138,45 @@ def test_compact_folds_and_expires(store_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["expired"]["advisories"] == 1
     assert "compacted_observations" in out
+
+
+def test_old_feed_only_iocs_expire_but_shared_and_linked_evidence_stays(store_path):
+    from store.maintenance import apply_retention
+
+    ids = []
+    for index in range(1, 5):
+        ids.append(
+            upsert_indicator(
+                "ipv4",
+                f"203.0.113.{index}",
+                source="feodo-tracker",
+                observed_at="2025-01-01T00:00:00Z",
+                raw=b"old",
+                path=store_path,
+            )
+        )
+    upsert_indicator(
+        "ipv4",
+        "203.0.113.2",
+        source="analyst",
+        observed_at="2025-01-01T00:00:00Z",
+        raw=b"evidence",
+        path=store_path,
+    )
+    conn = open_store(store_path).connection()
+    conn.execute(
+        "INSERT INTO relationships (src_id, rel, dst_id) VALUES (?, 'related', 'case:1')", (ids[2],)
+    )
+    upsert_indicator(
+        "ipv4",
+        "203.0.113.4",
+        source="feodo-tracker",
+        observed_at="2026-10-17T00:00:00Z",
+        raw=b"fresh",
+        path=store_path,
+    )
+    apply_retention(store_path, now=NOW, days=365)
+    assert expire_by_age(path=store_path, now=NOW)["indicators"] == 1
+    assert _ids(store_path, "indicators") == set(ids[1:])
+    assert ids[0] not in _ids(store_path, "fts", "ref")
+    assert expire_by_age(path=store_path, now=NOW)["indicators"] == 0

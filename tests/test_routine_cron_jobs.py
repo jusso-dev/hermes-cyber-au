@@ -422,7 +422,10 @@ class RoutineCronJobsTest(unittest.TestCase):
             _plant_cli(home, 'printf \'%s\\n\' "$*" >> "$HERMES_HOME/calls"\nexit 0\n')
             result = _run_script(home, "cyberau_store_maintenance.sh")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "store maintenance ok: backup, retention, vacuum\n")
+            self.assertEqual(json.loads(result.stdout.splitlines()[0])["files"], 0)
+            self.assertTrue(
+                result.stdout.endswith("store maintenance ok: backup, retention, vacuum\n")
+            )
             self.assertEqual(
                 (home / "calls").read_text(encoding="utf-8").splitlines(),
                 ["store backup", "store compact", "store vacuum"],
@@ -508,6 +511,7 @@ class RoutineCronJobsTest(unittest.TestCase):
 def _plant_profile(home: Path) -> None:
     scripts = home / "scripts"
     scripts.mkdir()
+    shutil.copy2(ROOT / "scripts" / "cyberau_cleanup.py", scripts)
     for name in SCRIPTS:
         dest = scripts / name
         dest.write_bytes((ROOT / "scripts" / name).read_bytes())

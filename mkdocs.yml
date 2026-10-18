@@ -118,6 +118,7 @@ nav:
       - Egress: security/egress.md
       - Secrets: security/secrets.md
   - Operations:
+      - Automatic cleanup: operations/cleanup.md
       - Overview: operations/index.md
       - Shipped routines: operations/routines.md
       - Updating: operations/updating.md

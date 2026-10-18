@@ -54,6 +54,8 @@ def test_writes_a_reference_when_the_skill_directory_exists(tmp_path):
 
 def test_checkout_report_does_not_create_skill_directories(tmp_path):
     before = sorted(path.name for path in (ROOT / "skills").iterdir())
+    regen = ROOT / "mcp" / "asd-ism" / "data" / "regen.json"
+    regen_before = regen.read_bytes() if regen.exists() else None
     destination = tmp_path / "PR_BODY.md"
     completed = subprocess.run(
         [sys.executable, str(SCRIPT), "--root", str(ROOT), "--write", str(destination)],
@@ -71,7 +73,7 @@ def test_checkout_report_does_not_create_skill_directories(tmp_path):
     assert "AU reporting obligations: using mcp/au-regulatory/data" in text
     assert "\u2014" not in text
     assert sorted(path.name for path in (ROOT / "skills").iterdir()) == before
-    assert not (ROOT / "mcp" / "asd-ism" / "data" / "regen.json").exists()
+    assert (regen.read_bytes() if regen.exists() else None) == regen_before
     assert "Wrote PR_BODY.md" in completed.stdout
 
 

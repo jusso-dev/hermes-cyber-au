@@ -2,7 +2,7 @@
 
 Installing this distribution adds thirteen cron jobs: five feed refreshes that run all day, three agent routines, a local software check, two nightly store jobs, the weekly maintenance job and the premium exposure watch. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
 
-On a new install, Hermes stores every new job id as paused. On an update, Hermes refreshes the definition for an id that already exists and keeps that job's pause or resume choice. An id that appears for the first time in a later version starts paused, including on an update.
+On a new install, Hermes stores every new job id as paused. Bootstrap then enables the two local maintenance jobs once: `cyberau-store-expire` and `cyberau-store-maintenance`. They need no model or API key. Other jobs stay paused. On an update, Hermes refreshes definitions and preserves pause choices. See [automatic cleanup](cleanup.md) for retention defaults and protected data.
 
 Times follow `timezone: Australia/Sydney` in `config.yaml`.
 

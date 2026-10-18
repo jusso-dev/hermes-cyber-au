@@ -19,6 +19,15 @@ uv pip install --quiet --python "$HERMES_PYTHON" 'pyyaml>=6,<7' 'stix2>=3,<4'
 /src/install/install.sh --profile cyber-au-ci --offline --no-hermes-install \
   --non-interactive --yes --allow-root
 export CYBERAU_HOME="$HERMES_HOME/profiles/cyber-au-ci"
+"$CYBERAU_HOME/mcp/.venv/bin/python" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+jobs = json.loads((Path(os.environ["CYBERAU_HOME"]) / "cron/jobs.json").read_text())["jobs"]
+enabled = {job["id"] for job in jobs if job.get("enabled")}
+assert enabled == {"cyberau-store-expire", "cyberau-store-maintenance"}, enabled
+PY
 hermes -p cyber-au-ci cyber-au doctor --offline --json
 
 # Hermes's plugin doctor imports a scratch copy. Point it at the installed

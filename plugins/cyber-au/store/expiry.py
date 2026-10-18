@@ -6,7 +6,7 @@ Two kinds of expiry:
   current list on every fetch. After a complete, live fetch, anything that
   source contributed and no longer lists is removed, so the store never keeps
   a C2 address or KEV flag the publisher has withdrawn.
-- Age. Feed advisories and EPSS history older than ``feed_retention_days``
+- Age. Feed advisories, EPSS history and unlinked Feodo-only IOCs older than ``feed_retention_days``
   (``cyber_au.store.feed_retention_days``, default 180) are removed.
 
 Only feed-sourced rows are touched. Analyst rows and other sources stay.
@@ -106,7 +106,7 @@ def expire_by_age(
     now: datetime | None = None,
     days: int | None = None,
 ) -> dict[str, int]:
-    """Delete feed advisories and EPSS history older than the feed window."""
+    """Delete aged feed rows, retaining shared or linked indicator evidence."""
     window = feed_retention_days() if days is None else require_retention_days(days)
     moment = (now or datetime.now(UTC)).astimezone(UTC)
     cutoff = (moment - timedelta(days=window)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -125,7 +125,30 @@ def expire_by_age(
             _delete_advisory(conn, row["id"])
         history = conn.execute("DELETE FROM epss_history WHERE date < ?", (cutoff[:10],)).rowcount
         _drop_feed_only_vulnerabilities(conn, before=cutoff[:10])
-    return {"advisories": len(old), "epss_history": history}
+        # Only the built-in list feed is disposable. Any other source or a
+        # relationship keeps the IOC, even when its feed evidence is old.
+        indicators = [
+            row[0]
+            for row in conn.execute(
+                """
+            SELECT i.id FROM indicators i WHERE i.last_seen < ?
+              AND EXISTS (SELECT 1 FROM observations o WHERE o.indicator_id = i.id
+                          UNION ALL SELECT 1 FROM indicator_counters c WHERE c.indicator_id = i.id)
+              AND NOT EXISTS (SELECT 1 FROM observations o WHERE o.indicator_id = i.id
+                              AND o.source_id != 'feodo-tracker')
+              AND NOT EXISTS (SELECT 1 FROM indicator_counters c WHERE c.indicator_id = i.id
+                              AND c.source_id != 'feodo-tracker')
+              AND NOT EXISTS (SELECT 1 FROM relationships r
+                              WHERE r.src_id = i.id OR r.dst_id = i.id)
+            """,
+                (cutoff,),
+            )
+        ]
+        for indicator_id in indicators:
+            conn.execute("DELETE FROM observations WHERE indicator_id = ?", (indicator_id,))
+            conn.execute("DELETE FROM indicator_counters WHERE indicator_id = ?", (indicator_id,))
+        _drop_orphan_indicators(conn, indicators)
+    return {"advisories": len(old), "epss_history": history, "indicators": len(indicators)}
 
 
 def _delete_advisory(conn, advisory_id: str) -> None:

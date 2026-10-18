@@ -199,14 +199,14 @@ Keep the filled `.env` in the profile directory only. Never commit it. The other
 
 ## 8. Optional: the morning briefing
 
-Scheduled jobs arrive paused, so you choose what runs. List them and resume the 07:30 Sydney briefing by its id:
+Bootstrap enables the two local [cleanup jobs](../operations/cleanup.md). Other scheduled jobs arrive paused, so you choose what runs. List them and resume the 07:30 Sydney briefing by its id:
 
 ```bash
 hermes -p cyber-au cron list
 hermes -p cyber-au cron resume cyberau-morning-brief
 ```
 
-`cron list` on the test container showed twelve jobs, all `[paused]`, including `cyberau-morning-brief`. The resume was not run there because the briefing needs a model. `hermes resume` with no job id lifts the global stop for every job, which is different. More is in [Routines](../operations/routines.md).
+The briefing needs a model and stays paused until resumed. `hermes resume` with no job id lifts the global stop for every job, which is different. More is in [Routines](../operations/routines.md).
 
 ## Docker instead
 

@@ -77,6 +77,9 @@ case " $* " in
     ;;
 esac
 if [ -n "$source_dir" ]; then
+  mkdir -p "$home/scripts" "$home/cron"
+  cp "$source_dir/scripts/cyberau_enable_maintenance.py" "$home/scripts/"
+  cp "$source_dir/cron/jobs.json" "$home/cron/jobs.json"
   mkdir -p "$home/mcp" "$home/plugins/cyber-au" "$home/plugin-data/cyber-au"
   cp "$source_dir/distribution.yaml" "$home/distribution.yaml"
   cp "$source_dir/config.yaml" "$home/config.yaml"
@@ -172,6 +175,9 @@ if [ "${1:-}" = "-C" ]; then
   fi
   if [ "${1:-}" = "checkout" ]; then
     repo=${CYBERAU_REPO:?}
+    mkdir -p "$dest/scripts" "$dest/cron"
+    cp "$repo/scripts/cyberau_enable_maintenance.py" "$dest/scripts/"
+    cp "$repo/cron/jobs.json" "$dest/cron/jobs.json"
     mkdir -p "$dest/install" "$dest/mcp" "$dest/plugins/cyber-au"
     cp "$repo/distribution.yaml" "$dest/distribution.yaml"
     cp "$repo/config.yaml" "$dest/config.yaml"

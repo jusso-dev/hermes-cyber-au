@@ -10,7 +10,7 @@ hermes -p cyber-au cyber-au update
 
 The command does three things, in order:
 
-1. `hermes profile update cyber-au --yes` replaces distribution-owned files. `cron/jobs.json` is merged by job id. A job that is new in this release arrives paused. A job you have already enabled stays enabled. `.env`, `memories/`, the intel store under `plugin-data/cyber-au/`, and your edits to `config.yaml` are kept.
+1. `hermes profile update cyber-au --yes` replaces distribution-owned files. `cron/jobs.json` is merged by job id. A job that is new in this release arrives paused. Bootstrap enables only the two local [maintenance jobs](cleanup.md) once and preserves subsequent manual pauses. A job you have already enabled stays enabled. `.env`, `memories/`, the intel store under `plugin-data/cyber-au/`, and your edits to `config.yaml` are kept.
 2. `install/bootstrap.sh` needs Python 3.11 or newer on `PATH` (it tries `python3`, then `python3.13`, `python3.12` and `python3.11`). It syncs the MCP virtualenv when `uv` is on `PATH`, patches the `mcp_servers` block when the renderer is present, and applies store migrations.
 3. `hermes -p cyber-au cyber-au doctor` reports what is healthy.
 

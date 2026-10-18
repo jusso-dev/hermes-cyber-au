@@ -38,4 +38,5 @@ run_step() {
 run_step backup store backup
 run_step retention store compact
 run_step vacuum store vacuum
+python3 "$script_dir/cyberau_cleanup.py" --profile-home "$profile" --apply
 printf 'store maintenance ok: backup, retention, vacuum\n'

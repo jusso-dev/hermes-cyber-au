@@ -8,8 +8,6 @@ Read-only Australian reporting obligations.
 - Server: `aureg`
 - Default: on
 - Upstream: https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches and the OAIC NDB scheme guide, https://www.cyber.gov.au/report-a-cyber-security-incident, https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf, and the Federal Register of Legislation for the Privacy Act 1988, the Security of Critical Infrastructure Act 2018 and the Cyber Security Act 2024.
-- Verified: 2026-10-17
-- Egress hosts: www.oaic.gov.au, www.cyber.gov.au, www.cisc.gov.au, www.legislation.gov.au
 - Source: `mcp/au-regulatory/src/cyberau_au_regulatory/source.py`
 
 ## Authentication
@@ -337,13 +335,18 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-Commonwealth legislation and government guidance. Short quotes are stored with the source URL, the retrieval date and the SHA-256 of the quoted sentence. This is guidance, not legal advice. The connector is not endorsed by the OAIC, ASD, the ACSC or the Cyber and Infrastructure Security Centre.
+Not stated in `SOURCE.md`.
 
 Attribution returned with each result:
 
 > Quotes are from Commonwealth legislation on the Federal Register of Legislation. This is guidance, not legal advice, and it is not a substitute for reading the Act or getting legal advice. This connector is not endorsed by the OAIC, the Australian Signals Directorate, the Australian Cyber Security Centre or the Cyber and Infrastructure Security Centre.
 
 ## Notes
+
+- Live health uses the Register's published HTML for the Act as made, rather than its JavaScript viewer. It checks source availability and snapshot schema; it does not verify subsequent amendments.
+- Terms: Commonwealth legislation and government guidance. Short quotes are stored with the source URL, the retrieval date and the SHA-256 of the quoted sentence. This is guidance, not legal advice. The connector is not endorsed by the OAIC, ASD, the ACSC or the Cyber and Infrastructure Security Centre.
+- Verified: 2026-10-17
+- Egress hosts: www.oaic.gov.au, www.cyber.gov.au, www.cisc.gov.au, www.legislation.gov.au
 
 Section numbers checked against the register, not by submitting anything to a regulator:
 

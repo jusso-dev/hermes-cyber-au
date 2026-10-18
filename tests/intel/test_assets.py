@@ -193,6 +193,10 @@ def test_coverage_counts_versions_and_match_identifiers(tmp_path: Path, capsys) 
 
 
 def test_local_kev_check_writes_candidate_report(tmp_path: Path, capsys, no_network) -> None:
+    # Freshness is file age. Give this test its own freshly written snapshot,
+    # independent of how long the checkout has existed.
+    kev = tmp_path / "kev.json"
+    kev.write_bytes(KEV.read_bytes())
     path = tmp_path / "assets.yaml"
     assets.write_inventory(
         path,
@@ -209,7 +213,7 @@ def test_local_kev_check_writes_candidate_report(tmp_path: Path, capsys, no_netw
     )
     output = tmp_path / "software-watch.json"
     assert (
-        assets.main(["check", "--inventory", str(path), "--kev", str(KEV), "--output", str(output)])
+        assets.main(["check", "--inventory", str(path), "--kev", str(kev), "--output", str(output)])
         == 0
     )
     report = json.loads(output.read_text(encoding="utf-8"))

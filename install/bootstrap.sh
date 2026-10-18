@@ -244,6 +244,11 @@ require_reference() {
 
 init_store
 
+# Hermes seeds distribution jobs paused. Only these two local, no-agent jobs
+# are enabled automatically; subsequent operator pause choices are preserved.
+"$PYTHON" "$PROFILE_HOME/scripts/cyberau_enable_maintenance.py" \
+  --profile-home "$PROFILE_HOME" --profile "$PROFILE"
+
 run_doctor() {
   if [ -f "$REPO_ROOT/plugins/cyber-au/cli.py" ] && grep -q doctor "$REPO_ROOT/plugins/cyber-au/cli.py"; then
     set +e
