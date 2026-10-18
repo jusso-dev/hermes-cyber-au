@@ -345,7 +345,7 @@ EOF
   [[ "$output" == *"already installed"* ]]
 }
 
-@test "a set key enables nvd without writing the value" {
+@test "an optional nvd key stays a placeholder without disabling the connector" {
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 0 ]
   home="$HOME/.hermes/profiles/cyber-au"
@@ -358,7 +358,7 @@ EOF
 import yaml
 from pathlib import Path
 loaded = yaml.safe_load(Path("$home/config.yaml").read_text())
-assert loaded["mcp_servers"]["nvd"]["enabled"] is True
+assert loaded["mcp_servers"]["nvd"].get("enabled", True) is True
 assert loaded["mcp_servers"]["nvd"]["env"]["NVD_API_KEY"] == "\${NVD_API_KEY}"
 PY
 }
