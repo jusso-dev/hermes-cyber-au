@@ -42,7 +42,6 @@ WINDOW_WARNING = (
     "added_after is older than 30 days. CTIS guidance is to poll indicators at most a month old."
 )
 UNAVAILABLE = "TAXII is unavailable. There is no cached or snapshot copy."
-SAMPLE_WARNING = "Shipped synthetic sample. This is not data from any TAXII server."
 POLL_LIMIT = "TAXII poll limit reached. Stay at or under one poll an hour."
 PAGE_LIMIT = "TAXII page limit reached for this hour."
 ACCEPT = "application/taxii+json;version=2.1"
@@ -100,8 +99,7 @@ def taxii_list_collections() -> dict:
         rows, cache, warning, urls = _list_collections(force_live=False)
     except sqlite3.Error:
         return _envelope([], "snapshot", warnings=("TAXII store could not be read.",))
-    warnings = tuple(item for item in (warning, _sample_note(rows, cache, urls)) if item)
-    return _envelope(rows, cache, warnings=warnings, urls=urls)
+    return _envelope(rows, cache, warnings=(warning,) if warning else (), urls=urls)
 
 
 def taxii_get_objects(
@@ -124,9 +122,6 @@ def taxii_get_objects(
         return _envelope([], "snapshot", warnings=("TAXII store could not be read.",))
     if warning:
         warnings.append(warning)
-    note = _sample_note(rows, cache, urls)
-    if note:
-        warnings.append(note)
     return _envelope(rows, cache, warnings=tuple(warnings), urls=urls, data_as_of=as_of)
 
 
@@ -266,7 +261,7 @@ def _list_collections(*, force_live: bool) -> tuple[list[dict], str, str, list[s
             payload, state = _cached_payload(url, {})
             if payload is not None:
                 return _collections_from_payload(payload, state, "", [url])
-        return _collections_from_payload(*_snapshot_payload("collections.json", "collections"), [])
+        return [], "snapshot", UNAVAILABLE, []
     missing = _missing_env()
     if missing:
         return [], "snapshot", missing, []
@@ -400,12 +395,6 @@ def _page_objects(
     return collected, _merge_cache(caches), warning, saw_more
 
 
-def _sample_note(rows: list[dict], cache: str, urls: list[str]) -> str:
-    if rows and cache == "snapshot" and not urls and not os.environ.get("CYBERAU_TAXII_SNAPSHOT"):
-        return SAMPLE_WARNING
-    return ""
-
-
 def _store_fresh() -> bool:
     with _db() as conn:
         row = conn.execute(
@@ -497,9 +486,6 @@ def _http_json(
         payload, state = _cached_payload(url, params)
         if payload is not None:
             return payload, state, ""
-        filename = _snapshot_name(kind)
-        if (_PACKAGE / "data" / filename).is_file():
-            return _snapshot_payload(filename, kind if kind != "discovery" else "")
         return None, "snapshot", UNAVAILABLE
     missing = _missing_env()
     if missing:
@@ -560,7 +546,10 @@ def _http_json(
 
 
 def _snapshot_payload(filename: str, kind: str) -> tuple[dict | None, str, str]:
-    path = _snapshot_dir() / filename
+    directory = _snapshot_dir()
+    if directory is None:
+        return None, "snapshot", UNAVAILABLE
+    path = directory / filename
     if not path.is_file():
         return None, "snapshot", UNAVAILABLE
     payload, problem = _read_json(path)
@@ -575,6 +564,8 @@ def _snapshot_payload(filename: str, kind: str) -> tuple[dict | None, str, str]:
 
 def _schema_probe(key: str) -> Probe:
     folder = _snapshot_dir()
+    if folder is None:
+        return Probe(key, True, "schema ok, no local copy to check")
     for filename, kind in (("collections.json", "collections"), ("objects.json", "objects")):
         path = folder / filename
         if not path.is_file():
@@ -1093,19 +1084,16 @@ def _offline_objects() -> tuple[dict | None, str, str, list[str]]:
         payload, state = _cached_payload(url, {})
         if payload is not None:
             return payload, state, "", [url]
-    payload, cache, warning = _snapshot_payload("objects.json", "objects")
-    return payload, cache, warning, []
+    return None, "snapshot", UNAVAILABLE, []
 
 
 def _offline() -> bool:
     return os.environ.get("CYBERAU_OFFLINE") == "1"
 
 
-def _snapshot_dir() -> Path:
+def _snapshot_dir() -> Path | None:
     override = os.environ.get("CYBERAU_TAXII_SNAPSHOT")
-    if override:
-        return Path(override)
-    return _PACKAGE / "data"
+    return Path(override) if override else None
 
 
 def _snapshot_name(kind: str) -> str:
