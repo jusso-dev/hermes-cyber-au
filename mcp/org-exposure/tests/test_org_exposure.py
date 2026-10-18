@@ -135,7 +135,7 @@ def test_eval_cases(env, monkeypatch):
     }
     for case in document["cases"]:
         clear_registry()
-        runners[case["id"]](env, monkeypatch, case["required"])
+        runners[case["id"]](env, monkeypatch)
 
 
 def test_leak_claim_is_labelled_unconfirmed_and_not_alerted(env):
@@ -454,22 +454,21 @@ def test_skill_and_shipped_files_omit_the_illustration_abn():
         assert "\u2014" not in text
 
 
-def _eval_no_findings(env, monkeypatch, required):
+def _eval_no_findings(env, monkeypatch):
     source, result = _run_case(env, monkeypatch, _watchlist(), [])
-    assert required["vendor_called"] is True
     assert len(source.seen) == 1
     assert result["data"]["calls"] >= 1
-    assert len(result["data"]["groups"]) == required["groups"]
+    assert len(result["data"]["groups"]) == 0
     assert stored_values() == []
     rendered = json.dumps(result).lower()
     assert "password" not in rendered
 
 
-def _eval_infostealer(env, monkeypatch, required):
+def _eval_infostealer(env, monkeypatch):
     source, result = _run_case(env, monkeypatch, _watchlist(), [_infostealer()])
     assert len(source.seen) == 1
-    assert len(result["data"]["groups"]) == required["groups"]
-    assert result["data"]["groups"][0]["kind"] == required["kind"]
+    assert len(result["data"]["groups"]) == 1
+    assert result["data"]["groups"][0]["kind"] == "infostealer_credential"
     assert stored_values() == [DOMAIN]
     row = result["data"]["groups"][0]["findings"][0]
     assert row["vendor"] == "fixture"
@@ -477,7 +476,7 @@ def _eval_infostealer(env, monkeypatch, required):
     assert "first seen 2026-10-15" in row["line"]
 
 
-def _eval_lookalike(env, monkeypatch, required):
+def _eval_lookalike(env, monkeypatch):
     profile = _watchlist(domains=[], brands=["Harbour"], exclude=["Harbour Logistics"])
     row = _finding(
         "leak_site_claim",
@@ -493,10 +492,9 @@ def _eval_lookalike(env, monkeypatch, required):
     assert result["data"]["groups"] == []
     assert stored_values() == []
     assert "Harbour Logistics" not in json.dumps(result["data"]["groups"])
-    assert required["absent_lookalike"] is True
 
 
-def _eval_third_party(env, monkeypatch, required):
+def _eval_third_party(env, monkeypatch):
     source = Source("fixture", [_infostealer()])
     ransom = Ransom([_infostealer()])
     register_premium_connector(source)
@@ -507,13 +505,12 @@ def _eval_third_party(env, monkeypatch, required):
     result = run_tool({"subject": "Other Fixture Org"}, now=NOW)
     assert source.seen == []
     assert ransom.seen == []
-    assert result["data"]["sent"] is required["sent"]
-    assert result["data"]["confirmation_required"] is required["confirmation_required"]
+    assert result["data"]["sent"] is False
+    assert result["data"]["confirmation_required"] is True
     assert result["data"]["calls"] == 0
     assert result["data"]["would_send"][0]["vendor"] == "fixture"
     assert "Other Fixture Org" in result["data"]["would_send"][0]["names"]
     assert "Nothing was sent" in result["data"]["message"]
-    assert required["discloses_vendor"] is True
     assert stored_values() == []
 
 
