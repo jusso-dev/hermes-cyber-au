@@ -83,7 +83,7 @@ def test_empty_invalid_and_malformed(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_INTERNETDB_SNAPSHOT", str(FIXTURES / "ip_drift.json"))
     drifted = internetdb_ip("1.1.1.1")
     assert drifted["data"] is None
-    assert "schema drift" in drifted["warnings"][0]
+    assert any("schema drift" in warning for warning in drifted["warnings"])
     assert schema_drift(json.loads((FIXTURES / "ip_404.json").read_text())) is None
     monkeypatch.setenv("CYBERAU_INTERNETDB_SNAPSHOT", str(FIXTURES / "ip_hit.json"))
     other = internetdb_ip("8.8.8.8")

@@ -536,8 +536,9 @@ def test_checkout_reports_only_installed_connectors_and_named_gaps(tmp_path: Pat
     releases = json.loads((REPO / "mcp" / "asd-ism" / "data" / "releases.json").read_text())
     newest = max(releases["releases"], key=lambda row: row["published_at"])
     assert newest["tag_name"] in snapshots["snapshot.ism"].detail
-    kev = json.loads((REPO / "mcp" / "cisa-kev" / "data" / "kev.json").read_text())
-    assert kev["catalogVersion"] in snapshots["snapshot.kev"].detail
+    for name in ("kev", "attack"):
+        assert snapshots[f"snapshot.{name}"].status == "warn"
+        assert "no local snapshot" in snapshots[f"snapshot.{name}"].detail
     tools = doctor.check_plugin_tools(ctx)
     assert tools.status == "ok", tools.detail
 
@@ -733,3 +734,27 @@ def test_plugin_imports_without_pyyaml(tmp_path: Path):
         cwd=tmp_path,
     )
     assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.parametrize(
+    "name,connector,filename",
+    [
+        ("kev", "cisa-kev", "kev.json"),
+        ("attack", "mitre-attack", "index.json"),
+    ],
+)
+@pytest.mark.parametrize("content", [None, "{", "{}"])
+def test_live_only_snapshot_absence_warns_but_corruption_fails(
+    tmp_path, name, connector, filename, content
+):
+    root = healthy(tmp_path)
+    directory = root / "mcp" / connector
+    _write(directory / "pyproject.toml", "[project]\n")
+    path = directory / "data" / filename
+    path.unlink(missing_ok=True)
+    if content is not None:
+        _write(path, content)
+    item = ids(run(root))[f"snapshot.{name}"]
+    assert item.status == ("warn" if content is None else "fail")
+    if content is None:
+        assert "no local snapshot" in item.detail

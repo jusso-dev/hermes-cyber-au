@@ -38,7 +38,7 @@ Strategy arguments for `mcp__e8__e8_requirements` are `patch_applications`, `pat
 
 Chapter arguments for `mcp__e8__essentials_chapter` are `enterprise-it`, `cloud`, and `ot`.
 
-Status values are `met`, `partial`, `not met`, `unknown`, and `missing`. Rules are in [scoring](references/scoring.md). Tool behaviour is in [sources](references/sources.md). The renderer input is in [input](references/input.md).
+Status values are `met`, `partial`, `not met`, `unknown`, and `missing`. Local file inventory is in [Essential Eight data](references/e8.md). Rules are in [scoring](references/scoring.md). Tool behaviour is in [sources](references/sources.md). The renderer input is in [input](references/input.md).
 
 Write the workbook from [the csv template](templates/assessment.csv) and [the report template](templates/assessment.md) by running `scripts/render_assessment.py`. The script prints the markdown. With `--out`, it writes both files.
 

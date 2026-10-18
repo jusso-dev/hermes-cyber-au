@@ -876,6 +876,17 @@ def _snapshot_check(ctx: Context, spec: tuple[str, str, tuple[str, ...]]) -> Che
             "not installed",
             f"Install the {label} connector.",
         )
+    optional_files = {
+        "snapshot.kev": ("kev.json",),
+        "snapshot.attack": ("index.json", "manifest.json"),
+    }.get(check_id)
+    if optional_files and not any((directory / "data" / name).exists() for name in optional_files):
+        return _item(
+            check_id,
+            "warn",
+            f"{label} has no local snapshot; live data is required",
+            f"Fetch {label} data when network access is available.",
+        )
     version, day, problem = _read_snapshot(check_id, directory)
     if problem:
         return _item(

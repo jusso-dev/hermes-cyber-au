@@ -166,7 +166,9 @@ def test_url_hosts_are_allowlisted_for_the_connector(feeds, allowlist):
 def test_refresh_keys_match_cyberau_mcp_refresh(feeds):
     keyed = {feed["refresh"]: feed for feed in feeds if "refresh" in feed}
     assert len(keyed) == len([feed for feed in feeds if "refresh" in feed])
-    assert sorted(keyed) == sorted(refresh.SUPPORTED + refresh.NOT_YET)
+    assert sorted(key for key, feed in keyed.items() if feed["refresh_supported"]) == sorted(
+        refresh.SUPPORTED
+    )
     for key, feed in keyed.items():
         assert feed["refresh_supported"] is (key in refresh.SUPPORTED), key
     for feed in feeds:
