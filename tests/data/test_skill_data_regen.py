@@ -303,7 +303,8 @@ def test_workflow_skips_missing_sources_and_pins_actions():
     assert "Skipping regen" not in text
     assert "absent. Skipping" not in text
     for source, spec in SOURCES.items():
-        assert f"cyberau-mcp regen {source} --fetch" in text
+        command = f"cyberau-mcp regen {source}" + (" --fetch" if source != "aureg" else "")
+        assert command in text
         assert spec.data_dir in text
     for gone in ("mcp/e8/", "mcp/aureg/", "mcp/attack/", "mcp/ism/"):
         assert gone not in text
@@ -534,3 +535,10 @@ def test_parser_step_counts_failures_even_when_the_command_exits_nonzero(tmp_pat
     completed, output, _work = _run_parser_step(tmp_path, "auscert failed", 1, payload)
     assert completed.returncode == 0, completed.stderr
     assert "failures=1" in output
+
+
+def test_obligations_workflow_does_not_claim_unsupported_live_refresh():
+    workflow = (ROOT / ".github/workflows/skill-data-regen.yml").read_text()
+    assert "regen aureg --fetch" not in workflow
+    assert "regen aureg" in workflow
+    assert "reviewed reference data" in workflow

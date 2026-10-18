@@ -62,16 +62,13 @@ jobs:
           else
             uv run --project mcp cyberau-mcp regen e8 --fetch
           fi
-      - name: AU reporting obligations (fetched weekly, Mondays Sydney time)
+      - name: AU reporting obligations (reviewed reference data)
         id: aureg
         continue-on-error: true
         run: |
-          set -euo pipefail
-          if [ "$(TZ=Australia/Sydney date +%u)" = "1" ] || [ "${{ inputs.force }}" = "true" ]; then
-            uv run --project mcp cyberau-mcp regen aureg --fetch
-          else
-            uv run --project mcp cyberau-mcp regen aureg
-          fi
+          # These quotes and deadlines require source review. Do not restamp them
+          # or claim a live refresh when only rebuilding the local hash manifest.
+          uv run --project mcp cyberau-mcp regen aureg
       # A source that could not be fetched must not stop the others from opening a
       # pull request. The fetch-failed job below still fails the run.
       - name: Record sources that could not be refreshed
