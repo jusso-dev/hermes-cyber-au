@@ -201,8 +201,17 @@ def organisation_name() -> str:
     return "cyber-au"
 
 
-def resolve_export_path(requested: str, store: str | Path | None = None) -> Path:
-    """Resolve a bundle path and refuse anything outside ``exports``."""
+def resolve_export_path(
+    requested: str,
+    store: str | Path | None = None,
+    *,
+    suffix: str = ".json",
+) -> Path:
+    """Resolve an export path and refuse anything outside ``exports``.
+
+    ``suffix`` is ``.json`` for STIX bundles and ``.duckdb`` for the
+    analytics export.
+    """
     if not isinstance(requested, str) or not requested.strip() or "\x00" in requested:
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
     unresolved = _data_dir(store) / "exports"
@@ -216,8 +225,9 @@ def resolve_export_path(requested: str, store: str | Path | None = None) -> Path
     resolved = candidate.resolve()
     if resolved != root and root not in resolved.parents:
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
-    if resolved.suffix.lower() != ".json":
-        raise ValueError("STIX export file must end in .json")
+    if resolved.suffix.lower() != suffix:
+        label = "STIX export" if suffix == ".json" else "export"
+        raise ValueError(f"{label} file must end in {suffix}")
     if resolved.exists() and resolved.is_dir():
         raise ValueError("export path must be a file")
     return resolved

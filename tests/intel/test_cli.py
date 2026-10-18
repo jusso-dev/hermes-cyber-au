@@ -27,7 +27,6 @@ def test_store_help_and_missing_command(capsys):
     assert "snapshot" in help_text
     assert "vacuum" in help_text
     assert "compact" in help_text
-    assert "duckdb" not in help_text.lower()
     assert main(["store"]) == 2
 
 
@@ -183,5 +182,5 @@ def test_cli_dedupes_exports_and_loads_kev(tmp_path, capsys, monkeypatch):
 def test_unknown_export_format_is_rejected(tmp_path):
     assert main(["store", "export", "--format", "stix", "--path", str(tmp_path / "x.sqlite")]) == 2
     assert (
-        main(["store", "export", "--format", "duckdb", "--path", str(tmp_path / "x.sqlite")]) == 2
+        main(["store", "export", "--format", "parquet", "--path", str(tmp_path / "x.sqlite")]) == 2
     )

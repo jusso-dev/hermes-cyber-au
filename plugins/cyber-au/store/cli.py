@@ -9,6 +9,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from .analytics import DuckDBUnavailable, export_duckdb
 from .api import (
     export_records,
     ingest_kev_catalogue,
@@ -138,20 +139,20 @@ def build_parser() -> argparse.ArgumentParser:
     export = sub.add_parser(
         "export",
         parents=[common],
-        help="Export records or a STIX 2.1 bundle (stix21)",
+        help="Export records, a STIX 2.1 bundle (stix21) or a DuckDB file (duckdb)",
     )
     export.add_argument(
         "--format",
-        choices=("records", "stix21"),
+        choices=("records", "stix21", "duckdb"),
         default="records",
-        help="records (default) or stix21",
+        help="records (default), stix21, or duckdb (needs the analytics extra)",
     )
     export.add_argument("--max-tlp")
     export.add_argument("--kind", action="append", dest="kinds")
     export.add_argument("--since", help="STIX export: records on or after this date")
     export.add_argument(
         "--output",
-        help="STIX bundle .json file under plugin-data/cyber-au/exports/",
+        help="stix21: .json file, duckdb: .duckdb file, under plugin-data/cyber-au/exports/",
     )
     export.set_defaults(func=_cmd_export)
 
@@ -372,8 +373,18 @@ def _cmd_export(args: argparse.Namespace) -> int:
         )
         sys.stdout.write(result["text"])
         return 0
+    if args.format == "duckdb":
+        if args.since or args.kinds:
+            raise ValueError("--since and --kind are not valid with --format duckdb")
+        try:
+            result = export_duckdb(output=args.output, max_tlp=args.max_tlp, store=args.path)
+        except DuckDBUnavailable as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        _emit(result)
+        return 0
     if args.output or args.since:
-        raise ValueError("--output and --since are only valid with --format stix21")
+        raise ValueError("--output needs --format stix21 or duckdb, --since needs stix21")
     kinds = args.kinds if args.kinds else ("indicator", "advisory", "vulnerability")
     records = export_records(kinds=kinds, max_tlp=args.max_tlp, path=args.path)
     _emit(
