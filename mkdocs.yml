@@ -104,8 +104,10 @@ nav:
           - SpyCloud: premium/terms/spycloud.md
           - UpGuard: premium/terms/upguard.md
   - Routines: routines/index.md
+  - Dashboard: dashboard.md
   - Intel store:
       - Overview: intel/index.md
+      - Asset inventory: intel/assets.md
       - Scoring: intel/scoring.md
       - STIX: intel/stix.md
       - Watchlists: intel/watchlists.md
@@ -123,6 +125,7 @@ nav:
   - Contributing: contributing/index.md
   - Reference:
       - Overview: reference/index.md
+      - Review decisions: reference/review-decisions.md
       - Data sources: reference/data-sources.md
       - Hermes structure: research/hermes-structure.md
       - Connector inventory: research/connectors.md

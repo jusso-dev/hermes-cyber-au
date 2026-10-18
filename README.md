@@ -112,8 +112,8 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | OpenPhish community feed. Never requests the URL under test | `phish` | none | off: licence terms | [docs/connectors/openphish.md](docs/connectors/openphish.md) |
 | OSV.dev open source vulnerabilities | `osv` | none | on | [docs/connectors/osv.md](docs/connectors/osv.md) |
 | AlienVault OTX indicators and subscribed pulses | `otx` | `OTX_API_KEY` | on | [docs/connectors/otx.md](docs/connectors/otx.md) |
-| PhishTank verified-online phishing URL database | `phish` | `PHISHTANK_APP_KEY` (optional) | not listed | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
-| Status tool for the shared premium interface. It does not call a vendor | `premium` | none | not listed | [docs/connectors/premium.md](docs/connectors/premium.md) |
+| PhishTank verified-online phishing URL database | `phish` | `PHISHTANK_APP_KEY` (optional) | off: no entry in `mcp/servers.yaml` | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
+| Status tool for the shared premium interface. It does not call a vendor | `premium` | none | off: no entry in `mcp/servers.yaml` | [docs/connectors/premium.md](docs/connectors/premium.md) |
 | Protective Security Policy Framework quotations | `pspf` | none | off: licence terms | [docs/connectors/pspf.md](docs/connectors/pspf.md) |
 | Ransomware.live victim claims for Australia | `ransomlive` | `RANSOMWARE_LIVE_API_KEY` (optional) | off: licence terms | [docs/connectors/ransomware-live.md](docs/connectors/ransomware-live.md) |
 | Recorded Future tools on the shared premium client | `recordedfuture`, `recordedfuture_mcp` | `RECORDED_FUTURE_API_TOKEN` (optional), `RECORDED_FUTURE_ORG_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_SECRET` (optional) | off | [docs/connectors/recorded-future.md](docs/connectors/recorded-future.md) |
