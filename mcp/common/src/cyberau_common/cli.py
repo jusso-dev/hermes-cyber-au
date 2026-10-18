@@ -24,6 +24,13 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "store":
         _configure_logging()
         return _store_command(argv[1:])
+    if argv and argv[0] == "provenance":
+        from cyberau_common.provenance import main as provenance_main
+
+        return provenance_main(argv[1:])
+    if argv and argv[0] == "assets":
+        _configure_logging()
+        return _assets_command(argv[1:])
     if argv and argv[0] == "refresh":
         from cyberau_common.refresh import refresh_main
 
@@ -64,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
     parser_check.add_argument("--json", dest="json_path", default="")
 
     sub.add_parser("store", help="Query and update the local intel store")
+    sub.add_parser("assets", help="Import, list and match the local asset inventory")
+    sub.add_parser("provenance", help="Print the provenance footer for connector results")
 
     # Parsed by refresh_main; listed here for --help.
     sub.add_parser("refresh", help="Refresh public feeds and optionally load the intel store")
@@ -157,6 +166,19 @@ def _store_command(argv: list[str]) -> int:
             return 2
         raise
     return store_main(argv)
+
+
+def _assets_command(argv: list[str]) -> int:
+    root = _plugin_root()
+    if root is None:
+        print("intel store is not installed", file=sys.stderr)
+        return 2
+    entry = str(root)
+    if entry not in sys.path:
+        sys.path.insert(0, entry)
+    from store.assets import main as assets_main
+
+    return assets_main(argv)
 
 
 def _plugin_root() -> Path | None:

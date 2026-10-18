@@ -123,15 +123,18 @@ python3 dashboard/server.py --profile ~/.hermes/profiles/cyber-au
 
 Then open <http://127.0.0.1:8765/>. Without `--profile` it uses `$CYBERAU_PROFILE_HOME`, else `/opt/data/profiles/cyber-au` if that directory exists, else `~/.hermes/profiles/cyber-au`. `--bind` (default `127.0.0.1`) and `--port` (default `8765`) change where it listens. Handoffs come from `<profile>/handoffs.jsonl` or `$CYBERAU_DATA_DIR/handoffs.jsonl`.
 
-The dashboard has no login. Keep it on `127.0.0.1`, or on a homelab publish it only on the LAN or Tailscale address, never the public internet. `dashboard/Dockerfile` builds a container that serves `/opt/data/profiles/cyber-au` on `0.0.0.0:8765` inside the container:
+The Sources page (`/sources`) lists every feed in `feeds/catalogue.yaml` with its server state, whether its key was set at the last bootstrap, last success, last error, item count, data age, cache state and licence. It reads files only. See [docs/dashboard.md](docs/dashboard.md).
+
+The dashboard has no login. Keep it on `127.0.0.1`, or on a homelab publish it only on the LAN or Tailscale address, never the public internet. It answers only requests whose `Host` header is the bind address, `localhost`, `127.0.0.1`, `::1`, or a name given with `--allowed-host` (repeatable) or `CYBERAU_DASHBOARD_ALLOWED_HOSTS` (comma separated). Any other host gets 421, which stops a web page reading it through DNS rebinding. `dashboard/Dockerfile` builds a container that serves `/opt/data/profiles/cyber-au` on `0.0.0.0:8765` inside the container:
 
 ```bash
 docker build -f dashboard/Dockerfile -t cyberau-dashboard .
 docker run -d --name cyberau-dashboard -v /path/to/hermes-data:/opt/data:ro \
+  -e CYBERAU_DASHBOARD_ALLOWED_HOSTS=192.168.1.10 \
   -p 192.168.1.10:8765:8765 cyberau-dashboard
 ```
 
-Replace `192.168.1.10` with the host's LAN or Tailscale address. The container runs as uid 10000, the same user that owns a Hermes home, and the volume should be mounted read-only. Tests: `python3 -m pytest tests/dashboard`.
+Replace `192.168.1.10` with the host's LAN or Tailscale address, in both places, and add any DNS name you browse to. The container runs as uid 10000, the same user that owns a Hermes home, and the volume should be mounted read-only. Tests: `python3 -m pytest tests/dashboard`.
 
 ## Premium feeds (paid, bring your own licence)
 
