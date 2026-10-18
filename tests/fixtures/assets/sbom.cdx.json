@@ -1,0 +1,41 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:00000000-0000-4000-8000-000000000001",
+  "version": 1,
+  "metadata": {
+    "component": {"type": "application", "name": "Billing API", "version": "1.0.0"}
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "examplelib",
+      "version": "2.4.0",
+      "purl": "pkg:pypi/examplelib@2.4.0"
+    },
+    {
+      "type": "library",
+      "group": "com.example",
+      "name": "example-parser",
+      "version": "1.9.3",
+      "purl": "pkg:maven/com.example/example-parser@1.9.3?type=jar#sub/path",
+      "components": [
+        {
+          "type": "library",
+          "name": "tinyzip",
+          "version": "0.4",
+          "supplier": {"name": "Example Compression Pty Ltd"},
+          "cpe": "cpe:2.3:a:examplecompression:tinyzip:0.4:*:*:*:*:*:*:*"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "examplelib",
+      "version": "2.4.0",
+      "purl": "pkg:pypi/examplelib@2.4.0"
+    },
+    {"type": "file", "name": "LICENSE.txt"},
+    {"type": "library", "version": "9.9"}
+  ]
+}

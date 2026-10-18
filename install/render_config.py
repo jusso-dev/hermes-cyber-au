@@ -405,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     _write_if_changed(
         args.status,
-        json.dumps({"missing_env": missing}, indent=2) + "\n",
+        json.dumps({"missing_env": missing, "present_env": sorted(present)}, indent=2) + "\n",
     )
     _print_skipped(skipped)
     _print_missing(missing)

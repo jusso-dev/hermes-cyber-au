@@ -402,3 +402,96 @@ def test_live_server_serves_and_rejects_traversal(profile: Path) -> None:
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+# --- Host and Origin checks (DNS rebinding) ----------------------------------------
+
+
+def _serve(profile: Path, bind: str = "127.0.0.1", allowed: tuple[str, ...] = ()):
+    httpd = server.make_server(profile, bind, 0, allowed)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    return httpd
+
+
+def _raw_get(port: int, headers: dict[str, str]) -> tuple[int, dict[str, str], bytes]:
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.putrequest("GET", "/", skip_host=True)
+        for key, value in headers.items():
+            conn.putheader(key, value)
+        conn.endheaders()
+        resp = conn.getresponse()
+        return resp.status, dict(resp.getheaders()), resp.read()
+    finally:
+        conn.close()
+
+
+@pytest.mark.block_network(allowed_hosts=["127.0.0.1"])
+def test_foreign_host_header_is_refused(profile: Path) -> None:
+    httpd = _serve(profile)
+    try:
+        port = httpd.server_address[1]
+        status, headers, body = _raw_get(port, {"Host": f"attacker.example:{port}"})
+        assert status == 421
+        assert b"Host not allowed" in body
+        assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
+        assert _raw_get(port, {})[0] == 421  # no Host header at all
+        assert _raw_get(port, {"Host": "127.0.0.1.attacker.example"})[0] == 421
+        assert _raw_get(port, {"Host": "localhost:bad"})[0] == 421
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+@pytest.mark.block_network(allowed_hosts=["127.0.0.1"])
+def test_loopback_and_allowed_hosts_are_served(profile: Path) -> None:
+    httpd = _serve(profile, allowed=("192.0.2.10", "dashboard.example.com,[2001:db8::1]"))
+    try:
+        port = httpd.server_address[1]
+        for host in (
+            f"127.0.0.1:{port}",
+            f"localhost:{port}",
+            "LOCALHOST",
+            f"[::1]:{port}",
+            "192.0.2.10:8765",  # Docker can publish a different outside port
+            "dashboard.example.com.",
+            "[2001:db8::1]:8765",
+        ):
+            assert _raw_get(port, {"Host": host})[0] == 200, host
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+@pytest.mark.block_network(allowed_hosts=["127.0.0.1"])
+def test_cross_origin_request_is_refused(profile: Path) -> None:
+    httpd = _serve(profile)
+    try:
+        port = httpd.server_address[1]
+        host = f"127.0.0.1:{port}"
+        assert _raw_get(port, {"Host": host, "Origin": f"http://127.0.0.1:{port}"})[0] == 200
+        assert _raw_get(port, {"Host": host, "Origin": "http://attacker.example"})[0] == 421
+        assert _raw_get(port, {"Host": host, "Origin": "null"})[0] == 421
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_allowed_host_names() -> None:
+    names = server.allowed_host_names("0.0.0.0", ["192.0.2.10", " Dash.Example.COM:8765 "])
+    assert names == {"localhost", "127.0.0.1", "::1", "192.0.2.10", "dash.example.com"}
+    assert "192.0.2.20" in server.allowed_host_names("192.0.2.20")
+    assert server.normalise_host("a b") is None
+    assert server.normalise_host("[::1") is None
+
+
+def test_allowed_hosts_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(server.ALLOWED_HOSTS_ENV, "192.0.2.10, dash.example.com ,")
+    assert server.env_allowed_hosts() == ["192.0.2.10", "dash.example.com"]
+
+
+def test_dockerfile_documents_allowed_hosts() -> None:
+    text = (ROOT / "dashboard" / "Dockerfile").read_text(encoding="utf-8")
+    assert server.ALLOWED_HOSTS_ENV in text
+    assert "dashboard/sources.py" in text

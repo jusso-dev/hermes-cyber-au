@@ -1,0 +1,6 @@
+Asset Name,Hostname,Manufacturer,Product,Version,CPE,Owner Team,Business Criticality,Internet Facing,Environment
+North gateway,gw1.example.com,examplevendor,edgegate,3.0.1,cpe:2.3:a:examplevendor:edgegate:3.0.1:*:*:*:*:*:*:*,platform,Tier 1,yes,IT
+Desk systems,,Exampleos Ltd,Workstation,11,,workplace,medium,no,corporate
+Plant historian,hist1.example.net,examplecontrols,historian server,7.2,,operations,high,no,OT
+Mail relay #2,192.0.2.25,examplemail,relay,,,messaging,low,yes,cloud
+Broken row,,,,,,nobody,low,maybe,it

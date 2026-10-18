@@ -10,6 +10,11 @@ Standard library only (Python 3.11 or later). Run it with:
 
 It binds to 127.0.0.1 by default. Do not publish it on the public internet. It has no
 login. On a homelab, publish the port on the LAN or Tailscale address only.
+
+Every request must name an allowed host in its Host header: the bind address,
+localhost, 127.0.0.1, ::1, or a name given with --allowed-host (or the comma
+separated CYBERAU_DASHBOARD_ALLOWED_HOSTS variable). Anything else gets 421. This
+stops a web page from reading the dashboard through DNS rebinding.
 """
 
 from __future__ import annotations
@@ -25,10 +30,14 @@ from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import unquote, urlsplit
 
 DEFAULT_BIND = "127.0.0.1"
 DEFAULT_PORT = 8765
+ALLOWED_HOSTS_ENV = "CYBERAU_DASHBOARD_ALLOWED_HOSTS"
+LOOPBACK_NAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+WILDCARD_BINDS = frozenset({"", "0.0.0.0", "::"})
 DOCKER_PROFILE = Path("/opt/data/profiles/cyber-au")
 CHAT_COMMAND = "hermes -p cyber-au chat"
 
@@ -42,24 +51,38 @@ REPORT_MAX_BYTES = 1024 * 1024
 HANDOFFS_MAX_BYTES = 4 * 1024 * 1024
 
 SECURITY_HEADERS = {
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'",
+    "Content-Security-Policy": (
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
+        "frame-ancestors 'none'; form-action 'none'"
+    ),
     "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
 
 
-def _load_conversations():
-    path = Path(__file__).with_name("conversations.py")
-    spec = importlib.util.spec_from_file_location("cyberau_dashboard_conversations", path)
+def _load_sibling(filename: str, name: str):
+    path = Path(__file__).with_name(filename)
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise ImportError(str(path))
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclasses look the module up by name
     spec.loader.exec_module(module)
     return module
 
 
-conversations = _load_conversations()
+conversations = _load_sibling("conversations.py", "cyberau_dashboard_conversations")
+sources = _load_sibling("sources.py", "cyberau_dashboard_sources")
+
+
+class SourceSettings(NamedTuple):
+    """Where the Sources page reads from. Unset fields fall back to profile defaults."""
+
+    catalogue: Path | None = None
+    status_files: tuple[Path, ...] = ()
+    data_dir: Path | None = None
 
 
 def default_profile() -> Path:
@@ -424,6 +447,7 @@ def render_index(profile: Path) -> bytes:
     parts = [
         "<h1>Hermes cyber-au dashboard</h1>",
         f"<p>Profile: <code>{esc(profile)}</code></p>",
+        '<p><a href="/sources">Sources: feed freshness and provenance</a></p>',
         '<div class="notice"><p>The morning briefing is set for 07:30 Australia/Sydney. '
         "Jobs do nothing until they are resumed. This page shows what Hermes has recorded. "
         "It does not run anything, and a job listed here has not necessarily run.</p></div>",
@@ -549,10 +573,177 @@ def render_not_found() -> bytes:
     return page("Not found", '<h1>Not found</h1><p><a href="/">Back to the dashboard</a></p>')
 
 
+def data_dir_for(profile: Path, settings: SourceSettings) -> Path:
+    if settings.data_dir is not None:
+        return settings.data_dir
+    env = os.environ.get("CYBERAU_DATA_DIR", "").strip()
+    if env:
+        return Path(env).expanduser()
+    return profile / "plugin-data" / "cyber-au"
+
+
+def catalogue_for(profile: Path, settings: SourceSettings) -> Path | None:
+    if settings.catalogue is not None:
+        return settings.catalogue if settings.catalogue.is_file() else None
+    here = Path(__file__).resolve().parent
+    for candidate in (
+        profile / "feeds" / "catalogue.yaml",
+        here / "feeds" / "catalogue.yaml",
+        here.parent / "feeds" / "catalogue.yaml",
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def status_files_for(profile: Path, settings: SourceSettings, catalogue: Path | None) -> list[Path]:
+    if settings.status_files:
+        return list(settings.status_files)
+    data_dir = data_dir_for(profile, settings)
+    found = [data_dir / name for name in sources.STATUS_NAMES]
+    if catalogue is not None:
+        found.append(catalogue.parent / "status.json")
+    return [path for path in found if path.is_file()]
+
+
+def render_sources(profile: Path, settings: SourceSettings) -> bytes:
+    catalogue = catalogue_for(profile, settings)
+    rows, notes = sources.collect(
+        profile,
+        catalogue=catalogue,
+        status_files=status_files_for(profile, settings, catalogue),
+        data_dir=data_dir_for(profile, settings),
+    )
+    parts = [
+        '<p><a href="/">Back to the dashboard</a></p>',
+        "<h1>Sources</h1>",
+        "<p>Each feed in the catalogue, whether its server is enabled, whether its key was "
+        "set at the last bootstrap, the last successful refresh, the item count and the "
+        "age of the data. Overdue means the last success is older than twice the poll "
+        "interval. For ASD, age uses the oldest member feed, and a missing feed is "
+        "reported as an error. This page reads files only. It never calls a feed.</p>",
+    ]
+    for note in notes:
+        parts.append(f'<p class="muted">{esc(note)}</p>')
+    if catalogue is not None:
+        parts.append(f'<p class="muted">Catalogue: <code>{esc(catalogue)}</code></p>')
+    if rows:
+        cells = []
+        for row in rows:
+            error = truncate(row.last_error, ERROR_LIMIT) if row.last_error else ""
+            cells.append(
+                "<tr>"
+                f"<td><code>{esc(row.id)}</code><br>{esc(row.name)}</td>"
+                f"<td>{esc(row.enabled)}</td>"
+                f"<td>{esc(row.key)}</td>"
+                f"<td>{esc(row.state)}</td>"
+                f"<td>{esc(row.last_success or 'never')}</td>"
+                f"<td>{esc(row.age)}</td>"
+                f"<td>{esc(row.poll or '-')}</td>"
+                f"<td>{esc(row.items if row.items is not None else '-')}</td>"
+                f"<td>{esc(row.data_as_of or '-')}</td>"
+                f"<td>{esc(row.cache)}</td>"
+                f"<td>{esc(error)}</td>"
+                f"<td>{esc(truncate(row.licence, CLAIM_LIMIT))}</td>"
+                f"<td>{esc(', '.join(row.origins) or '-')}</td>"
+                "</tr>"
+            )
+        parts.append(
+            "<table><thead><tr><th>Source</th><th>Server</th><th>Key</th><th>State</th>"
+            "<th>Last success</th><th>Age</th><th>Poll</th><th>Items</th><th>Data as of</th>"
+            "<th>Cache</th><th>Last error</th><th>Licence</th><th>Read from</th></tr></thead>"
+            "<tbody>" + "".join(cells) + "</tbody></table>"
+        )
+    parts.append(
+        '<p class="muted">Read-only view. Key state comes from bootstrap-status.json. '
+        "The profile .env is never opened.</p>"
+    )
+    return page("Sources", "\n".join(parts))
+
+
+# --- host checks --------------------------------------------------------------------
+
+_HOST_NAME_RE = re.compile(r"[a-z0-9._-]+|[0-9a-f:.]+")
+
+
+def normalise_host(value: str | None) -> str | None:
+    """Host name from a Host header value (port and IPv6 brackets removed), or None."""
+    if value is None:
+        return None
+    text = value.strip().lower()
+    if not text or any(ch.isspace() for ch in text):
+        return None
+    if text.startswith("["):
+        end = text.find("]")
+        if end == -1:
+            return None
+        name, rest = text[1:end], text[end + 1 :]
+        if rest and not (rest.startswith(":") and rest[1:].isdigit()):
+            return None
+    elif text.count(":") == 1:
+        name, port = text.split(":", 1)
+        if not port.isdigit():
+            return None
+    elif ":" in text:
+        name = text  # a bare IPv6 address, as an allowed-host entry may be written
+    else:
+        name = text
+    name = name.rstrip(".")
+    if not name or not _HOST_NAME_RE.fullmatch(name):
+        return None
+    return name
+
+
+def allowed_host_names(bind: str, extra: list[str] | tuple[str, ...] = ()) -> frozenset[str]:
+    """Loopback names, the bind address unless it is a wildcard, and operator extras."""
+    names = set(LOOPBACK_NAMES)
+    bound = normalise_host(bind) if bind not in WILDCARD_BINDS else None
+    if bound:
+        names.add(bound)
+    for item in extra:
+        for part in str(item).split(","):
+            name = normalise_host(part)
+            if name:
+                names.add(name)
+    return frozenset(names)
+
+
+def env_allowed_hosts() -> list[str]:
+    raw = os.environ.get(ALLOWED_HOSTS_ENV, "")
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+def request_allowed(headers, allowed: frozenset[str]) -> bool:
+    """True when the Host header, and the Origin header if sent, name an allowed host."""
+    hosts = headers.get_all("Host") or []
+    if len(hosts) != 1 or normalise_host(hosts[0]) not in allowed:
+        return False
+    origin = headers.get("Origin")
+    if origin is None:
+        return True
+    try:
+        parts = urlsplit(origin.strip())
+    except ValueError:
+        return False
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        return False
+    return normalise_host(parts.hostname) in allowed
+
+
+def render_misdirected() -> bytes:
+    return page(
+        "Host not allowed",
+        "<h1>Host not allowed</h1><p>This dashboard only answers requests addressed to "
+        "the host it was started on. Add the name with <code>--allowed-host</code>.</p>",
+    )
+
+
 # --- routing ------------------------------------------------------------------------
 
 
-def route(profile: Path, raw_path: str) -> tuple[int, bytes]:
+def route(
+    profile: Path, raw_path: str, settings: SourceSettings | None = None
+) -> tuple[int, bytes]:
     """Map a request target to (status, HTML body). Never raises for a bad request."""
     try:
         path = unquote(urlsplit(raw_path).path)
@@ -564,6 +755,8 @@ def route(profile: Path, raw_path: str) -> tuple[int, bytes]:
 
     if not segments and path == "/":
         return 200, render_index(profile)
+    if segments == ["sources"] and path == "/sources":
+        return 200, render_sources(profile, settings or SourceSettings())
     if len(segments) == 2 and segments[0] == "latest":
         latest = latest_report(profile, segments[1])
         if latest is not None:
@@ -588,16 +781,23 @@ def route(profile: Path, raw_path: str) -> tuple[int, bytes]:
     return 404, render_not_found()
 
 
-def make_handler(profile: Path) -> type[BaseHTTPRequestHandler]:
+def make_handler(
+    profile: Path,
+    allowed: frozenset[str] = LOOPBACK_NAMES,
+    settings: SourceSettings | None = None,
+) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "CyberAuDashboard"
         sys_version = ""
 
         def _send(self, head_only: bool) -> None:
-            try:
-                status, body = route(profile, self.path)
-            except Exception:  # keep the server alive; show nothing internal
-                status, body = 500, page("Error", "<h1>Something went wrong</h1>")
+            if not request_allowed(self.headers, allowed):
+                status, body = HTTPStatus.MISDIRECTED_REQUEST.value, render_misdirected()
+            else:
+                try:
+                    status, body = route(profile, self.path, settings)
+                except Exception:  # keep the server alive; show nothing internal
+                    status, body = 500, page("Error", "<h1>Something went wrong</h1>")
             self.send_response(status)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -624,8 +824,15 @@ def make_handler(profile: Path) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def make_server(profile: Path, bind: str, port: int) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer((bind, port), make_handler(profile))
+def make_server(
+    profile: Path,
+    bind: str,
+    port: int,
+    allowed_hosts: list[str] | tuple[str, ...] = (),
+    settings: SourceSettings | None = None,
+) -> ThreadingHTTPServer:
+    allowed = allowed_host_names(bind, list(allowed_hosts))
+    return ThreadingHTTPServer((bind, port), make_handler(profile, allowed, settings))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -633,10 +840,40 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", type=Path, default=None, help="Hermes profile directory")
     parser.add_argument("--bind", default=DEFAULT_BIND, help=f"address (default {DEFAULT_BIND})")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="port (default 8765)")
+    parser.add_argument(
+        "--allowed-host",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=(
+            "extra host name or address the Host header may carry, such as the LAN or "
+            f"Tailscale address. Repeat it, or set {ALLOWED_HOSTS_ENV} (comma separated)"
+        ),
+    )
+    parser.add_argument("--catalogue", type=Path, default=None, help="feeds/catalogue.yaml path")
+    parser.add_argument(
+        "--feed-status",
+        type=Path,
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="refresh status JSON written by cyberau-mcp refresh --status. Repeat for more",
+    )
+    parser.add_argument(
+        "--data-dir", type=Path, default=None, help="plugin data directory (CYBERAU_DATA_DIR)"
+    )
     args = parser.parse_args(argv)
     profile = (args.profile or default_profile()).expanduser()
-    server = make_server(profile, args.bind, args.port)
+    extra = [*env_allowed_hosts(), *args.allowed_host]
+    settings = SourceSettings(
+        catalogue=args.catalogue.expanduser() if args.catalogue else None,
+        status_files=tuple(path.expanduser() for path in args.feed_status),
+        data_dir=args.data_dir.expanduser() if args.data_dir else None,
+    )
+    server = make_server(profile, args.bind, args.port, extra, settings)
     print(f"Serving {profile} on http://{args.bind}:{server.server_address[1]}/", flush=True)
+    names = sorted(allowed_host_names(args.bind, extra))
+    print(f"Allowed hosts: {', '.join(names)}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
