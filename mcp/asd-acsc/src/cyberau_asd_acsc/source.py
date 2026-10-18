@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
-from cyberau_common.envelope import envelope, untrusted_text
+from cyberau_common.envelope import envelope, safe_url, untrusted_text
 from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
@@ -778,7 +778,7 @@ def _public(item: dict) -> dict:
         "id": item["id"],
         "feed": item["feed"],
         "title": untrusted_text(str(item.get("title") or ""), "asd"),
-        "link": item["link"],
+        "link": safe_url(item["link"]),
         "published": item.get("published") or "",
         "summary": untrusted_text(str(item.get("summary") or ""), "asd"),
         "cves": cves,
@@ -795,7 +795,7 @@ def _public_page(url: str, page: dict) -> dict:
         "body": untrusted_text(page["body"], "asd"),
         "cves": page["cves"],
         "attack_ids": page["attack_ids"],
-        "links": page["links"],
+        "links": [link for link in map(safe_url, page["links"]) if link],
     }
 
 

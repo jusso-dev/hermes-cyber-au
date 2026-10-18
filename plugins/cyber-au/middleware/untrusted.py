@@ -2,7 +2,14 @@
 
 Text from a feed connector can inform an answer. It cannot steer a later write
 or outbound tool. Middleware marks those results. The pre_tool_call hook blocks
-the later call unless the person has approved it in this session.
+the later call unless the person has approved that exact call.
+
+Approval is per action. A blocked call is recorded as a pending action (tool name
+plus a hash of its arguments) with a random one-time code, and the block message
+shows the action and the code. Only the person's own message (pre_llm_call
+user_message, never tool or feed text) that names the code approves it. The
+approval covers that one call once, lapses when the next turn starts or after
+_APPROVAL_TTL seconds, and is never stored for an empty session id.
 
 Hermes calls tool_execution middleware with the tool payload and a single-use
 next_call (hermes_cli/middleware.py). pre_tool_call blocks with
@@ -12,10 +19,14 @@ next_call (hermes_cli/middleware.py). pre_tool_call blocks with
 from __future__ import annotations
 
 import base64
+import hashlib
 import html
 import json
 import logging
 import re
+import secrets
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,8 +41,12 @@ BANNER = (
 )
 BLOCK_MESSAGE = (
     "Blocked because the previous feed result in this turn was flagged as "
-    "possible injection. A write or outbound tool stays blocked until you "
-    "approve it in this session."
+    "possible injection. A write or outbound tool stays blocked until the person "
+    "approves that exact call."
+)
+_PENDING_MESSAGE = (
+    " Pending action: {tool} with arguments {args}. Show the person this action. "
+    "To allow this one call, the person replies with: approve {code}"
 )
 _WARNING = "possible_injection"
 _WARNING_LINE = 'warnings: ["possible_injection"]'
@@ -152,17 +167,27 @@ _NEGATION = re.compile(
     r"\b(?:not|no|never|don't|dont|cannot|can't|cant|without|unless|if|but|except|stop|cancel)\b"
 )
 _ALLOWED_ACTIONS = re.compile(r"allowed actions\s*:", re.IGNORECASE)
+# Phrases that confirm a displayed pending action. Each must be followed by its code.
 _APPROVALS = {
+    "approve",
+    "approved",
     "i approve",
     "i approve this",
-    "approved",
+    "i approve action",
+    "approve action",
     "you have my approval",
     "permission granted",
     "approve the outbound action",
 }
+_CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+_CODE_LEN = 8
+_CODE = re.compile(rf"^[{_CODE_ALPHABET}]{{{_CODE_LEN}}}$")
+_APPROVAL_TTL = 600.0
+_MAX_PENDING = 8
+_ARGS_PREVIEW = 8192
 
 _servers: set[str] | None = None
-_approved: set[str] = set()
+_lock = threading.Lock()
 
 
 @dataclass
@@ -171,18 +196,72 @@ class _TurnState:
     hosts: set[str] = field(default_factory=set)
 
 
+@dataclass
+class _Action:
+    tool: str
+    digest: str
+    created: float
+    generation: int = 0
+    turn_id: str = ""
+
+
 _turns: dict[tuple[str, str], _TurnState] = {}
+# session -> code -> blocked action waiting for the person
+_pending: dict[str, dict[str, _Action]] = {}
+# session -> approved actions, each good for one call in the turn it was given
+_grants: dict[str, list[_Action]] = {}
+# session -> (turn generation, marker of the person's latest message)
+_generations: dict[str, tuple[int, str]] = {}
 
 
 def reset_state() -> None:
-    """Clear turn flags and session approvals."""
-    _turns.clear()
-    _approved.clear()
+    """Clear turn flags, pending actions and approvals."""
+    with _lock:
+        _turns.clear()
+        _pending.clear()
+        _grants.clear()
+        _generations.clear()
 
 
-def approve_session(session_id: str) -> None:
-    """Record that the person approved outbound actions for this session."""
-    _approved.add(session_id or "")
+def action_digest(tool_name: str, args: object) -> str:
+    """Stable hash of a tool call: tool name plus canonical JSON arguments."""
+    try:
+        body = json.dumps(args or {}, sort_keys=True, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        body = repr(args)
+    raw = f"{(tool_name or '').lower()}\n{body}".encode("utf-8", errors="replace")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def pending_actions(session_id: str) -> dict[str, tuple[str, str]]:
+    """Code to (tool name, argument digest) for blocked calls waiting on the person."""
+    with _lock:
+        _expire(session_id, time.monotonic())
+        return {
+            code: (action.tool, action.digest)
+            for code, action in _pending.get(session_id, {}).items()
+        }
+
+
+def approve_action(session_id: str, code: str, *, turn_id: str = "") -> bool:
+    """Approve one pending action by its code. False when there is nothing to approve.
+
+    The approval is single use and lapses when the next turn starts. Empty session
+    ids never hold an approval.
+    """
+    if not session_id:
+        return False
+    wanted = (code or "").strip().lower()
+    with _lock:
+        now = time.monotonic()
+        _expire(session_id, now)
+        action = _pending.get(session_id, {}).pop(wanted, None)
+        if action is None:
+            return False
+        generation = _generations.get(session_id, (0, ""))[0]
+        grant = _Action(action.tool, action.digest, now, generation, turn_id)
+        _grants.setdefault(session_id, []).append(grant)
+        return True
 
 
 def prompt_states_allowed_actions(prompt: str) -> bool:
@@ -231,7 +310,22 @@ def annotate_result(tool_name: str, result: object, *, session_id: str, turn_id:
     if flagged:
         state.flagged = True
     state.hosts.update(_source_hosts(result))
-    return _apply_banner(result, flagged)
+    return _apply_banner(_defuse(result), flagged)
+
+
+def _defuse(result: object) -> object:
+    """Break wrapper-marker look-alikes in feed text outside real wrappers.
+
+    Connector envelopes are already hardened. Wrapped upstream MCP servers (GitHub,
+    Cloudflare Radar, remote vendor servers) are not, so this is their backstop.
+    """
+    if not isinstance(result, (str, dict, list)):
+        return result
+    try:
+        from cyberau_common.envelope import harden_data
+    except ImportError:
+        return result
+    return harden_data(result)
 
 
 def tool_execution(
@@ -264,16 +358,21 @@ def pre_tool_call(
     turn_id: str = "",
     **kwargs: Any,
 ) -> dict | None:
-    """Block a write or outbound tool after a flagged feed result in this turn."""
+    """Block a write or outbound tool after a flagged feed result in this turn.
+
+    A call passes only when the person approved this exact call (same tool, same
+    arguments) in the current turn. The approval is used up by that one call.
+    """
     try:
         session = session_id or task_id or str(kwargs.get("session_id") or "")
-        if session in _approved:
-            return None
+        payload = args or {}
         if not _state(session, turn_id).flagged:
             return None
-        if _outbound(tool_name, args or {}, session, turn_id):
-            return {"action": "block", "message": BLOCK_MESSAGE}
-        return None
+        if not _outbound(tool_name, payload, session, turn_id):
+            return None
+        if _use_grant(session, tool_name, payload, turn_id):
+            return None
+        return {"action": "block", "message": _block_message(session, tool_name, payload)}
     except Exception:
         logger.exception("untrusted pre_tool_call failed")
         if _outbound_name(tool_name or ""):
@@ -312,25 +411,40 @@ def pre_llm_call(
     task_id: str = "",
     **kwargs: Any,
 ) -> None:
-    """Treat a short approval from the person as session approval."""
-    del kwargs
+    """Start a new turn and approve the one pending action the person names by code.
+
+    Only the person's own message reaches this hook, so text in a tool result or a
+    feed item cannot approve anything. A bare "approved" names no action and
+    approves nothing.
+    """
     try:
         session = session_id or task_id or ""
-        if _message_approves(user_message or ""):
-            _approved.add(session)
+        if not session:
+            return None
+        turn_id = str(kwargs.get("turn_id") or "")
+        _next_generation(session, turn_id, user_message or "")
+        code = _approval_code(user_message or "")
+        if code:
+            if approve_action(session, code, turn_id=turn_id):
+                # Approval arrives in a new turn. Keep the guard active there
+                # so this grant is consumed and cannot unlock other actions.
+                _state(session, turn_id).flagged = True
     except Exception:
         logger.exception("untrusted pre_llm_call failed")
     return None
 
 
 def on_session_start(session_id: str = "", task_id: str = "", **kwargs: Any) -> None:
-    """Drop approval and flags when a session starts."""
+    """Drop approvals, pending actions and flags when a session starts."""
     del kwargs
     try:
         session = session_id or task_id or ""
-        _approved.discard(session)
-        for key in [key for key in _turns if key[0] == session]:
-            del _turns[key]
+        with _lock:
+            _pending.pop(session, None)
+            _grants.pop(session, None)
+            _generations.pop(session, None)
+            for key in [key for key in _turns if key[0] == session]:
+                del _turns[key]
     except Exception:
         logger.exception("untrusted on_session_start failed")
     return None
@@ -405,6 +519,10 @@ def _hostile(result: object) -> bool:
     body: object = result
     if payload is not None:
         body = payload.get("data") if "data" in payload else payload
+        # Warnings can carry upstream error text, so they are feed text too.
+        warnings = [item for item in _warning_list(payload.get("warnings")) if item != _WARNING]
+        if any(detect_possible_injection(item) for item in warnings):
+            return True
     if not isinstance(body, (dict, list)):
         return detect_possible_injection(body if isinstance(body, str) else _as_text(body))
     strings = _strings(body)
@@ -591,17 +709,122 @@ def _outbound(tool_name: str, args: object, session_id: str, turn_id: str) -> bo
     return False
 
 
-def _message_approves(message: str) -> bool:
+def _approval_code(message: str) -> str:
+    """The code in a short approval message, or "" when the message is not one.
+
+    The message must be an approval phrase followed by exactly one code, with no
+    negation and nothing else. "approved" on its own names no action.
+    """
     text = " ".join(message.split()).casefold().replace("’", "'").rstrip(".!")
-    if not text or len(text) > 160:
-        return False
+    if not text or len(text) > 80:
+        return ""
     if _NEGATION.search(text):
+        return ""
+    if "<<" in text or "untrusted" in text or _WARNING in text:
+        return ""
+    phrase, _sep, code = text.rpartition(" ")
+    code = code.strip("\"'`:")
+    phrase = phrase.rstrip(" :,")
+    if not _CODE.match(code) or phrase not in _APPROVALS:
+        return ""
+    return code
+
+
+def _new_code(taken: dict[str, _Action]) -> str:
+    while True:
+        code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LEN))
+        if code not in taken:
+            return code
+
+
+def _preview(args: object) -> str | None:
+    try:
+        from cyberau_common.audit import redact_value
+
+        payload = json.loads(json.dumps(args or {}, default=str))
+        text = json.dumps(redact_value(payload), sort_keys=True, ensure_ascii=False)
+    except (ImportError, TypeError, ValueError):
+        return None
+    text = _INVISIBLE.sub("", text)
+    if len(text) > _ARGS_PREVIEW:
+        return None
+    return text
+
+
+def _block_message(session: str, tool_name: str, args: object) -> str:
+    """Record the blocked call as a pending action and say how to approve it."""
+    if not session:
+        return BLOCK_MESSAGE + " This session has no id, so the call cannot be approved here."
+    preview = _preview(args)
+    if preview is None:
+        return BLOCK_MESSAGE + (
+            " The full redacted arguments cannot be displayed safely."
+            " Reduce the action before requesting approval."
+        )
+    digest = action_digest(tool_name, args)
+    with _lock:
+        now = time.monotonic()
+        _expire(session, now)
+        waiting = _pending.setdefault(session, {})
+        code = next(
+            (
+                key
+                for key, item in waiting.items()
+                if item.tool == tool_name and item.digest == digest
+            ),
+            "",
+        )
+        if not code:
+            while len(waiting) >= _MAX_PENDING:
+                oldest = min(waiting, key=lambda key: waiting[key].created)
+                del waiting[oldest]
+            code = _new_code(waiting)
+            waiting[code] = _Action(tool_name, digest, now)
+    return BLOCK_MESSAGE + _PENDING_MESSAGE.format(tool=tool_name, args=preview, code=code)
+
+
+def _use_grant(session: str, tool_name: str, args: object, turn_id: str) -> bool:
+    """Use up an approval for this exact call in this turn. True when one was found."""
+    if not session:
         return False
-    if "<<untrusted" in text or _WARNING in text:
-        return False
-    if text in _APPROVALS:
-        return True
-    return text.startswith("i approve ")
+    digest = action_digest(tool_name, args)
+    with _lock:
+        _expire(session, time.monotonic())
+        grants = _grants.get(session) or []
+        for index, grant in enumerate(grants):
+            if grant.tool != tool_name or grant.digest != digest:
+                continue
+            if grant.turn_id and turn_id and grant.turn_id != turn_id:
+                continue
+            del grants[index]
+            return True
+    return False
+
+
+def _next_generation(session: str, turn_id: str, message: str) -> None:
+    """A new person message (or turn id) starts a new turn and drops older approvals."""
+    marker = turn_id or hashlib.sha256(message.encode("utf-8", errors="replace")).hexdigest()
+    with _lock:
+        generation, last = _generations.get(session, (0, ""))
+        if marker != last:
+            _generations[session] = (generation + 1, marker)
+            _grants.pop(session, None)
+
+
+def _expire(session: str, now: float) -> None:
+    """Drop stale pending actions and approvals. The caller holds _lock."""
+    waiting = _pending.get(session)
+    if waiting:
+        for code in [key for key, item in waiting.items() if now - item.created > _APPROVAL_TTL]:
+            del waiting[code]
+    generation = _generations.get(session, (0, ""))[0]
+    grants = _grants.get(session)
+    if grants:
+        grants[:] = [
+            item
+            for item in grants
+            if now - item.created <= _APPROVAL_TTL and item.generation == generation
+        ]
 
 
 def _yaml_server_keys(path: Path) -> set[str]:

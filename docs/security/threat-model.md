@@ -47,12 +47,15 @@ Feed text (RSS items, OTX pulses, advisory pages, email bodies under analysis) a
 
 STRIDE: spoofing and tampering. OWASP: LLM01:2025 Prompt Injection.
 
-Control ticket: [Prompt injection defences for feed content](../../tickets/062-sec-prompt-injection.md) (GitHub issue 66). That ticket wraps free text as untrusted, banners connector results, guards the next write or outbound tool unless the analyst approved it in this session, requires `trust: untrusted` on every connector server, keeps the SOUL rule free of scanner phrases, and states allowed actions in cron prompts.
+Control ticket: [Prompt injection defences for feed content](../../tickets/062-sec-prompt-injection.md) (GitHub issue 66). That ticket wraps free text as untrusted, banners connector results, guards the next write or outbound tool unless the analyst approves that exact call, requires `trust: untrusted` on every connector server, keeps the SOUL rule free of scanner phrases, and states allowed actions in cron prompts.
+
+The guard shows the tool and its full redacted arguments with a random approval code. The person's message must name that code. Approval binds the tool name and argument hash, permits one call, and expires after ten minutes or when the next turn starts. A bare approval, feed text and an empty session id grant nothing. Arguments too large to show in full cannot be approved through this guard. Wrapper look-alikes in nested fields and warnings are defused before reaching the model. These controls limit the effect of flagged content; the injection detector remains a heuristic.
 
 Tests:
 
 - In tree: `TestEnvelope.test_untrusted_text_property` and `TestEnvelope.test_warning_redaction_and_cache_names` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py). The first checks that feed text is wrapped, length-capped, and stripped of control and bidi characters. The second checks that the result envelope carries `untrusted: true`. Neither shows that the model ignores the text.
 - Specified by issue 66: the corpus under `tests/security/injection/`, and the deterministic hook test that every corpus case is blocked from triggering a write or outbound tool. The model eval pass rate is recorded per release.
+- In tree: `tests/security/injection/test_approval.py` checks exact-call approval, single use, expiry, session isolation and safe previews. `mcp/common/tests/test_envelope.py` and `tests/security/injection/test_feed_fields.py` check nested fields and wrapper look-alikes.
 
 ### T2. Secret leakage
 
@@ -101,7 +104,7 @@ Controls:
 - Already in the profile: `SOUL.md` states that the agent proposes and a person acts. Sending a report, blocking an address, opening a ticket, or contacting a regulator needs that person's approval in this session.
 - Platform, relied on and not re-built here: dangerous command approval and `approvals.deny`. See [Hermes security](https://github.com/NousResearch/hermes-agent/blob/43faacfb8de7b29548547a7fbdedad0cc6e7391c/website/docs/user-guide/security.md).
 - In tree: `mcp/servers.yaml` and the scaffold template already set `trust: untrusted` on every current connector server, so a tool without `readOnlyHint: true` asks for approval and fails closed in cron. No test pins that setting yet. Issue 66 owns the requirement.
-- Later ticket: issue 66 adds the `pre_tool_call` guard, which blocks a write or outbound tool after flagged content unless the analyst approved it in this session.
+- In tree: the `pre_tool_call` guard blocks a write or outbound tool after flagged content unless the analyst approved that exact pending call. The grant is consumed once and does not carry into later turns.
 
 Tests:
 
