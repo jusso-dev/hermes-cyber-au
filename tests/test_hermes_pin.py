@@ -273,6 +273,11 @@ def test_no_change_guard_ignores_the_pr_body_so_a_quiet_week_exits_cleanly():
     text = (ROOT / "ci" / "workflows" / "data-update-pr.yml").read_text(
         encoding="utf-8"
     )
-    guard = next(line for line in text.splitlines() if "ls-files --others" in line)
-    assert '-e "$BODY_FILE"' in guard
-    assert "-e changed.txt" in guard
+    # The no-change guard lives in tools/ci/data_update_pr.py, which leaves the
+    # PR body out of the committable paths. tests/test_data_update_pr.py covers
+    # that behaviour; here we check the workflow hands the script the body path.
+    assert "BODY_FILE: ${{ inputs.body_file }}" in text
+    assert 'data_update_pr.py" open' in text
+    script = (ROOT / "tools" / "ci" / "data_update_pr.py").read_text(encoding="utf-8")
+    assert "if path != body_rel" in script
+    assert "print(NO_CHANGE)" in script
