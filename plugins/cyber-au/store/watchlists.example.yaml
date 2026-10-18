@@ -1,0 +1,41 @@
+# Watchlist template. `cyberau-mcp store watchlist init` copies this file to
+# plugin-data/cyber-au/watchlists.yaml on your profile. That copy is yours: it stays on
+# your machine and is never committed or shipped. Replace every example value below.
+#
+# The values here are reserved for documentation (RFC 2606, RFC 5737, RFC 3849, RFC 5398),
+# so the template matches nothing real until you edit it.
+#
+# Watched values are never sent anywhere, except that `store watchlist run --crtsh` sends
+# each entry under `domains` to crt.sh to look for lookalike certificates.
+
+# Your domains. A stored domain, URL host or email domain equal to one of these, or under
+# it, is an exact match. A name that folds to the same letters or is one or two edits
+# away is a lookalike.
+domains:
+  - example.com
+  - example.com.au
+
+# Brand names to find in advisory titles, summaries and text. Matched as whole words,
+# ignoring case, punctuation and company suffixes such as Pty Ltd.
+brands:
+  - Example Brand
+
+# Your address ranges (CIDR). Stored IPs, URL hosts and CIDRs inside or covering a range
+# match.
+ip_ranges:
+  - 192.0.2.0/24
+  - 198.51.100.0/24
+  - 2001:db8::/32
+
+# Your autonomous system numbers, as AS64496 or 64496.
+asns:
+  - AS64496
+
+# Vendors whose advisories you want flagged. A plain name uses the built-in alias table
+# where it knows the vendor (for example Fortinet also matches FortiGate and FortiOS).
+# Add your own aliases with the mapping form.
+vendors:
+  - Fortinet
+  - name: Example Vendor
+    aliases:
+      - ExampleOS

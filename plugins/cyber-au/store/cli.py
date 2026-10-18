@@ -21,6 +21,14 @@ from .db import open_store, resolve_db_path
 from .maintenance import backup_store, restore_backup, snapshot_public, vacuum_store
 from .stix import export_stix, import_stix_file
 from .tools import intel_add_observation, intel_get, intel_search
+from .watchlists import (
+    LISTS,
+    WatchlistFileError,
+    hits,
+    init_watchlist,
+    list_matches,
+    run_watchlist,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -194,7 +202,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fold old observations into indicator counters, then VACUUM",
     )
     vacuum.set_defaults(func=_cmd_vacuum)
+
+    _add_watchlist(sub, common)
     return parser
+
+
+def _add_watchlist(sub, common: argparse.ArgumentParser) -> None:
+    watch_file = argparse.ArgumentParser(add_help=False)
+    watch_file.add_argument(
+        "--watchlist",
+        help="Watchlist file. Defaults to $CYBERAU_DATA_DIR/watchlists.yaml",
+    )
+    watchlist = sub.add_parser(
+        "watchlist",
+        help="Match your domains, brands, ranges, ASNs and vendors against the store",
+    )
+    commands = watchlist.add_subparsers(dest="watchlist_command", required=True)
+
+    run = commands.add_parser(
+        "run",
+        parents=[common, watch_file],
+        help="Recompute all matches and drop any that no longer hold (nightly)",
+    )
+    run.add_argument(
+        "--crtsh",
+        action="store_true",
+        help="Also send each watched domain to crt.sh to find lookalike certificates",
+    )
+    run.set_defaults(func=_cmd_watchlist_run)
+
+    matches = commands.add_parser("matches", parents=[common], help="Print current matches")
+    matches.add_argument("--since", help="Only matches first seen at or after this time")
+    matches.add_argument("--list", action="append", dest="lists", choices=LISTS, default=[])
+    matches.set_defaults(func=_cmd_watchlist_matches)
+
+    hit = commands.add_parser(
+        "hits",
+        parents=[common],
+        help="Print new matches as daily-briefing intel-store hits",
+    )
+    hit.add_argument("--since", required=True, help="ISO 8601 time, first match on or after")
+    hit.set_defaults(func=_cmd_watchlist_hits)
+
+    init = commands.add_parser(
+        "init", parents=[watch_file], help="Write the example watchlist if none exists"
+    )
+    init.set_defaults(func=_cmd_watchlist_init)
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
@@ -352,6 +405,31 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
 
 def _cmd_vacuum(args: argparse.Namespace) -> int:
     _emit(vacuum_store(args.path))
+    return 0
+
+
+def _cmd_watchlist_run(args: argparse.Namespace) -> int:
+    try:
+        summary = run_watchlist(store=args.path, watchlist=args.watchlist, crtsh=args.crtsh)
+    except WatchlistFileError as exc:
+        _emit({"status": "error", "routine": "watchlist", "error": str(exc)})
+        return 1
+    _emit(summary)
+    return 0
+
+
+def _cmd_watchlist_matches(args: argparse.Namespace) -> int:
+    _emit({"matches": list_matches(store=args.path, since=args.since, lists=args.lists)})
+    return 0
+
+
+def _cmd_watchlist_hits(args: argparse.Namespace) -> int:
+    _emit(hits(store=args.path, since=args.since))
+    return 0
+
+
+def _cmd_watchlist_init(args: argparse.Namespace) -> int:
+    _emit(init_watchlist(args.watchlist))
     return 0
 
 
