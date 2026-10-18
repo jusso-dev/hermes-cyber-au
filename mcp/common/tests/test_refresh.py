@@ -159,10 +159,30 @@ def test_sources_without_an_adapter_are_refused_not_skipped(capsys):
 def test_bad_arguments_fail_in_the_refresh_parser(capsys):
     assert main(["refresh", "--sources", "kev", "--snapshot-dir", "intel/snapshots"]) == 2
     capsys.readouterr()
+    assert main(["refresh", "--sources", "asd", "--kev-snapshot", "intel/kev.json"]) == 2
+    assert "--kev-snapshot requires kev" in capsys.readouterr().err
     assert main(["refresh"]) == 2
     assert "usage: cyberau-mcp refresh" in capsys.readouterr().err
     assert main(["refresh", "--sources", "kev,nope"]) == 2
     assert "unknown sources: nope" in capsys.readouterr().err
+
+
+def test_live_kev_refresh_writes_a_private_local_snapshot(feeds, tmp_path, capsys):
+    snapshot = tmp_path / "snapshots" / "kev.json"
+    assert main(["refresh", "--sources", "kev", "--kev-snapshot", str(snapshot)]) == 0
+    assert json.loads(snapshot.read_text(encoding="utf-8")) == KEV
+    assert oct(snapshot.stat().st_mode & 0o777) == "0o600"
+    assert "kev ok 2 items" in capsys.readouterr().out
+
+
+def test_failed_kev_refresh_does_not_replace_the_last_snapshot(feeds, tmp_path, monkeypatch):
+    from cyberau_cisa_kev import source as kev
+
+    snapshot = tmp_path / "kev.json"
+    snapshot.write_text('{"last":"known-good"}\n', encoding="utf-8")
+    monkeypatch.setattr(kev, "_catalog", lambda: (KEV, "snapshot"))
+    assert main(["refresh", "--sources", "kev", "--kev-snapshot", str(snapshot)]) == 1
+    assert json.loads(snapshot.read_text(encoding="utf-8")) == {"last": "known-good"}
 
 
 def test_nightly_outputs_status_and_summary_but_no_feed_rows(feeds, tmp_path, capsys):

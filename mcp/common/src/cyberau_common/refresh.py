@@ -16,7 +16,9 @@ import hashlib
 import ipaddress
 import json
 import logging
+import os
 import sys
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -59,6 +61,10 @@ def refresh_main(argv: list[str]) -> int:
     parser.add_argument("--catalogue", help="Feed catalogue path; status.json is written beside it")
     parser.add_argument("--status", help="Write per-source status JSON here")
     parser.add_argument("--summary", help="Write a Markdown summary here")
+    parser.add_argument(
+        "--kev-snapshot",
+        help="Write the freshly fetched CISA KEV catalogue to this local file",
+    )
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
@@ -73,13 +79,27 @@ def refresh_main(argv: list[str]) -> int:
     if unknown:
         print(f"refresh failed: unknown sources: {', '.join(unknown)}", file=sys.stderr)
         return 2
+    selected = [*required, *optional]
+    if args.kev_snapshot and "kev" not in selected:
+        print(
+            "refresh failed: --kev-snapshot requires kev in --sources or --optional-sources",
+            file=sys.stderr,
+        )
+        return 2
 
     # Connector request logs go to stderr; the ingest script reports only the
     # first line of output, which must be the summary.
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     run = _Run(store=args.store)
-    results = [_refresh_one(key, run) for key in [*required, *optional]]
+    results = [_refresh_one(key, run) for key in selected]
+    if args.kev_snapshot:
+        kev = next(result for result in results if result.source == "kev")
+        if kev.status == "ok" and run.kev_catalog is not None:
+            try:
+                _write_kev_snapshot(Path(args.kev_snapshot), run.kev_catalog)
+            except OSError as exc:
+                kev.fail(f"could not write KEV snapshot: {exc}")
     failed = [r for r in results if r.status == "fail" and r.source in required]
 
     print(_headline(results, failed))
@@ -387,6 +407,21 @@ def _write_status(path: Path, results: list[Result]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"generated_at": now, "sources": dict(sorted(sources.items()))}
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _write_kev_snapshot(path: Path, catalogue: dict) -> None:
+    """Atomically persist a live KEV catalogue for the local software watch."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=".kev-", suffix=".json", dir=path.parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as output:
+            json.dump(catalogue, output, indent=2, sort_keys=True)
+            output.write("\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
 
 
 def _summary(results: list[Result], failed: list[Result]) -> str:

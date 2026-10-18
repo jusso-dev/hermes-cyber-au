@@ -386,8 +386,8 @@ class RoutineCronJobsTest(unittest.TestCase):
             self.assertEqual(result.stdout, "ingest ok: asd,kev,epss,auscert,feodo\n")
             self.assertEqual(
                 (home / "calls").read_text(encoding="utf-8"),
-                "refresh --sources asd,kev,epss,auscert,feodo --store --snapshot-dir "
-                f"{home}/plugin-data/cyber-au/snapshots\n",
+                "refresh --sources asd,kev,epss,auscert,feodo --store --kev-snapshot "
+                f"{home}/plugin-data/cyber-au/snapshots/kev.json\n",
             )
 
     def test_local_software_watch_needs_local_inventory_and_snapshot(self):
@@ -471,11 +471,10 @@ class RoutineCronJobsTest(unittest.TestCase):
                 result = _run_script(home, f"cyberau_ingest_{feed}.sh")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, f"ingest ok: {feed}\n")
-                self.assertEqual(
-                    (home / "calls").read_text(encoding="utf-8"),
-                    f"refresh --sources {feed} --store --snapshot-dir "
-                    f"{home}/plugin-data/cyber-au/snapshots\n",
-                )
+                expected = f"refresh --sources {feed} --store"
+                if feed == "kev":
+                    expected += f" --kev-snapshot {home}/plugin-data/cyber-au/snapshots/kev.json"
+                self.assertEqual((home / "calls").read_text(encoding="utf-8"), expected + "\n")
 
     def test_nightly_expiry_and_watchlist_scripts(self):
         cases = {
