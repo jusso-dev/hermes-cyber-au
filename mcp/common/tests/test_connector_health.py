@@ -17,6 +17,21 @@ SCHEMA_PATH = ROOT / "mcp" / "first-epss" / "schema" / "epss_scores.response.jso
 SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
+def _mini_checkout(tmp_path: Path) -> Path:
+    """A checkout with one schema-bearing connector and one without, so the
+    result does not depend on how many connectors ship response schemas."""
+    root = tmp_path / "checkout"
+    for key in ("first-epss", "nvd"):
+        (root / "mcp" / key).mkdir(parents=True)
+        (root / "mcp" / key / "pyproject.toml").write_text("", encoding="utf-8")
+    schema_dir = root / "mcp" / "first-epss" / "schema"
+    schema_dir.mkdir()
+    (schema_dir / SCHEMA_PATH.name).write_text(
+        SCHEMA_PATH.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    return root
+
+
 def _row(epss=0.96, percentile=0.99, extra=None, drop=()):
     row = {
         "cve": "CVE-2024-3400",
@@ -63,20 +78,23 @@ def test_checkout_without_a_response_schema_is_not_checked(tmp_path: Path):
     )
     called = []
 
-    def boom(key: str) -> dict:
+    def record(key: str) -> dict:
         called.append(key)
-        raise AssertionError(key)
+        return {"ok": False, "status_code": None, "error_class": "no_fixture", "body": None}
 
     report = collect_connector_health(
         ROOT,
         live=True,
         check_schema=True,
         fixtures=fixtures,
-        fetcher=boom,
+        fetcher=record,
         today=date(2026, 10, 17),
     )
-    assert called == []
     by_key = {row["key"]: row for row in report["connectors"]}
+    with_schema = {
+        key for key in by_key if any((ROOT / "mcp" / key / "schema").glob("*.response.json"))
+    }
+    assert set(called) == with_schema - {"first-epss"}
     assert by_key["first-epss"]["status"] == "ok"
     assert by_key["first-epss"]["detail"] == "schema ok"
     assert by_key["first-epss"]["keyed"] is False
@@ -175,6 +193,7 @@ def test_cli_writes_json_from_fixtures(tmp_path: Path, monkeypatch, capsys):
         raise AssertionError("vendor probe")
 
     monkeypatch.setattr("cyberau_common.health.fetch_live", boom)
+    monkeypatch.setattr("cyberau_common.health.default_root", lambda: _mini_checkout(tmp_path))
     assert main(["health", "--all", "--schema-drift", "--json", str(out)]) == 0
     captured = capsys.readouterr().out
     assert "nvd not_checked not checked" in captured
@@ -184,8 +203,10 @@ def test_cli_writes_json_from_fixtures(tmp_path: Path, monkeypatch, capsys):
     assert any(row["status"] == "not_checked" for row in report["connectors"])
 
 
-def test_live_without_a_fixture_refuses_during_tests():
-    report = collect_connector_health(ROOT, live=True, check_schema=True, today=date(2026, 10, 17))
+def test_live_without_a_fixture_refuses_during_tests(tmp_path: Path):
+    report = collect_connector_health(
+        _mini_checkout(tmp_path), live=True, check_schema=True, today=date(2026, 10, 17)
+    )
     row = next(item for item in report["connectors"] if item["key"] == "first-epss")
     assert row["status"] == "fail"
     assert "refusing to probe" in row["detail"]

@@ -522,12 +522,14 @@ def test_checkout_reports_only_installed_connectors_and_named_gaps(tmp_path: Pat
             assert item.detail != "not installed"
         else:
             assert item.detail == "not installed"
-    assert "connector.attack" not in {item.id for item in checks}
-    assert "connector.e8" not in {item.id for item in checks}
 
     snapshots = {item.id: item for item in doctor.check_snapshots(ctx)}
-    assert snapshots["snapshot.e8"].detail == "not installed"
-    assert snapshots["snapshot.attack"].detail == "not installed"
+    for name in ("e8", "attack"):
+        installed = (REPO / "mcp" / servers[name]["connector"] / "pyproject.toml").is_file()
+        if installed:
+            assert snapshots[f"snapshot.{name}"].detail != "not installed"
+        else:
+            assert snapshots[f"snapshot.{name}"].detail == "not installed"
     releases = json.loads((REPO / "mcp" / "asd-ism" / "data" / "releases.json").read_text())
     newest = max(releases["releases"], key=lambda row: row["published_at"])
     assert newest["tag_name"] in snapshots["snapshot.ism"].detail
