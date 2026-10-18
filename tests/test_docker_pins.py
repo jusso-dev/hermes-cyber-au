@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = ROOT / "docker" / "Dockerfile"
 COMPOSE = ROOT / "docker" / "compose.yaml"
 INSTALL = ROOT / "install" / "install.sh"
+ENTRYPOINT = ROOT / "docker" / "entrypoint.sh"
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
@@ -53,6 +54,12 @@ def test_compose_image_is_overridable_and_builds_locally_by_default():
     assert "image: ${CYBERAU_IMAGE:-hermes-cyber-au:local}" in text
     assert "dockerfile: docker/Dockerfile" in text
     assert ":0.1.0" not in text
+
+
+def test_entrypoint_sets_profile_home_for_scratch_plugin_imports():
+    text = ENTRYPOINT.read_text(encoding="utf-8")
+    assert "CYBERAU_HOME=$DEST" in text
+    assert "export CYBERAU_HOME" in text
 
 
 def test_install_sh_pins_the_hermes_installer():

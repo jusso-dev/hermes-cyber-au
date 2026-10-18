@@ -30,7 +30,10 @@ if [ ! -e /opt/data/active_profile ] \
 fi
 
 # The cyber-au plugin imports connector packages. They live in the profile
-# virtualenv, not in the Hermes interpreter.
+# virtualenv, not in the Hermes interpreter. Hermes plugin doctor loads a
+# scratch copy, so point it back to the installed profile as well.
+CYBERAU_HOME=$DEST
+export CYBERAU_HOME
 site=$(echo /opt/data/profiles/cyber-au/mcp/.venv/lib/python*/site-packages)
 if [ -d "$site" ]; then
     PYTHONPATH="${site}${PYTHONPATH:+:$PYTHONPATH}"
