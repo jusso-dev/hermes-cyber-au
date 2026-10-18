@@ -11,9 +11,22 @@
       "deliver": "origin"
     },
     {
-      "id": "cyberau-ingest-public",
-      "name": "Ingest public feeds",
-      "script": "cyberau_ingest.sh",
+      "id": "cyberau-ingest-asd",
+      "name": "Ingest ASD's ACSC feeds",
+      "script": "cyberau_ingest_asd.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 30,
+        "display": "every 30m"
+      },
+      "schedule_display": "every 30m",
+      "deliver": "local"
+    },
+    {
+      "id": "cyberau-ingest-auscert",
+      "name": "Ingest AusCERT bulletins",
+      "script": "cyberau_ingest_auscert.sh",
       "no_agent": true,
       "schedule": {
         "kind": "interval",
@@ -21,6 +34,45 @@
         "display": "every 60m"
       },
       "schedule_display": "every 60m",
+      "deliver": "local"
+    },
+    {
+      "id": "cyberau-ingest-feodo",
+      "name": "Ingest Feodo Tracker C2 list",
+      "script": "cyberau_ingest_feodo.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 60,
+        "display": "every 60m"
+      },
+      "schedule_display": "every 60m",
+      "deliver": "local"
+    },
+    {
+      "id": "cyberau-ingest-kev",
+      "name": "Ingest CISA KEV",
+      "script": "cyberau_ingest_kev.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 360,
+        "display": "every 360m"
+      },
+      "schedule_display": "every 360m",
+      "deliver": "local"
+    },
+    {
+      "id": "cyberau-ingest-epss",
+      "name": "Ingest EPSS for KEV CVEs",
+      "script": "cyberau_ingest_epss.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
       "deliver": "local"
     },
     {
@@ -75,6 +127,32 @@
       "deliver": "origin"
     },
     {
+      "id": "cyberau-store-expire",
+      "name": "Expire stale feed data",
+      "script": "cyberau_store_expire.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 2 * * *",
+        "display": "30 2 * * *"
+      },
+      "schedule_display": "30 2 * * *",
+      "deliver": "local"
+    },
+    {
+      "id": "cyberau-watchlist",
+      "name": "Nightly watchlist matches",
+      "script": "cyberau_watchlist.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 4 * * *",
+        "display": "0 4 * * *"
+      },
+      "schedule_display": "0 4 * * *",
+      "deliver": "local"
+    },
+    {
       "id": "cyberau-store-maintenance",
       "name": "Store vacuum and backup",
       "script": "cyberau_store_maintenance.sh",
@@ -85,14 +163,6 @@
         "display": "0 3 * * 0"
       },
       "schedule_display": "0 3 * * 0",
-      "deliver": "local"
-    },
-    {
-      "id": "cyberau-store-vacuum",
-      "name": "Weekly store vacuum",
-      "schedule": "0 3 * * 0",
-      "no_agent": true,
-      "script": "cyberau_store_vacuum.sh",
       "deliver": "local"
     }
   ]

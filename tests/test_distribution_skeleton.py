@@ -116,31 +116,31 @@ class DistributionSkeletonTest(unittest.TestCase):
         self.assertIn('"jobs"', text)
         self.assertNotIn('"jobs": []', text)
         for job_id in (
-            "cyberau-ingest-public",
+            "cyberau-ingest-asd",
+            "cyberau-ingest-auscert",
+            "cyberau-ingest-feodo",
+            "cyberau-ingest-kev",
+            "cyberau-ingest-epss",
             "cyberau-morning-brief",
             "cyberau-kev-watch",
             "cyberau-weekly-exec",
+            "cyberau-store-expire",
+            "cyberau-watchlist",
             "cyberau-store-maintenance",
-            "cyberau-store-vacuum",
         ):
             self.assertIn(f'"id": "{job_id}"', text)
 
-    def test_weekly_vacuum_job_is_script_only(self):
+    def test_one_weekly_vacuum_job(self):
+        """Maintenance backs up, compacts and vacuums; a second vacuum job would race it."""
         payload = json.loads((ROOT / "cron/jobs.json").read_text(encoding="utf-8"))
         jobs = {job["id"]: job for job in payload["jobs"]}
-        job = jobs["cyberau-store-vacuum"]
-        self.assertEqual(job["name"], "Weekly store vacuum")
-        self.assertEqual(job["schedule"], "0 3 * * 0")
+        self.assertNotIn("cyberau-store-vacuum", jobs)
+        job = jobs["cyberau-store-maintenance"]
         self.assertIs(job["no_agent"], True)
-        self.assertEqual(job["script"], "cyberau_store_vacuum.sh")
-        self.assertEqual(job["deliver"], "local")
         self.assertNotIn("prompt", job)
-        script = ROOT / "scripts" / job["script"]
-        text = script.read_text(encoding="utf-8")
-        self.assertIn("store backup\n", text)
-        self.assertIn("store vacuum\n", text)
-        self.assertNotIn("store compact", text)
-        self.assertNotIn("\u2014", text)
+        text = (ROOT / "scripts" / job["script"]).read_text(encoding="utf-8")
+        for step in ("store backup", "store compact", "store vacuum"):
+            self.assertIn(step, text)
 
     def test_git_index_has_no_secret_files(self):
         tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
