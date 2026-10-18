@@ -209,7 +209,7 @@ def test_schema_drift_and_live_health(tmp_path, monkeypatch):
     monkeypatch.delenv("CYBERAU_FLASHPOINT_SNAPSHOT", raising=False)
     good = connector().health(live=False, check_schema=True)
     assert good.ok is True
-    assert good.detail == "schema ok"
+    assert good.detail == "schema ok, no local copy to check"
     drifted = tmp_path / "drift.json"
     drifted.write_text(
         json.dumps({"items": [{"indicator_value": "example.com.au"}]}),
@@ -281,13 +281,14 @@ def test_session_cache_skips_disk_and_history_drops_the_note(tmp_path, monkeypat
             assert b"Synthetic note" not in blob
 
 
-def test_offline_uses_cache_or_snapshot(tmp_path, monkeypatch):
+def test_offline_without_an_operator_snapshot_reports_unavailable(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.delenv("CYBERAU_FLASHPOINT_SNAPSHOT", raising=False)
-    shipped = flashpoint_indicator("example.com.au")
-    assert shipped["cache"] == "snapshot"
-    assert shipped["data"][0]["source_ref"] == "synthetic-indicator-1"
+    unavailable = flashpoint_indicator("example.com.au")
+    assert unavailable["cache"] == "snapshot"
+    assert unavailable["data"] == []
+    assert "unavailable" in unavailable["warnings"][0].lower()
 
     monkeypatch.setenv("CYBERAU_FLASHPOINT_SNAPSHOT", str(tmp_path / "missing.json"))
     missing = flashpoint_indicator("example.com.au")
@@ -361,9 +362,10 @@ def test_snapshot_is_never_served_as_live_without_a_warning(tmp_path, monkeypatc
 
     monkeypatch.delenv("CYBERAU_FLASHPOINT_SNAPSHOT", raising=False)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
-    shipped = flashpoint_indicator("example.com.au")
-    assert shipped["cache"] == "snapshot"
-    assert any("synthetic" in item.lower() for item in shipped["warnings"])
+    unavailable = flashpoint_indicator("example.com.au")
+    assert unavailable["cache"] == "snapshot"
+    assert unavailable["data"] == []
+    assert "unavailable" in unavailable["warnings"][0].lower()
 
 
 def test_stale_copy_carries_a_warning_and_the_matched_date(tmp_path, monkeypatch):
