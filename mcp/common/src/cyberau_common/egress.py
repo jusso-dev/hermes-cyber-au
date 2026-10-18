@@ -1,16 +1,22 @@
 """Egress allowlist. Connectors can only reach hosts listed for them.
 
-The policy resolves a hostname and refuses private or scoped addresses
-before the HTTP request is sent. The HTTP client resolves that hostname
-again when it opens the connection. Those two lookups are independent.
-The private and scoped checks still run before every request, including
-each redirect, and they are not relaxed because of that gap.
+Two checks apply. Before each request (and each redirect hop) the URL is
+checked against the connector's host list, with no DNS lookup. When the HTTP
+client opens a direct connection, it resolves the name once through
+``EgressPolicy.connect_addresses``, refuses private or scoped answers, and
+connects only to an address that passed. The check and the connection use
+the same answer, so a name that changes its answer between them cannot reach
+a private address.
+
+When a forward proxy is configured, the proxy resolves the name and nothing
+is resolved locally. Only the host list applies on that path.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import logging
+import os
 import socket
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -51,6 +57,12 @@ FLOOR_CIDRS: tuple[str, ...] = (
 
 FLOOR_NETWORKS = tuple(ipaddress.ip_network(item) for item in FLOOR_CIDRS)
 
+# Fake-IP DNS (common in TUN proxies and some secure web gateways) answers
+# every public name from this range and routes by name. It stays blocked
+# unless the operator sets this variable to 1.
+FAKE_IP_ENV = "CYBERAU_EGRESS_FAKE_IP"
+FAKE_IP_NETWORK = ipaddress.ip_network("198.18.0.0/15")
+
 _LOG = logging.getLogger("cyberau.egress")
 
 
@@ -82,12 +94,32 @@ class EgressPolicy:
         self._networks = _merge_networks(extra_networks)
 
     def check(self, url: str, *, resolve: bool = True) -> None:
-        """Refuse a URL. ``resolve=False`` skips DNS, for a call that sends nothing."""
+        """Refuse a URL that is outside the policy.
+
+        ``resolve=False`` checks the host list and any IP literal with no DNS
+        lookup. The HTTP client uses that form and vets the addresses it
+        actually connects to through ``connect_addresses``.
+        """
         try:
             self._check(url, resolve)
         except EgressDenied as exc:
             _LOG.warning("egress refused for %s: %s", self.connector, exc)
             raise
+
+    def connect_addresses(self, host: str) -> list:
+        """Resolve ``host`` once and return the addresses a connection may use.
+
+        Every answer is checked. The caller connects only to the returned
+        addresses, so the check and the connection share one lookup.
+        """
+        try:
+            literal = _ip_literal(host)
+            addresses = [literal] if literal is not None else list(self._resolver(host))
+            self._vet(host, addresses)
+        except EgressDenied as exc:
+            _LOG.warning("egress refused for %s: %s", self.connector, exc)
+            raise
+        return addresses
 
     def _check(self, url: str, resolve: bool) -> None:
         parts = urlsplit(url)
@@ -99,27 +131,36 @@ class EgressPolicy:
             raise EgressDenied("URL has no host")
         literal = _ip_literal(host)
         loopback = _is_loopback_name(host, literal)
+        loopback_allowed = loopback and scheme == "http" and self.allow_http_loopback
         if scheme == "http":
-            if not (self.allow_http_loopback and loopback):
+            if not loopback_allowed:
                 raise EgressDenied("only https is allowed")
         elif scheme != "https":
             raise EgressDenied("only https is allowed")
         if literal is not None and not self.allow_ip_literals:
             raise EgressDenied("IP literals are not allowed for this connector")
         normalised = literal.compressed if literal is not None else normalise_host(host)
-        if normalised not in self.hosts and not (
-            loopback and self.allow_http_loopback and scheme == "http"
-        ):
+        if normalised not in self.hosts and not loopback_allowed:
             raise EgressDenied(f"host {normalised} is not allowlisted for {self.connector}")
-        if not resolve:
+        if loopback and not loopback_allowed:
+            # The loopback opt-in covers http only. This needs no lookup.
+            raise EgressDenied(f"host {host} is a blocked address")
+        if literal is not None:
+            self._vet(host, [literal])
             return
-        # This lookup is only the pre-request check. The HTTP client resolves
-        # the name again when it connects.
-        addresses = [literal] if literal is not None else self._resolver(host)
+        if resolve:
+            self._vet(host, self._resolver(host))
+
+    def _vet(self, host: str, addresses) -> None:
         if not addresses:
             raise EgressUnresolved(f"host {host} did not resolve")
+        literal = _ip_literal(host)
+        loopback = _is_loopback_name(host, literal) and self.allow_http_loopback
+        fake_ip = literal is None and os.environ.get(FAKE_IP_ENV) == "1"
         for address in addresses:
-            if address.is_loopback and loopback and scheme == "http" and self.allow_http_loopback:
+            if loopback and address.is_loopback:
+                continue
+            if fake_ip and address in FAKE_IP_NETWORK:
                 continue
             if _is_blocked_ip(address, self._networks):
                 raise EgressDenied(f"host {host} resolves to a blocked address")

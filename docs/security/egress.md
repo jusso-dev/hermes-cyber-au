@@ -19,17 +19,23 @@ Redirects are not followed by the HTTP library. The client follows at most five 
 
 ## Private and scoped addresses
 
-Before a request is sent, every resolved address is refused when it is private, loopback, link-local, site-local, unique-local, multicast, reserved, or unspecified, or when it is an IPv4-mapped IPv6 address. Shared address space `100.64.0.0/10` is refused as well. The code applies that floor even when `global_deny_cidrs` in the allowlist file is shorter. CI fails if the file drops a floor network.
+When a direct connection is opened, every resolved address is refused when it is private, loopback, link-local, site-local, unique-local, multicast, reserved, or unspecified, or when it is an IPv4-mapped IPv6 address. Shared address space `100.64.0.0/10` is refused as well. The code applies that floor even when `global_deny_cidrs` in the allowlist file is shorter. CI fails if the file drops a floor network.
 
 An address on the connector's host list is still refused when it is private or scoped. Listing a name does not waive the address check.
 
-## Separate DNS lookups
+## One lookup per connection
 
-The policy resolves each hostname and refuses a private or scoped answer before it sends the request. The HTTP client resolves that same hostname again when it connects. The two lookups are not bound to each other. An address accepted by the check is not the address the connection is guaranteed to use.
+The per-hop check before each request uses only the URL and the host list. It does no DNS lookup. An IP literal is checked against the address rules at that point.
 
-The private and scoped checks still run before every request, including each redirect. They are not relaxed because of this gap.
+For a direct connection, the HTTP client's transport resolves the name once, refuses the whole answer if any address is private or scoped, and then connects to one of those addresses by number. TLS still uses the name from the URL for SNI and certificate checks. Because the check and the connection share one lookup, a name that answers with a public address first and a private address later cannot reach the private address.
 
-A name that does not resolve is refused as well, and the request fails closed. The client then serves a stale cache entry if one is within its stale window, or reports an upstream error. In offline mode a cache answer sends nothing, so it needs no lookup. Only the host list is checked for it.
+A name that does not resolve is refused, and the request fails closed. The client then serves a stale cache entry if one is within its stale window, or reports an upstream error. In offline mode a cache answer sends nothing, so it needs no lookup.
+
+## Proxies, fake-IP DNS and TLS inspection
+
+- `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY` and `NO_PROXY` are read the same way httpx reads them. A proxied request is checked against the host list only. It is not resolved locally, because the proxy resolves the name. The proxy is trusted to enforce its own rules. Hosts matched by `NO_PROXY` connect directly and get the address checks above.
+- Some TUN proxies and secure web gateways answer every public name from `198.18.0.0/15` (fake-IP DNS). That range is blocked by default. Set `CYBERAU_EGRESS_FAKE_IP=1` to accept answers in that range for listed names. It does not cover IP literals or any other range. Prefer an explicit `HTTPS_PROXY` where one is available.
+- For a gateway that inspects TLS, point `SSL_CERT_FILE` (or `SSL_CERT_DIR`) at a bundle that includes its CA. Do not turn certificate checks off.
 
 ## Web and browser tools
 

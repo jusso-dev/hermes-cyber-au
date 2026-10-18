@@ -10,13 +10,14 @@ import sys
 import time
 from pathlib import Path
 
+import httpcore
 import httpx
 import pytest
 from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy, EgressUnresolved
+from cyberau_common.egress import FAKE_IP_ENV, EgressDenied, EgressPolicy, EgressUnresolved
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpClient, HttpError, _EgressBackend, egress_transport
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import RedactFilter, redact
 from cyberau_common.server import Connector, ToolSpec, build_server
@@ -38,6 +39,30 @@ def _ip(text: str):
     return ipaddress.ip_address(text)
 
 
+class _FakeBackend(httpcore.NetworkBackend):
+    """Socket layer stand-in. Records the host it was asked to reach."""
+
+    def __init__(self, status: int = 200, body: bytes = b"ok"):
+        self.hosts: list[str] = []
+        self._reply = f"HTTP/1.1 {status} OK\r\nContent-Length: {len(body)}\r\n\r\n".encode() + body
+
+    def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        self.hosts.append(host)
+        return httpcore.MockStream([self._reply])
+
+    def connect_unix_socket(self, path, timeout=None, socket_options=None):
+        raise AssertionError("unix socket")
+
+    def sleep(self, seconds):
+        return None
+
+
+def _guarded_client(tmp_path: Path, policy: EgressPolicy, backend: _FakeBackend) -> HttpClient:
+    """A client whose transport runs the connect-time check over a fake socket layer."""
+    transport = egress_transport(policy, network_backend=backend)
+    return _client(tmp_path, None, policy=policy, transport=transport)
+
+
 def _client(tmp_path: Path, handler, **kwargs) -> HttpClient:
     policy = kwargs.pop(
         "policy",
@@ -52,7 +77,7 @@ def _client(tmp_path: Path, handler, **kwargs) -> HttpClient:
         cache=cache,
         limiter=limiter,
         user_agent=USER_AGENT,
-        transport=httpx.MockTransport(handler),
+        transport=kwargs.pop("transport", None) or httpx.MockTransport(handler),
         sleeper=kwargs.pop("sleeper", lambda _seconds: None),
         rng=kwargs.pop("rng", lambda: 0.0),
         rate=kwargs.pop("rate", 100.0),
@@ -249,6 +274,141 @@ class TestEgress:
         policy.check("https://example.com/", resolve=False)
         with pytest.raises(EgressDenied):
             policy.check("https://evil.test/", resolve=False)
+
+
+class TestConnectTimeEgress:
+    """The address vetted at connect time is the address the socket layer gets."""
+
+    ALLOW = "connectors:\n  demo:\n    hosts: [example.com]\n"
+
+    def _policy(self, tmp_path: Path, *answers: str) -> EgressPolicy:
+        path = tmp_path / "allow.yaml"
+        path.write_text(self.ALLOW, encoding="utf-8")
+        queue = [[_ip(item)] for item in answers]
+        return EgressPolicy(path, "demo", resolver=lambda host: queue.pop(0))
+
+    def test_connects_to_the_vetted_address(self, tmp_path: Path):
+        backend = _FakeBackend()
+        client = _guarded_client(tmp_path, self._policy(tmp_path, "1.1.1.1"), backend)
+        assert client.get("https://example.com/a", ttl=5).body == b"ok"
+        assert backend.hosts == ["1.1.1.1"]
+        client.close()
+
+    def test_public_at_check_time_private_at_connect_time_is_refused(self, tmp_path: Path):
+        policy = self._policy(tmp_path, "1.1.1.1", "10.0.0.1")
+        policy.check("https://example.com/a")
+        backend = _FakeBackend()
+        client = _guarded_client(tmp_path, policy, backend)
+        with pytest.raises(EgressDenied, match="blocked"):
+            client.get("https://example.com/a", ttl=5)
+        assert backend.hosts == []
+        client.close()
+
+    def test_mixed_answer_is_refused(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text(self.ALLOW, encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("1.1.1.1"), _ip("::1")])
+        backend = _FakeBackend()
+        client = _guarded_client(tmp_path, policy, backend)
+        with pytest.raises(EgressDenied):
+            client.get("https://example.com/a", ttl=5)
+        assert backend.hosts == []
+        client.close()
+
+    def test_no_answer_at_connect_time_fails_closed(self, tmp_path: Path):
+        path = tmp_path / "allow.yaml"
+        path.write_text(self.ALLOW, encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [])
+        backend = _FakeBackend()
+        client = _guarded_client(tmp_path, policy, backend)
+        with pytest.raises(HttpError, match="did not resolve"):
+            client.get("https://example.com/a", ttl=5)
+        assert backend.hosts == []
+        client.close()
+
+    def test_next_address_is_tried_after_a_connect_error(self, tmp_path: Path):
+        class Flaky(_FakeBackend):
+            def connect_tcp(self, host, port, **kwargs):
+                if host == "1.1.1.1":
+                    self.hosts.append(host)
+                    raise httpcore.ConnectError("refused")
+                return super().connect_tcp(host, port, **kwargs)
+
+        path = tmp_path / "allow.yaml"
+        path.write_text(self.ALLOW, encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("1.1.1.1"), _ip("8.8.8.8")])
+        backend = Flaky()
+        client = _guarded_client(tmp_path, policy, backend)
+        assert client.get("https://example.com/a", ttl=5).body == b"ok"
+        assert backend.hosts == ["1.1.1.1", "8.8.8.8"]
+        client.close()
+
+    def test_fake_ip_range_needs_the_opt_in(self, tmp_path: Path, monkeypatch):
+        monkeypatch.delenv(FAKE_IP_ENV, raising=False)
+        backend = _FakeBackend()
+        client = _guarded_client(tmp_path, self._policy(tmp_path, "198.18.0.1"), backend)
+        with pytest.raises(EgressDenied, match="blocked"):
+            client.get("https://example.com/a", ttl=5)
+        client.close()
+        monkeypatch.setenv(FAKE_IP_ENV, "1")
+        client = _guarded_client(tmp_path, self._policy(tmp_path, "198.18.0.1"), backend)
+        assert client.get("https://example.com/b", ttl=5).body == b"ok"
+        assert backend.hosts == ["198.18.0.1"]
+        client.close()
+        client = _guarded_client(tmp_path, self._policy(tmp_path, "10.0.0.1"), backend)
+        with pytest.raises(EgressDenied, match="blocked"):
+            client.get("https://example.com/c", ttl=5)
+        client.close()
+
+    def test_fake_ip_opt_in_does_not_cover_literals(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv(FAKE_IP_ENV, "1")
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "connectors:\n  demo:\n    hosts: [198.18.0.1]\n    allow_ip_literals: true\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(EgressDenied, match="blocked"):
+            EgressPolicy(path, "demo").check("https://198.18.0.1/", resolve=False)
+
+    def test_proxy_requests_do_not_resolve_locally(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
+        monkeypatch.setenv("NO_PROXY", "direct.example")
+
+        def resolver(host):
+            raise AssertionError("resolved locally")
+
+        path = tmp_path / "allow.yaml"
+        path.write_text(
+            "connectors:\n  demo:\n    hosts: [example.com, direct.example]\n",
+            encoding="utf-8",
+        )
+        policy = EgressPolicy(path, "demo", resolver=resolver)
+        client = HttpClient(
+            "demo",
+            policy=policy,
+            cache=HttpCache(tmp_path / "cache.sqlite"),
+            limiter=RateLimiter(tmp_path / "limit.sqlite"),
+            user_agent=USER_AGENT,
+        )
+        proxied = client._client._transport_for_url(httpx.URL("https://example.com/a"))
+        assert isinstance(proxied._pool, httpcore.HTTPProxy)
+        direct = client._client._transport_for_url(httpx.URL("https://direct.example/a"))
+        assert isinstance(direct._pool._network_backend, _EgressBackend)
+        policy.check("https://example.com/a", resolve=False)
+        client.close()
+
+    def test_direct_requests_use_the_egress_transport(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr("cyberau_common.http.get_environment_proxies", dict)
+        client = HttpClient(
+            "demo",
+            policy=_policy(tmp_path, self.ALLOW),
+            cache=HttpCache(tmp_path / "cache.sqlite"),
+            limiter=RateLimiter(tmp_path / "limit.sqlite"),
+            user_agent=USER_AGENT,
+        )
+        transport = client._client._transport_for_url(httpx.URL("https://example.com/a"))
+        assert isinstance(transport._pool._network_backend, _EgressBackend)
+        client.close()
 
 
 class TestCache:
@@ -490,17 +650,21 @@ class TestHttp:
         monkeypatch.setattr(socket, "getaddrinfo", failing)
         path = tmp_path / "real.yaml"
         path.write_text("connectors:\n  demo:\n    hosts: [example.com]\n", encoding="utf-8")
-        return _client(
+        policy = EgressPolicy(path, "demo")
+        backend = _FakeBackend()
+        client = _client(
             tmp_path,
             handler,
             clock=lambda: clock["t"],
-            policy=EgressPolicy(path, "demo"),
+            policy=policy,
+            transport=egress_transport(policy, network_backend=backend),
             **kwargs,
         )
+        return client, backend
 
     def test_offline_cache_answer_needs_no_dns(self, tmp_path: Path, monkeypatch):
         clock = {"t": 0.0}
-        client = self._seeded_dns_down(tmp_path, monkeypatch, clock, offline=True)
+        client, _backend = self._seeded_dns_down(tmp_path, monkeypatch, clock, offline=True)
         clock["t"] = 100.0
         response = client.get("https://example.com/a", ttl=5)
         assert (response.cache, response.body) == ("stale", b"cached")
@@ -510,11 +674,12 @@ class TestHttp:
 
     def test_dns_failure_serves_stale_or_fails_as_http_error(self, tmp_path: Path, monkeypatch):
         clock = {"t": 0.0}
-        client = self._seeded_dns_down(tmp_path, monkeypatch, clock)
+        client, backend = self._seeded_dns_down(tmp_path, monkeypatch, clock)
         clock["t"] = 100.0
         assert client.get("https://example.com/a", ttl=5).cache == "stale"
         with pytest.raises(HttpError):
             client.get("https://example.com/other", ttl=5)
+        assert backend.hosts == []
         client.close()
 
     def test_secrets_are_redacted_in_errors(self, tmp_path: Path):

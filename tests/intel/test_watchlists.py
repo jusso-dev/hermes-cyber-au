@@ -353,7 +353,8 @@ def crtsh(monkeypatch):
     state = {"t": 0.0, "resolved": []}
 
     def resolve(host: str):
-        # The egress pre-check resolves the host. Record it instead of using DNS.
+        # DNS belongs to the direct socket transport. MockTransport must not
+        # resolve anything; record an unexpected lookup without using DNS.
         state["resolved"].append(host)
         return [ipaddress.ip_address("1.2.3.4")]
 
@@ -398,7 +399,7 @@ def test_crtsh_lookalikes_only_contact_crtsh_and_are_audited(store_path, crtsh):
 
     assert requests, "crt.sh was not queried"
     assert {request.url.host for request in requests} == {"crt.sh"}
-    assert set(state["resolved"]) == {"crt.sh"}
+    assert state["resolved"] == []
     assert [request.url.params["q"] for request in requests] == ["%.example.com"]
     others = ("Example Brand", "Example Vendor", "192.0.2", "2001:db8", "64496", "Fortinet")
     for request in requests:

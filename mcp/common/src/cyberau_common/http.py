@@ -9,7 +9,9 @@ import random
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
+import httpcore
 import httpx
+from httpx._utils import get_environment_proxies
 
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy, EgressUnresolved
@@ -77,8 +79,16 @@ class HttpClient:
         self._rng = rng or random.random
         self.max_bytes = max_bytes
         self.max_retry_wait = max_retry_wait
+        mounts = None
+        if transport is None:
+            # Direct connections go through the egress transport. Proxied
+            # requests keep the environment proxy settings, and the proxy
+            # resolves the name.
+            transport = egress_transport(policy)
+            mounts = _proxy_mounts()
         self._client = httpx.Client(
             transport=transport,
+            mounts=mounts,
             follow_redirects=False,
             timeout=timeout,
         )
@@ -171,7 +181,7 @@ class HttpClient:
         skip_cache: bool = False,
     ) -> Response:
         # Host list only. A cache answer sends nothing, so it needs no DNS.
-        # Every network hop is resolved and checked in _request.
+        # Every network hop is checked again in _request.
         self.policy.check(url, resolve=False)
         key_material = key_body if key_body is not None else (content or b"")
         cache_key = self.cache.key(method, url, params, key_material, self.auth_scope)
@@ -223,9 +233,10 @@ class HttpClient:
         current_method = method
         current_content = content
         while True:
-            # The policy resolves and refuses before this hop. The client
-            # resolves the name again when it connects. See egress.py.
-            self.policy.check(current)
+            # Host list for this hop. A direct connection resolves once and
+            # vets the address it connects to (see egress_transport). A proxy
+            # resolves the name itself.
+            self.policy.check(current, resolve=False)
             host = httpx.URL(current).host or ""
             self.limiter.acquire(
                 f"{self.connector}:{host}",
@@ -286,6 +297,74 @@ class HttpClient:
         if self.max_retry_wait is None:
             return min(60.0, wait)
         return wait
+
+
+class _EgressBackend(httpcore.NetworkBackend):
+    """Resolves through the policy and connects only to an address that passed."""
+
+    def __init__(self, policy: EgressPolicy, inner: httpcore.NetworkBackend | None = None):
+        self._policy = policy
+        self._inner = inner or httpcore.SyncBackend()
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options=None,
+    ) -> httpcore.NetworkStream:
+        failure: Exception | None = None
+        for address in self._policy.connect_addresses(host):
+            try:
+                # A numeric host needs no second lookup. TLS still uses the
+                # name from the URL for SNI and certificate checks.
+                return self._inner.connect_tcp(
+                    address.compressed,
+                    port,
+                    timeout=timeout,
+                    local_address=local_address,
+                    socket_options=socket_options,
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
+                failure = exc
+        raise failure or httpcore.ConnectError(f"no address for {host}")
+
+    def connect_unix_socket(self, path: str, timeout=None, socket_options=None):
+        raise httpcore.ConnectError("unix sockets are not allowed")
+
+    def sleep(self, seconds: float) -> None:
+        self._inner.sleep(seconds)
+
+
+class _EgressTransport(httpx.HTTPTransport):
+    # handle_request is inherited, so cassette players that patch
+    # HTTPTransport still apply to this class.
+    def __init__(self, policy: EgressPolicy, network_backend=None):
+        self._pool = httpcore.ConnectionPool(
+            ssl_context=httpx.create_ssl_context(),
+            max_connections=100,
+            max_keepalive_connections=20,
+            keepalive_expiry=5.0,
+            network_backend=_EgressBackend(policy, network_backend),
+        )
+
+
+def egress_transport(policy: EgressPolicy, *, network_backend=None) -> httpx.HTTPTransport:
+    """An httpx transport whose direct connections are vetted by ``policy``.
+
+    ``network_backend`` replaces the socket layer, for tests.
+    """
+    return _EgressTransport(policy, network_backend)
+
+
+def _proxy_mounts() -> dict[str, httpx.HTTPTransport | None]:
+    # Same rules httpx applies on its own (HTTPS_PROXY, ALL_PROXY, NO_PROXY).
+    # None sends that pattern to the egress transport.
+    return {
+        pattern: None if proxy is None else httpx.HTTPTransport(proxy=proxy)
+        for pattern, proxy in get_environment_proxies().items()
+    }
 
 
 def _retry_after_seconds(header: str) -> float | None:
