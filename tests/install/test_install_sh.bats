@@ -333,9 +333,9 @@ EOF
   hash_config="$(cksum "$home/config.yaml")"
   hash_lock="$(cksum "$home/mcp/uv.lock")"
   hash_stamp="$(cksum "$home/mcp/.venv/.cyberau-sync-stamp")"
-  [[ "$output" == *"hermes cyber-au doctor is not in this checkout"* ]]
-  [[ "$output" == *"The doctor check is a separate ticket."* ]]
-  [[ "$output" == *"NVD_API_KEY is unset"* ]]
+  [[ "$output" == *"Initialised the intel store."* ]]
+  [[ "$output" == *"Bootstrap finished for cyber-au."* ]]
+  [[ "$output" != *"NVD_API_KEY is unset"* ]]
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 0 ]
   [ "$(cksum "$home/config.yaml")" = "$hash_config" ]
