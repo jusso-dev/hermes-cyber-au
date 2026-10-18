@@ -1,6 +1,6 @@
 """Commit data updates onto a dated branch and open or update one pull request.
 
-``ci/workflows/data-update-pr.yml`` calls this script. Justin copies that
+``.github/workflows/data-update-pr.yml`` calls this script. Justin copies that
 workflow into ``.github/workflows/`` by hand, because the token for this
 repository cannot push files under ``.github/workflows/``.
 

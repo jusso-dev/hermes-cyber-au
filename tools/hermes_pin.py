@@ -6,7 +6,7 @@ tools/hermes_pin.txt is the single source. ``get`` prints that tag.
 
 - distribution.yaml ``hermes_requires`` (lower bound, without the leading v)
 - docker/Dockerfile ``HERMES_VERSION``
-- ``HERMES_IMAGE`` in ci/workflows/ci.yml and .github/workflows/ci.yml
+- ``HERMES_IMAGE`` in .github/workflows/ci.yml
 
 A missing consumer is an error, and nothing is written until every consumer
 can be updated. That keeps the pins from drifting apart.
@@ -23,10 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PIN_REL = Path("tools/hermes_pin.txt")
 DIST_REL = Path("distribution.yaml")
 DOCKER_REL = Path("docker/Dockerfile")
-CI_RELS = (
-    Path("ci/workflows/ci.yml"),
-    Path(".github/workflows/ci.yml"),
-)
+CI_RELS = (Path(".github/workflows/ci.yml"),)
 
 TAG_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 DIST_RE = re.compile(

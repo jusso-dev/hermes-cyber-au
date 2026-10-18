@@ -46,7 +46,7 @@ If a migration fails for any reason, including an unreadable file, the store is 
 
 ## Hermes version policy
 
-`hermes_requires` in `distribution.yaml` is the minimum Hermes version for this distribution. That floor moves only in the weekly bump PR opened by `deps-and-hermes-bump` (`ci/workflows/deps-and-hermes-bump.yml`). Feature changes do not edit the floor.
+`hermes_requires` in `distribution.yaml` is the minimum Hermes version for this distribution. That floor moves only in the weekly bump PR opened by `deps-and-hermes-bump` (`.github/workflows/deps-and-hermes-bump.yml`). Feature changes do not edit the floor.
 
 `hermes update` updates Hermes itself, on the stable channel or on main (`hermes update --set-channel stable` or `hermes update --set-channel main`). It does not update this distribution. `cyber-au update` updates this distribution. It does not change which Hermes you have installed.
 
