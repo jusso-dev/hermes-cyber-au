@@ -1,11 +1,19 @@
-"""Checks for the cyber-au plugin skeleton. No network and no Hermes install."""
+"""Checks for the cyber-au plugin entrypoint. No network and no Hermes install.
+
+The plugin started as a skeleton of stubs. The audit hooks, feed guard, org
+exposure tool, doctor, update and migrate commands have since landed, so these
+checks pin the registration contract. The intel store and evidence tools are
+still stubs and keep their not-installed checks.
+"""
 
 from __future__ import annotations
 
 import argparse
 import builtins
+import contextlib
 import importlib.util
 import inspect
+import io
 import json
 import os
 import sys
@@ -58,14 +66,15 @@ KNOWN_MANIFEST_FIELDS = {
     "provides_locales",
     "requires_auth",
 }
-TOOLS = [
+STUB_TOOLS = [
     "intel_search",
     "intel_get",
     "intel_add_observation",
     "intel_export_stix",
     "evidence_import",
 ]
-HOOKS = ["pre_tool_call", "post_tool_call", "on_session_start", "on_session_end"]
+TOOLS = [*STUB_TOOLS, "cyber_au_org_exposure"]
+HOOKS = ["pre_tool_call", "post_tool_call", "pre_llm_call", "on_session_start", "on_session_end"]
 SECRET = "fixture-secret-value"
 
 
@@ -135,6 +144,14 @@ class FakeCtx:
 
 class PluginSkeletonTest(unittest.TestCase):
     def setUp(self) -> None:
+        # Audit hooks write under the data directory, so keep them off the real home.
+        scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(scratch.cleanup)
+        self.data = Path(scratch.name) / "plugin-data"
+        environ = mock.patch.dict(os.environ, {"CYBERAU_DATA_DIR": str(self.data)})
+        environ.start()
+        self.addCleanup(environ.stop)
+        os.environ.pop("CYBERAU_AUDIT_LOG_PATH", None)
         started = time.perf_counter()
         self.plugin = load_plugin()
         self.ctx = FakeCtx()
@@ -173,7 +190,7 @@ class PluginSkeletonTest(unittest.TestCase):
         self.assertEqual(manifest["homepage"], "https://github.com/jusso-dev/hermes-cyber-au")
         self.assertEqual(manifest["provides_tools"], TOOLS)
         self.assertEqual(manifest["provides_hooks"], HOOKS)
-        self.assertEqual(manifest["python_dependencies"], ["stix2>=3,<4"])
+        self.assertEqual(manifest["python_dependencies"], ["pyyaml>=6,<7", "stix2>=3,<4"])
         schema = manifest["config_schema"]
         self.assertEqual(schema["audit_log_path"]["type"], "str")
         self.assertEqual(schema["audit_log_path"]["default"], "")
@@ -182,11 +199,23 @@ class PluginSkeletonTest(unittest.TestCase):
 
     def test_registered_tools_and_hooks_match_the_manifest(self) -> None:
         self.assertEqual(list(self.ctx.tools), TOOLS)
-        self.assertEqual(list(self.ctx.hooks), HOOKS)
+        self.assertEqual(set(self.ctx.hooks), set(HOOKS))
         for name, registered in self.ctx.tools.items():
             self.assertEqual(registered["toolset"], "cyber-au")
             self.assertEqual(registered["schema"]["name"], name)
-            self.assertIn("not installed yet", registered["schema"]["description"])
+            if name in STUB_TOOLS:
+                self.assertIn("not installed yet", registered["schema"]["description"])
+
+    def test_tool_handlers_take_the_hermes_argument_dict(self) -> None:
+        for name, registered in self.ctx.tools.items():
+            parameters = list(inspect.signature(registered["handler"]).parameters.values())
+            self.assertTrue(parameters, name)
+            self.assertIn(
+                parameters[0].kind,
+                (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD),
+                name,
+            )
+            self.assertIs(parameters[-1].kind, inspect.Parameter.VAR_KEYWORD, name)
 
     def test_tools_report_that_they_are_not_installed_and_do_not_echo_input(self) -> None:
         secret_args = {
@@ -210,52 +239,59 @@ class PluginSkeletonTest(unittest.TestCase):
             self.assertEqual(payload["message"], message)
             self.assertNotIn(SECRET, raw)
 
-    def test_hooks_accept_kwargs_swallow_failures_and_do_not_block(self) -> None:
-        audit = sys.modules[f"{MODULE}.hooks.audit"]
-        original = audit._run
+    def _call_hook(self, callback, tool_name: str):
+        return callback(
+            tool_name=tool_name,
+            args={"query": "fixture"},
+            result="{}",
+            task_id="task",
+            duration_ms=1,
+            session_id="session",
+            turn_id="turn",
+            user_message="hello",
+            unknown_host_field=True,
+        )
 
-        def boom(event: str) -> None:
-            raise OSError(f"unavailable {event}")
+    def test_hooks_accept_kwargs_and_let_a_read_tool_through(self) -> None:
+        guard = sys.modules[f"{MODULE}.middleware.untrusted"]
+        guard.reset_state()
+        for name, callbacks in self.ctx.hooks.items():
+            self.assertTrue(callbacks, name)
+            for callback in callbacks:
+                kinds = {item.kind for item in inspect.signature(callback).parameters.values()}
+                self.assertIn(inspect.Parameter.VAR_KEYWORD, kinds, name)
+                self.assertIsNone(self._call_hook(callback, "intel_search"), name)
 
-        audit._run = boom
-        try:
-            for name, callbacks in self.ctx.hooks.items():
-                self.assertEqual(len(callbacks), 1)
-                callback = callbacks[0]
-                parameters = inspect.signature(callback).parameters.values()
-                self.assertTrue(
-                    any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters)
-                )
-                with self.assertLogs(audit.__name__, level="ERROR") as captured:
-                    result = callback(
-                        tool_name="terminal",
-                        args={"command": SECRET},
-                        result=SECRET,
-                        task_id="task",
-                        duration_ms=1,
-                        session_id=SECRET,
-                    )
-                self.assertIsNone(result)
-                logged = "\n".join(captured.output)
-                self.assertIn(name, logged)
-                self.assertNotIn(SECRET, logged)
-                self.assertNotIn('"action"', logged)
-        finally:
-            audit._run = original
+    def test_audit_hooks_write_the_chain_under_the_data_dir(self) -> None:
+        for callback in self.ctx.hooks["on_session_start"]:
+            self.assertIsNone(callback(session_id="session", platform="cli"))
+        for callback in self.ctx.hooks["pre_tool_call"]:
+            self.assertIsNone(callback(tool_name="intel_search", args={}, task_id="t"))
+        for callback in self.ctx.hooks["post_tool_call"]:
+            callback(tool_name="intel_search", args={}, result="{}", task_id="t", duration_ms=1)
+        days = list((self.data / "audit").glob("*.jsonl"))
+        self.assertEqual(len(days), 1)
+        events = [json.loads(line)["event"] for line in days[0].read_text("utf-8").splitlines()]
+        self.assertIn("session_start", events)
 
-    def test_hooks_say_the_audit_log_is_not_installed(self) -> None:
-        audit = sys.modules[f"{MODULE}.hooks.audit"]
-        callback = self.ctx.hooks["on_session_start"][0]
-        with self.assertLogs(audit.__name__, level="DEBUG") as captured:
-            self.assertIsNone(callback(session_id=SECRET))
-        logged = "\n".join(captured.output)
-        self.assertIn(audit.AUDIT_NOT_INSTALLED, logged)
-        self.assertNotIn(SECRET, logged)
+    def test_unwritable_audit_log_blocks_writes_but_not_reads(self) -> None:
+        blocker = self.data.parent / "not-a-directory"
+        blocker.write_text("", encoding="utf-8")
+        with mock.patch.dict(os.environ, {"CYBERAU_AUDIT_LOG_PATH": str(blocker / "audit")}):
+            results = [
+                self._call_hook(callback, "write_file")
+                for callback in self.ctx.hooks["pre_tool_call"]
+            ]
+            blocks = [item for item in results if isinstance(item, dict)]
+            self.assertTrue(blocks)
+            self.assertTrue(all(item["action"] == "block" for item in blocks))
+            for callback in self.ctx.hooks["pre_tool_call"]:
+                self.assertIsNone(self._call_hook(callback, "intel_search"))
 
     def test_middleware_passes_the_call_through(self) -> None:
         guard = sys.modules[f"{MODULE}.middleware.untrusted"]
         callbacks = self.ctx.middleware["tool_execution"]
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(callbacks, [guard.tool_execution])
         self.assertEqual(set(self.ctx.middleware), {"tool_execution"})
         seen: list[dict] = []
 
@@ -263,61 +299,69 @@ class PluginSkeletonTest(unittest.TestCase):
             seen.append(payload)
             return "downstream"
 
-        with self.assertLogs(guard.__name__, level="DEBUG") as captured:
-            result = callbacks[0](
-                next_call=next_call,
-                args={"query": SECRET},
-                tool_name="intel_search",
-            )
+        result = callbacks[0](
+            next_call=next_call,
+            args={"query": SECRET},
+            tool_name="intel_search",
+        )
         self.assertEqual(result, "downstream")
         self.assertEqual(seen, [{"query": SECRET}])
-        logged = "\n".join(captured.output)
-        self.assertIn(guard.GUARD_NOT_INSTALLED, logged)
-        self.assertNotIn(SECRET, logged)
 
-    def test_cli_and_slash_commands_are_stubs(self) -> None:
+    def _cli_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(prog="hermes")
+        plugin = parser.add_subparsers(dest="plugin_command").add_parser("cyber-au")
+        self.ctx.cli["cyber-au"]["setup_fn"](plugin)
+        return parser
+
+    def test_one_cli_command_and_one_slash_command(self) -> None:
         cli = sys.modules[f"{MODULE}.cli"]
         self.assertEqual(set(self.ctx.cli), {"cyber-au"})
         self.assertEqual(set(self.ctx.commands), {"cyber-au"})
         entry = self.ctx.cli["cyber-au"]
-        self.assertIs(entry["handler_fn"], cli.handle_cli)
-        parser = argparse.ArgumentParser(prog="hermes")
-        subparsers = parser.add_subparsers(dest="plugin_command")
-        plugin = subparsers.add_parser("cyber-au")
-        entry["setup_fn"](plugin)
-        for command, message in (
-            ("doctor", "cyber-au doctor is not installed yet."),
-            ("bootstrap", "cyber-au bootstrap is not installed yet."),
-            ("store", "The intel store is not installed yet."),
-            ("export", "STIX export is not installed yet."),
-        ):
-            args = parser.parse_args(["cyber-au", command])
-            self.assertEqual(cli.command_message(command), message)
-            self.assertEqual(entry["handler_fn"](args), message)
-            slash = self.ctx.commands["cyber-au"]["handler"]
-            self.assertEqual(slash(f"{command} {SECRET}"), message)
-        usage = cli.command_message(f"audit {SECRET}")
-        self.assertIn("not installed yet", usage)
-        self.assertNotIn(SECRET, usage)
-        self.assertNotIn("audit", usage)
+        self.assertIs(entry["handler_fn"], cli.handle)
+        self.assertIs(entry["setup_fn"], cli.setup_parser)
+        self.assertIs(self.ctx.commands["cyber-au"]["handler"], cli.slash)
 
-    def test_cli_stubs_answer_for_flags_that_ship_later(self) -> None:
-        cli = sys.modules[f"{MODULE}.cli"]
-        entry = self.ctx.cli["cyber-au"]
-        parser = argparse.ArgumentParser(prog="hermes")
-        plugin = parser.add_subparsers(dest="plugin_command").add_parser("cyber-au")
-        entry["setup_fn"](plugin)
-        for argv, message in (
-            (["doctor", "--offline", "--json", "--fix"], "cyber-au doctor is not installed yet."),
-            (["bootstrap", "--non-interactive"], "cyber-au bootstrap is not installed yet."),
-            (["store", "stats"], "The intel store is not installed yet."),
-            (["export", "--since", "2026-01-01"], "STIX export is not installed yet."),
-        ):
-            args = parser.parse_args(["cyber-au", *argv])
-            self.assertEqual(entry["handler_fn"](args), message)
-            self.assertEqual(cli.command_message(argv[0]), message)
+    def test_cli_parses_every_shipped_subcommand(self) -> None:
+        parser = self._cli_parser()
+        doctor = parser.parse_args(["cyber-au", "doctor", "--offline", "--json", "--fix"])
+        self.assertEqual(doctor.cyberau_command, "doctor")
+        self.assertTrue(doctor.offline and doctor.json and doctor.fix)
+        update = parser.parse_args(
+            ["cyber-au", "update", "--source", "/src", "--to", "v0.1.0", "--force-config"]
+        )
+        self.assertEqual(update.cyberau_command, "update")
+        self.assertEqual((update.source, update.to_tag), (Path("/src"), "v0.1.0"))
+        self.assertTrue(update.force_config)
+        migrate = parser.parse_args(["cyber-au", "migrate", "--migrations", "/m"])
+        self.assertEqual((migrate.cyberau_command, migrate.migrations), ("migrate", Path("/m")))
+        verify = parser.parse_args(["cyber-au", "audit", "verify", "--from", "2026-01-01"])
+        self.assertEqual((verify.cyberau_command, verify.audit_command), ("audit", "verify"))
+        export = parser.parse_args(
+            ["cyber-au", "audit", "export", "--since", "2026-01-01", "--format", "csv"]
+        )
+        self.assertEqual((export.audit_command, export.export_format), ("export", "csv"))
 
-    def test_stubs_do_not_open_or_write_any_path(self) -> None:
+    def test_cli_audit_verify_runs_against_the_data_dir(self) -> None:
+        args = self._cli_parser().parse_args(["cyber-au", "audit", "verify"])
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            self.assertEqual(self.ctx.cli["cyber-au"]["handler_fn"](args), 0)
+        self.assertIn("audit chain verified", stdout.getvalue())
+
+    def test_migrate_without_a_profile_home_is_refused(self) -> None:
+        args = self._cli_parser().parse_args(["cyber-au", "migrate"])
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(self.ctx.cli["cyber-au"]["handler_fn"](args), 2)
+
+    def test_slash_command_answers_usage_without_echoing_input(self) -> None:
+        slash = self.ctx.commands["cyber-au"]["handler"]
+        for raw in (f"store {SECRET}", f"audit {SECRET}", "", '"unbalanced'):
+            usage = slash(raw)
+            self.assertTrue(usage.startswith("Usage: /cyber-au doctor"), raw)
+            self.assertNotIn(SECRET, usage)
+
+    def test_stub_tools_do_not_open_or_write_any_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             report = Path(tmp) / "report.docx"
             report.write_bytes(b"fixture")
@@ -333,10 +377,8 @@ class PluginSkeletonTest(unittest.TestCase):
                 mock.patch.object(os, "open", refuse),
                 mock.patch.object(Path, "open", refuse),
             ):
-                for name, registered in self.ctx.tools.items():
-                    registered["handler"](args, task_id="t")
-                for callbacks in self.ctx.hooks.values():
-                    self.assertIsNone(callbacks[0](tool_name="evidence_import", args=args))
+                for name in STUB_TOOLS:
+                    self.ctx.tools[name]["handler"](args, task_id="t")
             self.assertFalse(data.exists())
             self.assertEqual(report.read_bytes(), b"fixture")
             self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["report.docx"])
@@ -366,7 +408,10 @@ class PluginSkeletonTest(unittest.TestCase):
             for token in banned:
                 self.assertNotIn(token, text, f"{path.name} contains {token!r}")
             self.assertNotIn("import stix2", text)
-            self.assertNotIn("open(", text)
+        # The remaining stubs must not touch the filesystem. Implemented modules
+        # (doctor, update, store) read and write files by design.
+        for stub in ("tools/store.py", "tools/evidence.py"):
+            self.assertNotIn("open(", (PLUGIN_DIR / stub).read_text(encoding="utf-8"), stub)
         prose = (PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8")
         self.assertNotIn("\u2014", prose)
         self.assertNotIn("\u2013", prose)
