@@ -5,8 +5,8 @@
 # then installed from that directory.
 set -eu
 
-PROFILE=cyber-au
-REF=
+PROFILE=${CYBERAU_PROFILE:-cyber-au}
+REF=${CYBERAU_REF:-}
 NO_HERMES_INSTALL=0
 OFFLINE=0
 NONINTERACTIVE=0
@@ -99,12 +99,6 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -n "${CYBERAU_PROFILE:-}" ]; then
-  PROFILE=$CYBERAU_PROFILE
-fi
-if [ -n "${CYBERAU_REF:-}" ]; then
-  REF=$CYBERAU_REF
-fi
 
 case $PROFILE in
   ''|-*|*[!A-Za-z0-9._-]*)
