@@ -22,6 +22,8 @@ import sys
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
+from cyberau_common.envelope import untrusted_text
+
 CACHE_WORDS = {
     "miss": "live",
     "hit": "cached",
@@ -43,7 +45,7 @@ def _time(value: object) -> datetime | None:
         moment = datetime.fromisoformat(text)
     except ValueError:
         return None
-    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC) if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
 def age(then: datetime | None, now: datetime) -> str:
@@ -102,7 +104,9 @@ def describe(envelope: dict, now: datetime) -> str:
     line = ", ".join(parts)
     warnings = [_flat(item) for item in envelope.get("warnings") or [] if str(item).strip()]
     if warnings:
-        line += ". Warnings (connector text): " + "; ".join(f'"{item}"' for item in warnings)
+        line += ". Warnings (connector text): " + "; ".join(
+            untrusted_text(item, "provenance-warning", max_len=WARNING_LIMIT) for item in warnings
+        )
     return line
 
 

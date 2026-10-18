@@ -72,10 +72,10 @@ Each match names the rule that made it, strongest first:
 
 | Method | Rule |
 |---|---|
-| `cpe` | The asset's CPE vendor and product equal the record's |
+| `cpe` | The asset's CPE part, vendor and product equal the record's |
 | `purl` | Same package type, namespace and name |
 | `vendor-product-fuzzy` | The token rule in `skills/daily-briefing/references/matching.md` on vendor and product, with the vendor aliases from the watchlist. Reported as a possible match |
 
-Versions are not compared, because NVD and KEV publish ranges. The match detail shows the asset version so an analyst can check it.
+All results are candidates. Versions are not compared, because NVD and KEV publish ranges. The match detail shows the asset version so an analyst can check it before calling an asset affected.
 
 Tests: `tests/intel/test_assets.py`, with synthetic fixtures in `tests/fixtures/assets/`.

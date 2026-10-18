@@ -224,7 +224,82 @@ def test_rows_combine_every_input(tmp_path: Path) -> None:
     )
     premium = by_id["example-premium"]
     assert premium.enabled == "not in config"
-    assert premium.key == "set at last bootstrap"
+    assert premium.key == "unknown (not recorded at last bootstrap)"
+
+
+def test_key_presence_needs_explicit_bootstrap_evidence(tmp_path: Path) -> None:
+    profile, data, catalogue = _profile(tmp_path)
+    status_file = data / "bootstrap-status.json"
+    for names, expected in (
+        (["EXAMPLE_TOKEN"], "missing: EXAMPLE_URL"),
+        (["EXAMPLE_TOKEN", "EXAMPLE_URL"], "set at last bootstrap"),
+    ):
+        status_file.write_text(json.dumps({"missing_env": [], "present_env": names}))
+        rows, _ = sources.collect(
+            profile, catalogue=catalogue, status_files=[], data_dir=data, now=NOW
+        )
+        assert next(row for row in rows if row.id == "example-premium").key == expected
+
+
+def test_offset_timestamp_is_displayed_in_utc(tmp_path: Path) -> None:
+    profile, data, catalogue = _profile(tmp_path)
+    status_file = data / "feed-status.json"
+    status = json.loads(status_file.read_text())
+    status["sources"]["kev"]["last_ok"] = "2026-10-18T19:00:00+11:00"
+    status_file.write_text(json.dumps(status))
+    rows, _ = sources.collect(
+        profile, catalogue=catalogue, status_files=[status_file], data_dir=data, now=NOW
+    )
+    kev = next(row for row in rows if row.id == "cisa-kev")
+    assert kev.last_success == "2026-10-18T08:00:00Z"
+    assert kev.age == "1h"
+
+
+def test_recent_asd_feed_does_not_hide_an_older_member(tmp_path: Path) -> None:
+    profile, data, catalogue = _profile(tmp_path)
+    catalogue.write_text(
+        CATALOGUE.replace(
+            "      - https://www.cyber.gov.au/rss/alerts",
+            "      - https://www.cyber.gov.au/rss/alerts\n"
+            "      - https://www.cyber.gov.au/rss/news",
+        )
+    )
+    with sqlite3.connect(data / "asd_advisories.sqlite") as conn:
+        conn.execute(
+            "INSERT INTO feed_status VALUES ('news', '2026-10-18T08:50:00Z', 'live', 2, "
+            "'', '2026-10-18T08:45:00Z')"
+        )
+    status_file = data / "feed-status.json"
+    status = json.loads(status_file.read_text())
+    status["sources"]["asd"].update(last_ok="2026-10-18T08:50:00Z", last_error=None)
+    status_file.write_text(json.dumps(status))
+    rows, _ = sources.collect(
+        profile, catalogue=catalogue, status_files=[status_file], data_dir=data, now=NOW
+    )
+    asd = next(row for row in rows if row.id == "asd-acsc")
+    assert asd.state == "overdue"
+    assert asd.last_success == "2026-10-16T08:30:00Z"
+    assert asd.data_as_of == "2026-10-16T07:00:00Z"
+
+
+def test_missing_asd_member_is_reported(tmp_path: Path) -> None:
+    profile, data, catalogue = _profile(tmp_path)
+    catalogue.write_text(
+        CATALOGUE.replace(
+            "      - https://www.cyber.gov.au/rss/alerts",
+            "      - https://www.cyber.gov.au/rss/alerts\n"
+            "      - https://www.cyber.gov.au/rss/news",
+        )
+    )
+    with sqlite3.connect(data / "asd_advisories.sqlite") as conn:
+        conn.execute(
+            "UPDATE feed_status SET last_success='2026-10-18T08:55:00Z', "
+            "method='live', warning='' WHERE feed='alerts'"
+        )
+    rows, _ = sources.collect(profile, catalogue=catalogue, status_files=[], data_dir=data, now=NOW)
+    asd = next(row for row in rows if row.id == "asd-acsc")
+    assert asd.state == "error after last success"
+    assert asd.last_error == "no successful refresh for news"
 
 
 def test_sources_page_renders_escaped_and_never_shows_env_values(tmp_path: Path) -> None:

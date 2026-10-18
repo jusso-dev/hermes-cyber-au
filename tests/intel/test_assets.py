@@ -174,6 +174,34 @@ def test_cli_import_list_and_match(tmp_path: Path, capsys, no_network) -> None:
     assert no_network == []
 
 
+def test_cpe_part_mismatch_is_not_a_product_match() -> None:
+    asset = assets.Asset(
+        "Example",
+        "examplevendor",
+        "edgegate",
+        extra={
+            "cpe": "cpe:2.3:h:examplevendor:edgegate:1:*:*:*:*:*:*:*",
+        },
+    )
+    assert (
+        assets.match(
+            [asset],
+            cpes=[
+                "cpe:2.3:a:examplevendor:edgegate:*:*:*:*:*:*:*:*",
+            ],
+        )
+        == []
+    )
+    found = assets.match(
+        [asset],
+        cpes=[
+            "cpe:2.3:h:examplevendor:edgegate:*:*:*:*:*:*:*:*",
+        ],
+    )
+    assert found[0].method == "cpe"
+    assert "Check the version" in found[0].detail
+
+
 def test_cli_strict_and_dry_run_write_nothing(tmp_path: Path, capsys) -> None:
     path = tmp_path / "assets.yaml"
     assert assets.main(["import", str(CSV), "--inventory", str(path), "--strict"]) == 1

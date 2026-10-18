@@ -620,7 +620,8 @@ def render_sources(profile: Path, settings: SourceSettings) -> bytes:
         "<p>Each feed in the catalogue, whether its server is enabled, whether its key was "
         "set at the last bootstrap, the last successful refresh, the item count and the "
         "age of the data. Overdue means the last success is older than twice the poll "
-        "interval. This page reads files only. It never calls a feed.</p>",
+        "interval. For ASD, age uses the oldest member feed, and a missing feed is "
+        "reported as an error. This page reads files only. It never calls a feed.</p>",
     ]
     for note in notes:
         parts.append(f'<p class="muted">{esc(note)}</p>')

@@ -180,6 +180,7 @@ mcp_servers:
     assert MARKER not in enabled.stderr
     status = json.loads((home / "plugin-data" / "cyber-au" / "bootstrap-status.json").read_text())
     assert MARKER not in json.dumps(status)
+    assert status["present_env"] == ["ABUSECH_AUTH_KEY", "PAID_TOKEN"]
 
 
 def test_partially_managed_config_keeps_user_servers_and_extra_fields(

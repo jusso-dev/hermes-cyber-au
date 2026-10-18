@@ -640,9 +640,9 @@ def match(
     vendor: str = "",
     product: str = "",
 ) -> list[Match]:
-    """Assets affected by a vulnerability record, each with the rule that matched.
+    """Candidate assets for a vulnerability record, with the rule that matched.
 
-    Rules, strongest first: ``cpe`` (the asset's CPE vendor and product equal the
+    Rules, strongest first: ``cpe`` (the asset's CPE part, vendor and product equal the
     record's), ``purl`` (same package type, namespace and name), then the labelled
     fallback ``vendor-product-fuzzy`` (the token rule on vendor and product). Versions
     are not compared, because feeds give ranges; the detail names both versions.
@@ -655,12 +655,13 @@ def match(
         asset_cpe = parse_cpe(asset.get("cpe"))
         if asset_cpe:
             for part, cvendor, cproduct, cversion in record_cpes:
-                if (asset_cpe[1], asset_cpe[2]) == (cvendor, cproduct):
+                if asset_cpe[:3] == (part, cvendor, cproduct):
                     hit = Match(
                         asset,
                         "cpe",
                         f"cpe {cvendor}:{cproduct} (record version {cversion or '*'}, "
-                        f"asset version {asset.get('version') or 'not recorded'})",
+                        f"asset version {asset.get('version') or 'not recorded'}). "
+                        "Check the version by hand",
                     )
                     break
         if hit is None and record_purls:
@@ -669,10 +670,15 @@ def match(
                 hit = Match(
                     asset,
                     "purl",
-                    f"purl {key} (asset version {asset.get('version') or 'not recorded'})",
+                    f"purl {key} (asset version {asset.get('version') or 'not recorded'}). "
+                    "Check the version by hand",
                 )
         if hit is None:
-            pairs = [(cvendor, cproduct) for _part, cvendor, cproduct, _v in record_cpes]
+            pairs = [
+                (cvendor, cproduct)
+                for part, cvendor, cproduct, _v in record_cpes
+                if asset_cpe is None or part == asset_cpe[0]
+            ]
             if vendor or product:
                 pairs.append((vendor, product))
             for pvendor, pproduct in pairs:

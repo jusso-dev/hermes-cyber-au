@@ -23,6 +23,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 STATUS_NAMES = ("feed-status.json", "feeds-status.json")
 _DURATION_RE = re.compile(
@@ -75,7 +76,7 @@ def parse_time(value: object) -> datetime | None:
         return None
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=UTC)
-    return moment
+    return moment.astimezone(UTC)
 
 
 def age_text(then: datetime | None, now: datetime) -> str:
@@ -260,6 +261,18 @@ def load_missing_env(path: Path) -> dict[str, list[str]] | None:
     return missing
 
 
+def load_present_env(path: Path) -> set[str] | None:
+    """Variable names explicitly recorded by bootstrap, never their values."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    names = data.get("present_env") if isinstance(data, dict) else None
+    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+        return None
+    return set(names)
+
+
 def load_refresh_status(paths: list[Path]) -> dict[str, dict]:
     """Merge every readable refresh status file. A later run of a source wins."""
     merged: dict[str, dict] = {}
@@ -355,7 +368,7 @@ def load_store_counts(path: Path) -> dict[str, dict]:
 # --- assembling ---------------------------------------------------------------------
 
 
-def _key_state(feed: dict, missing: dict[str, list[str]] | None) -> str:
+def _key_state(feed: dict, missing: dict[str, list[str]] | None, present: set[str] | None) -> str:
     auth = feed.get("auth") if isinstance(feed.get("auth"), dict) else {}
     names = [str(auth.get("env") or "")] + [str(item) for item in auth.get("env_also") or []]
     names = [name for name in names if name]
@@ -369,6 +382,11 @@ def _key_state(feed: dict, missing: dict[str, list[str]] | None) -> str:
         return "missing: " + ", ".join(unset)
     if auth.get("optional") and not feed.get("keyed"):
         return "optional"
+    if present is None:
+        return "unknown (not recorded at last bootstrap)"
+    unset = [name for name in names if name not in present]
+    if unset:
+        return "missing: " + ", ".join(unset)
     return "set at last bootstrap"
 
 
@@ -393,6 +411,7 @@ def build_rows(
     asd: list[dict],
     store: dict[str, dict],
     now: datetime,
+    present: set[str] | None = None,
 ) -> list[SourceRow]:
     rows: list[SourceRow] = []
     for feed in feeds:
@@ -403,7 +422,7 @@ def build_rows(
             connector=str(feed.get("connector") or ""),
             keyed=bool(feed.get("keyed")),
             enabled=_enabled_state(feed, servers),
-            key=_key_state(feed, missing),
+            key=_key_state(feed, missing, present),
             poll=str(feed.get("poll") or ""),
             licence=str(feed.get("licence") or "not stated"),
         )
@@ -419,21 +438,36 @@ def build_rows(
             if status.get("item_count") is not None:
                 row.items = int(status["item_count"])
         if row.connector == "asd-acsc" and asd:
+            urls = feed.get("urls") or [feed.get("url")]
+            expected = {
+                urlsplit(str(url)).path.rstrip("/").rsplit("/", 1)[-1] for url in urls if url
+            }
+            selected = [item for item in asd if not expected or item.get("feed") in expected]
             row.origins.append("ASD feed status")
-            methods = sorted({str(item.get("method") or "") for item in asd} - {""})
+            methods = sorted({str(item.get("method") or "") for item in selected} - {""})
             row.cache = ", ".join(methods) or row.cache
-            warnings = [str(item["warning"]) for item in asd if item.get("warning")]
+            warnings = [str(item["warning"]) for item in selected if item.get("warning")]
+            recorded = {
+                str(item.get("feed"))
+                for item in selected
+                if parse_time(item.get("last_success")) is not None
+            }
+            missing_feeds = sorted(expected - recorded)
+            if missing_feeds:
+                warnings.append("no successful refresh for " + ", ".join(missing_feeds))
             if warnings and not row.last_error:
                 row.last_error = "; ".join(warnings)
-            for item in asd:
+            # A recent aggregate refresh must not hide an older member feed.
+            success = []
+            for item in selected:
                 when = parse_time(item.get("last_success"))
                 if when:
                     success.append(when)
-            dates = [str(item["data_as_of"]) for item in asd if item.get("data_as_of")]
+            dates = [str(item["data_as_of"]) for item in selected if item.get("data_as_of")]
             if dates:
-                row.data_as_of = max(dates)
+                row.data_as_of = min(dates)
             if row.items is None:
-                row.items = sum(int(item.get("item_count") or 0) for item in asd)
+                row.items = sum(int(item.get("item_count") or 0) for item in selected)
         stored = store.get(row.id) or store.get(row.connector)
         if stored:
             row.origins.append(f"intel store ({stored['count']} rows)")
@@ -441,7 +475,11 @@ def build_rows(
                 row.items = stored["count"]
             if not row.data_as_of and stored.get("newest"):
                 row.data_as_of = stored["newest"]
-        last = max(success) if success else None
+        last = (
+            (min(success) if row.connector == "asd-acsc" and asd else max(success))
+            if success
+            else None
+        )
         row.last_success = last.strftime("%Y-%m-%dT%H:%M:%SZ") if last else None
         row.age = age_text(last, now)
         row.state = _freshness(last, row.poll, row.last_error, now)
@@ -487,5 +525,6 @@ def collect(
         asd=load_asd_status(data_dir / "asd_advisories.sqlite"),
         store=load_store_counts(data_dir / "intel.sqlite"),
         now=now or datetime.now(UTC),
+        present=load_present_env(data_dir / "bootstrap-status.json"),
     )
     return rows, notes
