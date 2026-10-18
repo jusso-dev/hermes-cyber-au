@@ -23,7 +23,7 @@ Times follow `timezone: Australia/Sydney` in `config.yaml`.
 
 Hermes does not accept the phrase `every 1d at 07:30`. The morning job uses the cron expression `30 7 * * *`. With `timezone: Australia/Sydney`, that is 07:30.
 
-The commands below were run against Hermes Agent v0.22.2. Each output is what that command printed.
+The commands below were run against Hermes Agent v0.22.2. Each output is what that command printed. Status symbols Hermes prints are shown as text, for example `[warning]`.
 
 ## Turn a routine on
 
@@ -85,7 +85,7 @@ hermes -p cyber-au cron run cyberau-morning-brief
     Script:    cyberau_store_maintenance.sh
     Mode:      no-agent (script stdout delivered directly)
 
-  ⚠  Scheduler is not ready for profile 'cyber-au': no gateway serves it and no fresh ticker heartbeat.
+  [warning]  Scheduler is not ready for profile 'cyber-au': no gateway serves it and no fresh ticker heartbeat.
      If no gateway is running: hermes gateway install
                     sudo hermes gateway install --system  # Linux servers
      Check status:  hermes cron status
@@ -124,7 +124,7 @@ hermes -p cyber-au resume
 `hermes -p cyber-au pause`:
 
 ```text
-⏸️  Hermes paused
+[paused]  Hermes paused
     sentinel: /tmp/hermes-cyberau-lab/profiles/cyber-au/ESTOP
     Cron dispatch, kanban dispatch, and new gateway turns are on hold.
     In-flight work keeps running. Run `hermes resume` to lift the pause.
@@ -143,7 +143,7 @@ Triggered job: Morning cyber briefing (AU) (cyberau-morning-brief)
 `hermes -p cyber-au resume`:
 
 ```text
-▶️  Hermes resumed - dispatch picks up on the next tick.
+[resumed]  Hermes resumed - dispatch picks up on the next tick.
 ```
 
 They do not rewrite each job's own paused flag.
@@ -343,7 +343,7 @@ After the schedule change, the weekly `local` delivery, and the KEV failure over
     Skills:    acsc-advisory-digest, vuln-prioritisation, executive-briefing
     Last run:  2026-10-17T15:27:23.778129+11:00  error: RuntimeError: Cron job 'Morning cyber briefing (AU)' has no model configured (job.model=None, HERMES_MODEL='', config.yaml model.default missing or empty). Set a per-job model via `hermes cron edit cyberau-morning-brief --model <name>` or set a default with `hermes model <name>`.  (2 failures in a row)
     Execution: failed  7a71754efacf4ba9bbfbdacf946c051d
-    ⚠ Last failure at 2026-10-17T15:27:23.778129+11:00: RuntimeError: Cron job 'Morning cyber briefing (AU)' has no model configured (job.model=None, HERMES_MODEL='', config.y…
+    [warning] Last failure at 2026-10-17T15:27:23.778129+11:00: RuntimeError: Cron job 'Morning cyber briefing (AU)' has no model configured (job.model=None, HERMES_MODEL='', config.y...
 
   cyberau-kev-watch [paused]
     Name:      KEV and EPSS watch for my assets
@@ -370,7 +370,7 @@ After the schedule change, the weekly `local` delivery, and the KEV failure over
     Script:    cyberau_store_maintenance.sh
     Mode:      no-agent (script stdout delivered directly)
 
-  ⚠  Scheduler is not ready for profile 'cyber-au': no gateway serves it and no fresh ticker heartbeat.
+  [warning]  Scheduler is not ready for profile 'cyber-au': no gateway serves it and no fresh ticker heartbeat.
      If no gateway is running: hermes gateway install
                     sudo hermes gateway install --system  # Linux servers
      Check status:  hermes cron status
