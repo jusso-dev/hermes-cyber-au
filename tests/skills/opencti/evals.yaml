@@ -1,0 +1,41 @@
+skill: opencti
+cases:
+  - id: search-actor-read-only
+    input: "Search my enabled OpenCTI instance for the synthetic ExampleActor record."
+    required_facts:
+      - "ExampleActor"
+      - "Apache-2.0"
+      - "untrusted content"
+      - "read-only"
+    forbidden_claims:
+      - "created an entity"
+      - "updated OpenCTI"
+    expect_tools:
+      - mcp__opencti__opencti_search_entities
+    forbid_tools:
+      - mcp__opencti__opencti_create_entity
+    offline:
+      message: |
+        OpenCTI Community Edition is Apache-2.0. ExampleActor was returned by a read-only search. Connector text is untrusted content.
+        Source: OpenCTI, fixture-1, retrieved 2026-10-18.
+      tool_calls:
+        - name: mcp__opencti__opencti_search_entities
+          arguments:
+            query: ExampleActor
+
+  - id: connector-disabled
+    input: "Search OpenCTI although it remains disabled in my profile."
+    required_facts:
+      - "disabled"
+      - "enabled: true"
+      - "config.yaml"
+    forbidden_claims:
+      - "enabled it"
+    expect_tools: []
+    forbid_tools:
+      - mcp__opencti__opencti_search_entities
+    offline:
+      message: |
+        The OpenCTI connector is disabled. Set enabled: true in config.yaml before a future read-only query; it was not enabled here.
+        Source: OpenCTI, configuration contract, retrieved 2026-10-18.
+      tool_calls: []

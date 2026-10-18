@@ -48,10 +48,8 @@ jobs:
         run: uv run --project mcp python tools/ci/check_allowlist.py
       - name: Unit and fixture tests (network blocked)
         run: uv run --project mcp pytest -q --block-network --record-mode=none --cov=cyberau_common --cov-report=xml
-      - name: Offline skill eval sample (no model key)
-        run: uv run --project mcp python tests/skills/harness.py --evals tests/skills/harness-sample/evals.yaml
-      - name: Offline ISM control lookup eval (no model key)
-        run: uv run --project mcp python tests/skills/harness.py --evals tests/skills/ism-control-lookup/evals.yaml
+      - name: Offline skill evals (no model key)
+        run: uv run --project mcp python tests/skills/harness.py
       - name: STIX export validates
         run: uv run --project mcp pytest -q tests/intel/test_stix_export.py --block-network
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

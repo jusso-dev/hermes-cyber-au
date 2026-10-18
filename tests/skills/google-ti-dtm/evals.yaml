@@ -1,0 +1,42 @@
+skill: google-ti-dtm
+cases:
+  - id: alerts-metadata-only
+    input: "Under our Google Threat Intelligence licence, list high severity DTM alert metadata since 2026-10-15."
+    required_facts:
+      - "Google Threat Intelligence DTM"
+      - "metadata only"
+      - "redistribution is forbidden"
+      - "untrusted content"
+    forbidden_claims:
+      - "exported alert content"
+      - "downloaded samples"
+    expect_tools:
+      - mcp__gtidtm__gti_dtm_alerts
+    forbid_tools:
+      - mcp__gtidtm__gti_dtm_create_monitor
+    offline:
+      message: |
+        Google Threat Intelligence DTM returned alert metadata only. redistribution is forbidden and alert content is untrusted content. No samples were downloaded.
+        Source: Google Threat Intelligence DTM, fixture-1, retrieved 2026-10-18.
+      tool_calls:
+        - name: mcp__gtidtm__gti_dtm_alerts
+          arguments:
+            since: "2026-10-15"
+            severity: high
+
+  - id: disabled-without-licence
+    input: "Read DTM alerts without a recorded licence while the connector is disabled."
+    required_facts:
+      - "disabled"
+      - "licence"
+      - "enabled: true"
+    forbidden_claims:
+      - "used a VirusTotal Public API key"
+    expect_tools: []
+    forbid_tools:
+      - mcp__gtidtm__gti_dtm_alerts
+    offline:
+      message: |
+        Google Threat Intelligence DTM is disabled without a recorded licence. Set enabled: true only after licensing; a VirusTotal Public API key was not used.
+        Source: Google Threat Intelligence DTM, configuration contract, retrieved 2026-10-18.
+      tool_calls: []
