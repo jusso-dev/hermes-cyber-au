@@ -47,10 +47,11 @@ COPY --chown=hermes:hermes . /opt/cyber-au/src
 # air-gapped bootstrap can still pass --offline.
 RUN uv --version \
     && hermes profile install /opt/cyber-au/src --name cyber-au --yes \
-    && if [ -f /opt/cyber-au/src/install/bootstrap.sh ]; then \
-         sh /opt/cyber-au/src/install/bootstrap.sh --profile cyber-au --non-interactive; \
-       fi \
     && uv pip install --python /opt/hermes/.venv/bin/python 'pyyaml>=6,<7' 'stix2>=3,<4' \
+    && chown -R hermes:hermes /opt/data \
+    && if [ -f /opt/cyber-au/src/install/bootstrap.sh ]; then \
+         runuser -u hermes -- sh /opt/cyber-au/src/install/bootstrap.sh --profile cyber-au --non-interactive; \
+       fi \
     && rm -rf /opt/cyber-au/profile \
     && cp -a /opt/data/profiles/cyber-au /opt/cyber-au/profile \
     && find /opt/data -mindepth 1 -maxdepth 1 \
