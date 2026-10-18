@@ -5,10 +5,33 @@ from pathlib import Path
 
 import cyberau_first_epss.source as source
 import httpx
+import pytest
 from cyberau_common.server import build_server
 from cyberau_first_epss.source import connector, epss_history, epss_scores, epss_top, schema_drift
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
+def test_journal_rotates_and_keeps_only_one_previous_generation(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(source, "_JOURNAL_BYTES", 40)
+    for index in range(10):
+        source._persist([{"cve": f"CVE-2026-{index:04d}"}])
+    current = tmp_path / "epss-observations.jsonl"
+    previous = tmp_path / "epss-observations.jsonl.1"
+    assert json.loads(current.read_text())["cve"] == "CVE-2026-0009"
+    assert json.loads(previous.read_text())["cve"] == "CVE-2026-0008"
+    assert current.stat().st_size + previous.stat().st_size < 80
+
+
+def test_journal_refuses_symlinked_archive(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    target = tmp_path / "evidence"
+    target.write_text("preserve")
+    (tmp_path / "epss-observations.jsonl.1").symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        source._persist([{"cve": "CVE-2026-0001"}])
+    assert target.read_text() == "preserve"
 
 
 def setup_function():

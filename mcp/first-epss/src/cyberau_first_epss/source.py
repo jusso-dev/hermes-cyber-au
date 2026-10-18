@@ -1,5 +1,6 @@
 """Read-only FIRST EPSS scores."""
 
+import fcntl
 import json
 import os
 import re
@@ -24,6 +25,7 @@ _CveList = Annotated[list[_CveId], Field(min_length=1, max_length=100)]
 _Score = Annotated[float, Field(ge=0, le=1)]
 _Limit = Annotated[int, Field(ge=1, le=500)]
 _TRANSPORT = None
+_JOURNAL_BYTES = 5 * 1024 * 1024
 
 API = "https://api.first.org/data/v1/epss"
 ATTRIBUTION = "FIRST EPSS. Cite the model version and the score date."
@@ -289,9 +291,19 @@ def _persist(rows: list[dict]) -> None:
     directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-epss"))
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "epss-observations.jsonl"
-    with path.open("a", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    previous = directory / "epss-observations.jsonl.1"
+    lock = directory / ".epss-observations.lock"
+    if any(p.is_symlink() for p in (path, previous, lock)):
+        raise ValueError("EPSS journal must not be a symlink")
+    # This diagnostic journal duplicates fetched scores; durable history lives
+    # in the intel store. Bound it to two generations across connector processes.
+    payload = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
+    with lock.open("a") as locked:
+        fcntl.flock(locked, fcntl.LOCK_EX)
+        if path.exists() and path.stat().st_size + len(payload.encode()) > _JOURNAL_BYTES:
+            path.replace(previous)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(payload)
 
 
 def _snapshot_text() -> str:

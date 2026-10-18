@@ -9,6 +9,7 @@ Weekly maintenance takes an integrity-checked store backup first, then compacts 
 | Artefact | Retention |
 | --- | --- |
 | HTTP response cache | Delete responses past their TTL plus seven days of fallback grace; vacuum SQLite |
+| EPSS diagnostic journal | Rotate on write at 5 MiB plus one response batch; keep one previous generation |
 | Downloaded Sigma releases | Keep newest two; delete recognised package files from older releases after 30 days |
 | Pre-migration store backups | Keep newest seven; delete older matching backups after 30 days |
 | Generated public store snapshots | Keep newest seven; delete older matching snapshots after 30 days |
