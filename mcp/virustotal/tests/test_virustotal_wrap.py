@@ -191,4 +191,4 @@ def test_prose_has_no_em_dash():
         ROOT / "skills" / "virustotal" / "SKILL.md",
     ]
     for path in paths:
-        assert "—" not in path.read_text(encoding="utf-8"), path.name
+        assert "\u2014" not in path.read_text(encoding="utf-8"), path.name
