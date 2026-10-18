@@ -166,6 +166,24 @@ def test_set_writes_nothing_when_a_consumer_is_missing(tmp_path: Path):
     assert (root / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").endswith("v0.22.2\n")
 
 
+@pytest.mark.parametrize(
+    "relative,content",
+    [
+        ("docker/Dockerfile", "ARG HERMES_DIGEST=sha256:" + "a" * 64 + "\n"),
+        (".devcontainer/Dockerfile", "FROM example.invalid/image@sha256:" + "a" * 64 + "\n"),
+        ("install/install.sh", "HERMES_PIN_COMMIT=" + "a" * 40 + "\n"),
+    ],
+)
+def test_version_bump_cannot_leave_immutable_pins_on_old_release(tmp_path, relative, content):
+    root = _fixture(tmp_path)
+    target = root / relative
+    _write(target, (target.read_text() if target.is_file() else "") + content)
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    with pytest.raises(pin.PinError, match="manual pin update"):
+        pin.set_pin(root, "v9.9.9")
+    assert {path: path.read_bytes() for path in before} == before
+
+
 def test_set_does_not_need_or_create_workflow_files(tmp_path: Path):
     root = _fixture(tmp_path, ci=False)
     pin.set_pin(root, "v9.9.9")

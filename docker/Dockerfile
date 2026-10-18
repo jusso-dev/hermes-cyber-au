@@ -1,6 +1,6 @@
 # Hermes Agent image with the cyber-au distribution preinstalled.
 # Runtime user and data volume checked against NousResearch/hermes-agent
-# Dockerfile at 43faacf (v0.22.2):
+# Dockerfile at d923a5e (v0.22.2):
 #   useradd -u 10000 -m -d /opt/data hermes
 #   ENV HERMES_HOME=/opt/data
 #   VOLUME ["/opt/data"]

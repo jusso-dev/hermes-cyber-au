@@ -180,6 +180,21 @@ def check_ci(root: Path) -> None:
 def set_pin(root: Path, tag: str) -> None:
     """Write ``tag`` to the pin file and every consumer. All writes happen, or none."""
     release = validate_tag(tag)
+    if release != read_pin(root):
+        # Changing a tag alone would leave the image digest or installer commit
+        # on the old release. These pins must be reviewed and changed together.
+        for rel, marker in (
+            (DOCKER_REL, "HERMES_DIGEST="),
+            (Path(".devcontainer/Dockerfile"), "@sha256:"),
+            (Path("install/install.sh"), "HERMES_PIN_COMMIT="),
+        ):
+            path = _inside(root, rel)
+            if path.is_file() and marker in path.read_text(encoding="utf-8"):
+                raise PinError(
+                    f"Hermes upgrade requires a manual pin update: {rel} pins a digest or "
+                    "installer commit. Update every image digest, installer commit and "
+                    "checksum together with tools/hermes_pin.txt and hermes_requires."
+                )
     planned = _plan(root, release)
     for rel, text in planned:
         _atomic_write(_inside(root, rel), text)

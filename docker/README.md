@@ -55,7 +55,7 @@ docker build -f docker/Dockerfile \
 
 `REVISION` is the commit recorded in `org.opencontainers.image.revision`. The other labels are `org.opencontainers.image.source`, `org.opencontainers.image.version` and `org.opencontainers.image.licenses=Apache-2.0`.
 
-Everything the build downloads is pinned:
+The base image, uv and connector wheels are pinned:
 
 | Input | Pin |
 |---|---|
@@ -64,6 +64,13 @@ Everything the build downloads is pinned:
 | Connector wheels | `install/bootstrap.sh` syncs the locked `mcp/uv.lock`. |
 
 To find the digest for a new Hermes tag, run `docker buildx imagetools inspect nousresearch/hermes-agent:<tag>` and copy the top-level `Digest`.
+
+Hermes version upgrades require a manual pin update. The weekly job stops with an
+explicit error instead of changing a tag while leaving its digest or installer on
+the old release. Update `tools/hermes_pin.txt`, `distribution.yaml`, both image
+pins in `docker/Dockerfile` and `.devcontainer/Dockerfile`, and the installer
+version, commit and checksum in `install/install.sh` together. Verify each
+upstream artifact and run the install checks before merging the upgrade.
 
 The build context ignores `.env`, key files, `tickets/` and `docs/`. The Dockerfile also deletes `tickets/` and `docs/` from the copied source, and it refuses to finish if a `.env`, `auth.json`, `credentials.json`, `.pem` or `.key` file is present. `.env.template` is the empty placeholder and is copied into the profile as `.env.EXAMPLE`.
 
