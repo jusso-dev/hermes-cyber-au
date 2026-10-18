@@ -84,11 +84,12 @@ def feeds(monkeypatch):
     monkeypatch.setattr(asd, "_items_for_feed", items_for_feed)
     monkeypatch.setattr(kev, "_catalog", lambda: (KEV, "miss"))
     monkeypatch.setattr(epss, "_fetch", epss_fetch)
-    monkeypatch.setattr(
-        auscert,
-        "_fetch",
-        lambda force_live=False: auscert._Feed(AUSCERT_XML.read_text(encoding="utf-8"), "miss"),
-    )
+
+    def auscert_fetch(*, force_live=False):
+        assert not force_live, "refresh must not bypass the AusCERT cache and rate limit"
+        return auscert._Feed(AUSCERT_XML.read_text(encoding="utf-8"), "miss")
+
+    monkeypatch.setattr(auscert, "_fetch", auscert_fetch)
     monkeypatch.setattr(abusech, "feodo_blocklist", feodo_blocklist)
     return state
 
