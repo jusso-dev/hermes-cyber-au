@@ -1,6 +1,6 @@
 # Shipped routines
 
-Installing this distribution adds five cron jobs. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
+Installing this distribution adds twelve cron jobs: five feed refreshes that run all day, three agent routines, two nightly store jobs, the weekly maintenance job and the premium exposure watch. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
 
 On a new install, Hermes stores every new job id as paused. On an update, Hermes refreshes the definition for an id that already exists and keeps that job's pause or resume choice. An id that appears for the first time in a later version starts paused, including on an update.
 
@@ -8,10 +8,17 @@ Times follow `timezone: Australia/Sydney` in `config.yaml`.
 
 | Id | Name | When (Sydney) | Delivery |
 |---|---|---|---|
-| `cyberau-ingest-public` | Ingest public feeds | every 60 minutes | `local` |
+| `premium-exposure-watch` | AU org exposure watch | every 6 hours | `origin` |
+| `cyberau-ingest-asd` | Ingest ASD's ACSC feeds | every 30 minutes | `local` |
+| `cyberau-ingest-auscert` | Ingest AusCERT bulletins | every 60 minutes | `local` |
+| `cyberau-ingest-feodo` | Ingest Feodo Tracker C2 list | every 60 minutes | `local` |
+| `cyberau-ingest-kev` | Ingest CISA KEV | every 360 minutes | `local` |
+| `cyberau-ingest-epss` | Ingest EPSS for KEV CVEs | every 720 minutes | `local` |
 | `cyberau-morning-brief` | Morning cyber briefing (AU) | 07:30 every day (`30 7 * * *`) | `origin` |
 | `cyberau-kev-watch` | KEV and EPSS watch for my assets | every 360 minutes | `origin` |
 | `cyberau-weekly-exec` | Weekly executive summary | 08:00 Monday (`0 8 * * 1`) | `origin` |
+| `cyberau-store-expire` | Expire stale feed data | 02:30 every day (`30 2 * * *`) | `local` |
+| `cyberau-watchlist` | Nightly watchlist matches | 04:00 every day (`0 4 * * *`) | `local` |
 | `cyberau-store-maintenance` | Store vacuum and backup | 03:00 Sunday (`0 3 * * 0`) | `local` |
 
 Hermes does not accept the phrase `every 1d at 07:30`. The morning job uses the cron expression `30 7 * * *`. With `timezone: Australia/Sydney`, that is 07:30.
@@ -36,13 +43,13 @@ hermes -p cyber-au cron run cyberau-morning-brief
 │                         Scheduled Jobs (profile: cyber-au)              │
 └─────────────────────────────────────────────────────────────────────────┘
 
-  cyberau-ingest-public [paused]
-    Name:      Ingest public feeds
-    Schedule:  every 60m
+  cyberau-ingest-asd [paused]
+    Name:      Ingest ASD's ACSC feeds
+    Schedule:  every 30m
     Repeat:    ∞
     Next run:  None
     Deliver:   local
-    Script:    cyberau_ingest.sh
+    Script:    cyberau_ingest_asd.sh
     Mode:      no-agent (script stdout delivered directly)
 
   cyberau-morning-brief [paused]
@@ -244,11 +251,20 @@ When the count reaches `cron.failure_nudge_threshold` in `config.yaml` (default 
 
 ## Scripts
 
-`cyberau-ingest-public` and `cyberau-store-maintenance` set `no_agent` and name a script. Hermes resolves that name inside `$HERMES_HOME/scripts/` and runs it with a sanitised environment, so provider credentials are not inherited. The ingest script does not open the profile `.env`. Keyed feeds run inside the agent jobs, where each MCP server receives its keys from `mcp_servers.*.env`.
+The feed, store and watchlist jobs set `no_agent` and name a script. Hermes resolves that name inside `$HERMES_HOME/scripts/` and runs it with a sanitised environment, so provider credentials are not inherited. The scripts do not open the profile `.env`. Keyed feeds run inside the agent jobs, where each MCP server receives its keys from `mcp_servers.*.env`.
 
-These scripts call `cyberau-mcp refresh` and `cyberau-mcp store`. `refresh --sources <keys> --store` fetches each source live through its connector and loads the results into the intel store: ASD and AusCERT items as advisories, KEV entries and EPSS scores (for every KEV CVE) as vulnerabilities, and Feodo Tracker C2 addresses as indicators. A source that only answers from a stale cache or a shipped snapshot counts as failed, and the other sources still run. The first line of output is the summary (`refresh ok: ...` or `refresh failed: <source>: <reason>`), and the exit code is 1 when a required source failed. `attack`, `nvd`, `abusech`, `otx` and `radar` are accepted for the nightly workflow but reported as skipped until they have refresh adapters.
+Each feed has its own job and cadence, matched to the connector's cache and rate limit: ASD every 30 minutes, AusCERT and Feodo Tracker hourly, KEV every 6 hours, and EPSS every 12 hours. `cyberau_ingest_<feed>.sh` calls `cyberau_ingest.sh <feed>`, which runs `cyberau-mcp refresh --sources <feed> --store`. Refresh fetches the feed live through its connector and loads it into the intel store: ASD and AusCERT items as advisories, KEV entries and EPSS scores (for every KEV CVE in the store) as vulnerabilities, and Feodo Tracker C2 addresses as indicators. A source that only answers from a stale cache or a shipped snapshot counts as failed. `attack`, `nvd`, `abusech`, `otx` and `radar` are accepted for the nightly workflow but reported as skipped until they have refresh adapters.
 
-Ingest refreshes the keyless sources `asd`, `kev`, `epss`, `auscert`, and `feodo`. Store maintenance runs `cyberau-mcp store backup`, then `store compact` (retention compaction), then `store vacuum`. Each script prints one line on success and one short line on failure. That line is what Hermes delivers.
+The store never keeps what a feed has withdrawn. After a complete, clean fetch, Feodo Tracker addresses that left the blocklist lose their Feodo evidence (an indicator no other source vouches for is deleted), and CVEs that left KEV lose their KEV fields. `cyberau-store-expire` runs `cyberau-mcp store compact` every night, which folds old observations into counters and deletes ASD and AusCERT advisories and EPSS history older than `cyber_au.store.feed_retention_days` (default 180). `cyberau-watchlist` recomputes watchlist matches every night after that, so a match whose store row expired disappears.
+
+`cyberau-store-maintenance` runs `cyberau-mcp store backup`, then `store compact`, then `store vacuum`. Each script prints one line on success and one short line on failure. That line is what Hermes delivers.
+
+An install upgraded from an earlier version keeps its old `cyberau-ingest-public` and `cyberau-store-vacuum` jobs, because Hermes never deletes a job you have. Remove them once the per-feed jobs are running, so feeds are not fetched twice and two vacuums do not overlap:
+
+```bash
+hermes -p cyber-au cron remove cyberau-ingest-public
+hermes -p cyber-au cron remove cyberau-store-vacuum
+```
 
 ## Morning briefing
 
@@ -309,13 +325,13 @@ After the schedule change, the weekly `local` delivery, and the KEV failure over
 │                         Scheduled Jobs (profile: cyber-au)              │
 └─────────────────────────────────────────────────────────────────────────┘
 
-  cyberau-ingest-public [paused]
-    Name:      Ingest public feeds
-    Schedule:  every 60m
+  cyberau-ingest-asd [paused]
+    Name:      Ingest ASD's ACSC feeds
+    Schedule:  every 30m
     Repeat:    ∞
     Next run:  None
     Deliver:   local
-    Script:    cyberau_ingest.sh
+    Script:    cyberau_ingest_asd.sh
     Mode:      no-agent (script stdout delivered directly)
 
   cyberau-morning-brief [active]
