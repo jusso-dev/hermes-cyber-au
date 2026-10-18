@@ -211,7 +211,8 @@ def _epss(result: Result, run: _Run) -> None:
 def _auscert(result: Result, run: _Run) -> None:
     from cyberau_auscert import source
 
-    feed = source._fetch(force_live=True)
+    # A fresh cache hit is fine; forcing a fetch trips AusCERT's 30 minute limiter.
+    feed = source._fetch()
     if feed.text is None or feed.cache not in _LIVE:
         result.fail("; ".join(feed.warnings) or "AusCERT feed was not fetched live")
         return
