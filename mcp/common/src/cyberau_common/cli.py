@@ -24,6 +24,11 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "store":
         _configure_logging()
         return _store_command(argv[1:])
+    if argv and argv[0] == "refresh":
+        from cyberau_common.refresh import refresh_main
+
+        _configure_logging()
+        return refresh_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="cyberau-mcp")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -60,8 +65,8 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("store", help="Query and update the local intel store")
 
-    refresh = sub.add_parser("refresh", help="Refresh local feed data")
-    refresh.add_argument("rest", nargs=argparse.REMAINDER)
+    # Parsed by refresh_main; listed here for --help.
+    sub.add_parser("refresh", help="Refresh public feeds and optionally load the intel store")
 
     doctor = sub.add_parser("doctor", help="Warn when .env is not mode 600")
     doctor.add_argument("--env", default="", help="Profile .env path")

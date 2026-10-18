@@ -761,7 +761,7 @@ class TestCli:
         assert main(["health", "stub", "--offline"]) == 0
         assert "ok" in capsys.readouterr().out
         assert main(["health", "missing"]) == 1
-        assert main(["refresh"]) == 2
+        assert main(["refresh"]) == 2  # --sources is required
 
 
 class TestRetryAfterParsing:
