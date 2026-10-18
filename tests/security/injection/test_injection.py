@@ -431,14 +431,20 @@ def test_hooks_accept_unknown_kwargs(guard):
 
 
 def test_plugin_register_wires_the_guard():
-    path = ROOT / "plugins" / "cyber-au" / "__init__.py"
-    spec = importlib.util.spec_from_file_location("cyberau_plugin_init", path)
+    # Load the plugin as a package, as Hermes does, under a name no other test uses.
+    name = "cyberau_plugin_injection_test"
+    plugin_dir = ROOT / "plugins" / "cyber-au"
+    spec = importlib.util.spec_from_file_location(
+        name, plugin_dir / "__init__.py", submodule_search_locations=[str(plugin_dir)]
+    )
     if spec is None or spec.loader is None:
-        raise ImportError(path)
+        raise ImportError(plugin_dir)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.modules[name] = module
 
     class _Ctx:
+        """Records middleware and hooks and ignores the plugin's other registrations."""
+
         def __init__(self):
             self.middleware = []
             self.hooks = []
@@ -449,10 +455,19 @@ def test_plugin_register_wires_the_guard():
         def register_hook(self, name, fn):
             self.hooks.append((name, fn))
 
-    ctx = _Ctx()
-    module.register(ctx)
-    assert ("tool_execution", _load_guard().tool_execution) in ctx.middleware
-    assert "pre_tool_call" in {name for name, _fn in ctx.hooks}
+        def __getattr__(self, _attr):
+            return lambda *args, **kwargs: None
+
+    try:
+        spec.loader.exec_module(module)
+        ctx = _Ctx()
+        module.register(ctx)
+        guard = sys.modules[f"{name}.middleware.untrusted"]
+    finally:
+        for loaded in [key for key in sys.modules if key == name or key.startswith(name + ".")]:
+            del sys.modules[loaded]
+    assert ("tool_execution", guard.tool_execution) in ctx.middleware
+    assert ("pre_tool_call", guard.pre_tool_call) in ctx.hooks
 
 
 def test_every_connector_server_is_untrusted():
