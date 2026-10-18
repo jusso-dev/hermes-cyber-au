@@ -1,4 +1,4 @@
-"""cyber-au doctor, update, and store migration commands."""
+"""cyber-au doctor, update, store migration, and audit commands."""
 
 from __future__ import annotations
 
@@ -8,24 +8,34 @@ import shlex
 import sys
 from pathlib import Path
 
-from .doctor import execute, format_json, format_text
+if __package__:
+    from . import update_path
+    from .doctor import execute, format_json, format_text
+else:
+    # install/bootstrap.sh runs this file directly, outside the plugin package.
+    _PLUGIN_DIR = Path(__file__).resolve().parent
+    if str(_PLUGIN_DIR) not in sys.path:
+        sys.path.insert(0, str(_PLUGIN_DIR))
+    import update_path
+    from doctor import execute, format_json, format_text
 
-_PLUGIN_DIR = Path(__file__).resolve().parent
-if str(_PLUGIN_DIR) not in sys.path:
-    sys.path.insert(0, str(_PLUGIN_DIR))
+try:
+    from cyberau_common.audit import add_audit_parser
+    from cyberau_common.audit import dispatch as audit_dispatch
+except ImportError:  # bootstrap can run before the connector packages are installed
+    add_audit_parser = None
+    audit_dispatch = None
 
-import update_path  # noqa: E402
-
-USAGE = "Usage: hermes cyber-au <doctor|update|migrate>"
+USAGE = "Usage: hermes cyber-au <doctor|update|migrate|audit>"
 
 
 def register(ctx) -> None:
     ctx.register_cli_command(
         name="cyber-au",
-        help="Check, update, or migrate the cyber-au profile",
+        help="Check, update, migrate, or audit the cyber-au profile",
         setup_fn=setup_parser,
         handler_fn=handle,
-        description="Doctor, update, and intel-store migration for the cyber-au profile.",
+        description="Doctor, update, store migration, and audit checks for the cyber-au profile.",
     )
     ctx.register_command(
         "cyber-au",
@@ -63,13 +73,23 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
 
     migrate = subs.add_parser("migrate", help="Apply intel store migrations")
     migrate.add_argument("--migrations", type=Path, default=None)
+    # install/bootstrap.sh and the update docs put the profile flags after the
+    # subcommand. SUPPRESS keeps a value given before the subcommand.
+    for sub in (update, migrate):
+        sub.add_argument("--profile", default=argparse.SUPPRESS)
+        sub.add_argument("--profile-home", type=Path, default=argparse.SUPPRESS)
+    if add_audit_parser is not None:
+        add_audit_parser(subs)
     parser.set_defaults(func=handle)
 
 
 def handle(args: argparse.Namespace) -> int:
     command = getattr(args, "cyberau_command", None) or getattr(args, "command", None)
     if command == "doctor":
-        report = execute(offline=bool(getattr(args, "offline", False)), fix=bool(getattr(args, "fix", False)))
+        report = execute(
+            offline=bool(getattr(args, "offline", False)),
+            fix=bool(getattr(args, "fix", False)),
+        )
         text = format_json(report) if getattr(args, "json", False) else format_text(report)
         sys.stdout.write(text)
         return report.exit_code()
@@ -77,12 +97,13 @@ def handle(args: argparse.Namespace) -> int:
         return _migrate(args)
     if command == "update":
         return _update(args)
+    if command == "audit" and audit_dispatch is not None:
+        return audit_dispatch(args)
     print(USAGE, file=sys.stderr)
     return 2
 
 
 def _migrate(args: argparse.Namespace) -> int:
-    profile = getattr(args, "profile", None) or os.environ.get("CYBERAU_PROFILE", "cyber-au")
     home = getattr(args, "profile_home", None)
     if home is None:
         print("migrate needs --profile-home", file=sys.stderr)
