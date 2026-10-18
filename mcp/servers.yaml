@@ -415,6 +415,7 @@ servers:
     lazy: true
     timeout: 120
     enabled_by_default: false
+    default_enabled: false
     required_env: []
   scamwatch:
     connector: scamwatch
@@ -515,7 +516,7 @@ servers:
     lazy: true
     timeout: 60
     enabled_by_default: false
-    disabled_reason: licence terms
+    off_reason: licence terms
     docs: docs/connectors/virustotal.md
     required_env:
     - VTAI_TOKEN

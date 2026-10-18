@@ -6,7 +6,7 @@ Read-only abuse.ch connector: URLhaus, ThreatFox, MalwareBazaar and Feodo Tracke
 
 - Key: `abusech`
 - Server: `abusech`
-- Default: off
+- Default: off: licence terms
 - Upstream: https://abuse.ch/ (URLhaus https://urlhaus-api.abuse.ch/v1/, ThreatFox https://threatfox-api.abuse.ch/api/v1/, MalwareBazaar https://mb-api.abuse.ch/api/v1/, Feodo Tracker https://feodotracker.abuse.ch/downloads/ipblocklist.json)
 - Verified: 2026-10-16
 - Egress hosts: urlhaus-api.abuse.ch, threatfox-api.abuse.ch, mb-api.abuse.ch, feodotracker.abuse.ch

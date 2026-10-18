@@ -58,7 +58,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 
 | Connector | Server | Auth | Default | Docs |
 |---|---|---|---|---|
-| Abuse.ch connector: URLhaus, ThreatFox, MalwareBazaar and Feodo Tracker | `abusech` | `ABUSECH_AUTH_KEY` | off | [docs/connectors/abusech.md](docs/connectors/abusech.md) |
+| Abuse.ch connector: URLhaus, ThreatFox, MalwareBazaar and Feodo Tracker | `abusech` | `ABUSECH_AUTH_KEY` | off: licence terms | [docs/connectors/abusech.md](docs/connectors/abusech.md) |
 | AbuseIPDB IP reputation. Reporting an address is not implemented | `abuseipdb` | `ABUSEIPDB_API_KEY` | on | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
 | ASD ACSC alerts, advisories and publications | `asd` | none | on | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
 | ASD Blueprint for Secure Cloud lookup | `blueprint` | none | on | [docs/connectors/asd-blueprint.md](docs/connectors/asd-blueprint.md) |
@@ -85,6 +85,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Hudson Rock Cavalier connector | `hudsonrock` | `HUDSONROCK_API_KEY` | off | [docs/connectors/hudson-rock.md](docs/connectors/hudson-rock.md) |
 | Intel 471 Titan alerts. Watchers are not created or edited | `intel471` | `INTEL471_EMAIL`, `INTEL471_API_KEY` | off | [docs/connectors/intel471.md](docs/connectors/intel471.md) |
 | IRAP guidance from cyber.gov.au | `irap` | none | on | [docs/connectors/irap.md](docs/connectors/irap.md) |
+| Junction (Microsoft Graph, Defender, Sentinel) | `junction` | none | off | [docs/connectors/junction.md](docs/connectors/junction.md) |
 | MISP connector for a user-supplied instance, including AusMISP | `misp` | `MISP_URL`, `MISP_API_KEY` | off | [docs/connectors/misp.md](docs/connectors/misp.md) |
 | MITRE ATT&CK (STIX 2.1) connector | `attack` | none | on | [docs/connectors/mitre-attack.md](docs/connectors/mitre-attack.md) |
 | NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | none | on | [docs/connectors/ncsc-nz.md](docs/connectors/ncsc-nz.md) |
@@ -107,7 +108,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | TAXII 2.1 client for a user-supplied API root | `taxii` | `TAXII_USERNAME`, `TAXII_PASSWORD` | off | [docs/connectors/taxii-ctis.md](docs/connectors/taxii-ctis.md) |
 | Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` (optional) | on | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
 | UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [docs/connectors/upguard.md](docs/connectors/upguard.md) |
-| virustotal | not listed | `VTAI_TOKEN` | not listed | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
+| virustotal | `virustotal` | `VTAI_TOKEN` | off: licence terms | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
 <!-- connectors:end -->
 
 Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).

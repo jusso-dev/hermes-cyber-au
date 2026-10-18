@@ -345,6 +345,7 @@ def parse_source_md(text: str) -> dict[str, str]:
     for line in text.splitlines():
         if mode == "head":
             if line.startswith("# "):
+                fields["title"] = line[2:].strip()
                 mode = "meta"
             continue
         if mode == "meta" and line.startswith("- ") and ": " in line[2:]:
@@ -406,7 +407,8 @@ def index_servers(path: Path) -> dict[str, list[tuple[str, dict]]]:
     for name, spec in servers.items():
         if not isinstance(spec, dict):
             continue
-        key = spec.get("connector")
+        # A wrap with no local package (virustotal, junction) is matched on its server name.
+        key = spec.get("connector", name)
         if not isinstance(key, str):
             continue
         grouped.setdefault(key, []).append((str(name), spec))
@@ -464,14 +466,19 @@ def server_cell(names: list[str]) -> str:
     return ", ".join(f"`{name}`" for name in names)
 
 
-def default_label(flags: list[bool | None]) -> str:
+def default_label(flags: list[bool | None], reasons: list[str] | None = None) -> str:
     if not flags or any(flag is None for flag in flags):
         return "not listed"
     if all(flag is True for flag in flags):
         return "on"
     if all(flag is False for flag in flags):
-        return "off"
+        reason = next((item for item in reasons or [] if item), "")
+        return f"off: {reason}" if reason else "off"
     return "mixed"
+
+
+def off_reasons(specs: list[tuple[str, dict]]) -> list[str]:
+    return [str(spec.get("off_reason") or "").strip() for _name, spec in specs]
 
 
 def manifest_flags(specs: list[tuple[str, dict]]) -> list[bool | None]:
@@ -989,11 +996,11 @@ def build(root: Path) -> dict[str, str]:
             [extracted.server_name] if extracted.server_name else []
         )
         flags = manifest_flags(specs)
-        default = default_label(flags) if specs else "not listed"
+        default = default_label(flags, off_reasons(specs)) if specs else "not listed"
         summary = ""
         if extracted.docstring:
             summary = extracted.docstring.strip().splitlines()[0].strip()
-        name = display_name(extracted.docstring, key)
+        name = display_name(extracted.docstring, fields.get("title") or key)
         tools = [
             render_tool(tool_name, description, inputs, responses)
             for tool_name, description in _tool_order(extracted, inputs, responses)

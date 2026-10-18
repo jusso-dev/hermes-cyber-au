@@ -653,4 +653,4 @@ def test_ships_off_by_default_with_the_terms_documented():
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     row = next(line for line in readme.splitlines() if "| `abusech` |" in line)
     assert "[docs/connectors/abusech.md](docs/connectors/abusech.md)" in row
-    assert "off: non-commercial terms" in row
+    assert f"off: {entry['off_reason']}" in row
