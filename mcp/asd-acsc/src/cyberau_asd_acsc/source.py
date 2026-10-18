@@ -16,7 +16,7 @@ from typing import Annotated, Literal
 from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
-from cyberau_common import USER_AGENT
+from cyberau_common import __version__
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -46,6 +46,9 @@ _ATTACK = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TRANSPORT = None
 _SLEEP = time.sleep
+# cyber.gov.au drops requests without a response when the user agent carries a
+# URL, an email address or "github", so the shared contact user agent hangs.
+USER_AGENT = f"hermes-cyber-au/{__version__}"
 _DIRECT = {
     "user-agent": USER_AGENT,
     "accept": "application/rss+xml, application/xml, text/xml, */*",

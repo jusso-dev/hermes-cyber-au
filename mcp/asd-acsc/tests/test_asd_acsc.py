@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import time
 from pathlib import Path
@@ -443,3 +444,9 @@ def asyncio_tools():
 
     listed = asyncio.run(build_server(connector()).list_tools())
     return {tool.name: tool for tool in listed}
+
+
+def test_user_agent_avoids_patterns_the_asd_waf_drops():
+    for headers in (source._DIRECT, source._BROWSER):
+        assert headers["user-agent"].startswith("hermes-cyber-au/")
+        assert not re.search(r"https?:|@|github", headers["user-agent"], re.I)
