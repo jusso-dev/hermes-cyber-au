@@ -43,6 +43,7 @@ class ValidateRepoTest(unittest.TestCase):
         self.assertNotIn("secrets.", text)
         self.assertIn("tools/ci/validate_repo.py", text)
         self.assertIn("tools/ci/style_check.py", text)
+        self.assertIn("group: ${{ github.workflow }}-${{ github.ref }}", text)
         self.assertNotIn("\u2014", text)
 
     def test_workflow_pins_every_action_to_a_full_sha(self):
