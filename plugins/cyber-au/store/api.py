@@ -571,7 +571,9 @@ def export_records(
     """Copy records out of the store.
 
     When ``max_tlp`` is omitted, ``AMBER`` and above stay in the store. Pass
-    ``max_tlp`` to request a higher ceiling. This is not a STIX or DuckDB export.
+    ``max_tlp`` to request a higher ceiling. The STIX export is in ``stix.py`` and
+    the DuckDB analytics export, which uses the same default ceiling, is in
+    ``analytics.py``.
     """
     chosen = _require_kinds(kinds)
     ceiling = EXPORT_DEFAULT_TLP if max_tlp is None else require_tlp(max_tlp)
