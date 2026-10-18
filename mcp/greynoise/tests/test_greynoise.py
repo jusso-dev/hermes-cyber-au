@@ -284,9 +284,7 @@ def test_live_health_ignores_cache(tmp_path, monkeypatch):
     ],
 )
 def test_live_health_validates_not_observed_response(payload, healthy):
-    source._TRANSPORT = httpx.MockTransport(
-        lambda _request: httpx.Response(404, json=payload)
-    )
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(404, json=payload))
     assert connector().health(live=True).ok is healthy
 
 
