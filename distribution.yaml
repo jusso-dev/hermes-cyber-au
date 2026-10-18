@@ -74,3 +74,96 @@ env_requires:
   - name: HINDSIGHT_API_KEY
     description: "Optional API key for your Hindsight server. Read from the environment. No key is shipped."
     required: false
+  - name: CLOUDFLARE_URLSCAN_API_TOKEN
+    description: "Cloudflare URL Scanner token (Account > URL Scanner > Edit). The cfscan server is off by default."
+    required: false
+  - name: CLOUDFLARE_ACCOUNT_ID
+    description: "Cloudflare account id for the URL Scanner. Used only with CLOUDFLARE_URLSCAN_API_TOKEN."
+    required: false
+  - name: GITHUB_ADVISORY_TOKEN
+    description: "Fine-grained GitHub token with no repository permissions, for the GitHub Advisory Database. The ghsa server returns no data without it."
+    required: false
+  - name: HIBP_API_KEY
+    description: "Have I Been Pwned key (paid subscription). Breach metadata works without it; account and domain lookups need it."
+    required: false
+  - name: CYBERAU_APPROVAL_KEY
+    description: "Random local secret that signs approval tokens for HIBP account and domain lookups. Not a vendor key. See .env.template for how to create one."
+    required: false
+  - name: PHISHTANK_APP_KEY
+    description: "Optional PhishTank application key. Without it PhishTank allows only a few downloads a day."
+    required: false
+  - name: VTAI_TOKEN
+    description: "Your own VirusTotal AI token. The virustotal server is off by default because of the licence terms."
+    required: false
+  - name: MISP_URL
+    description: "Your own MISP instance URL, including AusMISP. The misp server is off until enabled in config.yaml."
+    required: false
+  - name: MISP_API_KEY
+    description: "Read-only API key for MISP_URL. Never commit a value."
+    required: false
+  - name: RANSOMWARE_LIVE_API_KEY
+    description: "Optional free ransomware.live PRO key. The connector ships disabled."
+    required: false
+  - name: CLOUDFLARE_RADAR_API_TOKEN
+    description: "Cloudflare custom token with Account > Radar > Read only."
+    required: false
+  - name: HUDSONROCK_API_KEY
+    description: "Premium, bring your own licence. Hudson Rock Cavalier API key."
+    required: false
+  - name: SPYCLOUD_API_KEY
+    description: "Premium, bring your own licence. SpyCloud API key."
+    required: false
+  - name: UPGUARD_API_KEY
+    description: "Premium, bring your own licence. UpGuard API key with read permissions only."
+    required: false
+  - name: RECORDED_FUTURE_API_TOKEN
+    description: "Premium, bring your own licence. Recorded Future API token."
+    required: false
+  - name: RECORDED_FUTURE_ORG_ID
+    description: "Premium. Optional Recorded Future organisation id, for tokens that cover more than one organisation."
+    required: false
+  - name: RECORDED_FUTURE_MCP_CLIENT_ID
+    description: "Premium. OAuth client id for the official Recorded Future MCP server."
+    required: false
+  - name: RECORDED_FUTURE_MCP_CLIENT_SECRET
+    description: "Premium. OAuth client secret for the official Recorded Future MCP server."
+    required: false
+  - name: FLASHPOINT_API_TOKEN
+    description: "Premium, bring your own licence. Flashpoint Ignite API token."
+    required: false
+  - name: INTEL471_EMAIL
+    description: "Premium, bring your own licence. Intel 471 account email (HTTP Basic username)."
+    required: false
+  - name: INTEL471_API_KEY
+    description: "Premium, bring your own licence. Intel 471 API key (HTTP Basic password)."
+    required: false
+  - name: GTI_API_KEY
+    description: "Premium, bring your own licence. Google Threat Intelligence (DTM) API key."
+    required: false
+  - name: FALCON_CLIENT_ID
+    description: "Premium, bring your own licence. CrowdStrike Falcon API client id."
+    required: false
+  - name: FALCON_CLIENT_SECRET
+    description: "Premium, bring your own licence. CrowdStrike Falcon API client secret."
+    required: false
+  - name: FALCON_BASE_URL
+    description: "Premium. Optional CrowdStrike Falcon API base URL for your cloud region."
+    required: false
+  - name: SOCRADAR_API_KEY
+    description: "Premium, bring your own licence. SOCRadar company API key."
+    required: false
+  - name: SOCRADAR_COMPANY_ID
+    description: "Premium. SOCRadar numeric company id."
+    required: false
+  - name: DARKOWL_PUBLIC_KEY
+    description: "Premium, bring your own licence. DarkOwl public API key."
+    required: false
+  - name: DARKOWL_PRIVATE_KEY
+    description: "Premium, bring your own licence. DarkOwl private API key, used only to sign requests."
+    required: false
+  - name: FLARE_API_KEY
+    description: "Premium, bring your own licence. Flare API key."
+    required: false
+  - name: FLARE_TENANT_ID
+    description: "Premium. Optional Flare tenant id."
+    required: false

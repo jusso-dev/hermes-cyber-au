@@ -1084,6 +1084,65 @@ def stale_files(root: Path, files: dict[str, str]) -> list[str]:
     return problems
 
 
+# Names a server manifest reads that the user does not set: Hermes, bootstrap
+# or a role profile overlay supplies them.
+RUNTIME_ENV = frozenset(
+    {"CYBERAU_DATA_DIR", "CYBERAU_PROFILE_ROLE", "HERMES_HOME", "HINDSIGHT_READ_ONLY"}
+)
+_PLACEHOLDER_NAME = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
+_TEMPLATE_NAME = re.compile(r"^#?[ \t]*([A-Z][A-Z0-9_]*)=", re.MULTILINE)
+
+
+def manifest_env_names(path: Path) -> dict[str, list[str]]:
+    """Map each environment name a server reads to the servers that read it."""
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    found: dict[str, list[str]] = {}
+    for server, spec in (data.get("servers") or {}).items():
+        if not isinstance(spec, dict):
+            continue
+        names: list[str] = []
+        for entry in spec.get("env") or []:
+            if isinstance(entry, str):
+                names.extend(_PLACEHOLDER_NAME.findall(entry))
+        names.extend(n for n in spec.get("required_env") or [] if isinstance(n, str))
+        if isinstance(spec.get("token_env"), str):
+            names.append(spec["token_env"])
+        for name in names:
+            servers = found.setdefault(name, [])
+            if str(server) not in servers:
+                servers.append(str(server))
+    return found
+
+
+def env_doc_problems(root: Path) -> list[str]:
+    """Every user-set name in mcp/servers.yaml must be in .env.template and env_requires."""
+    used = manifest_env_names(root / "mcp" / "servers.yaml")
+    template_path = root / ".env.template"
+    template = template_path.read_text(encoding="utf-8") if template_path.exists() else ""
+    in_template = set(_TEMPLATE_NAME.findall(template))
+    dist_path = root / "distribution.yaml"
+    dist = yaml.safe_load(dist_path.read_text(encoding="utf-8")) if dist_path.exists() else {}
+    in_dist = {
+        str(item.get("name"))
+        for item in (dist or {}).get("env_requires") or []
+        if isinstance(item, dict)
+    }
+    problems: list[str] = []
+    for name in sorted(used):
+        if name in RUNTIME_ENV:
+            continue
+        servers = ", ".join(used[name])
+        if name not in in_template:
+            problems.append(f"env {name} (server {servers}) is missing from .env.template")
+        if name not in in_dist:
+            problems.append(
+                f"env {name} (server {servers}) is missing from distribution.yaml env_requires"
+            )
+    return problems
+
+
 def write(root: Path, files: dict[str, str]) -> None:
     docs_dir = root / "docs" / "connectors"
     docs_dir.mkdir(parents=True, exist_ok=True)
@@ -1108,7 +1167,9 @@ def main(argv: list[str] | None = None) -> int:
     root = (args.root or Path(__file__).resolve().parents[1]).resolve()
     files = build(root)
     problems = stale_files(root, files)
+    env_problems = env_doc_problems(root)
     if args.check:
+        problems += env_problems
         if problems:
             print("connector docs are stale:", file=sys.stderr)
             for item in problems:
@@ -1122,6 +1183,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     write(root, files)
     print(f"wrote {len(files)} files")
+    if env_problems:
+        print("environment names are not documented:", file=sys.stderr)
+        for item in env_problems:
+            print(f"  {item}", file=sys.stderr)
+        print("Add them by hand to .env.template and distribution.yaml.", file=sys.stderr)
+        return 1
     return 0
 
 
