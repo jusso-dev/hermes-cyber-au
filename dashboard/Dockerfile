@@ -8,7 +8,7 @@
 # comma separated, or the page answers 421 (Misdirected Request):
 #   -e CYBERAU_DASHBOARD_ALLOWED_HOSTS=192.168.1.10,dashboard.example.com
 # localhost, 127.0.0.1 and ::1 are always allowed.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
