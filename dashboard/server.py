@@ -155,6 +155,19 @@ def state_text(job: dict) -> str:
     return "not recorded (definition only)"
 
 
+def last_status_text(job: dict, state: str) -> str:
+    status = str(job.get("last_status") or "no run recorded")
+    if state == "paused" and status.lower() in {"error", "failed", "fail"}:
+        return "historical error; job paused"
+    return status
+
+
+def next_run_text(job: dict, state: str) -> str:
+    if state == "paused":
+        return "not scheduled while paused"
+    return str(job.get("next_run_at") or "not recorded")
+
+
 def report_dir(profile: Path, job_id: str) -> Path | None:
     if not JOB_ID_RE.fullmatch(job_id):
         return None
@@ -463,6 +476,7 @@ def render_index(profile: Path) -> bytes:
         for job in jobs:
             job_id = str(job.get("id", ""))
             name = job.get("name", "")
+            state = state_text(job)
             error = truncate(job["last_error"], ERROR_LIMIT) if job.get("last_error") else ""
             report = latest_report(profile, job_id)
             if report is None:
@@ -473,12 +487,12 @@ def render_index(profile: Path) -> bytes:
                 "<tr>"
                 f"<td><code>{esc(job_id)}</code></td>"
                 f"<td>{esc(name)}</td>"
-                f"<td>{esc(state_text(job))}</td>"
+                f"<td>{esc(state)}</td>"
                 f"<td>{esc(schedule_text(job))}</td>"
                 f"<td>{esc(job.get('deliver') or 'not set')}</td>"
-                f"<td>{esc(job.get('last_status') or 'no run recorded')}</td>"
+                f"<td>{esc(last_status_text(job, state))}</td>"
                 f"<td>{esc(error)}</td>"
-                f"<td>{esc(job.get('next_run_at') or 'not recorded')}</td>"
+                f"<td>{esc(next_run_text(job, state))}</td>"
                 f"<td>{latest}</td>"
                 "</tr>"
             )

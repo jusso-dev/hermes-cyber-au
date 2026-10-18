@@ -75,11 +75,34 @@ def test_jobs_render_runtime_fields(profile: Path) -> None:
     assert "30 7 * * *" in body
     assert "origin" in body
     assert "paused" in body
-    assert "2026-10-18T07:30:00+11:00" in body
+    assert "historical error; job paused" in body
+    assert "not scheduled while paused" in body
+    assert "2026-10-18T07:30:00+11:00" not in body
     assert "x" * 400 not in body  # truncated
     assert "x" * 300 in body
     assert "07:30 Australia/Sydney" in body
     assert "do nothing until" in body
+
+
+def test_enabled_job_retains_error_and_next_run(profile: Path) -> None:
+    _write_jobs(
+        profile,
+        [
+            {
+                "id": "cyberau-kev-watch",
+                "name": "KEV watch",
+                "schedule": {"kind": "cron", "expr": "0 * * * *"},
+                "state": "enabled",
+                "last_status": "error",
+                "next_run_at": "2026-10-18T08:00:00+11:00",
+            }
+        ],
+    )
+    status, body = _get(profile, "/")
+    assert status == 200
+    assert ">error<" in body
+    assert "historical error; job paused" not in body
+    assert "2026-10-18T08:00:00+11:00" in body
 
 
 def test_shipped_jobs_file_without_runtime_fields(profile: Path) -> None:
