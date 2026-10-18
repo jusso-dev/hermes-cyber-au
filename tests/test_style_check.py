@@ -141,6 +141,49 @@ class StyleCheckTest(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(hints, [])
 
+    def test_added_name_is_caught_by_the_hash_file(self):
+        with _TempTree() as root:
+            names = root / "tools" / "ci" / "private_names.sha256"
+            names.parent.mkdir(parents=True)
+            names.write_text("# header\n", encoding="utf-8")
+            self.assertTrue(self.mod.add_name(names, "  Blue   Falcon. "))
+            self.assertFalse(self.mod.add_name(names, "blue falcon"))
+            stored = names.read_text(encoding="utf-8")
+            self.assertNotIn("falcon", stored.lower())
+            (root / "notes.md").write_text("Ask Blue-Falcon first.\n", encoding="utf-8")
+            errors, _hints = self.mod.check(root)
+        self.assertTrue(any(item.endswith("banned private name") for item in errors))
+
+    def test_add_name_refuses_empty_and_unmatchable_names(self):
+        with _TempTree() as root:
+            names = root / "private_names.sha256"
+            with self.assertRaises(ValueError):
+                self.mod.add_name(names, " -- ")
+            with self.assertRaises(ValueError):
+                self.mod.add_name(names, "one two three four five")
+
+    def test_empty_list_warns_and_require_names_fails(self):
+        import contextlib
+        import io
+        import os
+        from unittest import mock
+
+        with _TempTree() as root:
+            names = root / "tools" / "ci" / "private_names.sha256"
+            names.parent.mkdir(parents=True)
+            names.write_text("# no hashes yet\n", encoding="utf-8")
+            (root / "notes.md").write_text("Plain text.\n", encoding="utf-8")
+            env = {k: v for k, v in os.environ.items() if not k.startswith("CYBERAU_")}
+            env["GITHUB_ACTIONS"] = "true"
+            out = io.StringIO()
+            with mock.patch.dict(os.environ, env, clear=True), contextlib.redirect_stdout(out):
+                self.assertEqual(self.mod.main(["--root", str(root)]), 0)
+                self.assertEqual(self.mod.main(["--root", str(root), "--require-names"]), 1)
+            self.assertIn("::warning title=Private name check inactive::", out.getvalue())
+            self.mod.add_name(names, "example private")
+            with mock.patch.dict(os.environ, env, clear=True), contextlib.redirect_stdout(out):
+                self.assertEqual(self.mod.main(["--root", str(root), "--require-names"]), 0)
+
 
 class _TempTree:
     def __enter__(self) -> Path:

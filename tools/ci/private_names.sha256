@@ -1,6 +1,9 @@
 # SHA-256 hashes of banned private names, one lowercase hex digest per line.
 # The names themselves stay out of this public repository.
-# Add a name with: printf '%s' 'the name' | shasum -a 256
-# Optional local names can be supplied as newline-separated plaintext in
-# CYBERAU_PRIVATE_NAMES. The workflow does not set that variable and does
-# not carry a secret.
+# These hashes are not secret: an unsalted SHA-256 of a short name can be
+# reversed with a word list. Use the CYBERAU_PRIVATE_NAMES repository secret
+# for any name that must not be guessable.
+# Add a name without echoing it:
+#   uv run --project mcp python tools/ci/style_check.py --add-name
+# The tool lowercases the name and joins its words with single spaces.
+# While this list is empty the check warns on every run that it is inactive.
