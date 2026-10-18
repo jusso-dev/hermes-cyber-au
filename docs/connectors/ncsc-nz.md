@@ -6,7 +6,7 @@ Read-only NCSC NZ alerts (formerly CERT NZ).
 
 - Key: `ncsc-nz`
 - Server: `ncscnz`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://www.ncsc.govt.nz/alerts/ HTML list (`?start=N`, 12 alerts a page). No RSS. cert.govt.nz redirects here.
 - Verified: 2026-10-16 the alerts page returned 200 from the build box. On 2026-10-17 live health returned ok from this host over HTTP/1.1 and the first page parsed to 12 alerts. An HTTP/2 GET from this host received a bot-check 403.
 - Egress hosts: www.ncsc.govt.nz

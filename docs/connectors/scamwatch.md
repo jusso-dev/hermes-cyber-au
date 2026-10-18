@@ -6,7 +6,7 @@ Read-only Scamwatch homepage alerts.
 
 - Key: `scamwatch`
 - Server: `scamwatch`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://www.scamwatch.gov.au/
 - Verified: 2026-10-17
 - Egress hosts: www.scamwatch.gov.au

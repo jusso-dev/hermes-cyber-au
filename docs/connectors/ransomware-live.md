@@ -6,7 +6,7 @@ Read-only ransomware.live victim claims for Australia.
 
 - Key: `ransomware-live`
 - Server: `ransomlive`
-- Default: off
+- Default: off: licence terms
 - Upstream: https://www.ransomware.live/apidocs
 - Verified: 2026-10-16
 - Egress hosts: api-pro.ransomware.live, api.ransomware.live

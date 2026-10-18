@@ -6,7 +6,7 @@ Read-only assessments from a ThreatSieve instance the operator already runs.
 
 - Key: `threatsieve`
 - Server: `threatsieve`
-- Default: on
+- Default: off: requires local setup
 - Upstream: https://github.com/jusso-dev/ThreatSieve/blob/HEAD/docs/api.md
 - Verified: 2026-10-17
 - Egress hosts: 127.0.0.1, localhost

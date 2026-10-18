@@ -614,6 +614,13 @@ def _connector_check(
 ) -> Check:
     check_id = f"connector.{name}"
     key = _connector_key(spec, name)
+    enabled = _is_enabled(spec)
+    if not enabled:
+        reason = str(spec.get("off_reason") or "disabled in profile")
+        detail = f"off: {reason}; probes skipped"
+        if external:
+            detail += "; external server"
+        return _item(check_id, "warn", detail)
     if external:
         return _external_check(ctx, check_id, name, spec)
     if not _connector_installed(ctx.root, key):

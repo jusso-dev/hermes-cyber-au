@@ -6,7 +6,7 @@ Read-only AusCERT public security bulletins.
 
 - Key: `auscert`
 - Server: `auscert`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://portal.auscert.org.au/rss/bulletins/ (the old https://www.auscert.org.au/rss/bulletins/ path returns a 404 page)
 - Verified: 2026-10-17
 - Egress hosts: portal.auscert.org.au

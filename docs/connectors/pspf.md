@@ -6,7 +6,7 @@ Read-only Protective Security Policy Framework quotations.
 
 - Key: `pspf`
 - Server: `pspf`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026 and https://www.protectivesecurity.gov.au/protective-security-directions-under-pspf
 - Verified: 2026-10-17
 - Egress hosts: www.protectivesecurity.gov.au

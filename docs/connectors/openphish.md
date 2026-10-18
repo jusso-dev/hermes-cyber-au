@@ -6,7 +6,7 @@ Read-only OpenPhish community feed. Never requests the URL under test.
 
 - Key: `openphish`
 - Server: `phish`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://openphish.com/feed.txt
 - Verified: 2026-10-17
 - Egress hosts: openphish.com, raw.githubusercontent.com

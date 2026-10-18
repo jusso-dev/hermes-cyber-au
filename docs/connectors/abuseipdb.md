@@ -6,7 +6,7 @@ Read-only AbuseIPDB IP reputation. Reporting an address is not implemented.
 
 - Key: `abuseipdb`
 - Server: `abuseipdb`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://docs.abuseipdb.com/
 - Verified: 2026-10-16
 - Egress hosts: api.abuseipdb.com

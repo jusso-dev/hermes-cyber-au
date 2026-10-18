@@ -1038,6 +1038,32 @@ def build(root: Path) -> dict[str, str]:
     readme = splice_readme(readme_path.read_text(encoding="utf-8"), block)
     files = dict(pages)
     files["README.md"] = readme
+    terms = [
+        "# Data sources",
+        "",
+        "Generated from `feeds/catalogue.yaml`. "
+        "Terms below are recorded source claims, not legal advice.",
+        "Sources with unconfirmed or non-commercial terms stay off "
+        "until the operator verifies permission.",
+        "",
+    ]
+    for feed in feeds:
+        terms.extend(
+            [
+                f"## {feed['name']} ({feed['id']})",
+                "",
+                f"Connector: `{feed['connector']}`. "
+                f"Default: {'on' if feed['enabled_by_default'] else 'off'}.",
+                "",
+                f"Source: {feed['url']}",
+                "",
+                f"Terms: {feed['licence']}",
+                "",
+            ]
+        )
+        if feed.get("notes"):
+            terms.extend([str(feed["notes"]), ""])
+    files["docs/reference/data-sources.md"] = "\n".join(terms)
     return files
 
 

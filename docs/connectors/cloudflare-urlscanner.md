@@ -6,7 +6,7 @@ Cloudflare URL Scanner. Submits are Unlisted and approval-gated.
 
 - Key: `cloudflare-urlscanner`
 - Server: `cfscan`
-- Default: off
+- Default: off: licence terms
 - Upstream: https://developers.cloudflare.com/radar/investigate/url-scanner/
 - Verified: 2026-10-16
 - Egress hosts: api.cloudflare.com

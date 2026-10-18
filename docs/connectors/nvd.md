@@ -22,17 +22,13 @@ Credential values are read from the profile environment. Nothing on this page is
 
 Server manifest `env` entry: `NVD_API_KEY=${NVD_API_KEY}`.
 
-Server manifest `required_env`: `NVD_API_KEY`.
-
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
-| `NVD_API_KEY` | credential | yes | yes | `lookup` |
+| `NVD_API_KEY` | credential | yes | no | `lookup` |
 | `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_NVD_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
-
-`NVD_API_KEY` is optional in `SOURCE.md`. `mcp/servers.yaml` lists it under `required_env`.
 
 ## Rate limits
 

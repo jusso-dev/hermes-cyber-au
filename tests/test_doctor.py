@@ -521,7 +521,7 @@ def test_checkout_reports_only_installed_connectors_and_named_gaps(tmp_path: Pat
         installed = (REPO / "mcp" / key / "pyproject.toml").is_file() or key == "stub"
         if doctor._is_external(spec):
             assert "external server" in item.detail
-        elif installed:
+        elif installed or not doctor._is_enabled(spec):
             assert item.detail != "not installed"
         else:
             assert item.detail == "not installed"
@@ -758,3 +758,25 @@ def test_live_only_snapshot_absence_warns_but_corruption_fails(
     assert item.status == ("warn" if content is None else "fail")
     if content is None:
         assert "no local snapshot" in item.detail
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_disabled_connector_skips_keys_installation_and_probes(tmp_path, installed):
+    root = healthy(tmp_path)
+    config = yaml.safe_load((root / "config.yaml").read_text())
+    config["mcp_servers"] = {"kev": {"enabled": False}}
+    (root / "config.yaml").write_text(yaml.safe_dump(config))
+    catalogue = yaml.safe_load((root / "mcp/servers.yaml").read_text())
+    catalogue["servers"]["kev"].update(
+        {"required_env": ["OPTIONAL_KEY"], "off_reason": "licence terms"}
+    )
+    (root / "mcp/servers.yaml").write_text(yaml.safe_dump(catalogue))
+    if not installed:
+        shutil.rmtree(root / "mcp/cisa-kev")
+
+    def unexpected_probe(*_args):
+        raise AssertionError("disabled connector was probed")
+
+    item = ids(run(root, health=unexpected_probe))["connector.kev"]
+    assert item.status == "warn"
+    assert "off: licence terms" in item.detail

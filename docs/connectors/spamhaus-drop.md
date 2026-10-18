@@ -6,7 +6,7 @@ Read-only Spamhaus DROP, DROPv6 and ASN-DROP lists.
 
 - Key: `spamhaus-drop`
 - Server: `drop`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://www.spamhaus.org/blocklists/do-not-route-or-peer/
 - Verified: 2026-10-17
 - Egress hosts: www.spamhaus.org

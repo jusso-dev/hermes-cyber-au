@@ -6,7 +6,7 @@ Read-only crt.sh certificate transparency search.
 
 - Key: `crtsh`
 - Server: `crtsh`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://crt.sh/
 - Verified: 2026-10-17
 - Egress hosts: crt.sh
