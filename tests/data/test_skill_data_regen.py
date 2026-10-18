@@ -80,9 +80,16 @@ def test_parser_check_is_absent(tmp_path, capsys):
     assert TOKEN not in captured.out + captured.err
 
 
-def test_cli_regen_forwards_flags(capsys):
+def test_cli_regen_forwards_flags(tmp_path, capsys, monkeypatch):
+    # Work on a copy so the CLI never rewrites the shipped Sigma snapshot.
+    shutil.copytree(ROOT / "mcp" / "sigma" / "data", tmp_path / "mcp" / "sigma" / "data")
+    monkeypatch.chdir(tmp_path)
+    assert main(["regen", "sigma"]) == 0
+    assert "Sigma data is unchanged." in capsys.readouterr().out
     assert main(["regen", "sigma", "--force"]) == 0
-    assert SKIP_MESSAGES["sigma"] in capsys.readouterr().out
+    assert "Regenerated Sigma data in mcp/sigma/data." in capsys.readouterr().out
+    assert main(["regen", "e8"]) == 0
+    assert SKIP_MESSAGES["e8"] in capsys.readouterr().out
 
 
 def test_cli_parser_check_is_absent(tmp_path, capsys):
