@@ -234,12 +234,14 @@ def test_http_errors_retry_timeout_and_egress(monkeypatch):
     assert "pdf" in pdf["warnings"][0]
 
 
-def test_live_health_uses_one_call(monkeypatch):
+@pytest.mark.parametrize("spacing", [" ", "&nbsp;", "&#160;", "\u00a0", "\n"])
+def test_live_health_uses_one_call(monkeypatch, spacing):
     monkeypatch.delenv("CYBERAU_OFFLINE")
     calls = {"n": 0}
-    body = b"<html>ransomware within 72 hours</html>"
+    body = f"<html>ransomware within 72{spacing}hours</html>".encode()
 
     def ok(_request: httpx.Request) -> httpx.Response:
+        assert str(_request.url) == CSA_TEXT
         calls["n"] += 1
         return httpx.Response(200, content=body)
 
@@ -253,6 +255,13 @@ def test_live_health_uses_one_call(monkeypatch):
     failed = connector().health(live=True)
     assert failed.ok is False
     assert "503" in failed.detail
+
+
+def test_live_health_rejects_viewer_shell():
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=b"<html>Cyber Security Act viewer</html>")
+    )
+    assert connector().health(live=True).ok is False
 
 
 def test_cassettes_replay():

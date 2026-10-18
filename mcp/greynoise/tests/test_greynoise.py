@@ -274,6 +274,22 @@ def test_live_health_ignores_cache(tmp_path, monkeypatch):
     assert failed.detail != "live ok"
 
 
+@pytest.mark.parametrize(
+    ("payload", "healthy"),
+    [
+        ({"ip": "1.1.1.1", "noise": False, "riot": False}, True),
+        ({"ip": "9.9.9.9", "noise": False, "riot": False}, False),
+        ({"ip": "1.1.1.1", "noise": "false", "riot": False}, False),
+        ({"message": "Not Found"}, False),
+    ],
+)
+def test_live_health_validates_not_observed_response(payload, healthy):
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(404, json=payload)
+    )
+    assert connector().health(live=True).ok is healthy
+
+
 def test_timeout_redacts_secret(monkeypatch):
     secret = "super-secret-greynoise-value"
     monkeypatch.setenv("GREYNOISE_API_KEY", secret)

@@ -107,8 +107,10 @@ class _GreyNoiseConnector(Connector):
         problem = schema_drift(payload or {})
         if problem:
             return Probe(self.key, False, problem)
-        if payload is None or _not_observed(payload):
-            return Probe(self.key, False, "live probe returned no classification")
+        if not _same_ip(payload.get("ip"), "1.1.1.1"):
+            return Probe(self.key, False, "live probe returned a different IP")
+        if _not_observed(payload):
+            return Probe(self.key, True, "live ok; probe IP not observed")
         record = _record(payload)
         mismatch = _response_problem(record)
         if mismatch:

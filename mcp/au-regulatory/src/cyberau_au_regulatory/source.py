@@ -7,6 +7,7 @@ import re
 import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+from html import unescape
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -35,7 +36,12 @@ OAIC_SCHEME = (
 )
 CYBER_REPORT = "https://www.cyber.gov.au/report-a-cyber-security-incident"
 CISC_PDF = "https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf"
-CSA_TEXT = "https://www.legislation.gov.au/C2024A00098/latest/text"
+# Probe the published text cited by the snapshot, not the JavaScript viewer.
+# This checks source availability, not whether the Act has since been amended.
+CSA_TEXT = (
+    "https://www.legislation.gov.au/C2024A00098/asmade/2024-11-29/"
+    "text/2/epub/OEBPS/document_1/document_1.html"
+)
 ATTRIBUTION = (
     "Quotes are from Commonwealth legislation on the Federal Register of Legislation. "
     "This is guidance, not legal advice, and it is not a substitute for reading the Act "
@@ -508,7 +514,7 @@ def _page_text(body: bytes, url: str) -> tuple[str | None, str]:
 
 
 def _missing_markers(text: str, markers: tuple[str, ...]) -> list[str]:
-    folded = text.lower()
+    folded = " ".join(unescape(text).lower().split())
     return [item for item in markers if item.lower() not in folded]
 
 
