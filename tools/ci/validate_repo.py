@@ -19,7 +19,9 @@ import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-# Fallback until feeds/catalogue.schema.json lands with the catalogue ticket.
+_AUTH_TYPES = ("none", "header", "bearer", "basic", "oauth", "hmac", "path", "passthrough")
+
+# Fallback used when feeds/catalogue.schema.json is missing. Keep enums in step with it.
 # Field names follow that ticket, including the Australian spelling "licence".
 CATALOGUE_SCHEMA: dict = {
     "type": "object",
@@ -44,11 +46,23 @@ CATALOGUE_SCHEMA: dict = {
                     "id": {"type": "string"},
                     "connector": {"type": "string"},
                     "url": {"type": "string"},
-                    "format": {"enum": ["rss", "atom", "json", "csv", "stix", "oscal", "html"]},
+                    "format": {
+                        "enum": [
+                            "rss",
+                            "atom",
+                            "json",
+                            "csv",
+                            "stix",
+                            "oscal",
+                            "html",
+                            "text",
+                            "mcp",
+                        ]
+                    },
                     "auth": {
                         "type": "object",
                         "properties": {
-                            "type": {"enum": ["none", "header", "bearer"]},
+                            "type": {"enum": list(_AUTH_TYPES)},
                             "env": {"type": "string"},
                             "header": {"type": "string"},
                         },
@@ -80,6 +94,7 @@ _EGRESS_LINE = re.compile(r"^[-*]\s+Egress hosts:\s*(.+?)\s*$", re.MULTILINE)
 _DURATION = re.compile(
     r"^P(?=\d|T)(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+S)?)?$"
 )
+_URL_PLACEHOLDER = re.compile(r"^\$\{[A-Z][A-Z0-9_]*\}")
 _FEED_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _NO_UPSTREAM = re.compile(r"^[-*]\s+Upstream:\s*none\b", re.MULTILINE | re.IGNORECASE)
 # Links a connector shows the user (terms, docs, attribution, sign-up pages).
@@ -258,8 +273,8 @@ def check_catalogue(root: Path) -> list[str]:
         if isinstance(connector, str) and connector not in known:
             findings.append(f"{label} connector {connector} does not exist")
         url = feed.get("url")
-        if isinstance(url, str) and not url.startswith("https://"):
-            findings.append(f"{label} url must use https")
+        if isinstance(url, str) and not (url.startswith("https://") or _URL_PLACEHOLDER.match(url)):
+            findings.append(f"{label} url must use https or start with a ${{VAR}} placeholder")
         poll = feed.get("poll")
         if isinstance(poll, str) and not _DURATION.fullmatch(poll):
             findings.append(f"{label} poll must be an ISO 8601 duration")
@@ -501,8 +516,8 @@ def _check_feed_auth(label: str, auth: object) -> list[str]:
         return []
     findings: list[str] = []
     auth_type = auth.get("type")
-    if auth_type not in {"none", "header", "bearer"}:
-        findings.append(f"{label} auth.type must be none, header or bearer")
+    if auth_type not in _AUTH_TYPES:
+        findings.append(f"{label} auth.type must be one of {', '.join(_AUTH_TYPES)}")
         return findings
     env_name = auth.get("env")
     if auth_type == "none":
@@ -567,7 +582,10 @@ def _known_connectors(root: Path) -> set[str]:
     if not mcp.is_dir():
         return found
     for child in mcp.iterdir():
-        if child.is_dir() and (child / "pyproject.toml").is_file():
+        # SOURCE.md covers wrapped servers that ship no Python package.
+        if child.is_dir() and any(
+            (child / name).is_file() for name in ("pyproject.toml", "SOURCE.md")
+        ):
             found.add(child.name)
     servers = mcp / "servers.yaml"
     if not servers.is_file():
