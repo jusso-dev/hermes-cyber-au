@@ -13,7 +13,7 @@ def _json(capsys):
     return json.loads(out)
 
 
-def test_refresh_stays_unimplemented():
+def test_refresh_needs_sources():
     assert main(["refresh"]) == 2
 
 
