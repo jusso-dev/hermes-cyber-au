@@ -370,6 +370,9 @@ def test_default_profile_resolution(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert server.default_profile() == present
 
 
+# CI runs pytest --block-network. This test only talks to its own loopback server,
+# so allow 127.0.0.1 and nothing else.
+@pytest.mark.block_network(allowed_hosts=["127.0.0.1"])
 def test_live_server_serves_and_rejects_traversal(profile: Path) -> None:
     _write_jobs(profile, [{"id": "daily", "name": "Daily"}])
     _write_report(profile, "daily", REPORT, "# Hi")
