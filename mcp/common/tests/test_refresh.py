@@ -195,3 +195,59 @@ def test_store_modules_come_from_the_checkout():
     api, db = _store_modules()
     assert Path(api.__file__).parent.parent == ROOT / "plugins" / "cyber-au"
     assert "store" in sys.modules
+
+
+def test_a_second_refresh_expires_what_the_feeds_withdrew(feeds, store_path, monkeypatch, capsys):
+    from cyberau_abusech import source as abusech
+    from cyberau_cisa_kev import source as kev
+
+    assert main(["refresh", "--sources", "kev,feodo", "--store"]) == 0
+    capsys.readouterr()
+
+    shrunk = {**KEV, "vulnerabilities": KEV["vulnerabilities"][:1]}
+    monkeypatch.setattr(kev, "_catalog", lambda: (shrunk, "miss"))
+    monkeypatch.setattr(
+        abusech,
+        "feodo_blocklist",
+        lambda country=None: {"cache": "miss", "warnings": [], "data": []},
+    )
+    assert main(["refresh", "--sources", "kev,feodo", "--store"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert "kev ok 1 items, stored 1, expired 1" in out
+    assert "feodo ok 0 items, stored 0, expired 1" in out
+
+    from store.api import table_counts
+
+    counts = table_counts(store_path)
+    assert counts["indicators"] == 0
+    assert counts["vulnerabilities"] == 1  # 0002 was only in the store for KEV
+
+
+def test_a_degraded_feodo_list_expires_nothing(feeds, store_path, monkeypatch, capsys):
+    from cyberau_abusech import source as abusech
+
+    assert main(["refresh", "--sources", "feodo", "--store"]) == 0
+    monkeypatch.setattr(
+        abusech,
+        "feodo_blocklist",
+        lambda country=None: {"cache": "miss", "warnings": ["partial"], "data": []},
+    )
+    assert main(["refresh", "--sources", "feodo", "--store"]) == 0
+
+    from store.api import table_counts
+
+    assert table_counts(store_path)["indicators"] == 1
+
+
+def test_epss_alone_scores_the_stored_kev_list(feeds, store_path, monkeypatch, capsys):
+    from cyberau_cisa_kev import source as kev
+
+    assert main(["refresh", "--sources", "kev", "--store"]) == 0
+
+    def no_fetch():
+        raise AssertionError("EPSS must not fetch KEV when the store has it")
+
+    monkeypatch.setattr(kev, "_catalog", no_fetch)
+    feeds["epss_calls"].clear()
+    assert main(["refresh", "--sources", "epss", "--store"]) == 0
+    assert feeds["epss_calls"] == [{"cve": "CVE-2026-0001,CVE-2026-0002"}]

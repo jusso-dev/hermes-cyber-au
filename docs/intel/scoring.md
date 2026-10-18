@@ -41,7 +41,7 @@ STIX 2.1 export is described in `docs/intel/stix.md`. DuckDB export is separate 
 
 `cyberau-mcp store snapshot --public` writes `intel/snapshots/public-<date>.sqlite.zst`. The date is UTC. The file contains public-source TLP:CLEAR indicators, their public observations and counters, advisories from those sources, and catalogue vulnerabilities. A source is public when it is not the analyst source, not marked keyed, and its default marking is CLEAR. Rows marked GREEN, AMBER, AMBER+STRICT or RED are omitted. Analyst observations and keyed-source rows are omitted, including notes, tags and upstream references. Register a keyed source with `ensure_source(..., keyed=True)`. A keyed flag is not cleared later.
 
-The weekly no-agent job `cyberau-store-vacuum` runs `scripts/cyberau_store_vacuum.sh`, which takes a backup and then vacuums. Newly shipped distribution jobs arrive paused.
+The weekly no-agent job `cyberau-store-maintenance` runs `scripts/cyberau_store_maintenance.sh`: `store backup`, then `store compact`, then `store vacuum`. The nightly job `cyberau-store-expire` runs `store compact` on its own. `store compact` folds observations older than `retention_days` into counters and deletes ASD and AusCERT advisories and EPSS history older than `cyber_au.store.feed_retention_days` (default 180). Each feed refresh also removes what the publisher withdrew: a Feodo Tracker address that leaves the blocklist loses its Feodo evidence (and the indicator goes when no other source vouches for it), and a CVE that leaves KEV loses its KEV fields. `scripts/cyberau_store_vacuum.sh` stays for installs that still have the older `cyberau-store-vacuum` job. Newly shipped distribution jobs arrive paused.
 
 ## Worked examples
 

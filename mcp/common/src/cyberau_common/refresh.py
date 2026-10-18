@@ -34,6 +34,7 @@ class Result:
     status: str = "ok"
     items: int = 0
     stored: int | None = None
+    expired: int | None = None
     detail: str = ""
     rows: list[dict] = field(default_factory=list)
 
@@ -155,6 +156,10 @@ def _kev(result: Result, run: _Run) -> None:
     if run.store:
         api, _db = _store_modules()
         result.stored = api.ingest_kev_catalogue(catalog)
+        if rows:  # an empty catalogue is a broken fetch, not a withdrawn list
+            from store.expiry import reconcile_kev
+
+            result.expired = reconcile_kev(str(row["cveID"]) for row in rows)
 
 
 def _kev_catalog(run: _Run) -> dict:
@@ -174,12 +179,14 @@ def _kev_catalog(run: _Run) -> dict:
 def _epss(result: Result, run: _Run) -> None:
     from cyberau_first_epss import source
 
-    try:
-        catalog = _kev_catalog(run)
-    except Exception as exc:
-        result.fail(f"EPSS needs the KEV catalogue for its CVE list: {exc}")
-        return
-    cves = sorted({str(row["cveID"]) for row in catalog.get("vulnerabilities") or []})
+    cves = _stored_kev_cves() if run.store and run.kev_catalog is None else []
+    if not cves:
+        try:
+            catalog = _kev_catalog(run)
+        except Exception as exc:
+            result.fail(f"EPSS needs the KEV catalogue for its CVE list: {exc}")
+            return
+        cves = sorted({str(row["cveID"]) for row in catalog.get("vulnerabilities") or []})
     for start in range(0, len(cves), _EPSS_BATCH):
         batch = cves[start : start + _EPSS_BATCH]
         payload, cache, warning = source._fetch({"cve": ",".join(batch)})
@@ -203,6 +210,14 @@ def _epss(result: Result, run: _Run) -> None:
                     epss_date=row["date"],
                 )
         result.stored = len(result.rows)
+
+
+def _stored_kev_cves() -> list[str]:
+    """KEV CVEs already in the store, so a separate EPSS job needs no KEV fetch."""
+    _api, db = _store_modules()
+    conn = db.open_store().connection()
+    rows = conn.execute("SELECT cve_id FROM vulnerabilities WHERE kev_date_added IS NOT NULL")
+    return sorted(row[0] for row in rows)
 
 
 # AusCERT
@@ -275,6 +290,13 @@ def _feodo(result: Result, run: _Run) -> None:
                     source_ref=source.FEODO_URL,
                 )
         result.stored = len(rows)
+        if envelope.get("warnings"):  # only a clean, complete list may expire entries
+            return
+        from store.expiry import reconcile_indicators
+
+        result.expired = reconcile_indicators(
+            "feodo-tracker", [(_ip_type(row["indicator"]), row["indicator"]) for row in rows]
+        )
 
 
 def _ip_type(value: object) -> str | None:
@@ -342,6 +364,8 @@ def _headline(results: list[Result], failed: list[Result]) -> str:
 
 def _line(result: Result) -> str:
     stored = "" if result.stored is None else f", stored {result.stored}"
+    if result.expired:
+        stored += f", expired {result.expired}"
     detail = f" ({result.detail})" if result.detail else ""
     return f"{result.source} {result.status} {result.items} items{stored}{detail}"
 
