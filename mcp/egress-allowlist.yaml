@@ -99,6 +99,7 @@ connectors:
     - api.github.com
     - github.com
     - objects.githubusercontent.com
+    - release-assets.githubusercontent.com
     allow_ip_literals: false
     allow_http_loopback: false
   crtsh:
@@ -124,6 +125,8 @@ connectors:
     hosts:
       - 127.0.0.1
       - localhost
+    allow_ip_literals: true
+    allow_http_loopback: true
   threatsieve:
     hosts:
       - 127.0.0.1

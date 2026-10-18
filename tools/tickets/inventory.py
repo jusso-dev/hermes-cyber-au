@@ -385,7 +385,7 @@ Field names from """ + hsrc('website/docs/reference/mcp-config-reference.md') + 
         rate="GitHub API limits. One download per release.",
         cache="Snapshot per release under `mcp/sigma/data/<tag>/`.",
         terms="Sigma rules are under the Detection Rule License (DRL) 1.1, which requires attribution. Keep `author` and `id` on every rule shown.",
-        hosts=["api.github.com", "github.com", "objects.githubusercontent.com"],
+        hosts=["api.github.com", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"],
         notes="Conversion uses pySigma with the Kusto backend for Microsoft Sentinel and Defender KQL. Check the current pySigma backend package names on PyPI before pinning.",
         verified="SigmaHQ/sigma is public.",
         tools=[
