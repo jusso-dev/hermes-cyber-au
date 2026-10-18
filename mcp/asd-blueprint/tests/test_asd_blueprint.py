@@ -374,7 +374,7 @@ def test_snapshot_answer_carries_snapshot_warning(tmp_path, monkeypatch):
     saved = json.loads(
         (tmp_path / "blueprint-observations.jsonl").read_text(encoding="utf-8").splitlines()[0]
     )
-    assert saved["data_as_of"] == "2026-10-17T01:25:00Z"
+    assert saved["data_as_of"] == "2026-10-17"
 
 
 def test_parser_skips_nav_header_footer_aside_form_and_noscript():
