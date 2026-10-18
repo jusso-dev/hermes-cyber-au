@@ -155,6 +155,19 @@ def state_text(job: dict) -> str:
     return "not recorded (definition only)"
 
 
+def last_status_text(job: dict, state: str) -> str:
+    status = str(job.get("last_status") or "no run recorded")
+    if state == "paused" and status.lower() in {"error", "failed", "fail"}:
+        return "historical error; job paused"
+    return status
+
+
+def next_run_text(job: dict, state: str) -> str:
+    if state == "paused":
+        return "not scheduled while paused"
+    return str(job.get("next_run_at") or "not recorded")
+
+
 def report_dir(profile: Path, job_id: str) -> Path | None:
     if not JOB_ID_RE.fullmatch(job_id):
         return None
@@ -246,14 +259,6 @@ def load_handoffs(path: Path) -> tuple[list[dict], int]:
             bad += 1
     records.reverse()
     return records, bad
-
-
-def session_summary(profile: Path) -> int:
-    """Number of entries in <profile>/sessions, 0 when absent or empty."""
-    try:
-        return sum(1 for _ in (profile / "sessions").iterdir())
-    except OSError:
-        return 0
 
 
 # --- markdown and HTML --------------------------------------------------------------
@@ -471,6 +476,7 @@ def render_index(profile: Path) -> bytes:
         for job in jobs:
             job_id = str(job.get("id", ""))
             name = job.get("name", "")
+            state = state_text(job)
             error = truncate(job["last_error"], ERROR_LIMIT) if job.get("last_error") else ""
             report = latest_report(profile, job_id)
             if report is None:
@@ -481,12 +487,12 @@ def render_index(profile: Path) -> bytes:
                 "<tr>"
                 f"<td><code>{esc(job_id)}</code></td>"
                 f"<td>{esc(name)}</td>"
-                f"<td>{esc(state_text(job))}</td>"
+                f"<td>{esc(state)}</td>"
                 f"<td>{esc(schedule_text(job))}</td>"
                 f"<td>{esc(job.get('deliver') or 'not set')}</td>"
-                f"<td>{esc(job.get('last_status') or 'no run recorded')}</td>"
+                f"<td>{esc(last_status_text(job, state))}</td>"
                 f"<td>{esc(error)}</td>"
-                f"<td>{esc(job.get('next_run_at') or 'not recorded')}</td>"
+                f"<td>{esc(next_run_text(job, state))}</td>"
                 f"<td>{latest}</td>"
                 "</tr>"
             )
@@ -532,13 +538,16 @@ def render_index(profile: Path) -> bytes:
     parts.append(render_conversation_snapshots(profile))
 
     parts.append("<h2>Chat</h2>")
-    count = session_summary(profile)
-    if count == 0:
+    count, unreadable_store = conversations.session_count(profile)
+    if count == 0 and not unreadable_store:
         parts.append(
-            f"<p>No chat has been opened yet. Start one with:</p><pre>{esc(CHAT_COMMAND)}</pre>"
+            "<p>No chat has been opened yet. Run this inside the same Hermes installation "
+            "and cyber-au profile shown above:</p>"
+            f"<pre>{esc(CHAT_COMMAND)}</pre>"
+            '<p class="muted">This read-only dashboard cannot start chats.</p>'
         )
-    else:
-        parts.append(f"<p>{count} chat session record(s) found in <code>sessions</code>.</p>")
+    elif count > 0:
+        parts.append(f"<p>{count} stored chat session snapshot(s) found.</p>")
 
     parts.append(
         '<p class="muted">Read-only view. Do not publish this page on the public internet.</p>'

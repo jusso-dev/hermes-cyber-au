@@ -75,11 +75,34 @@ def test_jobs_render_runtime_fields(profile: Path) -> None:
     assert "30 7 * * *" in body
     assert "origin" in body
     assert "paused" in body
-    assert "2026-10-18T07:30:00+11:00" in body
+    assert "historical error; job paused" in body
+    assert "not scheduled while paused" in body
+    assert "2026-10-18T07:30:00+11:00" not in body
     assert "x" * 400 not in body  # truncated
     assert "x" * 300 in body
     assert "07:30 Australia/Sydney" in body
     assert "do nothing until" in body
+
+
+def test_enabled_job_retains_error_and_next_run(profile: Path) -> None:
+    _write_jobs(
+        profile,
+        [
+            {
+                "id": "cyberau-kev-watch",
+                "name": "KEV watch",
+                "schedule": {"kind": "cron", "expr": "0 * * * *"},
+                "state": "enabled",
+                "last_status": "error",
+                "next_run_at": "2026-10-18T08:00:00+11:00",
+            }
+        ],
+    )
+    status, body = _get(profile, "/")
+    assert status == 200
+    assert ">error<" in body
+    assert "historical error; job paused" not in body
+    assert "2026-10-18T08:00:00+11:00" in body
 
 
 def test_shipped_jobs_file_without_runtime_fields(profile: Path) -> None:
@@ -339,6 +362,7 @@ def test_sibling_role_snapshot(tmp_path: Path) -> None:
     assert "Claimed the item" in body
     assert ">watcher<" in body
     assert ">analyst<" in body
+    assert "2 stored chat session snapshot(s) found." in body
 
 
 def test_no_session_store_says_so(profile: Path) -> None:
@@ -346,15 +370,42 @@ def test_no_session_store_says_so(profile: Path) -> None:
     assert "No conversations found in these profiles." in body
 
 
+def test_empty_session_store_says_no_chat(profile: Path) -> None:
+    import sqlite3
+
+    conn = sqlite3.connect(profile / "state.db")
+    conn.execute("CREATE TABLE sessions (id TEXT)")
+    conn.execute("CREATE TABLE messages (id INT, session_id TEXT, role TEXT, content TEXT)")
+    conn.commit()
+    conn.close()
+
+    _, body = _get(profile, "/")
+    assert "No chat has been opened yet" in body
+    assert "stored chat session snapshot(s) found." not in body
+
+
+def test_unreadable_session_store_does_not_claim_no_chat(profile: Path) -> None:
+    (profile / "state.db").write_bytes(b"not a SQLite database")
+
+    _, body = _get(profile, "/")
+    assert "The session store could not be read." in body
+    assert "No chat has been opened yet" not in body
+    assert "stored chat session snapshot(s) found." not in body
+
+
 def test_sessions_message(profile: Path) -> None:
     _, body = _get(profile, "/")
     assert "No chat has been opened yet" in body
+    assert "same Hermes installation" in body
+    assert "This read-only dashboard cannot start chats." in body
     (profile / "sessions").mkdir()
-    _, body = _get(profile, "/")
-    assert "No chat has been opened yet" in body
     (profile / "sessions" / "s1.json").write_text("{}", encoding="utf-8")
     _, body = _get(profile, "/")
+    assert "No chat has been opened yet" in body
+    _write_session(profile, "s1", [("user", "stored chat", None)])
+    _, body = _get(profile, "/")
     assert "No chat has been opened yet" not in body
+    assert "1 stored chat session snapshot(s) found." in body
 
 
 def test_default_profile_resolution(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
