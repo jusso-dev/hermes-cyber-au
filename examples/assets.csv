@@ -1,0 +1,5 @@
+hostname,ip,role,owner,product,version,internet_facing,criticality,soci_asset,demo
+WS-DEMO-042,192.0.2.10,Staff laptop,demo.user@example.com,Windows 11,23H2,no,medium,no,DEMO DATA synthetic
+VPN-DEMO-01,192.0.2.20,Remote access gateway,it-ops@example.com,Citrix NetScaler ADC,13.1-48.47,yes,high,no,DEMO DATA synthetic
+APP-DEMO-07,192.0.2.30,Payroll web app,finance@example.com,Apache Log4j,2.14.1,yes,high,no,DEMO DATA synthetic
+SCADA-DEMO-03,192.0.2.40,Water treatment HMI,ot-ops@example.com,Example HMI,4.2,no,critical,yes,DEMO DATA synthetic

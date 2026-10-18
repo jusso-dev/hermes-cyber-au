@@ -18,6 +18,7 @@ distribution_owned:
   - feeds
   - playbooks
   - profiles
+  - examples
 env_requires:
   - name: ABUSECH_AUTH_KEY
     description: "abuse.ch Auth-Key (free at https://auth.abuse.ch/). Needed for URLhaus, ThreatFox, MalwareBazaar."

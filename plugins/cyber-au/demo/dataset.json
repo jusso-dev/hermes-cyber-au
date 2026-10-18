@@ -1,0 +1,80 @@
+{
+  "demo": true,
+  "label": "DEMO DATA: synthetic, not real threat intelligence",
+  "version": "demo-2026.10",
+  "source": {
+    "id": "cyber-au-demo",
+    "name": "cyber-au DEMO dataset (synthetic, not real intelligence)"
+  },
+  "indicators": [
+    {
+      "id": "demo-ind-001",
+      "type": "ipv4",
+      "value": "203.0.113.45",
+      "verdict": "malicious",
+      "confidence": 80,
+      "tags": ["demo", "c2"],
+      "observed_at": "2026-10-10T00:00:00Z",
+      "note": "DEMO: synthetic command and control address for the fictional DemoLoader."
+    },
+    {
+      "id": "demo-ind-002",
+      "type": "domain",
+      "value": "update.example.net",
+      "verdict": "malicious",
+      "confidence": 75,
+      "tags": ["demo", "payload-host"],
+      "observed_at": "2026-10-10T00:00:00Z",
+      "note": "DEMO: synthetic payload host that serves the fictional DemoLoader script."
+    },
+    {
+      "id": "demo-ind-003",
+      "type": "sha256",
+      "value": "80a67057fca09654d9e3c87207428bea1ef73ffd9ecd6ffddaf8964ecccc28b7",
+      "verdict": "malicious",
+      "confidence": 70,
+      "tags": ["demo", "loader"],
+      "observed_at": "2026-10-10T00:00:00Z",
+      "note": "DEMO: synthetic hash of the fictional DemoLoader script. It is the SHA-256 of a placeholder phrase."
+    },
+    {
+      "id": "demo-ind-004",
+      "type": "domain",
+      "value": "payroll-update.example.org",
+      "verdict": "malicious",
+      "confidence": 70,
+      "tags": ["demo", "phishing"],
+      "observed_at": "2026-10-12T00:00:00Z",
+      "note": "DEMO: synthetic lookalike payroll domain used in the sample phishing email."
+    },
+    {
+      "id": "demo-ind-005",
+      "type": "ipv4",
+      "value": "198.51.100.23",
+      "verdict": "suspicious",
+      "confidence": 50,
+      "tags": ["demo", "phishing"],
+      "observed_at": "2026-10-12T00:00:00Z",
+      "note": "DEMO: synthetic sending server of the sample phishing email."
+    },
+    {
+      "id": "demo-ind-006",
+      "type": "ipv4",
+      "value": "192.0.2.10",
+      "verdict": "benign",
+      "confidence": 60,
+      "tags": ["demo", "internal"],
+      "observed_at": "2026-10-12T00:00:00Z",
+      "note": "DEMO: the fictional staff laptop WS-DEMO-042. It is the victim, not an attacker."
+    }
+  ],
+  "advisories": [
+    {
+      "id": "demo-adv-001",
+      "title": "DEMO advisory: synthetic DemoLoader campaign using update.example.net",
+      "url": "https://example.com/demo/advisory-001",
+      "published_at": "2026-10-12",
+      "summary": "DEMO: a made-up advisory. A fictional loader is delivered by payroll-themed phishing and beacons over HTTPS to 203.0.113.45."
+    }
+  ]
+}

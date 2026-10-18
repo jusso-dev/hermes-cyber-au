@@ -13,6 +13,18 @@ from pathlib import Path
 __all__ = ["data_dir", "main", "org_exposure", "register"]
 
 
+def main(argv: list[str] | None = None) -> int:
+    """Run the ``cyber-au`` command line.
+
+    The import is deferred so ``register`` can add the profile virtualenv to
+    ``sys.path`` before ``cli`` pulls in ``doctor`` and its PyYAML import.
+    """
+    _connector_packages()
+    from .cli import main as cli_main
+
+    return cli_main(argv)
+
+
 def data_dir() -> Path:
     """Return the directory for cyber-au plugin state.
 

@@ -1,0 +1,15 @@
+# DEMO DATA. Synthetic indicator list for trying hermes-cyber-au.
+# Addresses come from the RFC 5737 documentation ranges and the domains are
+# example.com, example.net and example.org, so none of them is a real threat.
+# The CVE ids are real public CVEs, so live CISA KEV and EPSS lookups return
+# real, sourced answers for them.
+203.0.113.45
+198.51.100.23
+192.0.2.10
+update.example.net
+payroll-update.example.org
+https://update.example.net/agent/setup.ps1
+80a67057fca09654d9e3c87207428bea1ef73ffd9ecd6ffddaf8964ecccc28b7
+93540835ba1fafab84b6a7e000b6affeafc220720bd2ab82f9d269436f743db2
+CVE-2023-4966
+CVE-2021-44228

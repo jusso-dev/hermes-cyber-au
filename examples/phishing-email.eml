@@ -1,0 +1,42 @@
+X-Demo-Data: DEMO DATA. Synthetic sample email. Not a real message, sender or organisation.
+Return-Path: <payroll@payroll-update.example.org>
+Received: from mail.payroll-update.example.org (mail.payroll-update.example.org [198.51.100.23])
+	by mx.example.com with ESMTPS id DEMO0001
+	for <demo.user@example.com>; Fri, 17 Oct 2026 08:58:11 +1100
+Authentication-Results: mx.example.com;
+	spf=fail (sender IP is 198.51.100.23) smtp.mailfrom=payroll-update.example.org;
+	dkim=none;
+	dmarc=fail action=none header.from=example.com
+From: "Example Payroll" <payroll@example.com>
+Reply-To: payroll@payroll-update.example.org
+To: demo.user@example.com
+Subject: Action needed: confirm your bank details before Friday's pay run
+Date: Fri, 17 Oct 2026 08:58:05 +1100
+Message-ID: <demo-0001@payroll-update.example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="demo-boundary"
+
+--demo-boundary
+Content-Type: text/plain; charset="utf-8"
+
+DEMO DATA. This is a synthetic phishing email for trying hermes-cyber-au.
+
+Hi,
+
+Our payroll system is moving. Please confirm your bank details today or
+your pay may be delayed:
+
+https://payroll-update.example.org/confirm?id=DEMO-0001
+
+The attached update tool will finish the change for you.
+
+Example Payroll Team
+
+--demo-boundary
+Content-Type: text/plain; name="update-tool.txt"
+Content-Disposition: attachment; filename="update-tool.txt"
+X-Demo-Attachment-SHA256: 93540835ba1fafab84b6a7e000b6affeafc220720bd2ab82f9d269436f743db2
+
+DEMO DATA. Harmless placeholder attachment. There is no payload.
+
+--demo-boundary--

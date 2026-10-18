@@ -1,5 +1,7 @@
 # hermes-cyber-au
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/jusso-dev/hermes-cyber-au)
+
 A [Hermes Agent](https://github.com/NousResearch/hermes-agent) distribution for Australian cyber security teams.
 
 Install it once and you get an analyst assistant that knows the ISM, the Essential Eight and ASD Essentials, reads ASD's ACSC and AusCERT, pulls in global threat intel, keeps a local intel store, and can write a briefing. It proposes actions. It does not take them.
@@ -37,19 +39,35 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 
 The Hermes details behind this design (manifest fields, what an update replaces, MCP config, plugin hooks, cron rules) are written up with sources in [docs/research/hermes-structure.md](docs/research/hermes-structure.md).
 
-## Install
+## Quick start
 
-`install/install.sh` installs Hermes if needed, then this profile. `main` is not a release tag. For a pinned install, prefer `bash install/install.sh --ref <tag>` with a release tag or commit. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
+You need Linux, macOS or WSL2 with `git`, `curl`, Python 3.11 or newer and [uv](https://docs.astral.sh/uv/). On Debian or Ubuntu also install `libatomic1`, which the Hermes installer needs. Hermes 0.22.2 or newer is installed for you if it is missing. No key is needed.
 
 ```bash
-bash install/install.sh
-cp ~/.hermes/profiles/cyber-au/.env.EXAMPLE ~/.hermes/profiles/cyber-au/.env
-hermes -p cyber-au model
-hermes -p cyber-au cyber-au doctor --offline
-hermes -p cyber-au cron resume cyberau-morning-brief
+git clone https://github.com/jusso-dev/hermes-cyber-au.git
+cd hermes-cyber-au
+bash install/install.sh                           # Hermes if missing, the profile, keyless connectors
+hermes -p cyber-au cyber-au doctor --offline      # public connectors show as enabled
+hermes -p cyber-au cyber-au demo triage           # a sourced answer now: no keys, no model, DEMO data
+hermes -p cyber-au model                          # choose a model provider
+hermes -p cyber-au chat                           # then ask one of the prompts below
 ```
 
-Public sources answer with no keys. A free key (abuse.ch, NVD, OTX, GreyNoise, or a Cloudflare Radar read token) raises limits or turns on a source that ships disabled. The profile still needs a model before `chat` or a briefing job can run. The morning briefing, KEV watch, and weekly summary deliver to `origin`, which is the chat you are in, or the job's last output when no channel is configured. `hermes -p cyber-au cron list` shows that output. Details are in [docs/operations/routines.md](docs/operations/routines.md).
+`demo triage` triages a synthetic sample alert offline and labels all of its output as demo. It never reads or writes your real intel store. The full walk-through, with output from a clean Ubuntu 24.04 container, is in [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md). To try it with nothing installed, open the repository in GitHub Codespaces or a VS Code dev container: see [docs/getting-started/codespaces.md](docs/getting-started/codespaces.md).
+
+`main` is not a release tag. For a pinned install use `bash install/install.sh --ref <tag>`. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md). Scheduled jobs arrive paused; `hermes -p cyber-au cron resume cyberau-morning-brief` turns on the 07:30 Sydney briefing. Details are in [docs/operations/routines.md](docs/operations/routines.md).
+
+## What can I ask it?
+
+No keys needed. Run the chat from the root of your checkout so the `examples/` paths resolve. The files in [examples/](examples/) are synthetic demo data.
+
+- Triage the alert in examples/edr-alert.json. It is demo data.
+- Is CVE-2023-4966 in the CISA KEV catalogue, and what is its EPSS score?
+- Which ISM controls cover multi-factor authentication for privileged users? Cite the ISM release.
+- What does Essential Eight Maturity Level 2 require for patching applications?
+- Using examples/incident-timeline.md, could this be an eligible data breach under the NDB scheme, and when does the 30 day assessment window end?
+
+Ten prompts, the skill each one uses and what a good answer looks like are in [docs/getting-started/first-hour.md](docs/getting-started/first-hour.md).
 
 ## Connectors
 
