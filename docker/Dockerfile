@@ -8,8 +8,20 @@
 # PID 1 stays root so s6-overlay can start. Supervised processes drop to
 # hermes (UID 10000) with s6-setuidgid. Do not set USER hermes here.
 
+# Base and tool images are pinned by digest. A tag can be moved; a digest
+# cannot. HERMES_DIGEST is the multi-arch index digest of
+# nousresearch/hermes-agent:v0.22.2. When HERMES_VERSION changes, update
+# HERMES_DIGEST in the same commit (tests/test_docker_pins.py checks the
+# version named on the next line matches HERMES_VERSION).
+# HERMES_DIGEST version: v0.22.2
 ARG HERMES_VERSION=v0.22.2
-FROM nousresearch/hermes-agent:${HERMES_VERSION}
+ARG HERMES_DIGEST=sha256:36099926da316742423544e055d4734777105ffe6341873af5459b957d0c2919
+
+# uv 0.13.1 from Astral's published image, pinned by index digest. This
+# replaces piping https://astral.sh/uv/install.sh into a shell.
+FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
+
+FROM nousresearch/hermes-agent:${HERMES_VERSION}@${HERMES_DIGEST}
 
 ARG HERMES_VERSION
 ARG VERSION=0.1.0
@@ -21,6 +33,7 @@ LABEL org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.revision="${REVISION}"
 
+COPY --from=uv /uv /uvx /usr/local/bin/
 COPY --chmod=0755 docker/entrypoint.sh /opt/cyber-au/entrypoint.sh
 COPY --chown=hermes:hermes . /opt/cyber-au/src
 
@@ -29,11 +42,10 @@ COPY --chown=hermes:hermes . /opt/cyber-au/src
 # home, so the build deletes those files and leaves the base image's
 # dotfiles plus profiles/cyber-au. The seed is also kept outside /opt/data
 # because the upstream image declares that path as a volume.
-# The upstream image does not ship uv. Install it for this build, then let
-# bootstrap download the locked connector wheels. A later air-gapped
-# bootstrap can still pass --offline.
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && export PATH="/root/.local/bin:${PATH}" \
+# The upstream image does not ship uv. It is copied from the pinned uv
+# image above, then bootstrap downloads the locked connector wheels. A later
+# air-gapped bootstrap can still pass --offline.
+RUN uv --version \
     && hermes profile install /opt/cyber-au/src --name cyber-au --yes \
     && if [ -f /opt/cyber-au/src/install/bootstrap.sh ]; then \
          sh /opt/cyber-au/src/install/bootstrap.sh --profile cyber-au --non-interactive; \
