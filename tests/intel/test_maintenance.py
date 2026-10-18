@@ -174,21 +174,14 @@ def test_backup_keeps_seven_daily_copies_and_replaces_the_same_day(store_path):
     assert names == [f"intel-2026-01-{day:02d}.sqlite" for day in range(2, 9)]
 
     _indicator(store_path, value="later.example", raw=b"later")
-    same_morning = backup_store(
-        store_path, now=datetime(2026, 5, 5, 1, tzinfo=UTC), zone=zone
-    )
+    same_morning = backup_store(store_path, now=datetime(2026, 5, 5, 1, tzinfo=UTC), zone=zone)
     _indicator(store_path, value="evening.example", raw=b"evening")
-    same_evening = backup_store(
-        store_path, now=datetime(2026, 5, 5, 20, tzinfo=UTC), zone=zone
-    )
+    same_evening = backup_store(store_path, now=datetime(2026, 5, 5, 20, tzinfo=UTC), zone=zone)
     assert same_morning["path"] == same_evening["path"]
     assert same_evening["kept"] == 7
     copied = sqlite3.connect(same_evening["path"])
     try:
-        values = {
-            row[0]
-            for row in copied.execute("SELECT value_norm FROM indicators")
-        }
+        values = {row[0] for row in copied.execute("SELECT value_norm FROM indicators")}
     finally:
         copied.close()
     assert "evening.example" in values

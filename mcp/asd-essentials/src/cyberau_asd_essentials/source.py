@@ -50,9 +50,7 @@ CHAPTERS = {
     "ot": "https://www.cyber.gov.au/publication/essentials-for-ot",
 }
 TRANSITION_URL = "https://www.cyber.gov.au/publication/transitioning-from-the-essential-eight"
-LAUNCH_URL = (
-    "https://www.asd.gov.au/news/2026-10-15-asd-essentials-evolving-our-approach-cyber-security-resilience"
-)
+LAUNCH_URL = "https://www.asd.gov.au/news/2026-10-15-asd-essentials-evolving-our-approach-cyber-security-resilience"
 _PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 _SLEEP = __import__("time").sleep
@@ -99,9 +97,7 @@ _STRATEGY_LABELS = {
     "user_application_hardening": "User application hardening",
     "regular_backups": "Regular backups",
 }
-_STRATEGY_ALIASES = {
-    label.lower(): key for key, label in _STRATEGY_LABELS.items()
-}
+_STRATEGY_ALIASES = {label.lower(): key for key, label in _STRATEGY_LABELS.items()}
 _STRATEGY_ALIASES.update({key: key for key in _STRATEGY_LABELS})
 _STRATEGY_ALIASES["restrict admin privileges"] = "restrict_admin_privileges"
 _STRATEGY_ALIASES["restrict office macros"] = "restrict_office_macros"
@@ -1070,8 +1066,7 @@ def _chapter_body(chapter: str, page: dict, *, actions: list[dict], domain: str 
 
 def _public_action(action: dict) -> dict:
     shared = {
-        key: _quote(value)
-        for key, value in (action.get("shared_responsibility") or {}).items()
+        key: _quote(value) for key, value in (action.get("shared_responsibility") or {}).items()
     }
     return {
         "principle_id": action.get("principle_id") or "",

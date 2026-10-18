@@ -14,9 +14,7 @@ def render_vendor_terms(spec: VendorSpec) -> str:
     if spec.paid:
         standing = "Paid, bring your own licence. The server ships disabled."
     else:
-        standing = (
-            "Free feed. It still ships disabled because it handles victim claims."
-        )
+        standing = "Free feed. It still ships disabled because it handles victim claims."
     lines = [
         f"# {spec.name}",
         "",

@@ -136,9 +136,7 @@ def score_signals(signals: Sequence[Signal]) -> Verdict:
     for signal in signals:
         key = (signal.source_id, signal.classification)
         if key in seen:
-            raise ValueError(
-                f"duplicate signal: {signal.source_id} {signal.classification}"
-            )
+            raise ValueError(f"duplicate signal: {signal.source_id} {signal.classification}")
         seen.add(key)
     malicious = _total(signals, "malicious")
     suspicious = _total(signals, "suspicious")
@@ -203,11 +201,7 @@ def _decide(malicious: int, suspicious: int, benign: int) -> tuple[str, int]:
         return "malicious", malicious
     if benign >= BENIGN_MIN and malicious == 0 and suspicious < BENIGN_BLOCK_SUSPICIOUS:
         return "benign", benign
-    if (
-        suspicious >= SUSPICIOUS_VERDICT_MIN
-        or malicious > 0
-        or (benign > 0 and suspicious > 0)
-    ):
+    if suspicious >= SUSPICIOUS_VERDICT_MIN or malicious > 0 or (benign > 0 and suspicious > 0):
         if suspicious > 0:
             confidence = suspicious
         elif malicious > 0 and benign > 0:
@@ -219,15 +213,11 @@ def _decide(malicious: int, suspicious: int, benign: int) -> tuple[str, int]:
 
 
 def _total(signals: Sequence[Signal], classification: str) -> int:
-    raw = sum(
-        signal.points for signal in signals if signal.classification == classification
-    )
+    raw = sum(signal.points for signal in signals if signal.classification == classification)
     return min(CLASS_CAP, raw)
 
 
-def _supporting(
-    signals: Sequence[Signal], verdict: str, suspicious: int
-) -> tuple[str, ...]:
+def _supporting(signals: Sequence[Signal], verdict: str, suspicious: int) -> tuple[str, ...]:
     if verdict == "unknown":
         return ()
     if verdict == "suspicious" and suspicious == 0:
@@ -243,9 +233,7 @@ def _supporting(
 
 def _context(signals: Sequence[Signal], supporting: tuple[str, ...]) -> tuple[str, ...]:
     chosen = set(supporting)
-    return _unique(
-        signal.source_id for signal in signals if signal.source_id not in chosen
-    )
+    return _unique(signal.source_id for signal in signals if signal.source_id not in chosen)
 
 
 def _bounds(signals: Sequence[Signal]) -> tuple[str | None, str | None]:

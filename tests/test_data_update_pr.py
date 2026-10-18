@@ -93,9 +93,7 @@ def test_default_allowed_paths():
         ".github/workflows/data-update-pr.yml",
         ".git/hooks/pre-commit",
     ]
-    assert [
-        path for path in allowed if not data_update_pr.is_allowed(path, pattern)
-    ] == []
+    assert [path for path in allowed if not data_update_pr.is_allowed(path, pattern)] == []
     assert [path for path in refused if data_update_pr.is_allowed(path, pattern)] == []
 
 
@@ -136,9 +134,7 @@ def test_push_refspec_rejects_the_default_branch():
 
 
 def test_redact_hides_the_token():
-    assert (
-        data_update_pr.redact(f"token {SECRET} end", SECRET) == "token [redacted] end"
-    )
+    assert data_update_pr.redact(f"token {SECRET} end", SECRET) == "token [redacted] end"
     assert data_update_pr.redact("main is fine", "main") == "main is fine"
 
 
@@ -181,9 +177,7 @@ def test_open_commits_a_dated_branch_and_opens_one_pull_request(tmp_path: Path):
     env["TITLE"] = 'Refresh "snapshots" for $DATE'
     main_sha = _rev(work, "main", env)
     (work / "feeds" / "catalogue.yaml").write_text("new\n", encoding="utf-8")
-    (work / "mcp" / "cisa-kev" / "data" / "my file.json").write_text(
-        "{}\n", encoding="utf-8"
-    )
+    (work / "mcp" / "cisa-kev" / "data" / "my file.json").write_text("{}\n", encoding="utf-8")
     (work / "PR_BODY.md").write_text("Body for the pull request.\n", encoding="utf-8")
     result = _run(work, env, "open")
     assert result.returncode == 0, result.stderr
@@ -199,9 +193,7 @@ def test_open_commits_a_dated_branch_and_opens_one_pull_request(tmp_path: Path):
         "41898282+github-actions[bot]@users.noreply.github.com",
         'Refresh "snapshots" for $DATE',
     ]
-    files = set(
-        _git(work, env, "ls-tree", "-r", "--name-only", "HEAD").stdout.splitlines()
-    )
+    files = set(_git(work, env, "ls-tree", "-r", "--name-only", "HEAD").stdout.splitlines())
     assert "feeds/catalogue.yaml" in files
     assert "mcp/cisa-kev/data/my file.json" in files
     assert "PR_BODY.md" not in files
@@ -247,10 +239,7 @@ def test_second_run_updates_the_existing_pull_request(tmp_path: Path):
     assert _rev(bare, "main", env) == main_sha
     second_tip = _rev(bare, "refs/heads/data/intel-refresh/2026-10-17", env)
     assert second_tip != first_tip
-    assert (
-        _git(bare, env, "show", f"{second_tip}:feeds/catalogue.yaml").stdout
-        == "newer\n"
-    )
+    assert _git(bare, env, "show", f"{second_tip}:feeds/catalogue.yaml").stdout == "newer\n"
     edit = _gh_calls(log)[-1]
     assert edit == ["pr", "edit", "42", "--body-file", "PR_BODY.md"]
     assert "--label" not in edit
@@ -278,10 +267,7 @@ def test_body_file_alone_is_not_a_commit(tmp_path: Path):
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == data_update_pr.NO_CHANGE
     assert _gh_calls(log) == []
-    assert (
-        "PR_BODY.md"
-        not in _git(work, env, "ls-tree", "-r", "--name-only", "HEAD").stdout
-    )
+    assert "PR_BODY.md" not in _git(work, env, "ls-tree", "-r", "--name-only", "HEAD").stdout
 
 
 def test_deleted_data_file_is_committed(tmp_path: Path):
@@ -298,10 +284,7 @@ def test_deleted_data_file_is_committed(tmp_path: Path):
     tip = _rev(bare, "refs/heads/data/intel-refresh/2026-10-17", env)
     listed = _git(bare, env, "ls-tree", "-r", "--name-only", tip).stdout
     assert "feeds/old.yaml" not in listed
-    assert (
-        "feeds/old.yaml"
-        in _git(bare, env, "ls-tree", "-r", "--name-only", "main").stdout
-    )
+    assert "feeds/old.yaml" in _git(bare, env, "ls-tree", "-r", "--name-only", "main").stdout
     assert _rev(bare, "main", env) == main_sha
 
 
@@ -336,9 +319,7 @@ def test_symlink_inside_a_data_directory_is_refused(tmp_path: Path):
 
 
 @pytest.mark.parametrize("spelling", ["feeds//body.md", "feeds/./body.md", "./feeds/body.md"])
-def test_body_file_is_never_committed_under_any_spelling(
-    tmp_path: Path, spelling: str
-):
+def test_body_file_is_never_committed_under_any_spelling(tmp_path: Path, spelling: str):
     work, _bare, env = _repo(tmp_path)
     _install_gh(tmp_path, env)
     env["BODY_FILE"] = spelling
@@ -442,23 +423,15 @@ def test_workflow_is_pinned_and_leaves_github_workflows_for_justin():
         assert re.search(r"@[0-9a-f]{40} # v\d+\.\d+\.\d+\s*$", line), line
     default = _workflow_default_allowed(text)
     assert default == data_update_pr.DEFAULT_ALLOWED
-    refuse = text.split("- name: Refuse unexpected paths", 1)[1].split(
-        "- name: Commit", 1
-    )[0]
-    download = text.split("- name: Download the data artifact", 1)[1].split(
-        "- name: Refuse", 1
-    )[0]
-    commit = text.split("- name: Commit, push and open or update the pull request", 1)[
-        1
-    ]
+    refuse = text.split("- name: Refuse unexpected paths", 1)[1].split("- name: Commit", 1)[0]
+    download = text.split("- name: Download the data artifact", 1)[1].split("- name: Refuse", 1)[0]
+    commit = text.split("- name: Commit, push and open or update the pull request", 1)[1]
     assert "secrets." not in refuse
     assert "GH_TOKEN" not in refuse
     assert "secrets." not in download
     assert "GH_TOKEN:" in commit
     assert "secrets.DATA_PR_TOKEN || github.token" in commit
-    checkout = text.split("- name: Check out the repository", 1)[1].split(
-        "- name: Keep", 1
-    )[0]
+    checkout = text.split("- name: Check out the repository", 1)[1].split("- name: Keep", 1)[0]
     assert "secrets.DATA_PR_TOKEN || github.token" in checkout
 
 
@@ -493,9 +466,7 @@ def _repo(tmp: Path) -> tuple[Path, Path, dict[str, str]]:
     (work / "feeds").mkdir()
     (work / "feeds" / "catalogue.yaml").write_text("old\n", encoding="utf-8")
     (work / "mcp" / "cisa-kev" / "data").mkdir(parents=True)
-    (work / "mcp" / "cisa-kev" / "data" / "kev.json").write_text(
-        "{}\n", encoding="utf-8"
-    )
+    (work / "mcp" / "cisa-kev" / "data" / "kev.json").write_text("{}\n", encoding="utf-8")
     _commit_all(work, env, "Initial")
     _run_git(["git", "-C", str(work), "push", "-q", "-u", "origin", "main"], env)
     return work, bare, env
@@ -550,9 +521,7 @@ def _plant_hooks(work: Path, tmp: Path) -> None:
         hook.chmod(0o755)
 
 
-def _run(
-    repo: Path, env: dict[str, str], *args: str
-) -> subprocess.CompletedProcess[str]:
+def _run(repo: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=repo,
@@ -586,18 +555,12 @@ def _commit_all(repo: Path, env: dict[str, str], message: str) -> None:
     )
 
 
-def _git(
-    repo: Path, env: dict[str, str], *args: str
-) -> subprocess.CompletedProcess[str]:
+def _git(repo: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
     return _run_git(["git", "-C", str(repo), *args], env)
 
 
-def _run_git(
-    command: list[str], env: dict[str, str]
-) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        command, env=env, check=False, capture_output=True, text=True
-    )
+def _run_git(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(command, env=env, check=False, capture_output=True, text=True)
     if result.returncode != 0:
         raise AssertionError(result.stderr or result.stdout)
     return result
@@ -624,8 +587,4 @@ def _remote_heads(repo: Path, env: dict[str, str]) -> set[str]:
 def _gh_calls(log: Path) -> list[list[str]]:
     if not log.exists():
         return []
-    return [
-        json.loads(line)
-        for line in log.read_text(encoding="utf-8").splitlines()
-        if line
-    ]
+    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]

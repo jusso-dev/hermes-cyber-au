@@ -249,9 +249,7 @@ def _add_e8(document: dict, as_of: str, built: Built) -> None:
             requirement_id = str(requirement.get("id") or "missing")
             raw_text = requirement.get("text")
             text = raw_text.strip() if isinstance(raw_text, str) else ""
-            matched = [
-                item for item in items if item.get("requirement_id") == requirement_id
-            ]
+            matched = [item for item in items if item.get("requirement_id") == requirement_id]
             refs, texts, instructions = _pack(matched)
             if not text:
                 status = "missing"
@@ -365,18 +363,14 @@ def _add_essentials(document: dict, as_of: str, built: Built) -> None:
             continue
         domain_name = str(domain.get("domain") or "missing")
         phase = str(domain.get("phase") or "missing")
-        actions = (
-            domain.get("actions") if isinstance(domain.get("actions"), list) else []
-        )
+        actions = domain.get("actions") if isinstance(domain.get("actions"), list) else []
         for action in actions:
             if not isinstance(action, dict):
                 continue
             action_id = str(action.get("id") or "missing")
             raw_text = action.get("text")
             text = raw_text.strip() if isinstance(raw_text, str) else ""
-            matched = [
-                item for item in items if item.get("requirement_id") == action_id
-            ]
+            matched = [item for item in items if item.get("requirement_id") == action_id]
             refs, texts, instructions = _pack(matched)
             if not text:
                 status = "missing"
@@ -414,9 +408,7 @@ def _add_essentials(document: dict, as_of: str, built: Built) -> None:
         return
     for phase in sorted(counts):
         met, total = counts[phase]
-        built.phase_lines.append(
-            f"priority phase {phase}: {met} of {total} actions met"
-        )
+        built.phase_lines.append(f"priority phase {phase}: {met} of {total} actions met")
     built.phase_lines.append("A priority phase is not a maturity score.")
 
 
@@ -472,9 +464,7 @@ def _add_controls(document: dict, as_of: str, built: Built) -> None:
         control_id = _control_id(str(raw))
         statement, state = _lookup(payload, control_id)
         matched = [
-            item
-            for item in items
-            if _control_id(str(item.get("control_id") or "")) == control_id
+            item for item in items if _control_id(str(item.get("control_id") or "")) == control_id
         ]
         refs, texts, instructions = _pack(matched)
         if state != "found":
@@ -549,11 +539,7 @@ def _add_transition(document: dict, as_of: str, built: Built) -> None:
         return
     texts = []
     for item in payload.get("mappings") or []:
-        if (
-            isinstance(item, dict)
-            and isinstance(item.get("text"), str)
-            and item["text"].strip()
-        ):
+        if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"].strip():
             texts.append(defang_observable(item["text"].strip()))
     if not texts:
         built.extras.append("No transition mapping was retrieved.")
@@ -627,9 +613,7 @@ def _add_import(document: dict, as_of: str, built: Built) -> None:
     copied = [
         defang_observable(str(item.get("text")).strip())
         for item in records
-        if isinstance(item, dict)
-        and isinstance(item.get("text"), str)
-        and item["text"].strip()
+        if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"].strip()
     ]
     if not copied:
         built.extras.append("M365-Secure evidence import returned no records.")
@@ -662,9 +646,7 @@ def _ism_ids(
             control_id = _control_id(str(raw))
             parts.append(f"{control_id} missing")
             built.missing_controls.append(control_id)
-        notes.append(
-            "ISM source missing (mcp__ism__ism_get_control). No statement was invented."
-        )
+        notes.append("ISM source missing (mcp__ism__ism_get_control). No statement was invented.")
         return " ".join(parts), " ".join(notes), tuple(cites)
     cited = _cite(
         "asd-ism",
@@ -699,9 +681,7 @@ def _requirements(blocks: list[dict]) -> list[tuple[int | None, dict]]:
         level = block.get("maturity_level")
         parsed = (
             level
-            if isinstance(level, int)
-            and not isinstance(level, bool)
-            and level in (1, 2, 3)
+            if isinstance(level, int) and not isinstance(level, bool) and level in (1, 2, 3)
             else None
         )
         requirements = block.get("requirements")
@@ -982,15 +962,11 @@ def _markdown(built: Built, as_of: str) -> str:
 def _gaps(built: Built) -> list[str]:
     sources = "; ".join(built.missing_sources) if built.missing_sources else "none"
     controls = (
-        ", ".join(dict.fromkeys(built.missing_controls))
-        if built.missing_controls
-        else "none"
+        ", ".join(dict.fromkeys(built.missing_controls)) if built.missing_controls else "none"
     )
     unknown = [row.strategy_or_domain for row in built.rows if row.status == "unknown"]
     unscored = [
-        row.evidence_ref
-        for row in built.rows
-        if row.status == "missing" and row.evidence_ref
+        row.evidence_ref for row in built.rows if row.status == "missing" and row.evidence_ref
     ]
     return [
         f"1. Missing sources: {sources}.",

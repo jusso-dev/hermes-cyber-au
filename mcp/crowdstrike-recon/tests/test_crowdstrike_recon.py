@@ -408,9 +408,11 @@ def test_live_health_is_one_rules_query(tmp_path, monkeypatch):
     assert "limit=1" in recon[0]
     assert "/entities/" not in recon[0]
     _transport(
-        lambda request: httpx.Response(401, json=OAUTH_401)
-        if request.url.path.endswith("/oauth2/token")
-        else httpx.Response(500, json={"errors": [{"message": "no"}]})
+        lambda request: (
+            httpx.Response(401, json=OAUTH_401)
+            if request.url.path.endswith("/oauth2/token")
+            else httpx.Response(500, json={"errors": [{"message": "no"}]})
+        )
     )
     failed = connector().health(live=True)
     assert failed.ok is False

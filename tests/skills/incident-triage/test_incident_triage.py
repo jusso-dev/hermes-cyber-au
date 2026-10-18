@@ -39,9 +39,7 @@ def test_skill_passes_the_structural_check():
     assert harness.check_skill(SKILL) == []
 
 
-def test_eval_runs_offline_without_a_provider_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_eval_runs_offline_without_a_provider_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     for name in harness.PROVIDER_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)

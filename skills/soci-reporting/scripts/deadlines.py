@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 SYDNEY = ZoneInfo("Australia/Sydney")
-UTC = timezone.utc  # datetime.UTC needs Python 3.11; this helper also runs on 3.9
+UTC = timezone.utc  # noqa: UP017 datetime.UTC needs Python 3.11; this helper also runs on 3.9
 
 # report_hours run from awareness. written_record_hours run from the oral report.
 TRIGGERS: dict[str, dict[str, str | int]] = {
@@ -124,13 +124,9 @@ def _attach_sydney(naive: datetime) -> datetime:
         instants.setdefault(int(candidate.timestamp()), candidate)
     shown = naive.isoformat(timespec="seconds")
     if not instants:
-        raise ValueError(
-            f"{shown} does not exist in Australia/Sydney. Provide an offset."
-        )
+        raise ValueError(f"{shown} does not exist in Australia/Sydney. Provide an offset.")
     if len(instants) > 1:
-        raise ValueError(
-            f"{shown} is ambiguous in Australia/Sydney. Provide an offset."
-        )
+        raise ValueError(f"{shown} is ambiguous in Australia/Sydney. Provide an offset.")
     return next(iter(instants.values()))
 
 

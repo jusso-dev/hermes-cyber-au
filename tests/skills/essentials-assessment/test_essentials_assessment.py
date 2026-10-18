@@ -65,9 +65,7 @@ def test_offline_messages_match_the_renderer():
         assert case.offline.message.strip() == RENDER.render(document).markdown.strip()
 
 
-def test_eval_runs_offline_without_a_provider_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_eval_runs_offline_without_a_provider_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     for name in harness.PROVIDER_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
@@ -160,13 +158,8 @@ def test_partial_mfa_does_not_award_a_maturity_level_from_synthetic_requirements
         },
     )
     report = RENDER.render(document)
-    assert (
-        "Synthetic requirement: administrators use a second factor." in report.markdown
-    )
-    assert (
-        "Synthetic requirement: ordinary accounts use a second factor."
-        in report.markdown
-    )
+    assert "Synthetic requirement: administrators use a second factor." in report.markdown
+    assert "Synthetic requirement: ordinary accounts use a second factor." in report.markdown
     assert "CANARY-STATEMENT" not in report.markdown
     assert "ism-9999 missing" in report.markdown
     assert "multi_factor_authentication none" in report.markdown
@@ -291,16 +284,8 @@ def test_cli_writes_the_workbook_and_rejects_a_bad_document(tmp_path: Path):
     source = FIXTURES / "backups-no-evidence.json"
     out = tmp_path / "workbook"
     assert RENDER.main([str(source), "--out", str(out)]) == 0
-    assert (
-        (out / "assessment.csv")
-        .read_text(encoding="utf-8")
-        .startswith("strategy_or_domain,")
-    )
-    assert (
-        (out / "assessment.md")
-        .read_text(encoding="utf-8")
-        .startswith("# Essentials assessment")
-    )
+    assert (out / "assessment.csv").read_text(encoding="utf-8").startswith("strategy_or_domain,")
+    assert (out / "assessment.md").read_text(encoding="utf-8").startswith("# Essentials assessment")
     bad = tmp_path / "bad.json"
     bad.write_text("[]\n", encoding="utf-8")
     assert RENDER.main([str(bad)]) == 2
@@ -337,9 +322,7 @@ def _e8_block(requirements: list[dict], level: object = 1) -> dict:
 )
 def test_instruction_phrasings_in_evidence_do_not_score(text: str):
     document = _base(
-        evidence=[
-            {"ref": "E-1", "text": text, "requirement_id": "R1", "status": "met"}
-        ],
+        evidence=[{"ref": "E-1", "text": text, "requirement_id": "R1", "status": "met"}],
         e8=_e8_block([{"id": "R1", "text": "Synthetic requirement.", "ism_ids": []}]),
     )
     report = RENDER.render(document)
@@ -347,14 +330,10 @@ def test_instruction_phrasings_in_evidence_do_not_score(text: str):
     assert "not carried out" in report.markdown
 
 
-@pytest.mark.parametrize(
-    "text", ["There are no backup records.", "Backups: none recorded."]
-)
+@pytest.mark.parametrize("text", ["There are no backup records.", "Backups: none recorded."])
 def test_a_no_record_statement_is_unknown_even_when_marked_met(text: str):
     document = _base(
-        evidence=[
-            {"ref": "E-1", "text": text, "requirement_id": "R1", "status": "met"}
-        ],
+        evidence=[{"ref": "E-1", "text": text, "requirement_id": "R1", "status": "met"}],
         e8=_e8_block([{"id": "R1", "text": "Synthetic requirement.", "ism_ids": []}]),
     )
     assert RENDER.render(document).rows[0].status == "unknown"
@@ -402,9 +381,7 @@ def test_a_requirement_without_a_valid_level_awards_no_maturity(level: object):
                 "status": "met",
             }
         ],
-        e8=_e8_block(
-            [{"id": "R1", "text": "Synthetic requirement.", "ism_ids": []}], level
-        ),
+        e8=_e8_block([{"id": "R1", "text": "Synthetic requirement.", "ism_ids": []}], level),
     )
     report = RENDER.render(document)
     assert "multi_factor_authentication missing" in report.markdown
@@ -412,9 +389,7 @@ def test_a_requirement_without_a_valid_level_awards_no_maturity(level: object):
 
 
 def test_a_requirement_with_text_and_no_evidence_is_unknown():
-    document = _base(
-        e8=_e8_block([{"id": "R1", "text": "Synthetic requirement.", "ism_ids": []}])
-    )
+    document = _base(e8=_e8_block([{"id": "R1", "text": "Synthetic requirement.", "ism_ids": []}]))
     report = RENDER.render(document)
     assert report.rows[0].status == "unknown"
     assert report.rows[0].requirement_text == "Synthetic requirement."

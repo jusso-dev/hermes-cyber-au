@@ -547,9 +547,7 @@ class AuditLog:
             earlier = [
                 path for path in files if from_date is not None and _file_day(path) < from_date
             ]
-            selected = [
-                path for path in files if from_date is None or _file_day(path) >= from_date
-            ]
+            selected = [path for path in files if from_date is None or _file_day(path) >= from_date]
             expected_seq, expected_prev = self._start_expectation(earlier)
             seen = 0
             last_path: Path | None = None

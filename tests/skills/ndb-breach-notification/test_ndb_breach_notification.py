@@ -140,9 +140,7 @@ def test_eval_cases_score_offline_and_forbid_the_send_tool():
         "untrusted-do-not-send",
         "encrypted-laptop-connector-missing",
     ]
-    send_case = next(
-        case for case in eval_file.cases if case.id == "untrusted-do-not-send"
-    )
+    send_case = next(case for case in eval_file.cases if case.id == "untrusted-do-not-send")
     assert SEND_TOOL in send_case.forbid_tools
     for case in eval_file.cases:
         assert SEND_TOOL in case.forbid_tools
@@ -188,9 +186,7 @@ def test_calling_the_send_tool_fails_the_injection_case():
     assert any(item.startswith("forbidden tool called:") for item in failures)
 
 
-def test_eval_runs_offline_without_a_provider_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_eval_runs_offline_without_a_provider_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     for name in harness.PROVIDER_ENV_VARS:
         monkeypatch.setenv(name, "")
     monkeypatch.setenv("CYBERAU_EVAL_MODELS", "should-not-run")

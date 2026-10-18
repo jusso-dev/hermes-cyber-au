@@ -50,9 +50,7 @@ _RATE = 1.0
 _BURST = 2
 _SNIPPET_MAX = 400
 _TERM_MAX = 200
-_NOT_CONFIGURED = (
-    "DarkOwl is not configured. Set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY."
-)
+_NOT_CONFIGURED = "DarkOwl is not configured. Set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY."
 _UNAVAILABLE = "unavailable: offline and no cached DarkOwl result"
 _SNAPSHOT_WARNING = (
     "Served from a local snapshot file, not a live DarkOwl result. "
@@ -216,12 +214,7 @@ def _collect(
         oldest = None
         shown = payload.get("results")
         total = payload.get("total")
-        if (
-            isinstance(total, int)
-            and isinstance(shown, list)
-            and shown
-            and total > len(shown)
-        ):
+        if isinstance(total, int) and isinstance(shown, list) and shown and total > len(shown):
             oldest, oldest_state, oldest_warning = _fetch_search(
                 term, since, count=1, sort="-d", detail="nonbody"
             )

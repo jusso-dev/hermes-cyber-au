@@ -16,9 +16,7 @@ from pathlib import Path
 
 import yaml
 
-_UUID = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
+_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 _SKIP_KEYS = {"condition", "timeframe"}
 _LEVELS = {"informational", "low", "medium", "high", "critical"}
 _STATUSES = {"experimental", "test", "stable", "deprecated", "unsupported"}
@@ -33,9 +31,7 @@ def load_support(path: Path) -> dict:
     if not isinstance(loaded, dict):
         raise TypeError("Kusto support file must be a mapping")
     supported = loaded.get("supported")
-    if not isinstance(supported, list) or any(
-        not isinstance(item, str) for item in supported
-    ):
+    if not isinstance(supported, list) or any(not isinstance(item, str) for item in supported):
         raise ValueError("Kusto support file needs a supported list")
     for key in ("source_name", "version", "retrieved"):
         if not isinstance(loaded.get(key), str) or not loaded[key].strip():
@@ -153,18 +149,12 @@ def _field_keys(node: object) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Lint a Sigma rule for a Kusto hunt draft."
-    )
+    parser = argparse.ArgumentParser(description="Lint a Sigma rule for a Kusto hunt draft.")
     parser.add_argument("path", nargs="?", type=Path, help="Sigma YAML file")
     parser.add_argument("--support", type=Path, default=support_path())
     args = parser.parse_args(argv)
     try:
-        text = (
-            sys.stdin.read()
-            if args.path is None
-            else args.path.read_text(encoding="utf-8")
-        )
+        text = sys.stdin.read() if args.path is None else args.path.read_text(encoding="utf-8")
         payload = lint_text(text, load_support(args.support))
     except (OSError, ValueError, TypeError, yaml.YAMLError) as exc:
         payload = _fail([f"sigma lint failed: {exc}"])

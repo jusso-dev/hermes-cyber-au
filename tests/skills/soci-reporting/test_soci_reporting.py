@@ -39,9 +39,7 @@ def test_spring_forward_adds_hours_in_utc_then_returns_to_sydney():
     assert due.astimezone(UTC) - start.astimezone(UTC) == timedelta(hours=12)
     assert due.utcoffset() == timedelta(hours=11)
 
-    wall = (start.replace(tzinfo=None) + timedelta(hours=12)).replace(
-        tzinfo=deadlines.SYDNEY
-    )
+    wall = (start.replace(tzinfo=None) + timedelta(hours=12)).replace(tzinfo=deadlines.SYDNEY)
     assert deadlines.format_sydney(wall) == "2026-10-04T08:00:00+11:00"
     assert deadlines.format_sydney(due) != deadlines.format_sydney(wall)
 
@@ -54,9 +52,7 @@ def test_autumn_change_adds_hours_in_utc_then_returns_to_sydney():
     assert due.astimezone(UTC) - start.astimezone(UTC) == timedelta(hours=12)
     assert due.utcoffset() == timedelta(hours=10)
 
-    wall = (start.replace(tzinfo=None) + timedelta(hours=12)).replace(
-        tzinfo=deadlines.SYDNEY
-    )
+    wall = (start.replace(tzinfo=None) + timedelta(hours=12)).replace(tzinfo=deadlines.SYDNEY)
     assert deadlines.format_sydney(due) != deadlines.format_sydney(wall)
 
 
@@ -165,9 +161,7 @@ def test_cli_prints_the_spring_forward_deadline(capsys: pytest.CaptureFixture[st
 
 
 def test_cli_rejects_a_nonexistent_sydney_time(capsys: pytest.CaptureFixture[str]):
-    code = deadlines.main(
-        ["--trigger", "critical_incident", "--aware-at", "2026-10-04T02:30:00"]
-    )
+    code = deadlines.main(["--trigger", "critical_incident", "--aware-at", "2026-10-04T02:30:00"])
     assert code == 2
     assert "does not exist" in capsys.readouterr().err
 
@@ -192,9 +186,7 @@ def test_eval_deadlines_match_the_helper_and_forbid_submission():
     assert critical["report_due"] not in coverage
     assert other["report_due"] not in coverage
 
-    assert any(
-        "submit_report" in tool for case in loaded.cases for tool in case.forbid_tools
-    )
+    assert any("submit_report" in tool for case in loaded.cases for tool in case.forbid_tools)
     for case in loaded.cases:
         assert case.offline is not None
         assert all("submit" not in call.name for call in case.offline.tool_calls)

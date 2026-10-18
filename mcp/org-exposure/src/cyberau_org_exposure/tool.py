@@ -20,8 +20,7 @@ SCHEMA = {
             "subject": {
                 "type": "string",
                 "description": (
-                    "domain, ABN, brand or watchlist entry id; "
-                    "default all watchlist entries"
+                    "domain, ABN, brand or watchlist entry id; default all watchlist entries"
                 ),
             },
             "since": {"type": "string", "format": "date"},

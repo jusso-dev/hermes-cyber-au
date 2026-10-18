@@ -97,8 +97,7 @@ def _placeholder(raw: str, server: str) -> tuple[str, str]:
         raise SystemExit(f"Server {server} has an env entry that is not NAME=${{NAME}}")
     if not PLACEHOLDER.match(value.strip()):
         raise SystemExit(
-            f"Refusing a literal env value for {name} on {server}. "
-            f"Use a ${{{name}}} placeholder."
+            f"Refusing a literal env value for {name} on {server}. Use a ${{{name}}} placeholder."
         )
     return name, value.strip()
 
@@ -142,9 +141,7 @@ def _server_entry(
             value = str(value).strip()
             key = str(key)
         else:
-            raise SystemExit(
-                f"Server {name} has an env entry that is not NAME=${{NAME}}"
-            )
+            raise SystemExit(f"Server {name} has an env entry that is not NAME=${{NAME}}")
         env[key] = value
     entry: dict = {
         "command": str(command),
@@ -249,8 +246,7 @@ def render_config(
         default_on = True
         if isinstance(spec, dict):
             default_on = (
-                spec.get("enabled_by_default", spec.get("default_enabled", True))
-                is not False
+                spec.get("enabled_by_default", spec.get("default_enabled", True)) is not False
             )
         if default_on:
             for variable in required:
@@ -292,13 +288,9 @@ def _top_level_block(lines: list[str], key: str) -> tuple[int, int] | None:
     if start is None:
         return None
     end = start + 1
-    while end < len(lines) and (
-        lines[end].strip() == "" or lines[end][0] in " \t#"
-    ):
+    while end < len(lines) and (lines[end].strip() == "" or lines[end][0] in " \t#"):
         end += 1
-    while end > start + 1 and (
-        lines[end - 1].strip() == "" or lines[end - 1].startswith("#")
-    ):
+    while end > start + 1 and (lines[end - 1].strip() == "" or lines[end - 1].startswith("#")):
         end -= 1
     return start, end
 

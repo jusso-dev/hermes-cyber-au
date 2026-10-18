@@ -325,11 +325,7 @@ def _session_card(session: dict, *, preview: bool) -> str:
         f'<h3><a href="{href}">{esc(session["title"])}</a></h3>',
         f'<p class="muted">{esc(session["speaker"])}'
         + (f" · {esc(session['when'])}" if session.get("when") else "")
-        + (
-            f" · {esc(session['count'])} messages"
-            if session.get("count") not in (None, "")
-            else ""
-        )
+        + (f" · {esc(session['count'])} messages" if session.get("count") not in (None, "") else "")
         + "</p>",
     ]
     if not turns:
@@ -419,8 +415,7 @@ def render_conversation(session: dict) -> bytes:
         f"<h1>{esc(session['title'])}</h1>"
         f'<p class="muted">{esc(" · ".join(meta))}</p>'
         "<p>Snapshot of the stored session. The system prompt and tool arguments "
-        "are not shown.</p>"
-        + _session_card(session, preview=False)
+        "are not shown.</p>" + _session_card(session, preview=False)
     )
     return page(session["title"], body)
 

@@ -62,12 +62,8 @@ def test_empty_config_renders_keyless_and_disables_keyed(tmp_path: Path) -> None
     assert kev["lazy"] is True
     assert kev["x-cyber-au-managed"] is True
     assert "enabled" not in kev
-    assert kev["command"] == str(
-        home.resolve() / "mcp" / ".venv" / "bin" / "cyberau-mcp"
-    )
-    assert kev["env"]["CYBERAU_DATA_DIR"] == str(
-        home.resolve() / "plugin-data" / "cyber-au"
-    )
+    assert kev["command"] == str(home.resolve() / "mcp" / ".venv" / "bin" / "cyberau-mcp")
+    assert kev["env"]["CYBERAU_DATA_DIR"] == str(home.resolve() / "plugin-data" / "cyber-au")
     assert kev["env"]["CYBERAU_EGRESS_ALLOWLIST"] == str(
         home.resolve() / "mcp" / "egress-allowlist.yaml"
     )
@@ -88,22 +84,18 @@ def test_second_render_is_byte_identical(tmp_path: Path) -> None:
     assert first.returncode == 0, first.stderr
     before = {
         "config": config.read_bytes(),
-        "managed": (
-            home / "plugin-data" / "cyber-au" / "managed-servers.json"
-        ).read_bytes(),
-        "status": (
-            home / "plugin-data" / "cyber-au" / "bootstrap-status.json"
-        ).read_bytes(),
+        "managed": (home / "plugin-data" / "cyber-au" / "managed-servers.json").read_bytes(),
+        "status": (home / "plugin-data" / "cyber-au" / "bootstrap-status.json").read_bytes(),
     }
     second = _run(home, SERVERS, config, env_file)
     assert second.returncode == 0, second.stderr
     assert config.read_bytes() == before["config"]
-    assert (
-        home / "plugin-data" / "cyber-au" / "managed-servers.json"
-    ).read_bytes() == before["managed"]
-    assert (
-        home / "plugin-data" / "cyber-au" / "bootstrap-status.json"
-    ).read_bytes() == before["status"]
+    assert (home / "plugin-data" / "cyber-au" / "managed-servers.json").read_bytes() == before[
+        "managed"
+    ]
+    assert (home / "plugin-data" / "cyber-au" / "bootstrap-status.json").read_bytes() == before[
+        "status"
+    ]
 
 
 def test_user_edits_survive_and_a_key_enables_abusech(tmp_path: Path) -> None:
@@ -169,10 +161,7 @@ mcp_servers:
     assert loaded["mcp_servers"]["custom"]["command"] == "/usr/bin/true"
     assert loaded["mcp_servers"]["custom"]["args"] == ["stay"]
     assert loaded["mcp_servers"]["abusech"]["enabled"] is False
-    assert (
-        loaded["mcp_servers"]["abusech"]["env"]["ABUSECH_AUTH_KEY"]
-        == "${ABUSECH_AUTH_KEY}"
-    )
+    assert loaded["mcp_servers"]["abusech"]["env"]["ABUSECH_AUTH_KEY"] == "${ABUSECH_AUTH_KEY}"
     assert "ABUSECH_AUTH_KEY is unset" in disabled.stdout
 
     _write(env_file, f"ABUSECH_AUTH_KEY={MARKER}\nPAID_TOKEN={MARKER}\n")
@@ -189,9 +178,7 @@ mcp_servers:
     assert MARKER not in text
     assert MARKER not in enabled.stdout
     assert MARKER not in enabled.stderr
-    status = json.loads(
-        (home / "plugin-data" / "cyber-au" / "bootstrap-status.json").read_text()
-    )
+    status = json.loads((home / "plugin-data" / "cyber-au" / "bootstrap-status.json").read_text())
     assert MARKER not in json.dumps(status)
 
 
@@ -254,9 +241,7 @@ mcp_servers:
     assert "retired" not in servers_out
     assert "epss" in servers_out
     names = json.loads(
-        (home / "plugin-data" / "cyber-au" / "managed-servers.json").read_text(
-            encoding="utf-8"
-        )
+        (home / "plugin-data" / "cyber-au" / "managed-servers.json").read_text(encoding="utf-8")
     )["servers"]
     assert names == ["epss", "kev"]
     again = _run(home, servers, config, env_file)

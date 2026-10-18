@@ -104,9 +104,7 @@ def test_search_snapshot_wraps_text_and_stores_counts_only(tmp_path, monkeypatch
     assert "Older synthetic paste" not in json.dumps(result)
     assert any("snapshot" in warning for warning in result["warnings"])
     assert not (tmp_path / "intel.sqlite").exists()
-    assert (
-        connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 1, 1)) == []
-    )
+    assert connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 1, 1)) == []
     assert not (tmp_path / "intel.sqlite").exists()
 
 

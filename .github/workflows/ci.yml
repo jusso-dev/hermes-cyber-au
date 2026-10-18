@@ -67,19 +67,16 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Plugin doctor
-        run: |
-          docker run --rm -v "$PWD:/src:ro" "$HERMES_IMAGE" plugins doctor /src/plugins/cyber-au --ci
+      - name: Read the pinned Hermes image
+        run: echo "HERMES_IMAGE=nousresearch/hermes-agent:$(python3 tools/hermes_pin.py get)" >> "$GITHUB_ENV"
       - name: Distribution install smoke test
         run: |
           docker run --rm -v "$PWD:/src:ro" -e HERMES_HOME=/tmp/hh "$HERMES_IMAGE" \
             profile install /src --name cyber-au-ci --yes
-      - name: Bootstrap and doctor inside the image
+      - name: Bootstrap, profile doctor and plugin doctor inside the image
         run: |
           docker run --rm -v "$PWD:/src:ro" --entrypoint bash "$HERMES_IMAGE" -lc '
-            set -euo pipefail
-            /src/install/install.sh --profile cyber-au-ci --offline --no-hermes-install --non-interactive --yes --allow-root
-            hermes -p cyber-au-ci cyber-au doctor --offline --json'
+            bash /src/tools/ci/hermes_smoke.sh'
 
   secrets:
     runs-on: ubuntu-latest

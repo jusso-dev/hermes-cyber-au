@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.util
 import json
 import os
@@ -64,8 +65,8 @@ def _plugin():
 
 
 plugin = _plugin()
-doctor = plugin.doctor
-cli = plugin.cli
+cli = importlib.import_module(f"{plugin.__name__}.cli")
+doctor = importlib.import_module(f"{plugin.__name__}.doctor")
 
 
 def _write(path: Path, text: str) -> None:
@@ -469,9 +470,9 @@ def test_fix_reruns_bootstrap_only(tmp_path: Path):
         "set -eu\n"
         "mkdir -p mcp/.venv\n"
         "python3 -c 'import hashlib, pathlib; "
-        "p=pathlib.Path(\"mcp/uv.lock\"); "
-        "out=pathlib.Path(\"mcp/.venv/.cyberau-lock-sha256\"); "
-        "out.write_text(hashlib.sha256(p.read_bytes()).hexdigest()+\"\\n\")'\n"
+        'p=pathlib.Path("mcp/uv.lock"); '
+        'out=pathlib.Path("mcp/.venv/.cyberau-lock-sha256"); '
+        'out.write_text(hashlib.sha256(p.read_bytes()).hexdigest()+"\\n")\'\n'
         "printf '%s\\n' \"$*\" > bootstrap-args.txt\n",
     )
     report = run(root, fix=True, offline=True)
@@ -518,7 +519,9 @@ def test_checkout_reports_only_installed_connectors_and_named_gaps(tmp_path: Pat
         spec = servers[name]
         key = spec.get("connector") or name
         installed = (REPO / "mcp" / key / "pyproject.toml").is_file() or key == "stub"
-        if installed:
+        if doctor._is_external(spec):
+            assert "external server" in item.detail
+        elif installed:
             assert item.detail != "not installed"
         else:
             assert item.detail == "not installed"
@@ -659,3 +662,74 @@ def test_unreadable_lock_stamp_is_reported_not_raised(tmp_path: Path):
             health=lambda _name, _live: (0, "ok"),
         )
     )
+
+
+def test_native_connector_with_wrap_metadata_is_probed(tmp_path: Path):
+    root = healthy(tmp_path)
+    catalogue = root / "mcp" / "servers.yaml"
+    content = yaml.safe_load(catalogue.read_text())
+    content["servers"]["kev"]["wrap"] = {"upstream": "https://example.com/mcp"}
+    catalogue.write_text(yaml.safe_dump(content))
+    probes = []
+
+    def health(name, live):
+        probes.append((name, live))
+        return 1, "probe failed"
+
+    report = run(root, health=health)
+    assert ("cisa-kev", False) in probes
+    assert ids(report)["connector.kev"].status == "fail"
+
+
+def test_doctor_uses_the_profile_selected_by_hermes(tmp_path: Path, monkeypatch):
+    from types import SimpleNamespace
+
+    selected = tmp_path / "profiles" / "selected"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setitem(
+        sys.modules, "hermes_constants", SimpleNamespace(get_hermes_home=lambda: selected)
+    )
+    assert doctor.profile_home(tmp_path) == selected
+
+
+def test_connector_packages_follow_cyberau_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    # hermes plugins doctor loads a copy of the plugin from a scratch directory,
+    # so CYBERAU_HOME names the profile whose mcp/.venv holds the connectors.
+    packages = tmp_path / "mcp" / ".venv" / "lib" / "python3.99" / "site-packages"
+    _write(packages / "cyberau_doctor_probe_pkg" / "__init__.py", "VALUE = 7\n")
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.delitem(sys.modules, "cyberau_doctor_probe_pkg", raising=False)
+    monkeypatch.setenv("CYBERAU_HOME", str(tmp_path))
+    assert plugin._profile_homes()[0] == tmp_path
+    plugin._connector_packages()
+    assert str(packages) in sys.path
+    import cyberau_doctor_probe_pkg
+
+    assert cyberau_doctor_probe_pkg.VALUE == 7
+    monkeypatch.delitem(sys.modules, "cyberau_doctor_probe_pkg")
+
+
+def test_plugin_imports_without_pyyaml(tmp_path: Path):
+    # On a native install PyYAML is only importable after register() adds the
+    # profile venv, so importing the package itself must not need it.
+    import subprocess
+
+    script = (
+        "import importlib.util, sys\n"
+        "sys.modules['yaml'] = None\n"
+        "d = sys.argv[1]\n"
+        "spec = importlib.util.spec_from_file_location(\n"
+        "    'cyberau_noyaml', d + '/__init__.py', submodule_search_locations=[d])\n"
+        "module = importlib.util.module_from_spec(spec)\n"
+        "sys.modules[spec.name] = module\n"
+        "spec.loader.exec_module(module)\n"
+        "assert callable(module.register) and callable(module.main)\n"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", script, str(REPO / "plugins" / "cyber-au")],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=tmp_path,
+    )
+    assert proc.returncode == 0, proc.stderr

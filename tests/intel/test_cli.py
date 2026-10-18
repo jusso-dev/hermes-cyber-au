@@ -30,6 +30,24 @@ def test_store_help_and_missing_command(capsys):
     assert main(["store"]) == 2
 
 
+def test_store_init_creates_the_schema(tmp_path, capsys, monkeypatch):
+    import sqlite3
+
+    from store.db import close_store
+
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    path = tmp_path / "intel.sqlite"
+    assert main(["store", "init", "--path", str(path)]) == 0
+    capsys.readouterr()
+    close_store(path)
+    connection = sqlite3.connect(path)
+    try:
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master")}
+    finally:
+        connection.close()
+    assert {"schema_version", "sources", "indicators", "observations"} <= tables
+
+
 def test_cli_dedupes_exports_and_loads_kev(tmp_path, capsys, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     path = tmp_path / "intel.sqlite"

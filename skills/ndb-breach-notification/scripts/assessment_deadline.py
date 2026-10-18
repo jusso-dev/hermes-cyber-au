@@ -32,9 +32,7 @@ def assessment_window(aware_at: str, as_of: str | None = None) -> dict[str, obje
     daylight saving starts or ends. An ``aware_at`` after ``as_of`` is an error.
     """
     aware_day = sydney_day(aware_at, "aware_at")
-    as_of_day = (
-        datetime.now(SYDNEY).date() if as_of is None else sydney_day(as_of, "as_of")
-    )
+    as_of_day = datetime.now(SYDNEY).date() if as_of is None else sydney_day(as_of, "as_of")
     if aware_day > as_of_day:
         raise DeadlineError("aware_at is after as_of; check the awareness date")
     deadline = aware_day + timedelta(days=ASSESSMENT_DAYS)

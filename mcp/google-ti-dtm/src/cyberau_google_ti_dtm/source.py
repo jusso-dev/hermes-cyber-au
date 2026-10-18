@@ -68,16 +68,12 @@ _Severity = Literal["low", "medium", "high"]
 
 _MISSING_KEY = "GTI_API_KEY is not set"
 _NOT_USABLE = "Google Threat Intelligence DTM response was not usable"
-_UNAVAILABLE = (
-    "unavailable: offline and no cached Google Threat Intelligence DTM response"
-)
+_UNAVAILABLE = "unavailable: offline and no cached Google Threat Intelligence DTM response"
 _SNAPSHOT_NOTE = (
     "Served from a snapshot, not live Google Threat Intelligence DTM data. "
     "Do not treat it as current."
 )
-_RATE_LIMITED = (
-    "Google Threat Intelligence DTM returned HTTP 429 after Retry-After was honoured"
-)
+_RATE_LIMITED = "Google Threat Intelligence DTM returned HTTP 429 after Retry-After was honoured"
 
 
 def gti_dtm_alerts(
@@ -123,8 +119,7 @@ def connector() -> PremiumConnector:
             ToolSpec(
                 name="gti_dtm_alerts",
                 description=(
-                    "DTM alerts since a date, with monitor, severity, "
-                    "alert type and matched value."
+                    "DTM alerts since a date, with monitor, severity, alert type and matched value."
                 ),
                 fn=gti_dtm_alerts,
             ),
