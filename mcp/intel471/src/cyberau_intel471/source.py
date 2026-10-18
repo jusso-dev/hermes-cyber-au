@@ -21,6 +21,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,

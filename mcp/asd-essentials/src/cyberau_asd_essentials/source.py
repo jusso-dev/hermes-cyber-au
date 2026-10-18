@@ -202,7 +202,8 @@ def essentials_chapter(chapter: _Chapter, domain: _Domain | None = None) -> dict
             [page.get("url") or CHAPTERS[chapter]],
             _data_as_of(essentials),
             tuple(
-                item for item in (warning, f"no domain named {selected!r}. Chapters name: {names}")
+                item
+                for item in (warning, f"no domain named {selected!r}. Chapters name: {names}")
                 if item
             ),
         )

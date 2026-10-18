@@ -66,7 +66,8 @@ def internetdb_ip(ip: Annotated[str, Field(description="IPv4 or IPv6 address")])
             None,
             cache,
             url,
-            warnings=notes + ("InternetDB rate limited the request (429) after honouring Retry-After",),
+            warnings=notes
+            + ("InternetDB rate limited the request (429) after honouring Retry-After",),
         )
     if status == 404 or (payload is not None and _is_empty(payload)):
         return _envelope(
@@ -76,7 +77,9 @@ def internetdb_ip(ip: Annotated[str, Field(description="IPv4 or IPv6 address")])
             warnings=notes + ("InternetDB has no information for this address",),
         )
     if status != 200:
-        return _envelope(None, cache, url, warnings=notes + (f"InternetDB returned status {status}",))
+        return _envelope(
+            None, cache, url, warnings=notes + (f"InternetDB returned status {status}",)
+        )
     if payload is None:
         return _envelope(None, cache, url, warnings=notes + ("InternetDB payload was not usable",))
     drift = schema_drift(payload)

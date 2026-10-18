@@ -11,7 +11,13 @@ from cyberau_common.envelope import untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 
 SNAPSHOT = Path(__file__).resolve().parent / "fixtures" / "kev.json"
-FIXTURE_VALUES = ("CVE-2024-12345", "CVE-2021-44228", "Example widget flaw", "Log4Shell", "2026.10.16")
+FIXTURE_VALUES = (
+    "CVE-2024-12345",
+    "CVE-2021-44228",
+    "Example widget flaw",
+    "Log4Shell",
+    "2026.10.16",
+)
 
 
 def setup_function():

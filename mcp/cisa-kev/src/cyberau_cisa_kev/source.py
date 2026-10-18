@@ -130,7 +130,11 @@ def _load_catalog() -> tuple[dict | None, str, tuple[str, ...]]:
     finally:
         client.close()
     if not isinstance(catalog, dict) or not isinstance(catalog.get("vulnerabilities"), list):
-        return None, "snapshot", (unavailable(LABEL, "the live response had no vulnerabilities list"),)
+        return (
+            None,
+            "snapshot",
+            (unavailable(LABEL, "the live response had no vulnerabilities list"),),
+        )
     return catalog, response.cache, ()
 
 

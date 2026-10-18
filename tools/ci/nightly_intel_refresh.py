@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from cyberau_common.secrets import redact
+from cyberau_common.secrets import distribution_env_names, is_plain_config_name, redact
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -94,13 +94,13 @@ def parse_porcelain_z(data: str) -> list[str]:
             continue
         status = entry[:2]
         path = entry[3:]
+        if path:
+            paths.append(path)
         if "R" in status or "C" in status:
             if index >= len(parts):
                 break
-            path = parts[index]
+            paths.append(parts[index])
             index += 1
-        if path:
-            paths.append(path)
     return paths
 
 
@@ -142,6 +142,26 @@ def status_signature(path: Path) -> dict[str, str]:
         for name, entry in sources.items()
         if isinstance(entry, dict)
     }
+
+
+def scrub(text: str, env: Mapping[str, str]) -> str:
+    cleaned = redact(text)
+    names = set(distribution_env_names()) | {
+        name for name in env if re.search(r"KEY|TOKEN|SECRET|PASSWORD", name, re.IGNORECASE)
+    }
+    for name in names:
+        value = env.get(name, "")
+        if not is_plain_config_name(name) and len(value) >= 8:
+            cleaned = cleaned.replace(value, "[REDACTED]")
+    return cleaned
+
+
+def scrub_file(path: Path, env: Mapping[str, str]) -> None:
+    if path.is_file():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        cleaned = scrub(text, env)
+        if cleaned != text:
+            path.write_text(cleaned, encoding="utf-8")
 
 
 def refresh_args(sources: str, catalogue: str, summary: str) -> list[str]:
@@ -200,16 +220,19 @@ def execute(
         set_output("open_pr", "false")
         return 1
     if result.stdout.strip():
-        print(redact(result.stdout.strip()))
+        print(scrub(result.stdout.strip(), current))
     if result.code != 0:
-        detail = redact(result.stderr or result.stdout).strip()
+        detail = scrub(result.stderr or result.stdout, current).strip()
         if detail:
             print(detail, file=sys.stderr)
+
+    scrub_file(root / summary, current)
+    scrub_file(status_path, current)
 
     try:
         changed = list_changes()
     except RuntimeError as exc:
-        print(redact(str(exc)), file=sys.stderr)
+        print(scrub(str(exc), current), file=sys.stderr)
         set_output("open_pr", "false")
         return 1
     bad = outside_data_dirs(changed)

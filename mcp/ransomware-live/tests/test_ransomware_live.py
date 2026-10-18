@@ -438,14 +438,24 @@ def test_every_tool_is_unavailable_without_live_or_cached_data(mode, tmp_path, m
     if mode == "offline":
         monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.setenv("CYBERAU_ORG_WATCHLIST", str(FIXTURES / "org-exposure.yaml"))
-    results = [ransom_au_victims(), ransom_au_victims(sector="Education"), ransom_watchlist_match(90)]
+    results = [
+        ransom_au_victims(),
+        ransom_au_victims(sector="Education"),
+        ransom_watchlist_match(90),
+    ]
     for result in results:
         jsonschema.validate(result, ENVELOPE)
         assert result["data"] == []
         assert result["cache"] == "snapshot"
         assert any("is unavailable" in item for item in result["warnings"])
         text = json.dumps(result)
-        for marker in ("Wattle Sample", "Harbour Sample", "samplegroup", "wattlesample", "2026-10-15"):
+        for marker in (
+            "Wattle Sample",
+            "Harbour Sample",
+            "samplegroup",
+            "wattlesample",
+            "2026-10-15",
+        ):
             assert marker not in text, marker
     assert not (tmp_path / "ransomlive-metadata.jsonl").exists()
 

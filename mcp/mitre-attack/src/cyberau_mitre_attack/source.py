@@ -571,7 +571,9 @@ def _load(domain: str, *, force_live: bool = False) -> _Loaded:
         return _stored_or_unavailable(domain, [*warnings, warning])
     model, problem = _build(_loads(body), domain, version)
     if model is None:
-        return _stored_or_unavailable(domain, [*warnings, f"{domain} bundle was not usable: {problem}"])
+        return _stored_or_unavailable(
+            domain, [*warnings, f"{domain} bundle was not usable: {problem}"]
+        )
     _store(path, body)
     return _Loaded(model, version, "stale" if cache == "stale" else "miss", [*urls, url], warnings)
 

@@ -36,7 +36,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_catalog` | `HttpClient` |  | `1 / (6 * 3600)` | `1` | `rolling` |
+| `_load_catalog` | `HttpClient` |  | `1 / (6 * 3600)` | `1` | `rolling` |
 
 ## Cache
 
@@ -46,7 +46,7 @@ A `get` call that omits `stale_if_error` uses the shared client default (1 day).
 
 | Function | Call | TTL | Stale if error |
 |---|---|---|---|
-| `_catalog` | `get` | `6 * 3600` (6 hours) | not set (shared client default 1 day) |
+| `_load_catalog` | `get` | `6 * 3600` (6 hours) | not set (shared client default 1 day) |
 
 ## Tools
 
