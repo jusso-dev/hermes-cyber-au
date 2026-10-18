@@ -5,7 +5,8 @@ import json
 import os
 import re
 import time
-from datetime import UTC, datetime, timedelta
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -20,6 +21,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
 from pydantic import Field
 
 OAIC_QUICK = (
@@ -56,16 +58,15 @@ _SOURCES = (
     {"url": CISC_PDF, "markers": ("84 hours", "48 hours")},
     {"url": CSA_TEXT, "markers": ("72 hours", "ransomware")},
 )
-_NOT_LIVE = {
-    "snapshot": (
-        "answered from the shipped snapshot, not a live fetch; "
-        "check the source URL for amendments made since the snapshot date"
-    ),
-    "stale": (
-        "answered from a locally stored copy of the snapshot, not a live fetch; "
-        "check the source URL for amendments made since the snapshot date"
-    ),
-}
+# The shipped snapshot is refused once its retrieval date is older than this.
+SNAPSHOT_MAX_AGE_DAYS = 180
+LABEL = "Australian reporting obligations"
+_AMENDMENTS = "check the source URL for amendments made since the snapshot date"
+_STALE_NOTE = (
+    "answered from a locally stored copy of the snapshot, not a live fetch; " + _AMENDMENTS
+)
+# Tests set this to simulate another day when the snapshot age is checked.
+_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _RESOLVER = None
 _CLOCK = None
@@ -81,7 +82,7 @@ def aureg_obligation(
     problem = _regime_problem(regime)
     if problem:
         return _envelope([], "snapshot", warnings=(problem,))
-    payload, cache, warning = _load()
+    payload, cache, warning, note = _load()
     if warning:
         return _envelope([], cache, warnings=(warning,))
     wanted = _trigger(trigger)
@@ -98,7 +99,7 @@ def aureg_obligation(
     stored = _persist(public)
     if stored:
         warnings.append(stored)
-    warnings.append(_NOT_LIVE[cache])
+    warnings.extend(note)
     return _envelope(public, cache, _urls(rows), _as_of(payload), tuple(warnings))
 
 
@@ -117,7 +118,7 @@ def aureg_deadline(regime: _Regime, trigger: str, aware_at: str) -> dict:
         warnings.append(aware_note)
     if problem or not wanted or aware is None:
         return _envelope([], "snapshot", warnings=tuple(warnings))
-    payload, cache, warning = _load()
+    payload, cache, warning, note = _load()
     if warning:
         warnings.append(warning)
         return _envelope([], cache, warnings=tuple(warnings))
@@ -130,7 +131,7 @@ def aureg_deadline(regime: _Regime, trigger: str, aware_at: str) -> dict:
     stored = _persist(public)
     if stored:
         warnings.append(stored)
-    warnings.append(_NOT_LIVE[cache])
+    warnings.extend(note)
     return _envelope(public, cache, _urls(rows), _as_of(payload), tuple(warnings))
 
 
@@ -256,20 +257,55 @@ def _trigger(value: str | None) -> str | None:
     return text or None
 
 
-def _load() -> tuple[dict | None, str, str]:
+def _load() -> tuple[dict | None, str, str, tuple[str, ...]]:
+    """Return (payload, cache, problem, notes). Notes label where the rules came from."""
     override = os.environ.get("CYBERAU_AUREG_SNAPSHOT", "").strip()
     if override:
-        return _read(Path(override), "snapshot")
+        payload, cache, warning = _read(Path(override), "snapshot")
+        as_of = (payload or {}).get("retrieved_at")
+        return payload, cache, warning, (_override_note(as_of), _AMENDMENTS)
+    note = ""
     if os.environ.get("CYBERAU_OFFLINE") == "1":
         current = _data_dir() / "obligations-current.json"
         if current.is_file():
             payload, _cache, warning = _read(current, "stale")
-            if warning:
-                shipped, shipped_cache, shipped_warning = _read(_snapshot_path(), "snapshot")
-                note = warning if not shipped_warning else f"{warning}; {shipped_warning}"
-                return shipped, shipped_cache, note
-            return payload, "stale", ""
-    return _read(_snapshot_path(), "snapshot")
+            if not warning:
+                return payload, "stale", "", (_STALE_NOTE,)
+            note = warning
+    payload, cache, warning = _shipped()
+    if warning:
+        return None, cache, f"{note}; {warning}" if note else warning, ()
+    as_of = payload.get("retrieved_at") if payload else None
+    notes = (note, snapshot_note(LABEL, as_of), _AMENDMENTS)
+    return payload, cache, "", tuple(item for item in notes if item)
+
+
+def _shipped() -> tuple[dict | None, str, str]:
+    path = _snapshot_path()
+    if path is None:
+        return None, "snapshot", unavailable(LABEL, "the shipped obligations snapshot is missing")
+    payload, cache, warning = _read(path, "snapshot")
+    if warning:
+        return None, cache, unavailable(LABEL, warning)
+    problem = check_shipped(
+        path.read_text(encoding="utf-8"),
+        payload.get("retrieved_at"),
+        label=LABEL,
+        max_age_days=SNAPSHOT_MAX_AGE_DAYS,
+        today=_TODAY() if _TODAY else None,
+    )
+    if problem:
+        return None, cache, unavailable(LABEL, problem)
+    return payload, cache, ""
+
+
+def _override_note(as_of: object) -> str:
+    day = parse_day(as_of)
+    when = day.isoformat() if day else "an unknown date"
+    return (
+        f"served the operator-supplied {LABEL} snapshot dated {when} from "
+        "CYBERAU_AUREG_SNAPSHOT, not a live fetch"
+    )
 
 
 def _read(path: Path, cache: str) -> tuple[dict | None, str, str]:
@@ -292,6 +328,8 @@ def _read(path: Path, cache: str) -> tuple[dict | None, str, str]:
 def _health_payload() -> tuple[dict | None, str]:
     override = os.environ.get("CYBERAU_AUREG_SNAPSHOT", "").strip()
     path = Path(override) if override else _snapshot_path()
+    if path is None:
+        return None, "the shipped obligations snapshot is missing"
     payload, _cache, warning = _read(path, "snapshot")
     if warning and payload is not None and schema_drift(payload):
         return payload, ""
@@ -547,8 +585,8 @@ def _urls(rows: list[dict]) -> list[str]:
 def _as_of(payload: dict | None) -> str | None:
     if not payload:
         return None
-    value = payload.get("retrieved_at")
-    return str(value) if value else None
+    day = parse_day(payload.get("retrieved_at"))
+    return day.isoformat() if day else None
 
 
 def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnings=()):
@@ -565,8 +603,9 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
     )
 
 
-def _snapshot_path() -> Path:
-    return _PACKAGE / "data" / "obligations-2026-10-17.json"
+def _snapshot_path() -> Path | None:
+    found = sorted((_PACKAGE / "data").glob("obligations-*.json"))
+    return found[-1] if found else None
 
 
 def _data_dir() -> Path:

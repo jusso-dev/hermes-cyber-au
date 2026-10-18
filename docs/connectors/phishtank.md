@@ -6,7 +6,7 @@ Read-only PhishTank verified-online phishing URL database.
 
 - Key: `phishtank`
 - Server: `phish`
-- Default: not listed
+- Default: off: no entry in `mcp/servers.yaml`
 - Upstream: https://phishtank.org/developer_info.php
 - Verified: 2026-10-17
 - Egress hosts: data.phishtank.com, cdn.phishtank.com
@@ -158,7 +158,9 @@ The developer page lists the database as HTTP. This connector uses HTTPS. On 17 
 
 Records are stored in `$CYBERAU_DATA_DIR/phishtank.sqlite` (table `phish`, id `phish_id`) until the shared intel store exists. Rows are not deleted when they leave the hourly online-valid set.
 
-The bundled `data/online-valid.json` is synthetic. It is served only offline with no cache, with `cache: snapshot` and a warning, and is never written to the intel store. A cached copy older than an hour, or one served after a failed or rate-limited download, carries a warning.
+Fallback ladder: a fresh download, then the cached copy (labelled stale when older than an hour, or when served after a failed or rate-limited download), then unavailable. When neither a download nor a cached copy is available, `phishtank_check_url` returns empty data with `cache: snapshot` and an "is unavailable" warning. No snapshot ships with the connector. Treat an unavailable result as unknown, not clean.
+
+`CYBERAU_PHISHTANK_SNAPSHOT` may point at an operator-supplied `online-valid.json`. It is read only when set, served with `cache: snapshot` and a warning that it came from that file rather than a live download, and never written to the intel store. The offline schema check reads that file or the cached copy, and reports ok with "no local copy to check" when neither exists. Synthetic test data lives under `tests/fixtures/` and is never served at runtime.
 
 ## Operator guide
 

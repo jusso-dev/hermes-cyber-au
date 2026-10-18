@@ -343,7 +343,7 @@ def test_sibling_role_snapshot(tmp_path: Path) -> None:
 
 def test_no_session_store_says_so(profile: Path) -> None:
     _, body = _get(profile, "/")
-    assert "No conversation has been recorded yet." in body
+    assert "No conversations found in these profiles." in body
 
 
 def test_sessions_message(profile: Path) -> None:

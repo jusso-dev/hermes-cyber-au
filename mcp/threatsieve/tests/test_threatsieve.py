@@ -49,7 +49,7 @@ def test_domain_and_unknown_assessments(monkeypatch, tmp_path):
     assert "<<untrusted source=threatsieve>>" in found["data"][0]["observable"]
     assert "<<untrusted source=threatsieve>>" in found["data"][0]["actors"][0]["name"]
     assert "<<untrusted source=threatsieve>>" in found["data"][0]["evidence"][0]
-    assert any("synthetic fixture" in item for item in found["warnings"])
+    assert any("operator-supplied snapshot file" in item for item in found["warnings"])
     assert any("demo data" in item for item in found["warnings"])
     assert not (tmp_path / "threatsieve-observations.jsonl").exists()
     assert SECRET not in json.dumps(found)
@@ -476,3 +476,51 @@ def test_hostile_upstream_strings_are_wrapped_or_dropped(monkeypatch, tmp_path):
         _disarm()
     assert hostile not in json.dumps(refused)
     assert "THREATSIEVE_API_KEY" in refused["warnings"][0]
+
+
+def _assert_unavailable(result: dict) -> None:
+    assert result["data"] == []
+    assert any("ThreatSieve is unavailable" in item for item in result["warnings"])
+    text = json.dumps(result)
+    for marker in ("asm_example_com", "obs_example_com", "T1566"):
+        assert marker not in text
+
+
+def test_no_shipped_snapshot_is_served_offline(monkeypatch, tmp_path):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.delenv("CYBERAU_THREATSIEVE_SNAPSHOT", raising=False)
+    monkeypatch.setenv("THREATSIEVE_API_KEY", SECRET)
+    result = threatsieve_assess("example.com")
+    assert result["cache"] == "snapshot"
+    _assert_unavailable(result)
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert probe.detail == "no local copy to check"
+
+
+def test_no_shipped_snapshot_is_served_when_live_fails(monkeypatch, tmp_path):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+
+    def boom(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    _arm(monkeypatch, boom)
+    try:
+        failed = threatsieve_assess("example.com")
+    finally:
+        _disarm()
+    _assert_unavailable(failed)
+
+    def busy(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"retry-after": "0"}, json={"error": "rate_limited"})
+
+    _arm(monkeypatch, busy)
+    try:
+        limited = threatsieve_assess("example.com")
+    finally:
+        _disarm()
+    _assert_unavailable(limited)
+
+    monkeypatch.delenv("THREATSIEVE_API_KEY", raising=False)
+    _assert_unavailable(threatsieve_assess("example.com"))

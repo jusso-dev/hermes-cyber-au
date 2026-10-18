@@ -20,6 +20,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 MCP_URL = "https://haveibeenpwned.com/mcp"
 ATTRIBUTION = (
@@ -30,7 +31,10 @@ PUBLIC_TOOLS = ("hibp_list_breaches", "hibp_get_breach", "hibp_get_pwned_passwor
 GATED_TOOLS = ("hibp_get_breached_account", "hibp_get_breached_domain")
 TEST_ACCOUNT = "account-exists@hibp-integration-tests.com"
 
-_PACKAGE = Path(__file__).resolve().parents[2]
+_SNAPSHOT_NOTE = (
+    "served the operator-supplied HIBP snapshot in CYBERAU_HIBP_SNAPSHOT, not a live fetch. "
+    "It is partial, not the full HIBP catalogue"
+)
 _HEADERS = {"accept": "application/json, text/event-stream"}
 _PREFIX = re.compile(r"[0-9A-Fa-f]{5}")
 _ACCOUNT = re.compile(r"[^@\s]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}")
@@ -267,6 +271,8 @@ class _HibpConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_HIBP_SNAPSHOT"):
+                return Probe(self.key, True, "no local copy to check")
             problem = _snapshot_drift(_load_snapshot())
             return Probe(self.key, problem is None, problem or "schema ok")
         if not live:
@@ -398,11 +404,14 @@ def _fetch_public(
         response = client.post_json(MCP_URL, _rpc_body(tool, arguments), headers=_HEADERS, ttl=ttl)
     except Exception as exc:
         if offline:
-            return _from_snapshot(tool, arguments)
-        return None, "snapshot", f"HIBP is unavailable: {redact(str(exc))}"
+            reason = "offline mode is on and nothing is cached for this request"
+            return None, "snapshot", unavailable("HIBP", reason)
+        return None, "snapshot", unavailable("HIBP", redact(str(exc)))
     finally:
         client.close()
     payload, warning = _structured(tool, response.status, response.headers, response.body)
+    if payload is None and response.status >= 400:
+        warning = unavailable("HIBP", warning)
     return payload, response.cache, warning
 
 
@@ -418,7 +427,8 @@ def _fetch_gated(tool: str, arguments: dict) -> tuple[dict | None, str, str]:
             ),
         )
     if os.environ.get("CYBERAU_OFFLINE") == "1":
-        return None, "snapshot", "unavailable offline: account and domain lookups are never cached"
+        reason = "offline mode is on and account and domain lookups are never cached"
+        return None, "snapshot", unavailable("HIBP", reason)
     client = _client(_NoCache(), "hibp-keyed", rate=10 / 60, burst=1, offline=False)
     try:
         response = client.post_json(
@@ -521,7 +531,11 @@ def _structured(tool: str, status: int, headers: dict, body: bytes) -> tuple[dic
 def _from_snapshot(tool: str, arguments: dict) -> tuple[dict | None, str, str]:
     payload = _snapshot_payload(tool, arguments)
     if payload is None:
-        return None, "snapshot", "no matching record in the offline snapshot or cache"
+        return (
+            None,
+            "snapshot",
+            "no matching record in the operator-supplied HIBP snapshot, which is partial",
+        )
     return payload, "snapshot", ""
 
 
@@ -566,8 +580,11 @@ def _page_payload(key: str, rows: list, limit: int, offset: int) -> dict:
 
 
 def _load_snapshot() -> dict | None:
+    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     override = os.environ.get("CYBERAU_HIBP_SNAPSHOT")
-    path = Path(override) if override else _PACKAGE / "data" / "snapshot.json"
+    if not override:
+        return None
+    path = Path(override)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -591,7 +608,7 @@ def _snapshot_drift(snapshot: dict | None) -> str | None:
 def _snapshot_note(cache: str) -> tuple[str, ...]:
     if cache != "snapshot":
         return ()
-    return ("offline snapshot: partial, not the full HIBP catalogue",)
+    return (_SNAPSHOT_NOTE,)
 
 
 def _breach(row: dict) -> dict:

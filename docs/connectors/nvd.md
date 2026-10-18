@@ -22,17 +22,13 @@ Credential values are read from the profile environment. Nothing on this page is
 
 Server manifest `env` entry: `NVD_API_KEY=${NVD_API_KEY}`.
 
-Server manifest `required_env`: `NVD_API_KEY`.
-
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
-| `NVD_API_KEY` | credential | yes | yes | `lookup` |
+| `NVD_API_KEY` | credential | yes | no | `lookup` |
 | `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_NVD_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
-
-`NVD_API_KEY` is optional in `SOURCE.md`. `mcp/servers.yaml` lists it under `required_env`.
 
 ## Rate limits
 
@@ -184,8 +180,14 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-This product uses data from the NVD API but is not endorsed or certified by the NVD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
+This product uses data from the NVD API but is not endorsed or certified by the NVD. See [Data sources, licences and attribution](../reference/data-sources.md).
 
 Attribution returned with each result:
 
 > This product uses data from the NVD API but is not endorsed or certified by the NVD.
+
+## Fallback and fixtures
+
+Each call is fetched live and cached (24 hours for a CVE or its history, 1 hour for a search). If the live fetch fails, or `CYBERAU_OFFLINE=1` is set, the connector's own cache answers when it has a copy of that request. When there is no cached copy, the tool returns empty data with a warning that NVD is unavailable. No CVE data is shipped with the connector, so nothing from the repo is ever served as NVD data.
+
+`CYBERAU_NVD_SNAPSHOT` may point at an operator-supplied NVD response file. It is read instead of the live API, and every answer carries a warning that it came from that file, not a live fetch. The sample responses used by the tests live in `tests/fixtures/` and are not real NVD records.

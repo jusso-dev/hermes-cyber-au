@@ -18,6 +18,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 PRO_VICTIMS = "https://api-pro.ransomware.live/victims/"
@@ -36,7 +37,6 @@ _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _Date = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
 _Limit = Annotated[int, Field(ge=1, le=500)]
 _Days = Annotated[int, Field(ge=1, le=90)]
-_PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 # One poll an hour on average. The burst covers retries of that same poll.
 POLL_RATE = 1 / 3600
@@ -45,7 +45,10 @@ _CACHE_TTL = 3600
 _SOURCE = "ransomlive"
 _STALE_NOTE = "live fetch failed; served from a stale cached copy"
 _UNUSABLE = "ransomware.live response was not usable"
-_SNAPSHOT_NOTE = "served from the bundled synthetic snapshot, not live data"
+_PINNED_NOTE = (
+    "served the operator-supplied snapshot in CYBERAU_RANSOMLIVE_SNAPSHOT, not a live fetch"
+)
+_LABEL = "ransomware.live"
 
 
 def ransom_au_victims(
@@ -127,6 +130,8 @@ class _RansomLiveConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT"):
+                return Probe(self.key, True, "no local copy to check")
             payload = _load(_snapshot_text())
             problem = schema_drift(payload)
             if problem:
@@ -223,7 +228,7 @@ def _fetch(
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     if snapshot and not force_live:
-        return _load(_snapshot_text()), "snapshot", "served from a snapshot file, not live data"
+        return _load(_snapshot_text()), "snapshot", _PINNED_NOTE
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, params, b"", "anonymous")
@@ -233,7 +238,8 @@ def _fetch(
             return _load_bytes(cached.body), "hit", ""
         return _load_bytes(cached.body), "stale", "offline; served from a stale cached copy"
     if offline:
-        return _load(_snapshot_text()), "snapshot", f"offline with no cached copy; {_SNAPSHOT_NOTE}"
+        reason = "offline mode is on and no cached copy is stored"
+        return None, "snapshot", unavailable(_LABEL, reason)
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = HttpClient(
         "ransomware-live",
@@ -259,11 +265,12 @@ def _fetch(
         except Exception as exc:
             return _after_error(exc, cache, cache_key, force_live=force_live)
         if response.status in (401, 403):
-            return None, "miss", _auth_warning(response.status)
+            return None, "miss", _failed(_auth_warning(response.status), force_live)
         if response.status == 429:
             return _after_limit(cache, cache_key, force_live=force_live)
         if response.status >= 400:
-            return None, "snapshot", f"ransomware.live returned {response.status}"
+            message = f"ransomware.live returned {response.status}"
+            return None, "snapshot", _failed(message, force_live)
         if response.cache == "stale":
             return _load_bytes(response.body), "stale", _STALE_NOTE
         return _load_bytes(response.body), response.cache, ""
@@ -273,12 +280,19 @@ def _fetch(
 
 def _after_error(exc: Exception, cache: HttpCache, cache_key: str, *, force_live: bool):
     message = _safe(exc)
-    if force_live or isinstance(exc, EgressDenied):
+    if force_live:
         return None, "snapshot", message
+    if isinstance(exc, EgressDenied):
+        return None, "snapshot", unavailable(_LABEL, message)
     cached = cache.get(cache_key)
     if cached:
         return _load_bytes(cached.body), "stale", f"{_STALE_NOTE} ({message})"
-    return None, "snapshot", f"ransomware.live unavailable: {message}"
+    return None, "snapshot", unavailable(_LABEL, message)
+
+
+def _failed(message: str, force_live: bool) -> str:
+    """Live probes keep the plain message. Tool calls say the source is unavailable."""
+    return message if force_live else unavailable(_LABEL, message)
 
 
 def _after_limit(cache: HttpCache, cache_key: str, *, force_live: bool):
@@ -286,7 +300,7 @@ def _after_limit(cache: HttpCache, cache_key: str, *, force_live: bool):
         cached = cache.get(cache_key)
         if cached:
             return _load_bytes(cached.body), "stale", f"{_STALE_NOTE} (rate limited)"
-    return None, "snapshot", "ransomware.live rate limited; retry later"
+    return None, "snapshot", _failed("ransomware.live rate limited; retry later", force_live)
 
 
 def _auth_warning(status: int) -> str:
@@ -588,9 +602,11 @@ def _load_bytes(body: bytes):
 
 
 def _snapshot_text() -> str:
+    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "victims_au.json"
-    return path.read_text(encoding="utf-8")
+    if not snapshot:
+        return ""
+    return Path(snapshot).read_text(encoding="utf-8")
 
 
 def _data_dir() -> Path:

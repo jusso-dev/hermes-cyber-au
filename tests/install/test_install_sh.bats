@@ -84,6 +84,14 @@ if [ -n "$source_dir" ]; then
   cp "$source_dir/mcp/pyproject.toml" "$home/mcp/pyproject.toml"
   cp "$source_dir/mcp/uv.lock" "$home/mcp/uv.lock"
   cp "$source_dir/mcp/egress-allowlist.yaml" "$home/mcp/egress-allowlist.yaml"
+  mkdir -p "$home/mcp/asd-ism/data" "$home/mcp/asd-essentials/data"
+  printf '{}\n' > "$home/mcp/asd-ism/data/releases.json"
+  printf '{}\n' > "$home/mcp/asd-essentials/data/e8-maturity-test.json"
+  printf '{}\n' > "$home/mcp/asd-essentials/data/essentials-test.json"
+  if [ "${STORE_FAKE_KEV:-0}" = "1" ]; then
+    mkdir -p "$home/mcp/cisa-kev/data"
+    printf '{}\n' > "$home/mcp/cisa-kev/data/kev.json"
+  fi
   exit 0
 fi
 printf '%s\n' "unhandled hermes command: $*" >&2
@@ -106,11 +114,15 @@ for arg in "$@"; do
 done
 [ "$1" = "sync" ] || exit 1
 mkdir -p "$project/.venv/bin"
+ln -sf "${CYBERAU_REAL_PYTHON:?}" "$project/.venv/bin/python"
 printf '%s\n' 'frozen' >"$project/.venv/.cyberau-sync-stamp"
 cat >"$project/.venv/bin/cyberau-mcp" <<'STUB'
 #!/bin/sh
-printf '%s\n' "store is not part of the shared library yet" >&2
-exit 2
+if [ "${STORE_FAKE_FAIL:-}" = "$2" ]; then
+  printf '%s\n' "synthetic store failure: $2" >&2
+  exit 7
+fi
+exit 0
 STUB
 chmod +x "$project/.venv/bin/cyberau-mcp"
 exit 0
@@ -227,17 +239,42 @@ EOF
   grep -q "profile install" "$HERMES_FAKE_LOG"
 }
 
-@test "CYBERAU_PROFILE overrides --profile" {
+@test "--profile overrides CYBERAU_PROFILE" {
   export CYBERAU_PROFILE=from-env
   run "$REPO/install/install.sh" --profile from-flag --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 0 ]
+  grep -q -- "--name from-flag" "$HERMES_FAKE_LOG"
+  ! grep -q -- "--name from-env" "$HERMES_FAKE_LOG"
+}
+
+@test "CYBERAU_PROFILE applies when --profile is not given" {
+  export CYBERAU_PROFILE=from-env
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
+  [ "$status" -eq 0 ]
   grep -q -- "--name from-env" "$HERMES_FAKE_LOG"
-  ! grep -q -- "--name from-flag" "$HERMES_FAKE_LOG"
+}
+
+@test "--ref overrides CYBERAU_REF" {
+  install_fake_git
+  export CYBERAU_REF=from-env
+  run "$REPO/install/install.sh" --ref v0.1.0 --no-hermes-install --non-interactive --yes
+  [ "$status" -eq 0 ]
+  grep -q "fetch --depth 1 origin v0.1.0" "$GIT_LOG"
+  ! grep -q "from-env" "$GIT_LOG"
 }
 
 @test "missing Hermes does not pipe the installer into a shell" {
   rm -f "$WORK/bin/hermes"
   run "$REPO/install/install.sh" --non-interactive
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"https://raw.githubusercontent.com/NousResearch/hermes-agent/"* ]]
+  [[ "$output" == *"checked against sha256"* ]]
+  [ ! -s "$CURL_LOG" ]
+}
+
+@test "--hermes-latest shows the moving upstream installer" {
+  rm -f "$WORK/bin/hermes"
+  run "$REPO/install/install.sh" --hermes-latest --non-interactive
   [ "$status" -eq 1 ]
   [[ "$output" == *"https://hermes-agent.nousresearch.com/install.sh"* ]]
   [ ! -s "$CURL_LOG" ]
@@ -296,9 +333,9 @@ EOF
   hash_config="$(cksum "$home/config.yaml")"
   hash_lock="$(cksum "$home/mcp/uv.lock")"
   hash_stamp="$(cksum "$home/mcp/.venv/.cyberau-sync-stamp")"
-  [[ "$output" == *"hermes cyber-au doctor is not in this checkout"* ]]
-  [[ "$output" == *"The doctor check is a separate ticket."* ]]
-  [[ "$output" == *"NVD_API_KEY is unset"* ]]
+  [[ "$output" == *"Initialised the intel store."* ]]
+  [[ "$output" == *"Bootstrap finished for cyber-au."* ]]
+  [[ "$output" != *"NVD_API_KEY is unset"* ]]
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 0 ]
   [ "$(cksum "$home/config.yaml")" = "$hash_config" ]
@@ -308,7 +345,7 @@ EOF
   [[ "$output" == *"already installed"* ]]
 }
 
-@test "a set key enables nvd without writing the value" {
+@test "an optional nvd key stays a placeholder without disabling the connector" {
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 0 ]
   home="$HOME/.hermes/profiles/cyber-au"
@@ -321,16 +358,16 @@ EOF
 import yaml
 from pathlib import Path
 loaded = yaml.safe_load(Path("$home/config.yaml").read_text())
-assert loaded["mcp_servers"]["nvd"]["enabled"] is True
+assert loaded["mcp_servers"]["nvd"].get("enabled", True) is True
 assert loaded["mcp_servers"]["nvd"]["env"]["NVD_API_KEY"] == "\${NVD_API_KEY}"
 PY
 }
 
-@test "plugin enable is skipped when the skeleton is absent" {
+@test "plugin enable failure stops installation when the plugin exists" {
   export HERMES_FAKE_ENABLE_FAIL=1
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"plugin skeleton is not in this checkout"* ]]
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Could not enable the cyber-au plugin."* ]]
 }
 
 @test "the Hermes installer pipe lives only in the confirmed function" {
@@ -340,4 +377,28 @@ PY
     in_fn && /^}/ { in_fn = 0 }
     END { exit(found == 1 ? 0 : 1) }
   ' "$REPO/install/install.sh"
+}
+
+
+@test "store initialisation error is visible and fails bootstrap" {
+  export STORE_FAKE_FAIL=init
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"synthetic store failure: init"* ]]
+}
+
+@test "KEV import error is visible and fails bootstrap" {
+  export STORE_FAKE_KEV=1 STORE_FAKE_FAIL=ingest-kev
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"synthetic store failure: ingest-kev"* ]]
+}
+
+@test "missing required reference files fail bootstrap" {
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
+  [ "$status" -eq 0 ]
+  rm "$HOME/.hermes/profiles/cyber-au/mcp/asd-essentials/data/e8-maturity-test.json"
+  run "$REPO/install/bootstrap.sh" --profile cyber-au --offline --non-interactive
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Essential Eight maturity reference files are missing"* ]]
 }

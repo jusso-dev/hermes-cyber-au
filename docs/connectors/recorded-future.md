@@ -686,6 +686,8 @@ Set `RECORDED_FUTURE_API_TOKEN` in the profile `.env`. Optional: `RECORDED_FUTUR
 
 The connector also checks `mcp_servers.recordedfuture.enabled` in the profile `config.yaml` before every upstream call, and counts each call against your quota. If that file is missing or `enabled` is not `true`, every call is refused. Domain inputs must be on the org-exposure watchlist. With no watchlist they are refused unless `CYBERAU_RF_ALLOW_EXTERNAL=1`.
 
+Fallback ladder: live call, then the response cached earlier, then unavailable. When none of those has data, a tool returns empty data and an "is unavailable" warning. No snapshot ships with the package. Synthetic samples live under `tests/fixtures/` and are read only by the offline schema check (`health --check-schema` without `--live`). `CYBERAU_RF_SCHEMA_FIXTURE` points that check at another file.
+
 `cyberau-mcp health recorded-future --live` fails when the token is missing, when a call fails, or when the answer came from a cached or snapshot copy.
 
 The optional official MCP entry `recordedfuture_mcp` points at `https://mcp.recordedfuture.com/mcp` with `auth: oauth`, `trust: untrusted` and `enabled: false`. Its `tools.include` list is frozen to read tools. Anything that updates alerts or creates takedowns is excluded.

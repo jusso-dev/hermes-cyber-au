@@ -8,7 +8,19 @@ plaintext stays out of this public repository. If CYBERAU_PRIVATE_NAMES is
 set, those newline-separated names are hashed in memory and checked as well.
 Hash a name as lowercase words separated by single spaces; matching ignores
 case and punctuation, so a hashed "acme" also catches "Acme." and "acme_corp".
-The workflow does not set that variable and does not carry a secret.
+
+The hashes are not secret. An unsalted SHA-256 of a short name can be
+reversed with a word list, so treat the hash file as public. A masked
+CYBERAU_PRIVATE_NAMES repository secret keeps names out of the repository
+entirely.
+
+When no banned names are configured the check cannot catch any, so it says
+so on every run (as a GitHub Actions warning annotation in CI). Pass
+--require-names, or set CYBERAU_REQUIRE_PRIVATE_NAMES=1, to fail instead.
+
+Add a name without echoing it or writing the plaintext anywhere:
+
+    uv run --project mcp python tools/ci/style_check.py --add-name
 
 Run from the repository root:
 
@@ -18,6 +30,7 @@ Run from the repository root:
 from __future__ import annotations
 
 import argparse
+import getpass
 import hashlib
 import os
 import re
@@ -89,18 +102,94 @@ _HINT_RE = re.compile(
 )
 _MAX_BYTES = 1_000_000
 _ENV_NAMES = "CYBERAU_PRIVATE_NAMES"
+_ENV_REQUIRE = "CYBERAU_REQUIRE_PRIVATE_NAMES"
+_NO_NAMES = (
+    "private name check is not active: tools/ci/private_names.sha256 has no hashes "
+    f"and {_ENV_NAMES} is unset. Add hashes with --add-name (see issue #156)."
+)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check hermes-cyber-au house style.")
     parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument(
+        "--add-name",
+        action="store_true",
+        help="read one name from the terminal or stdin and append its hash; never echoes it",
+    )
+    parser.add_argument(
+        "--require-names",
+        action="store_true",
+        help=f"fail when no banned names are configured (or set {_ENV_REQUIRE}=1)",
+    )
     args = parser.parse_args(argv)
-    errors, hints = check(args.root.resolve(), extra_names=_names_from_env())
+    root = args.root.resolve()
+    if args.add_name:
+        return _add_name_interactive(root)
+    extra = _names_from_env()
+    errors, hints = check(root, extra_names=extra)
     for hint in hints:
         print(hint)
     for error in errors:
         print(error)
+    if not _active_hashes(root, extra):
+        require = args.require_names or os.environ.get(_ENV_REQUIRE, "") == "1"
+        if require:
+            print(f"error: {_NO_NAMES}")
+            return 1
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            print(f"::warning title=Private name check inactive::{_NO_NAMES}")
+        else:
+            print(f"warning: {_NO_NAMES}", file=sys.stderr)
     return 1 if errors else 0
+
+
+def normalise_name(name: str) -> str:
+    """Lowercase words joined by single spaces, the form _candidates produces."""
+    return " ".join(_ALNUM.findall(name.lower()))
+
+
+def name_digest(name: str) -> str:
+    cleaned = normalise_name(name)
+    if not cleaned:
+        raise ValueError("name has no letters or digits")
+    if len(cleaned.split(" ")) > _MAX_WORDS:
+        raise ValueError(f"name has more than {_MAX_WORDS} words and could never match")
+    return _digest(cleaned)
+
+
+def add_name(names_file: Path, name: str) -> bool:
+    """Append the hash of ``name``. Returns False if it was already listed."""
+    digest = name_digest(name)
+    existing, _errors = _load_hashes(names_file.parent, names_file)
+    if digest in existing:
+        return False
+    text = names_file.read_text(encoding="utf-8") if names_file.is_file() else ""
+    if text and not text.endswith("\n"):
+        text += "\n"
+    names_file.write_text(text + digest + "\n", encoding="utf-8")
+    return True
+
+
+def _add_name_interactive(root: Path) -> int:
+    names_file = root / "tools" / "ci" / "private_names.sha256"
+    if sys.stdin.isatty():
+        name = getpass.getpass("Name to ban (not echoed): ")
+    else:
+        name = sys.stdin.readline()
+    try:
+        added = add_name(names_file, name)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    rel = _rel(root, names_file)
+    print(f"added a hash to {rel}" if added else f"that name is already in {rel}")
+    return 0
+
+
+def _active_hashes(root: Path, extra_names: list[str] | tuple[str, ...] = ()) -> bool:
+    hashes, _errors = _load_hashes(root, None)
+    return bool(hashes) or any(name.strip() for name in extra_names)
 
 
 def check(

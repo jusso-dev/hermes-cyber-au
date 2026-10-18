@@ -1,8 +1,8 @@
-# Proposed: .github/workflows/skill-data-regen.yml
-# Regenerate bundled skill data from local directories (ISM OSCAL, Essential Eight,
-# AU reporting obligations, ATT&CK and Sigma) and re-check advisory parsers.
-# Missing data directories are skipped. Live pages are not fetched.
-# Justin copies this file to .github/workflows/ by hand.
+# Refresh the reference data that connectors ship and skills read: ISM OSCAL
+# catalogues, the Essential Eight and ASD Essentials data, and AU reporting
+# obligations. Each source is downloaded through its connector's egress policy.
+# A missing data directory fails the run. A pull request opens when data changed.
+# ATT&CK and Sigma are not shipped: those connectors fetch live and cache.
 # 17:00 UTC daily is 04:00 AEDT.
 name: skill-data-regen
 
@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       parser_failures: ${{ steps.parsers.outputs.failures }}
+      fetch_failures: ${{ steps.fetch_outcome.outputs.failures }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,55 +39,51 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install "uv<1"
       - run: uv sync --project mcp --all-packages --frozen
-      - name: ISM from local OSCAL catalogues (latest release plus the one before)
+      # Each step downloads upstream again through the connector's egress policy and
+      # rewrites the shipped data only when upstream changed, or when the copy needs
+      # a new retrieval date before connectors refuse it as too old.
+      - name: ISM OSCAL catalogues (latest release plus the one before)
+        id: ism
+        continue-on-error: true
         run: |
           set -euo pipefail
-          if [ -d mcp/ism/data ] || [ -d mcp/asd-ism/data ]; then
-            if [ "${{ inputs.force }}" = "true" ]; then
-              uv run --project mcp cyberau-mcp regen ism --keep 2 --force
-            else
-              uv run --project mcp cyberau-mcp regen ism --keep 2
-            fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            uv run --project mcp cyberau-mcp regen ism --fetch --keep 2 --force
           else
-            echo "ISM data directory is absent. Skipping regen ism."
+            uv run --project mcp cyberau-mcp regen ism --fetch --keep 2
           fi
       - name: Essential Eight maturity data and ASD Essentials chapters
+        id: e8
+        continue-on-error: true
         run: |
           set -euo pipefail
-          if [ -d mcp/e8/data ]; then
-            if [ "${{ inputs.force }}" = "true" ]; then
-              uv run --project mcp cyberau-mcp regen e8 --force
-            else
-              uv run --project mcp cyberau-mcp regen e8
-            fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            uv run --project mcp cyberau-mcp regen e8 --fetch --force
           else
-            echo "Essential Eight data directory is absent. Skipping regen e8."
+            uv run --project mcp cyberau-mcp regen e8 --fetch
           fi
-      - name: AU reporting obligations (weekly, Mondays Sydney time)
+      - name: AU reporting obligations (reviewed reference data)
+        id: aureg
+        continue-on-error: true
+        run: |
+          # These quotes and deadlines require source review. Do not restamp them
+          # or claim a live refresh when only rebuilding the local hash manifest.
+          uv run --project mcp cyberau-mcp regen aureg
+      # A source that could not be fetched must not stop the others from opening a
+      # pull request. The fetch-failed job below still fails the run.
+      - name: Record sources that could not be refreshed
+        id: fetch_outcome
+        env:
+          ISM: ${{ steps.ism.outcome }}
+          E8: ${{ steps.e8.outcome }}
+          AUREG: ${{ steps.aureg.outcome }}
         run: |
           set -euo pipefail
-          if [ ! -d mcp/aureg/data ]; then
-            echo "AU reporting obligations data directory is absent. Skipping regen aureg."
-            exit 0
-          fi
-          if [ "$(TZ=Australia/Sydney date +%u)" = "1" ] || [ "${{ inputs.force }}" = "true" ]; then
-            uv run --project mcp cyberau-mcp regen aureg
-          else
-            echo "Skipping regen aureg until Monday in Australia/Sydney."
-          fi
-      - name: ATT&CK and Sigma when the local data directories exist
-        run: |
-          set -euo pipefail
-          if [ -d mcp/attack/data ]; then
-            uv run --project mcp cyberau-mcp regen attack
-          else
-            echo "ATT&CK data directory is absent. Skipping regen attack."
-          fi
-          if [ -d mcp/sigma/data ]; then
-            uv run --project mcp cyberau-mcp regen sigma
-          else
-            echo "Sigma data directory is absent. Skipping regen sigma."
-          fi
+          failures=""
+          [ "$ISM" = "success" ] || failures="$failures ism"
+          [ "$E8" = "success" ] || failures="$failures e8"
+          [ "$AUREG" = "success" ] || failures="$failures aureg"
+          echo "failures=${failures# }" >> "$GITHUB_OUTPUT"
       - name: Rebuild skill reference files from data
         run: uv run --project mcp python tools/build_skill_references.py --write PR_BODY.md
       - name: Re-check advisory parsers
@@ -127,13 +124,14 @@ jobs:
           set -euo pipefail
           paths="$RUNNER_TEMP/skill-data-paths.txt"
           : > "$paths"
-          if [ -d mcp/ism/data ]; then echo "mcp/ism/data/" >> "$paths"; fi
-          if [ -d mcp/asd-ism/data ]; then echo "mcp/asd-ism/data/" >> "$paths"; fi
-          if [ -d mcp/e8/data ]; then echo "mcp/e8/data/" >> "$paths"; fi
-          if [ -d mcp/aureg/data ]; then echo "mcp/aureg/data/" >> "$paths"; fi
-          if [ -d mcp/attack/data ]; then echo "mcp/attack/data/" >> "$paths"; fi
-          if [ -d mcp/sigma/data ]; then echo "mcp/sigma/data/" >> "$paths"; fi
-          if [ -d skills ]; then echo "skills/" >> "$paths"; fi
+          for dir in mcp/asd-ism/data mcp/asd-essentials/data mcp/au-regulatory/data; do
+            if [ ! -d "$dir" ]; then
+              echo "$dir is missing" >&2
+              exit 1
+            fi
+            echo "$dir/" >> "$paths"
+          done
+          echo "skills/" >> "$paths"
           if [ -f PR_BODY.md ]; then echo "PR_BODY.md" >> "$paths"; fi
           {
             echo "paths<<EOF"
@@ -150,6 +148,18 @@ jobs:
           name: parser-check
           if-no-files-found: ignore
           path: parser-check.json
+
+  fetch-failed:
+    needs: regen
+    if: needs.regen.outputs.fetch_failures != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail the run for sources that could not be refreshed
+        env:
+          FAILURES: ${{ needs.regen.outputs.fetch_failures }}
+        run: |
+          echo "::error title=Skill data not refreshed::regen failed for: $FAILURES. See the regen job log."
+          exit 1
 
   parser-issue:
     needs: regen

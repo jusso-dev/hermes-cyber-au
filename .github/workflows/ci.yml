@@ -12,11 +12,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  HERMES_IMAGE: nousresearch/hermes-agent:v0.22.2   # bumped by deps-and-hermes-bump.yml
 
 jobs:
   lint:
@@ -51,10 +48,8 @@ jobs:
         run: uv run --project mcp python tools/ci/check_allowlist.py
       - name: Unit and fixture tests (network blocked)
         run: uv run --project mcp pytest -q --block-network --record-mode=none --cov=cyberau_common --cov-report=xml
-      - name: Offline skill eval sample (no model key)
-        run: uv run --project mcp python tests/skills/harness.py --evals tests/skills/harness-sample/evals.yaml
-      - name: Offline ISM control lookup eval (no model key)
-        run: uv run --project mcp python tests/skills/harness.py --evals tests/skills/ism-control-lookup/evals.yaml
+      - name: Offline skill evals (no model key)
+        run: uv run --project mcp python tests/skills/harness.py
       - name: STIX export validates
         run: uv run --project mcp pytest -q tests/intel/test_stix_export.py --block-network
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -68,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Read the pinned Hermes image
-        run: echo "HERMES_IMAGE=nousresearch/hermes-agent:$(python3 tools/hermes_pin.py get)" >> "$GITHUB_ENV"
+        run: echo "HERMES_IMAGE=$(python3 tools/hermes_pin.py image)" >> "$GITHUB_ENV"
       - name: Distribution install smoke test
         run: |
           docker run --rm -v "$PWD:/src:ro" -e HERMES_HOME=/tmp/hh "$HERMES_IMAGE" \

@@ -10,8 +10,9 @@ import random
 import re
 import sqlite3
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -26,6 +27,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
 from pydantic import Field
 
 OVERVIEW_URL = "https://www.cyber.gov.au/irap"
@@ -43,9 +45,15 @@ ATTRIBUTION = (
     "Short quotations only. This is not an IRAP assessment and it is not endorsed by ASD."
 )
 SNAPSHOT_NOTE = (
-    "Shipped snapshot: short passages seen through a search index on 16 October 2026. "
-    "It is not a full fetch of the cyber.gov.au page. Read the current page before relying on it."
+    "Snapshot: short passages seen through a search index. "
+    "It is not a full fetch of the cyber.gov.au page."
 )
+# The shipped snapshot is refused once its data-retrieved date is older than this.
+SNAPSHOT_MAX_AGE_DAYS = 180
+LABEL = "IRAP guidance"
+# Tests set this to simulate another day when the snapshot age is checked.
+_TODAY: Callable[[], date] | None = None
+_RETRIEVED = re.compile(r'data-retrieved="([^"]*)"')
 _STOP = frozenset(
     "about all and any are can does for from has have how its may not should that the their "
     "them then there these they this was what when where which who why will with would you "
@@ -84,6 +92,11 @@ def irap_search_guidance(query: _QUERY) -> dict:
     matched = [row for row in records if _matches(query, row["sentence"])]
     cache = _merge_cache([page["cache"] for page in pages])
     urls = [page["url"] for page in pages]
+    if not records:
+        # No page could be read, so "not covered" would be a guess.
+        if not any("is unavailable" in item for item in warnings):
+            warnings.append(unavailable(LABEL, "no page could be read"))
+        return _envelope(None, cache, urls, None, tuple(warnings))
     if not matched:
         warnings.append("not covered")
         return _envelope(_not_covered(), cache, urls, _as_of(records), tuple(warnings))
@@ -98,6 +111,8 @@ def irap_consumer_checklist() -> dict:
     page = pages[0]
     checks = [_public(row) for row in page["records"] if row["kind"] == "check"]
     warnings = _page_warnings(pages)
+    if not page["records"] and not any("is unavailable" in item for item in warnings):
+        warnings.append(unavailable(LABEL, "the consumer guide could not be read"))
     if not checks and not page["warning"]:
         warnings.append("consumer guide checklist is empty")
     return _envelope(checks, page["cache"], [page["url"]], _as_of(page["records"]), tuple(warnings))
@@ -105,7 +120,11 @@ def irap_consumer_checklist() -> dict:
 
 def _page_warnings(pages: list[dict]) -> list[str]:
     warnings = [page["warning"] for page in pages if page["warning"]]
-    if any(page["snapshot"] for page in pages):
+    notes = [page["note"] for page in pages if page["records"] and page["note"]]
+    for note in notes:
+        if note not in warnings:
+            warnings.append(note)
+    if notes:
         warnings.append(SNAPSHOT_NOTE)
     return warnings
 
@@ -240,7 +259,8 @@ def _fetch_page(page_id: str, url: str, filename: str, *, force_live: bool) -> d
         _limit()
     except Exception as exc:
         page = _snapshot_page(page_id, url, filename, after_block=False)
-        page["warning"] = f"{page_id} rate limited: {redact(str(exc))}"
+        reason = f"{page_id} rate limited: {redact(str(exc))}"
+        page["warning"] = f"{reason}; {page['warning']}" if page["warning"] else reason
         return page
     direct = _http(url, _DIRECT, skip_cache=force_live)
     accepted = _accept(page_id, url, direct, "direct")
@@ -264,22 +284,49 @@ def _fetch_page(page_id: str, url: str, filename: str, *, force_live: bool) -> d
             note = f"{page_id} fetch failed: {fallback_warning}"
             return _done(page_id, url, records, "stale", note, blocked)
     page = _snapshot_page(page_id, url, filename, after_block=False)
-    if page["records"] and not page["warning"]:
-        page["warning"] = f"{page_id} fetch failed: {fallback_warning}; served shipped snapshot"
-    elif not page["warning"]:
-        page["warning"] = fallback_warning or f"{page_id} is unavailable"
+    reason = f"{page_id} fetch failed: {fallback_warning or 'unavailable'}"
+    page["warning"] = f"{reason}; {page['warning']}" if page["warning"] else reason
     page["blocked"] = blocked
     return page
 
 
 def _snapshot_page(page_id: str, url: str, filename: str, *, after_block: bool) -> dict:
     text = _read_snapshot(filename)
+    override = bool(os.environ.get("CYBERAU_IRAP_SNAPSHOT"))
+    match = _RETRIEVED.search(text or "")
+    as_of = match.group(1) if match else None
+    if not override:
+        if text is None:
+            problem = f"the shipped {page_id} snapshot is missing"
+        else:
+            problem = check_shipped(
+                text,
+                as_of,
+                label=LABEL,
+                max_age_days=SNAPSHOT_MAX_AGE_DAYS,
+                today=_TODAY() if _TODAY else None,
+            )
+        if problem:
+            warning = unavailable(f"{LABEL} ({page_id})", problem)
+            return _done(page_id, url, [], "snapshot", warning, blocked=after_block)
     records, warning = _interpret(page_id, url, text, snapshot_rules=True)
     if after_block and not warning:
-        warning = f"{page_id} served shipped snapshot after cyber.gov.au could not be reached"
+        warning = f"{page_id} answered from the snapshot after cyber.gov.au could not be reached"
     if records and text and not warning:
         _persist(page_id, url, text, records, method="snapshot")
-    return _done(page_id, url, records, "snapshot", warning, blocked=after_block)
+    page = _done(page_id, url, records, "snapshot", warning, blocked=after_block)
+    if records:
+        page["note"] = _override_note(as_of) if override else snapshot_note(LABEL, as_of)
+    return page
+
+
+def _override_note(as_of: object) -> str:
+    day = parse_day(as_of)
+    when = day.isoformat() if day else "an unknown date"
+    return (
+        f"served the operator-supplied {LABEL} snapshot dated {when} from "
+        "CYBERAU_IRAP_SNAPSHOT, not a live fetch"
+    )
 
 
 def _accept(page_id: str, url: str, fetched: dict, method: str) -> dict | None:
@@ -632,6 +679,7 @@ def _done(
         "cache": cache,
         "warning": warning,
         "blocked": blocked,
+        "note": "",
     }
 
 

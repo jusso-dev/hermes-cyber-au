@@ -36,6 +36,8 @@ Dates use Australia/Sydney. The watchlist is the user-owned file `watchlists/org
 
 The PRO API allows 500,000 requests a month and returns 429 after that. This connector polls at most about once an hour. Results are cached for one hour.
 
-If the live fetch fails and a cached copy exists, the result is marked `stale` with a warning. With no cached copy it returns an `unavailable` warning and no records. Only offline mode (`CYBERAU_OFFLINE=1`) falls back to the bundled synthetic snapshot, and that result is marked `snapshot` with a warning that it is not live data. A snapshot is never written to the metadata store. `health --live` fails unless the live service answered.
+If the live fetch fails and a cached copy exists, the result is marked `stale` with a warning. With no cached copy it returns no records and a warning that ransomware.live is unavailable. Offline mode (`CYBERAU_OFFLINE=1`) reads the cache only and ends the same way. The package ships no victim data: the synthetic claims under `tests/fixtures/` are for tests and are never served at runtime.
+
+`CYBERAU_RANSOMLIVE_SNAPSHOT` points at an operator-supplied JSON file in the v2 or PRO shape. When it is set it is used instead of the live API, marked `snapshot`, with a warning that it is the operator-supplied snapshot and not a live fetch. Tests use it to pin the fixtures. A snapshot is never written to the metadata store. `--schema-drift` checks that file, and reports "no local copy to check" when it is not set. `health --live` fails unless the live service answered.
 
 Attribution on every result: ransomware.live. Victim entries are leak-site claims, not confirmed incidents.

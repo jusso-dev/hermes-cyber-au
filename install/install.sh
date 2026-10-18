@@ -5,15 +5,25 @@
 # then installed from that directory.
 set -eu
 
-PROFILE=cyber-au
-REF=
+# Environment variables set the defaults. Command-line flags override them.
+PROFILE=${CYBERAU_PROFILE:-cyber-au}
+REF=${CYBERAU_REF:-}
 NO_HERMES_INSTALL=0
+HERMES_LATEST=0
 OFFLINE=0
 NONINTERACTIVE=0
 YES=0
 ALLOW_ROOT=0
 
 HERMES_INSTALL_URL=https://hermes-agent.nousresearch.com/install.sh
+# Pinned Hermes installer: the upstream scripts/install.sh at the commit the
+# v0.22.2 tag points to, checked against this SHA-256 before it runs. Keep
+# HERMES_PIN_VERSION in step with tools/hermes_pin.txt. To refresh, download
+# the script at the new tag's commit and record its sha256sum here.
+HERMES_PIN_VERSION=v0.22.2
+HERMES_PIN_COMMIT=d923a5eb487a17c0a68801bba9ef0f56c81040a8
+HERMES_PIN_SHA256=f4cdb0e20f1aca2c3871a76b962fd4db61510f549cf973759c753ac13349beb5
+HERMES_PINNED_URL=https://raw.githubusercontent.com/NousResearch/hermes-agent/$HERMES_PIN_COMMIT/scripts/install.sh
 REPO_URL=https://github.com/jusso-dev/hermes-cyber-au.git
 
 usage() {
@@ -24,10 +34,12 @@ Install Hermes (unless it is already there), install the cyber-au profile,
 and bootstrap connectors.
 
 Options:
-  --profile <name>       Profile name (default: cyber-au, or CYBERAU_PROFILE)
-  --ref <tag|sha>        Git ref to install (or CYBERAU_REF). Offline uses the
+  --profile <name>       Profile name (default: CYBERAU_PROFILE, else cyber-au)
+  --ref <tag|sha>        Git ref to install (default: CYBERAU_REF). Offline uses the
                          local checkout only when HEAD is already that ref.
   --no-hermes-install    Do not run the upstream Hermes installer
+  --hermes-latest        Run the moving upstream installer (latest stable
+                         Hermes) instead of the pinned, checksum-verified one
   --offline              Install from this checkout. No network calls.
   --non-interactive      Do not prompt
   --yes                  Answer yes to the Hermes installer prompt
@@ -73,6 +85,10 @@ while [ $# -gt 0 ]; do
       NO_HERMES_INSTALL=1
       shift
       ;;
+    --hermes-latest)
+      HERMES_LATEST=1
+      shift
+      ;;
     --offline)
       OFFLINE=1
       shift
@@ -99,12 +115,6 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -n "${CYBERAU_PROFILE:-}" ]; then
-  PROFILE=$CYBERAU_PROFILE
-fi
-if [ -n "${CYBERAU_REF:-}" ]; then
-  REF=$CYBERAU_REF
-fi
 
 case $PROFILE in
   ''|-*|*[!A-Za-z0-9._-]*)
@@ -153,17 +163,48 @@ if [ -f "$0" ]; then
 fi
 
 hermes_install_display() {
-  if [ -n "${HERMES_INSTALL_CHANNEL:-}" ]; then
-    printf '%s\n' "HERMES_INSTALL_CHANNEL=$HERMES_INSTALL_CHANNEL curl -fsSL $HERMES_INSTALL_URL | bash"
+  if [ "$HERMES_LATEST" -eq 1 ]; then
+    if [ -n "${HERMES_INSTALL_CHANNEL:-}" ]; then
+      printf '%s\n' "HERMES_INSTALL_CHANNEL=$HERMES_INSTALL_CHANNEL curl -fsSL $HERMES_INSTALL_URL | bash"
+    else
+      printf '%s\n' "curl -fsSL $HERMES_INSTALL_URL | bash"
+    fi
   else
-    printf '%s\n' "curl -fsSL $HERMES_INSTALL_URL | bash"
+    printf '%s\n' "Hermes $HERMES_PIN_VERSION installer from $HERMES_PINNED_URL"
+    printf '%s\n' "  checked against sha256 $HERMES_PIN_SHA256, then run with --commit $HERMES_PIN_COMMIT"
+  fi
+}
+
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  else
+    die "Neither sha256sum nor shasum is available to verify the Hermes installer."
+  fi
+}
+
+verify_sha256() {
+  file=$1
+  expected=$2
+  actual=$(sha256_of "$file")
+  if [ "$actual" != "$expected" ]; then
+    die "The Hermes installer checksum does not match. Expected $expected, got $actual. Nothing was run."
   fi
 }
 
 run_hermes_installer() {
   # Reached only after the command has been shown and accepted.
   # HERMES_INSTALL_CHANNEL is inherited by the upstream script when set.
-  curl -fsSL "$HERMES_INSTALL_URL" | bash
+  if [ "$HERMES_LATEST" -eq 1 ]; then
+    curl -fsSL "$HERMES_INSTALL_URL" | bash
+    return
+  fi
+  HERMES_SCRIPT_DIR=$(mktemp -d)
+  curl -fsSL "$HERMES_PINNED_URL" -o "$HERMES_SCRIPT_DIR/install.sh"
+  verify_sha256 "$HERMES_SCRIPT_DIR/install.sh" "$HERMES_PIN_SHA256"
+  bash "$HERMES_SCRIPT_DIR/install.sh" --commit "$HERMES_PIN_COMMIT"
 }
 
 ensure_hermes() {
@@ -172,7 +213,7 @@ ensure_hermes() {
   fi
   display=$(hermes_install_display)
   printf '%s\n' "Hermes is not installed. The upstream installer is:"
-  printf '%s\n' "  $display"
+  printf '%s\n' "$display" | sed 's/^/  /'
   if [ "$OFFLINE" -eq 1 ]; then
     die "--offline will not download Hermes."
   fi
@@ -356,7 +397,8 @@ bootstrap_script() {
 
 CLONE_DIR=
 SOURCE=
-trap 'if [ -n "$CLONE_DIR" ]; then rm -rf "$CLONE_DIR"; fi' EXIT
+HERMES_SCRIPT_DIR=
+trap 'if [ -n "$CLONE_DIR" ]; then rm -rf "$CLONE_DIR"; fi; if [ -n "$HERMES_SCRIPT_DIR" ]; then rm -rf "$HERMES_SCRIPT_DIR"; fi' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 

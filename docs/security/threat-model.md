@@ -33,13 +33,13 @@ Two further assets sit under those five. Distribution files (`SOUL.md`, skills, 
 
 | Id | Threat | Entry | Impact on | Later ticket | Test |
 |---|---|---|---|---|---|
-| T1 | Indirect prompt injection in feed content | MCP tool results | A4, then A1, A3, or A5 if it steers a later action | [062](../../tickets/062-sec-prompt-injection.md) (issue 66) | `TestEnvelope.test_untrusted_text_property`, `TestEnvelope.test_warning_redaction_and_cache_names`; corpus and hook test in issue 66 |
-| T2 | Secret leakage | Tool args, logs, cassettes, exports, briefing delivery | A1, and A2 when a delivery copies store data | [061](../../tickets/061-sec-secrets.md) (issue 65) | Redaction tests in `test_library.py` and `test_nvd.py`; gitleaks in issue 65 |
-| T3 | Exfiltration to an attacker host | Web tools, MCP | A1, A2, A5 | [063](../../tickets/063-sec-egress.md) (issue 67) | `TestEgress` and `TestHttp.test_redirect_to_denied_host`; allowlist check in issue 67 |
-| T4 | Tampered distribution or dependency | `hermes profile update`, uv | A5, then A1 and A2 | [065](../../tickets/065-sec-supply-chain.md) (issue 69) | Release-notes, SBOM, and attestation checks in issue 69 |
-| T5 | Unreviewed action | Write tools | A3, A4 | [062](../../tickets/062-sec-prompt-injection.md) (issue 66), on top of Hermes approvals | SOUL rules test; hook test in issue 66 |
-| T6 | Loss of accountability | No single entry; the record is missing or altered | A2, A3, A4 | [064](../../tickets/064-sec-audit-log.md) (issue 68) | `audit verify` tamper test in issue 68 |
-| T7 | Over-trust in a wrong answer | Skills | A4 | [040](../../tickets/040-skill-standards-evals.md) (issue 44) | SOUL rules test; `tests/skills/harness.py` in issue 44 |
+| T1 | Indirect prompt injection in feed content | MCP tool results | A4, then A1, A3, or A5 if it steers a later action | [062](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/062-sec-prompt-injection.md) (issue 66) | `TestEnvelope.test_untrusted_text_property`, `TestEnvelope.test_warning_redaction_and_cache_names`; corpus and hook test in issue 66 |
+| T2 | Secret leakage | Tool args, logs, cassettes, exports, briefing delivery | A1, and A2 when a delivery copies store data | [061](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/061-sec-secrets.md) (issue 65) | Redaction tests in `test_library.py` and `test_nvd.py`; gitleaks in issue 65 |
+| T3 | Exfiltration to an attacker host | Web tools, MCP | A1, A2, A5 | [063](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/063-sec-egress.md) (issue 67) | `TestEgress` and `TestHttp.test_redirect_to_denied_host`; allowlist check in issue 67 |
+| T4 | Tampered distribution or dependency | `hermes profile update`, uv | A5, then A1 and A2 | [065](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/065-sec-supply-chain.md) (issue 69) | Release-notes, SBOM, and attestation checks in issue 69 |
+| T5 | Unreviewed action | Write tools | A3, A4 | [062](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/062-sec-prompt-injection.md) (issue 66), on top of Hermes approvals | SOUL rules test; hook test in issue 66 |
+| T6 | Loss of accountability | No single entry; the record is missing or altered | A2, A3, A4 | [064](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/064-sec-audit-log.md) (issue 68) | `audit verify` tamper test in issue 68 |
+| T7 | Over-trust in a wrong answer | Skills | A4 | [040](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/040-skill-standards-evals.md) (issue 44) | SOUL rules test; `tests/skills/harness.py` in issue 44 |
 
 ### T1. Indirect prompt injection
 
@@ -47,13 +47,13 @@ Feed text (RSS items, OTX pulses, advisory pages, email bodies under analysis) a
 
 STRIDE: spoofing and tampering. OWASP: LLM01:2025 Prompt Injection.
 
-Control ticket: [Prompt injection defences for feed content](../../tickets/062-sec-prompt-injection.md) (GitHub issue 66). That ticket wraps free text as untrusted, banners connector results, guards the next write or outbound tool unless the analyst approves that exact call, requires `trust: untrusted` on every connector server, keeps the SOUL rule free of scanner phrases, and states allowed actions in cron prompts.
+Control ticket: [Prompt injection defences for feed content](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/062-sec-prompt-injection.md) (GitHub issue 66). That ticket wraps free text as untrusted, banners connector results, guards the next write or outbound tool unless the analyst approves that exact call, requires `trust: untrusted` on every connector server, keeps the SOUL rule free of scanner phrases, and states allowed actions in cron prompts.
 
 The guard shows the tool and its full redacted arguments with a random approval code. The person's message must name that code. Approval binds the tool name and argument hash, permits one call, and expires after ten minutes or when the next turn starts. A bare approval, feed text and an empty session id grant nothing. Arguments too large to show in full cannot be approved through this guard. Wrapper look-alikes in nested fields and warnings are defused before reaching the model. These controls limit the effect of flagged content; the injection detector remains a heuristic.
 
 Tests:
 
-- In tree: `TestEnvelope.test_untrusted_text_property` and `TestEnvelope.test_warning_redaction_and_cache_names` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py). The first checks that feed text is wrapped, length-capped, and stripped of control and bidi characters. The second checks that the result envelope carries `untrusted: true`. Neither shows that the model ignores the text.
+- In tree: `TestEnvelope.test_untrusted_text_property` and `TestEnvelope.test_warning_redaction_and_cache_names` in [mcp/common/tests/test_library.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/common/tests/test_library.py). The first checks that feed text is wrapped, length-capped, and stripped of control and bidi characters. The second checks that the result envelope carries `untrusted: true`. Neither shows that the model ignores the text.
 - Specified by issue 66: the corpus under `tests/security/injection/`, and the deterministic hook test that every corpus case is blocked from triggering a write or outbound tool. The model eval pass rate is recorded per release.
 - In tree: `tests/security/injection/test_approval.py` checks exact-call approval, single use, expiry, session isolation and safe previews. `mcp/common/tests/test_envelope.py` and `tests/security/injection/test_feed_fields.py` check nested fields and wrapper look-alikes.
 
@@ -63,11 +63,11 @@ A provider key or connector key leaves `.env` through a tool argument, a log lin
 
 STRIDE: information disclosure. OWASP: LLM02:2025 Sensitive Information Disclosure.
 
-Control ticket: [Secrets handling](../../tickets/061-sec-secrets.md) (GitHub issue 65). Config keeps `${VAR}` placeholders, `cyberau_common.secrets.redact()` covers logs, envelopes, exceptions, and the audit log, cassettes are scrubbed, gitleaks runs on history, and doctor warns when `.env` is looser than mode 600. Hermes already filters the MCP subprocess environment and redacts common secret shapes in MCP errors.
+Control ticket: [Secrets handling](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/061-sec-secrets.md) (GitHub issue 65). Config keeps `${VAR}` placeholders, `cyberau_common.secrets.redact()` covers logs, envelopes, exceptions, and the audit log, cassettes are scrubbed, gitleaks runs on history, and doctor warns when `.env` is looser than mode 600. Hermes already filters the MCP subprocess environment and redacts common secret shapes in MCP errors.
 
 Tests:
 
-- In tree: `TestHttp.test_secrets_are_redacted_in_errors`, `TestEnvelope.test_redact_headers_and_log`, `TestEnvelope.test_fixtures_have_no_secret`, and `TestCache.test_key_ignores_secret_and_changes_with_scope` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py). Also `test_offline_prefers_cache_and_redacts_api_key` and `test_nvd_vcr_config_filters_api_key` in [mcp/nvd/tests/test_nvd.py](../../mcp/nvd/tests/test_nvd.py). `DistributionSkeletonTest.test_env_template_has_no_values` and `test_git_index_has_no_secret_files` in [tests/test_distribution_skeleton.py](../../tests/test_distribution_skeleton.py).
+- In tree: `TestHttp.test_secrets_are_redacted_in_errors`, `TestEnvelope.test_redact_headers_and_log`, `TestEnvelope.test_fixtures_have_no_secret`, and `TestCache.test_key_ignores_secret_and_changes_with_scope` in [mcp/common/tests/test_library.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/common/tests/test_library.py). Also `test_offline_prefers_cache_and_redacts_api_key` and `test_nvd_vcr_config_filters_api_key` in [mcp/nvd/tests/test_nvd.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/nvd/tests/test_nvd.py). `DistributionSkeletonTest.test_env_template_has_no_values` and `test_git_index_has_no_secret_files` in [tests/test_distribution_skeleton.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tests/test_distribution_skeleton.py).
 - Specified by issue 65: seeded fake keys never appear in test output, cassettes, logs, or exports, and gitleaks is clean on full history.
 
 ### T3. Exfiltration
@@ -76,11 +76,11 @@ A URL tool or a connector reaches a host outside the catalogue and sends session
 
 STRIDE: information disclosure. OWASP: LLM02:2025, with LLM01:2025 as the usual way the call gets chosen.
 
-Control ticket: [Egress allowlist](../../tickets/063-sec-egress.md) (GitHub issue 67). Connectors use `mcp/egress-allowlist.yaml` (HTTPS, private ranges refused, redirects checked again). Web and browser tools are either disabled in this profile or refused by a `pre_tool_call` hook for hosts outside that list. Sandbox egress is Docker with no network, or iron-proxy limited to catalogue hosts. Hermes already provides `security.website_blocklist`, SSRF protection on URL tools, and `security.allow_private_urls: false` (set in this profile's `config.yaml`).
+Control ticket: [Egress allowlist](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/063-sec-egress.md) (GitHub issue 67). Connectors use `mcp/egress-allowlist.yaml` (HTTPS, private ranges refused, redirects checked again). Web and browser tools are either disabled in this profile or refused by a `pre_tool_call` hook for hosts outside that list. Sandbox egress is Docker with no network, or iron-proxy limited to catalogue hosts. Hermes already provides `security.website_blocklist`, SSRF protection on URL tools, and `security.allow_private_urls: false` (set in this profile's `config.yaml`).
 
 Tests:
 
-- In tree: `TestEgress.test_denies_other_host`, `TestEgress.test_denies_private_dns_and_link_local`, `TestEgress.test_punycode_lookalike_is_denied`, and `TestHttp.test_redirect_to_denied_host` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py).
+- In tree: `TestEgress.test_denies_other_host`, `TestEgress.test_denies_private_dns_and_link_local`, `TestEgress.test_punycode_lookalike_is_denied`, and `TestHttp.test_redirect_to_denied_host` in [mcp/common/tests/test_library.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/common/tests/test_library.py).
 - Specified by issue 67: a connector test that refuses an off-list call before a socket opens, `tools/ci/check_allowlist.py` so the allowlist and the inventory cannot drift, and hook tests for allowed, denied, and redirecting URLs.
 
 ### T4. Tampered update or dependency
@@ -89,7 +89,7 @@ Tests:
 
 STRIDE: spoofing and tampering. OWASP: LLM03:2025 Supply Chain.
 
-Control ticket: [Supply chain](../../tickets/065-sec-supply-chain.md) (GitHub issue 69, milestone v0.2). Lockfile hashes, a CycloneDX SBOM, GitHub artifact attestations, release notes that list every changed skill, SOUL line, and cron job, and docs that recommend `install.sh --ref <tag>` over `main`. A legitimate update must still keep `.env`, memories, the intel store, and local config edits: [Update and pinning path](../../tickets/014-install-update-path.md).
+Control ticket: [Supply chain](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/065-sec-supply-chain.md) (GitHub issue 69, milestone v0.2). Lockfile hashes, a CycloneDX SBOM, GitHub artifact attestations, release notes that list every changed skill, SOUL line, and cron job, and docs that recommend `install.sh --ref <tag>` over `main`. A legitimate update must still keep `.env`, memories, the intel store, and local config edits: [Update and pinning path](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/014-install-update-path.md).
 
 Tests specified by issue 69: `gh attestation verify` on a release asset, an SBOM that lists every runtime dependency in the lock, and a release-notes generator test covering SOUL, skills, and cron diffs. Nothing in tree yet implements those checks. `DistributionSkeletonTest.test_owned_paths_exist` only checks that the manifest's owned paths are present.
 
@@ -108,7 +108,7 @@ Controls:
 
 Tests:
 
-- In tree: `DistributionSkeletonTest.test_soul_states_the_rules_and_avoids_scanner_phrases` in [tests/test_distribution_skeleton.py](../../tests/test_distribution_skeleton.py). `TestServer.test_read_only_hint_unless_writes` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py).
+- In tree: `DistributionSkeletonTest.test_soul_states_the_rules_and_avoids_scanner_phrases` in [tests/test_distribution_skeleton.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tests/test_distribution_skeleton.py). `TestServer.test_read_only_hint_unless_writes` in [mcp/common/tests/test_library.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/common/tests/test_library.py).
 - Specified by issue 66: the deterministic hook test that every injection-corpus case is blocked from triggering a write or outbound tool. Issue 44's harness can assert that a named tool was not called.
 
 ### T6. Loss of accountability
@@ -117,7 +117,7 @@ After a tool call, an approval, a block, an export, or a delivery, an assessor c
 
 STRIDE: repudiation. OWASP: this cuts across LLM02 and LLM06. The log is what makes those two detectable.
 
-Control ticket: [Tamper-evident audit log](../../tickets/064-sec-audit-log.md) (GitHub issue 68). Append-only hash-chained JSONL of session, tool, approval, export, delivery, and config events. Results are hashed, so TLP:AMBER bodies stay out of the log. If the log cannot be written, write tools are blocked and read tools continue with a warning.
+Control ticket: [Tamper-evident audit log](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/064-sec-audit-log.md) (GitHub issue 68). Append-only hash-chained JSONL of session, tool, approval, export, delivery, and config events. Results are hashed, so TLP:AMBER bodies stay out of the log. If the log cannot be written, write tools are blocked and read tools continue with a warning.
 
 Test specified by issue 68: deleting or editing any line makes `cyber-au audit verify` fail with the line number. The plugin directory is still a placeholder, so this test is not in the tree yet.
 
@@ -127,11 +127,11 @@ A skill states an ISM control id that is not in the loaded release, or a deadlin
 
 STRIDE: no category fits a wrong but honest answer. Tampering is the nearest, with the analyst's decision record as the thing that ends up wrong. OWASP: LLM09:2025 Misinformation.
 
-Control ticket: [Skill authoring standard and offline eval harness](../../tickets/040-skill-standards-evals.md) (GitHub issue 44). Citations are `Source: <name>, <version>, retrieved <date>`. A missing fact is answered with "I don't know". The same rule is already in `SOUL.md`. The workflows where a wrong id or a wrong deadline does the damage are [ISM control lookup](../../tickets/044-skill-ism-control-lookup.md), [NDB breach notification](../../tickets/049-skill-ndb-breach-notification.md), and [SOCI reporting](../../tickets/050-skill-soci-reporting.md). Those skills are held to the issue 44 harness.
+Control ticket: [Skill authoring standard and offline eval harness](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/040-skill-standards-evals.md) (GitHub issue 44). Citations are `Source: <name>, <version>, retrieved <date>`. A missing fact is answered with "I don't know". The same rule is already in `SOUL.md`. The workflows where a wrong id or a wrong deadline does the damage are [ISM control lookup](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/044-skill-ism-control-lookup.md), [NDB breach notification](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/049-skill-ndb-breach-notification.md), and [SOCI reporting](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/050-skill-soci-reporting.md). Those skills are held to the issue 44 harness.
 
 Tests:
 
-- In tree: `DistributionSkeletonTest.test_soul_states_the_rules_and_avoids_scanner_phrases` in [tests/test_distribution_skeleton.py](../../tests/test_distribution_skeleton.py).
+- In tree: `DistributionSkeletonTest.test_soul_states_the_rules_and_avoids_scanner_phrases` in [tests/test_distribution_skeleton.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tests/test_distribution_skeleton.py).
 - Specified by issue 44: `tests/skills/harness.py` scores required facts, forbidden claims, and expected tool calls against recorded fixtures. Structural checks (frontmatter, sections, citation shape) run in CI with no model key.
 
 ## Platform controls this distribution relies on
@@ -170,19 +170,19 @@ These are Hermes v0.22.2 controls. The distribution uses them as they ship. Each
 | LLM01:2025 | Prompt Injection | T1. Issue 66. |
 | LLM02:2025 | Sensitive Information Disclosure | T2 and T3. Issues 65 and 67. |
 | LLM03:2025 | Supply Chain | T4. Issue 69. Distributions are unsigned today; that is the gap issue 69 closes. |
-| LLM04:2025 | Data and Model Poisoning | Vendor model training stays with the model provider. Feed rows can still bias a later answer once they sit in the store. Issue 66 marks that text untrusted. Issue 44 requires a citation for a factual claim. [Store schema and ingest](../../tickets/052-store-schema-ingest.md) keeps a `source_id` on each observation. |
+| LLM04:2025 | Data and Model Poisoning | Vendor model training stays with the model provider. Feed rows can still bias a later answer once they sit in the store. Issue 66 marks that text untrusted. Issue 44 requires a citation for a factual claim. [Store schema and ingest](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/052-store-schema-ingest.md) keeps a `source_id` on each observation. |
 | LLM05:2025 | Improper Output Handling | A briefing or a drafted ticket is output that Slack, Teams, email, or a tracker may render. T5 requires approval before that write. Issue 65 keeps secrets out of the delivery. Residual: a markup sanitiser for channel posts has no ticket yet. The agent's own later fetches still have to pass the T3 allowlist. |
 | LLM06:2025 | Excessive Agency | T5. Hermes approvals plus `trust: untrusted` (set today, required by issue 66). Cron ships paused. |
 | LLM07:2025 | System Prompt Leakage | `SOUL.md` and the skills are published in this repository. Secrecy of the system prompt is not an asset. The impact that matters is a secret written into SOUL or a skill, which issue 65 and `test_env_template_has_no_values` forbid. Hermes still blocks a distribution SOUL that trips the injection scanner. |
-| LLM08:2025 | Vector and Embedding Weaknesses | v0.1 stores indicators as SQLite rows ([store schema](../../tickets/052-store-schema-ingest.md)). Revisit this row if a later ticket adds an embedding index. |
+| LLM08:2025 | Vector and Embedding Weaknesses | v0.1 stores indicators as SQLite rows ([store schema](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/052-store-schema-ingest.md)). Revisit this row if a later ticket adds an embedding index. |
 | LLM09:2025 | Misinformation | T7. Issue 44, with the ISM, NDB, and SOCI skills as the workflows where a wrong fact does harm. |
-| LLM10:2025 | Unbounded Consumption | Residual. The shared client already caps response size (`TestHttp.test_size_cap`) and rate-limits (`TestLimiter` in [mcp/common/tests/test_library.py](../../mcp/common/tests/test_library.py)). Issue 66 caps the length of an untrusted field. No ticket yet sets a provider-spend limit. The impact is a run that spends the team's model quota or delays the briefing. |
+| LLM10:2025 | Unbounded Consumption | Residual. The shared client already caps response size (`TestHttp.test_size_cap`) and rate-limits (`TestLimiter` in [mcp/common/tests/test_library.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/common/tests/test_library.py)). Issue 66 caps the length of an untrusted field. No ticket yet sets a provider-spend limit. The impact is a run that spends the team's model quota or delays the briefing. |
 
 ## Residuals
 
 These stay accepted until a later ticket takes them.
 
 - The host is trusted to the same degree as the operator. Disk encryption and OS hardening are outside the distribution.
-- TLP:AMBER handling in the store is marking, retention, and export ([retention and snapshots](../../tickets/054-store-retention-snapshots.md), [STIX export](../../tickets/053-store-stix-export.md), issue 68). Choosing a delivery channel whose audience is wider than the marking is an operator decision. The log records the delivery. Channel choice stays with the operator.
+- TLP:AMBER handling in the store is marking, retention, and export ([retention and snapshots](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/054-store-retention-snapshots.md), [STIX export](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tickets/053-store-stix-export.md), issue 68). Choosing a delivery channel whose audience is wider than the marking is an operator decision. The log records the delivery. Channel choice stays with the operator.
 - LLM05 markup in a delivered briefing, and LLM10 provider spend, have no dedicated ticket. The bounds above are what exists.
 - Issue 69 is milestone v0.2. Until it lands, an operator who tracks `main` is trusting an unsigned git update. The install docs for that pin are part of issue 69.

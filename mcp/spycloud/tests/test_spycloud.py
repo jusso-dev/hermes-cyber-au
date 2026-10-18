@@ -265,6 +265,47 @@ def test_offline_snapshot_or_unavailable(monkeypatch):
     assert any("unavailable" in item for item in missing["warnings"])
 
 
+# Distinctive values from the synthetic fixtures. None may reach the agent
+# unless the operator points a CYBERAU_SPYCLOUD_*_SNAPSHOT variable at them.
+FIXTURE_VALUES = (
+    "doc-example-1",
+    "doc-example-2",
+    "synthetic-password",
+    "Example catalogue entry",
+    "Synthetic breach metadata",
+)
+
+
+def _assert_every_tool_unavailable():
+    results = {
+        "spycloud_watchlist_exposure": spycloud_watchlist_exposure(),
+        "spycloud_breach_info": spycloud_breach_info("4242"),
+    }
+    for name, result in results.items():
+        assert result["data"] is None, name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        dumped = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            assert value not in dumped, (name, value)
+
+
+def test_offline_without_override_serves_no_fixture_rows(monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_every_tool_unavailable()
+
+
+@pytest.mark.parametrize("failure", ["timeout", "503"])
+def test_failed_live_fetch_serves_no_fixture_rows(monkeypatch, failure):
+    def broken(_request):
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(503, content=b"{}")
+
+    _live(monkeypatch, broken)
+    source._SLEEPER = lambda _delay: None
+    _assert_every_tool_unavailable()
+
+
 def test_redirect_outside_the_allowlist_is_refused(monkeypatch):
     seen = []
 

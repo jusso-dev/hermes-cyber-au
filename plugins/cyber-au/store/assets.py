@@ -31,6 +31,7 @@ import tempfile
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -39,6 +40,7 @@ TEMPLATE_PATH = Path(__file__).resolve().parent / "assets.example.yaml"
 MAX_BYTES = 20 * 1024 * 1024
 MAX_ASSETS = 50_000
 MAX_VALUE = 200
+SNAPSHOT_STALE_AFTER = timedelta(hours=12)
 
 REQUIRED = ("name", "vendor", "product", "exposure", "owner")
 OPTIONAL = (
@@ -699,6 +701,100 @@ def match(
     return found
 
 
+def coverage(assets: list[Asset]) -> dict[str, int]:
+    """Return local inventory coverage counts without exposing asset values."""
+    return {
+        "assets": len(assets),
+        "version_recorded": sum(bool(asset.get("version")) for asset in assets),
+        "cpe_recorded": sum(bool(asset.get("cpe")) for asset in assets),
+        "purl_recorded": sum(bool(asset.get("purl")) for asset in assets),
+        "version_missing": sum(not asset.get("version") for asset in assets),
+    }
+
+
+def check_kev(
+    assets: list[Asset], catalogue: object, *, snapshot_file_modified_at: datetime | None = None
+) -> dict[str, object]:
+    """Match a local CISA KEV catalogue or refresh snapshot against an inventory."""
+    if isinstance(catalogue, dict):
+        rows = catalogue.get("vulnerabilities")
+        version = clean(catalogue.get("catalogVersion") or catalogue.get("dateReleased"))
+    else:
+        rows = catalogue
+        version = ""
+    if not isinstance(rows, list):
+        raise InventoryError("KEV data needs a vulnerabilities list")
+    candidates: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        cve = clean(row.get("cveID"))
+        vendor = clean(row.get("vendorProject"))
+        product = clean(row.get("product"))
+        if not cve or not vendor or not product:
+            continue
+        for hit in match(assets, vendor=vendor, product=product):
+            candidates.append(
+                {
+                    "cve_id": cve.upper(),
+                    "source": "CISA Known Exploited Vulnerabilities",
+                    "date_added": clean(row.get("dateAdded")),
+                    "due_date": clean(row.get("dueDate")),
+                    "required_action": clean(row.get("requiredAction")),
+                    "status": "candidate",
+                    "match_method": "kev-vendor-product",
+                    "asset": {
+                        "name": hit.asset.name,
+                        "version": hit.asset.get("version"),
+                        "owner": hit.asset.owner,
+                        "exposure": hit.asset.exposure,
+                    },
+                    "verification": (
+                        "Confirm the affected version against the CISA or vendor source before "
+                        "calling this asset affected."
+                    ),
+                }
+            )
+    candidates.sort(key=lambda item: (str(item["cve_id"]), str(item["asset"])))
+    report: dict[str, object] = {
+        "source": "CISA Known Exploited Vulnerabilities",
+        "catalogue_version": version,
+        "inventory_assets": len(assets),
+        "monitoring": "configured" if assets else "not_configured",
+        "candidates": candidates,
+    }
+    if not assets:
+        report["message"] = "Software monitoring is not configured because the inventory is empty."
+    elif not rows:
+        report["message"] = (
+            "The KEV snapshot has no vulnerability records. This is not an all-clear."
+        )
+    if snapshot_file_modified_at is not None:
+        now = datetime.now(UTC)
+        age = max(timedelta(), now - snapshot_file_modified_at)
+        report["snapshot_file_modified_at"] = snapshot_file_modified_at.isoformat()
+        report["snapshot_age_seconds"] = int(age.total_seconds())
+        report["snapshot_status"] = "stale" if age > SNAPSHOT_STALE_AFTER else "fresh"
+        if age > SNAPSHOT_STALE_AFTER:
+            report["freshness_warning"] = "KEV snapshot is stale; candidates may be incomplete."
+    return report
+
+
+def write_report(path: Path, report: dict[str, object]) -> None:
+    """Atomically write a local candidate report with owner-only permissions."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(prefix=".software-watch-", suffix=".json", dir=path.parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as out:
+            json.dump(report, out, indent=2, sort_keys=True)
+            out.write("\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
 # --- command line -------------------------------------------------------------------
 
 
@@ -734,6 +830,18 @@ def main(argv: list[str] | None = None) -> int:
     show = sub.add_parser("list", help="Print the inventory as JSON")
     add_path(show)
 
+    audit = sub.add_parser(
+        "coverage", help="Print version and identifier coverage counts for the local inventory"
+    )
+    add_path(audit)
+
+    check = sub.add_parser(
+        "check", help="Match a local CISA KEV catalogue or refresh snapshot and write candidates"
+    )
+    check.add_argument("--kev", required=True, type=Path, help="CISA KEV JSON or refresh snapshot")
+    check.add_argument("--output", type=Path, help="Write the local candidate report here")
+    add_path(check)
+
     find = sub.add_parser("match", help="Which assets a CVE record affects, and how")
     find.add_argument("--cpe", action="append", default=[])
     find.add_argument("--purl", action="append", default=[])
@@ -749,6 +857,29 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.action == "list":
             print(json.dumps([asset.as_dict() for asset in read_inventory(path)], indent=2))
+            return 0
+        if args.action == "coverage":
+            print(json.dumps(coverage(read_inventory(path)), indent=2, sort_keys=True))
+            return 0
+        if args.action == "check":
+            try:
+                catalogue = json.loads(_read(args.kev))
+            except json.JSONDecodeError as exc:
+                raise InventoryError(f"KEV JSON is not valid: {exc.msg}") from exc
+            modified = datetime.fromtimestamp(args.kev.stat().st_mtime, UTC)
+            report = check_kev(read_inventory(path), catalogue, snapshot_file_modified_at=modified)
+            if args.output:
+                write_report(args.output, report)
+                note = str(report.get("message") or report.get("freshness_warning") or "")
+                print(
+                    f"checked {report['inventory_assets']} assets; "
+                    f"{len(report['candidates'])} candidate matches; "
+                    f"monitoring {report['monitoring']}; "
+                    f"snapshot {report.get('snapshot_status', 'unknown')}; wrote {args.output}"
+                    + (f"; {note}" if note else "")
+                )
+            else:
+                print(json.dumps(report, indent=2, sort_keys=True))
             return 0
         if args.action == "match":
             if not (args.cpe or args.purl or (args.vendor and args.product)):
@@ -780,6 +911,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"assets: {exc}", file=sys.stderr)
         for problem in exc.problems[:50]:
             print(f"  {problem}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"assets: {exc}", file=sys.stderr)
         return 1
     except OSError as exc:
         print(f"assets: cannot read {exc.filename}: {exc.strerror}", file=sys.stderr)

@@ -1,0 +1,50 @@
+{
+  "name": "hermes-cyber-au",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "hermes",
+  "containerUser": "hermes",
+  "updateRemoteUserUID": true,
+  "overrideCommand": true,
+  "containerEnv": {
+    "HERMES_HOME": "/opt/data",
+    "CYBERAU_PROFILE": "cyber-au"
+  },
+  "postCreateCommand": "sh .devcontainer/post-create.sh",
+  "secrets": {
+    "ABUSECH_AUTH_KEY": {
+      "description": "Optional. Free abuse.ch Auth-Key for URLhaus, ThreatFox and MalwareBazaar.",
+      "documentationUrl": "https://auth.abuse.ch/"
+    },
+    "NVD_API_KEY": {
+      "description": "Optional. Raises NVD limits from 5 to 50 requests per 30 seconds.",
+      "documentationUrl": "https://nvd.nist.gov/developers/request-an-api-key"
+    },
+    "OTX_API_KEY": {
+      "description": "Optional. AlienVault OTX API key."
+    },
+    "GREYNOISE_API_KEY": {
+      "description": "Optional. GreyNoise community key."
+    }
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb"
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": [
+        "docs/getting-started/quickstart.md",
+        "docs/getting-started/first-hour.md"
+      ]
+    },
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff"
+      ]
+    }
+  }
+}

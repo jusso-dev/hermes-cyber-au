@@ -1,4 +1,4 @@
-"""cyber-au doctor, update, store migration, and audit commands."""
+"""cyber-au doctor, update, store migration, audit, and demo commands."""
 
 from __future__ import annotations
 
@@ -9,13 +9,14 @@ import sys
 from pathlib import Path
 
 if __package__:
-    from . import update_path
+    from . import demo, update_path
     from .doctor import execute, format_json, format_text
 else:
     # install/bootstrap.sh runs this file directly, outside the plugin package.
     _PLUGIN_DIR = Path(__file__).resolve().parent
     if str(_PLUGIN_DIR) not in sys.path:
         sys.path.insert(0, str(_PLUGIN_DIR))
+    import demo
     import update_path
     from doctor import execute, format_json, format_text
 
@@ -26,16 +27,18 @@ except ImportError:  # bootstrap can run before the connector packages are insta
     add_audit_parser = None
     audit_dispatch = None
 
-USAGE = "Usage: hermes cyber-au <doctor|update|migrate|audit>"
+USAGE = "Usage: hermes cyber-au <doctor|update|migrate|audit|demo>"
 
 
 def register(ctx) -> None:
     ctx.register_cli_command(
         name="cyber-au",
-        help="Check, update, migrate, or audit the cyber-au profile",
+        help="Check, update, migrate, audit, or demo the cyber-au profile",
         setup_fn=setup_parser,
         handler_fn=handle,
-        description="Doctor, update, store migration, and audit checks for the cyber-au profile.",
+        description=(
+            "Doctor, update, store migration, audit checks, and demo mode for the cyber-au profile."
+        ),
     )
     ctx.register_command(
         "cyber-au",
@@ -80,6 +83,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
         sub.add_argument("--profile-home", type=Path, default=argparse.SUPPRESS)
     if add_audit_parser is not None:
         add_audit_parser(subs)
+    demo.add_parser(subs)
     parser.set_defaults(func=handle)
 
 
@@ -97,6 +101,8 @@ def handle(args: argparse.Namespace) -> int:
         return _migrate(args)
     if command == "update":
         return _update(args)
+    if command == "demo":
+        return demo.dispatch(args)
     if command == "audit" and audit_dispatch is not None:
         return audit_dispatch(args)
     print(USAGE, file=sys.stderr)

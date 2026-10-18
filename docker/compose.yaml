@@ -1,15 +1,18 @@
 # Agent plus an optional gateway. Keys come from an env file beside this
 # compose file. That file is not part of the image.
+#
+# By default compose builds the image from this checkout and tags it
+# hermes-cyber-au:local. To run a published release instead, set
+# CYBERAU_IMAGE to a release tag, which uses CalVer (YYYY.MM.DD):
+#   CYBERAU_IMAGE=ghcr.io/jusso-dev/hermes-cyber-au:2026.10.24 \
+#     docker compose -f docker/compose.yaml run --rm agent
 name: hermes-cyber-au
 
 x-hermes: &hermes
-  image: ghcr.io/jusso-dev/hermes-cyber-au:0.1.0
+  image: ${CYBERAU_IMAGE:-hermes-cyber-au:local}
   build:
     context: ..
     dockerfile: docker/Dockerfile
-    args:
-      HERMES_VERSION: v0.22.2
-      VERSION: "0.1.0"
   environment:
     HERMES_PROFILE: cyber-au
   env_file:

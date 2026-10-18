@@ -1,0 +1,13 @@
+# Historical public fixtures reviewed in #159. Each entry is one exact
+# finding fingerprint from `gitleaks git --log-opts="--all"`, not a path,
+# rule, or value-wide exemption.
+d0455c5295d57644a5e5983f65a53e113554a3a8:docs/connectors/intel471.md:generic-api-key:334
+d0455c5295d57644a5e5983f65a53e113554a3a8:mcp/intel471/SOURCE.md:generic-api-key:40
+59b0813077b8cc6229706b517b1c5e70249bedc1:tests/test_connector_docs.py:generic-api-key:177
+59b0813077b8cc6229706b517b1c5e70249bedc1:tests/test_connector_docs.py:generic-api-key:178
+59b0813077b8cc6229706b517b1c5e70249bedc1:tests/test_connector_docs.py:generic-api-key:179
+59b0813077b8cc6229706b517b1c5e70249bedc1:tests/test_connector_docs.py:generic-api-key:180
+59b0813077b8cc6229706b517b1c5e70249bedc1:tests/test_connector_docs.py:generic-api-key:187
+47b22549e8957766419de444ef7466abef0af49f:docs/connectors/intel471.md:generic-api-key:27
+b3cf4c058f399d4c3ffeafc76ef8420a41147d49:tests/skills/test_harness.py:aws-access-token:269
+4e348bf8ce7edf25e56892bbe904c060960ebfc8:mcp/abusech/tests/test_abusech.py:generic-api-key:27

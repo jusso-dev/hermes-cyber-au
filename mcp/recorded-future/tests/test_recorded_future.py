@@ -297,7 +297,10 @@ def test_auth_errors_retry_after_and_timeout_cache(monkeypatch, tmp_path):
 
     _install(monkeypatch, denied(401))
     rejected = rf_company_by_domain("example.com.au")
-    assert rejected["warnings"] == ["RECORDED_FUTURE_API_TOKEN was rejected"]
+    assert rejected["warnings"] == [
+        "Recorded Future is unavailable: RECORDED_FUTURE_API_TOKEN was rejected. "
+        "No live, cached or shipped data was served"
+    ]
     assert TOKEN not in json.dumps(rejected)
     _install(monkeypatch, denied(403))
     rf._CACHE = None
@@ -351,7 +354,10 @@ def test_offline_uses_cache_or_reports_unavailable(monkeypatch):
     rf._CACHE_PATH = None
     missing = rf_company_by_domain("example.com.au")
     assert missing["cache"] == "snapshot"
-    assert missing["warnings"] == ["unavailable"]
+    assert missing["warnings"] == [
+        "Recorded Future is unavailable: offline and nothing cached this session. "
+        "No live, cached or shipped data was served"
+    ]
 
 
 def test_redirect_off_allowlist_is_refused_and_token_is_dropped(monkeypatch):
@@ -733,3 +739,51 @@ def test_live_health_fails_on_stale_snapshot_bad_payload_and_offline(monkeypatch
     rf._CONFIG = None
     monkeypatch.delenv("CYBERAU_OFFLINE")
     assert client.health(live=True).ok is False
+
+
+_FIXTURE_VALUES = ("ih:example", "Example Pty Ltd", "dw-1", "da-1", "user@example.com.au", "42")
+
+
+def _every_tool() -> list[dict]:
+    digest = hashlib.sha1(b"user@example.com.au").hexdigest()
+    return [
+        rf_identity_exposure(["example.com.au"]),
+        rf_identity_detections(),
+        rf_identity_lookup_hashed([digest]),
+        rf_brand_alerts(),
+        rf_alert_detail("domain_abuse", "alert-1"),
+        rf_company_by_domain("example.com.au"),
+        rf_risklist_status("domain"),
+    ]
+
+
+def _assert_all_unavailable(results: list[dict]) -> None:
+    for result in results:
+        assert result["data"] in ([], None, {}), result
+        assert any("is unavailable" in item for item in result["warnings"]), result
+        text = json.dumps(result)
+        for value in _FIXTURE_VALUES:
+            assert f'"{value}"' not in text, value
+
+
+def test_offline_without_cache_is_unavailable_for_every_tool(monkeypatch):
+    _install(monkeypatch, lambda request: httpx.Response(500))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_all_unavailable(_every_tool())
+
+
+def test_failed_live_fetch_is_unavailable_for_every_tool(monkeypatch):
+    def timeout(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("timed out")
+
+    _install(monkeypatch, timeout, sleeper=lambda _seconds: None)
+    _assert_all_unavailable(_every_tool())
+    _install(monkeypatch, lambda request: httpx.Response(503), sleeper=lambda _seconds: None)
+    _assert_all_unavailable(_every_tool())
+
+
+def test_schema_samples_live_only_in_tests(monkeypatch):
+    assert not (Path(rf.__file__).resolve().parent / "data").exists()
+    assert rf._SAMPLES == FIXTURES / "schema_samples.json"
+    monkeypatch.delenv("CYBERAU_RF_SCHEMA_FIXTURE", raising=False)
+    assert load_schema_samples(allow_fixture=False) is None

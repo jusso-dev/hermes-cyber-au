@@ -21,6 +21,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 DROP_V4 = "https://www.spamhaus.org/drop/drop_v4.json"
 DROP_V6 = "https://www.spamhaus.org/drop/drop_v6.json"
@@ -43,7 +44,12 @@ ATTRIBUTION = (
     "Spamhaus DROP, DROPv6 and ASN-DROP. Provided free of charge by Spamhaus. Attribute Spamhaus."
 )
 _LIMITED = "A second DROP fetch inside an hour was refused by the limiter."
-_UNAVAILABLE = "DROP lists are unavailable"
+_LABEL = "Spamhaus DROP data"
+_UNAVAILABLE = unavailable(_LABEL)
+_OPERATOR = (
+    "served the operator-supplied DROP snapshot named by CYBERAU_DROP_SNAPSHOT, "
+    "not a live fetch. Check the source before relying on it"
+)
 _CACHE_TTL = 24 * 3600
 _STALE_IF_ERROR = 24 * 3600
 # One refresh is three list downloads, plus retries. The hourly guard below is
@@ -128,10 +134,10 @@ class _DropConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            problem = _snapshot_problem()
+            problem, detail = _snapshot_problem()
             if problem:
                 return Probe(self.key, False, problem)
-            return Probe(self.key, True, "schema ok")
+            return Probe(self.key, True, detail)
         if not live:
             return Probe(self.key, True, "offline ok")
         try:
@@ -230,14 +236,16 @@ class _PrefixTree:
 
 def _load(*, force_live: bool = False) -> _Bundle:
     if not force_live and os.environ.get("CYBERAU_DROP_SNAPSHOT"):
-        return _from_dir(Path(os.environ["CYBERAU_DROP_SNAPSHOT"]), "snapshot")
+        bundle = _from_dir(Path(os.environ["CYBERAU_DROP_SNAPSHOT"]), "snapshot")
+        bundle.warnings.insert(0, _OPERATOR)
+        return bundle
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     cache = HttpCache(_data_dir() / "http_cache.sqlite")
     if offline:
         cached = _from_http_cache(cache, allow_stale=True)
         if cached is not None:
             return cached
-        return _from_dir(_PACKAGE / "data", "snapshot")
+        return _Bundle.empty("snapshot", [unavailable(_LABEL, "offline mode and no cached copy")])
     if not force_live and not _needs_network(cache):
         cached = _from_http_cache(cache, allow_stale=False)
         if cached is not None:
@@ -247,7 +255,7 @@ def _load(*, force_live: bool = False) -> _Bundle:
     except RateLimited:
         return _fallback(cache, _LIMITED)
     try:
-        return _from_network(cache, force_live=force_live)
+        return _mark_missing(_from_network(cache, force_live=force_live))
     except RateLimited:
         return _fallback(cache, _LIMITED)
     except Exception as exc:
@@ -371,10 +379,17 @@ def _fallback(cache: HttpCache, warning: str) -> _Bundle:
         cached.cache = "stale"
         cached.warnings.append(warning)
         return cached
-    bundle = _from_dir(_PACKAGE / "data", "snapshot")
-    bundle.warnings.append(warning)
-    if not bundle.loaded:
-        bundle.warnings.append(_UNAVAILABLE)
+    reason = "the live fetch failed and there is no cached copy"
+    return _Bundle.empty("snapshot", [warning, unavailable(_LABEL, reason)])
+
+
+def _mark_missing(bundle: _Bundle) -> _Bundle:
+    """Name each list the live fetch could not load, so empty data is not read as clean."""
+    for name, _url in LISTS:
+        if name not in bundle.loaded:
+            reason = "the live fetch failed and there is no cached copy"
+            bundle.warnings.append(unavailable(f"Spamhaus {name} list", reason))
+    bundle.warnings = _unique(bundle.warnings)
     return bundle
 
 
@@ -459,16 +474,34 @@ def _drift_rows(rows: list[dict], kind: str) -> str | None:
     return None
 
 
-def _snapshot_problem() -> str | None:
-    root = _snapshot_root()
-    for name, filename in _FILES.items():
-        path = root / filename
-        if not path.is_file():
-            return f"DROP snapshot missing {filename}"
-        problem = schema_drift(path.read_text(encoding="utf-8"), name)
+def _snapshot_problem() -> tuple[str | None, str]:
+    """Check the operator snapshot, else the local cache. Fixtures are never read here."""
+    override = os.environ.get("CYBERAU_DROP_SNAPSHOT")
+    if override:
+        root = Path(override)
+        for name, filename in _FILES.items():
+            path = root / filename
+            if not path.is_file():
+                return f"DROP snapshot missing {filename}", ""
+            problem = schema_drift(path.read_text(encoding="utf-8"), name)
+            if problem:
+                return problem, ""
+        return None, "schema ok"
+    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    checked = False
+    for name, url in LISTS:
+        item = cache.get(_cache_key(cache, url))
+        if item is None:
+            continue
+        checked = True
+        try:
+            text = item.body.decode("utf-8")
+        except UnicodeDecodeError:
+            return f"{name}: DROP payload was not UTF-8", ""
+        problem = schema_drift(text, name)
         if problem:
-            return problem
-    return None
+            return f"{name}: {problem}", ""
+    return None, "schema ok" if checked else "schema ok, no local copy to check"
 
 
 def _persist(kind: str, rows: list[dict], seen_at: str, warnings: list[str]) -> None:
@@ -663,11 +696,6 @@ def _cache_key(cache: HttpCache, url: str) -> str:
 def _response_schema(name: str) -> dict:
     path = _PACKAGE / "schema" / f"{name}.response.json"
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _snapshot_root() -> Path:
-    override = os.environ.get("CYBERAU_DROP_SNAPSHOT")
-    return Path(override) if override else _PACKAGE / "data"
 
 
 def _data_dir() -> Path:

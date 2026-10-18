@@ -21,6 +21,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -56,7 +57,8 @@ _PLAIN = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
 _SEVERITY = {"low", "medium", "high"}
 _CREDENTIAL_KINDS = {"infostealer_credential", "breach_credential"}
 _PACKAGE = Path(__file__).resolve().parents[2]
-_DATA = Path(__file__).resolve().parent / "data"
+# Synthetic test copies. Only the offline schema check reads these, never a tool.
+_FIXTURES = _PACKAGE / "tests" / "fixtures"
 _CACHES: dict[str, object] = {}
 _TRANSPORT = None
 _RESOLVER = None
@@ -68,11 +70,11 @@ _Severity = Literal["low", "medium", "high"]
 
 _MISSING_KEY = "GTI_API_KEY is not set"
 _NOT_USABLE = "Google Threat Intelligence DTM response was not usable"
-_UNAVAILABLE = "unavailable: offline and no cached Google Threat Intelligence DTM response"
-_SNAPSHOT_NOTE = (
-    "Served from a snapshot, not live Google Threat Intelligence DTM data. "
-    "Do not treat it as current."
-)
+_UNAVAILABLE = "offline and nothing cached this session"
+_LABEL = {
+    "alerts": "Google Threat Intelligence DTM alerts",
+    "monitors": "Google Threat Intelligence DTM monitors",
+}
 _RATE_LIMITED = "Google Threat Intelligence DTM returned HTTP 429 after Retry-After was honoured"
 
 
@@ -275,11 +277,9 @@ def _collect(
             break
         seen.add(current)
         payload, cache, warning, headers, _status = _fetch_one(kind, current, query)
-        if warning:
-            warnings.append(warning)
-            break
-        if payload is None:
-            warnings.append(_NOT_USABLE)
+        if warning or payload is None:
+            reason = warning or _NOT_USABLE
+            warnings.append(reason if rows else unavailable(_LABEL[kind], reason))
             break
         problem = schema_drift(payload, kind=kind)
         if problem:
@@ -300,7 +300,7 @@ def _collect(
         current = str(httpx.URL(current).join(nxt))
         query = None
     if snapshot_served:
-        warnings.append(_SNAPSHOT_NOTE)
+        warnings.append(_snapshot_note(kind))
     for label in ("snapshot", "stale", "miss", "hit"):
         if label in labels:
             cache = label
@@ -388,7 +388,7 @@ def _from_snapshot(
         if cached:
             return _load_body(cached.body), "stale", "", dict(cached.headers), 200
     path = _snapshot_path(kind)
-    if path.is_file():
+    if path is not None and path.is_file():
         payload = _read_json(path)
         if payload is None:
             return None, "snapshot", _NOT_USABLE, {}, 0
@@ -419,8 +419,12 @@ def _live_problem() -> str | None:
 
 
 def _schema_problem() -> str | None:
+    """Offline schema check. Reads the operator snapshot, else the test fixture."""
     for kind in ("alerts", "monitors"):
-        payload = _read_json(_snapshot_path(kind))
+        path = _snapshot_path(kind) or _FIXTURES / f"dtm_{kind}_synthetic.json"
+        if not path.is_file():
+            continue
+        payload = _read_json(path)
         if payload is None:
             return f"Google Threat Intelligence DTM {kind} snapshot was not usable"
         problem = schema_drift(payload, kind=kind)
@@ -747,12 +751,17 @@ def _snapshot_env(kind: str) -> str:
     return "CYBERAU_GTI_DTM_MONITORS"
 
 
-def _snapshot_path(kind: str) -> Path:
+def _snapshot_path(kind: str) -> Path | None:
+    """Operator-supplied snapshot file, or None. Nothing shipped is ever served."""
     raw = os.environ.get(_snapshot_env(kind))
-    if raw:
-        return Path(raw)
-    name = "dtm_alerts_synthetic.json" if kind == "alerts" else "dtm_monitors_synthetic.json"
-    return _DATA / name
+    return Path(raw) if raw else None
+
+
+def _snapshot_note(kind: str) -> str:
+    return (
+        f"Served from the operator-supplied snapshot file in {_snapshot_env(kind)}, "
+        "not live Google Threat Intelligence DTM data. Do not treat it as current."
+    )
 
 
 def _response_schema_path(kind: str) -> Path:

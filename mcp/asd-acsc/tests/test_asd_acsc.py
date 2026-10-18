@@ -37,6 +37,7 @@ def isolated(tmp_path, monkeypatch):
 
 def test_list_newest_first_and_attribution():
     listed = asd_list_items()
+    assert any("operator-supplied" in warning for warning in listed["warnings"])
     assert listed["attribution"].startswith("© Commonwealth of Australia 2026")
     assert listed["data"][0]["link"] == ITEM
     assert listed["data"][0]["published"] == "2026-10-15"
@@ -133,7 +134,8 @@ def test_fallback_ladder_names_the_feed(tmp_path, monkeypatch):
     )
     failed = asd_list_items(feeds=["alerts"])
     assert failed["cache"] == "snapshot"
-    assert "served shipped snapshot" in failed["warnings"][0]
+    assert failed["data"] == []
+    assert "is unavailable" in failed["warnings"][0]
     assert "alerts" in failed["warnings"][0]
 
     def http11(request: httpx.Request) -> httpx.Response:
@@ -282,16 +284,15 @@ def test_malformed_live_feed_uses_stored_poll(monkeypatch):
     assert "alerts" in listed["warnings"][0]
 
 
-def test_get_item_keeps_fallback_page(monkeypatch):
+def test_get_item_does_not_serve_shipped_page_when_fetch_fails(monkeypatch):
     monkeypatch.delenv("CYBERAU_OFFLINE")
     monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
     source._TRANSPORT = httpx.MockTransport(
         lambda _request: (_ for _ in ()).throw(httpx.ConnectError("timed out"))
     )
     page = asd_get_item(ITEM)
-    assert page["data"]["cves"] == ["CVE-2024-3400"]
-    assert page["warnings"]
-    assert page["data"] is not None
+    assert page["data"] is None
+    assert "is unavailable" in page["warnings"][0]
 
 
 def test_page_fetch_does_not_drop_dated_advisory(monkeypatch):
@@ -450,3 +451,49 @@ def test_user_agent_avoids_patterns_the_asd_waf_drops():
     for headers in (source._DIRECT, source._BROWSER):
         assert headers["user-agent"].startswith("hermes-cyber-au/")
         assert not re.search(r"https?:|@|github", headers["user-agent"], re.I)
+
+
+_FIXTURE_VALUES = (
+    "Synthetic",
+    "synthetic",
+    "about-older-alert",
+    "CVE-2024-3400",
+)
+
+
+def _assert_unavailable(result: dict, empty) -> None:
+    assert result["data"] == empty
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    encoded = json.dumps(result)
+    for value in _FIXTURE_VALUES:
+        assert value not in encoded
+
+
+def _all_tools_unavailable() -> None:
+    for feed in source.FEEDS:
+        _assert_unavailable(asd_list_items(feeds=[feed]), [])
+    _assert_unavailable(asd_list_items(), [])
+    _assert_unavailable(asd_search("vendor"), [])
+    _assert_unavailable(asd_search("CVE-2024-3400"), [])
+    _assert_unavailable(asd_get_item(ITEM), None)
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    _all_tools_unavailable()
+    assert connector().health(live=False, check_schema=True).ok is True
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+
+    def fail(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network unreachable")
+
+    source._TRANSPORT = httpx.MockTransport(fail)
+    _all_tools_unavailable()
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: httpx.Response(500, content=(FIXTURES / "http_500.txt").read_bytes())
+    )
+    _assert_unavailable(asd_list_items(feeds=["advisories"]), [])

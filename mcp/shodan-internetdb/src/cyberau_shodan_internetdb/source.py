@@ -18,6 +18,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 ROOT = "https://internetdb.shodan.io"
@@ -26,6 +27,11 @@ ATTRIBUTION = (
 )
 REQUIRED = ("ip", "ports", "hostnames", "cpes", "tags", "vulns")
 _LISTS = ("hostnames", "cpes", "tags", "vulns")
+LABEL = "Shodan InternetDB"
+SNAPSHOT_NOTE = (
+    "served the operator-supplied InternetDB snapshot file (CYBERAU_INTERNETDB_SNAPSHOT), "
+    "not a live fetch"
+)
 _PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 _TTL = 24 * 3600
@@ -51,38 +57,43 @@ def internetdb_ip(ip: Annotated[str, Field(description="IPv4 or IPv6 address")])
     payload, status, cache, warning = _fetch(url)
     if warning:
         return _envelope(None, cache, url, warnings=(warning,))
+    # Only an operator-supplied snapshot file reaches here with cache "snapshot".
+    notes = (SNAPSHOT_NOTE,) if cache == "snapshot" else ()
     if status in (401, 403):
-        return _envelope(None, cache, url, warnings=(_denied(status),))
+        return _envelope(None, cache, url, warnings=notes + (_denied(status),))
     if status == 429:
         return _envelope(
             None,
             cache,
             url,
-            warnings=("InternetDB rate limited the request (429) after honouring Retry-After",),
+            warnings=notes
+            + ("InternetDB rate limited the request (429) after honouring Retry-After",),
         )
     if status == 404 or (payload is not None and _is_empty(payload)):
         return _envelope(
             _empty(address),
             cache,
             url,
-            warnings=("InternetDB has no information for this address",),
+            warnings=notes + ("InternetDB has no information for this address",),
         )
     if status != 200:
-        return _envelope(None, cache, url, warnings=(f"InternetDB returned status {status}",))
+        return _envelope(
+            None, cache, url, warnings=notes + (f"InternetDB returned status {status}",)
+        )
     if payload is None:
-        return _envelope(None, cache, url, warnings=("InternetDB payload was not usable",))
+        return _envelope(None, cache, url, warnings=notes + ("InternetDB payload was not usable",))
     drift = schema_drift(payload)
     if drift:
-        return _envelope(None, cache, url, warnings=(drift,))
+        return _envelope(None, cache, url, warnings=notes + (drift,))
     if _parse_ip(payload["ip"]) != address:
         warning = "InternetDB returned a record for a different address"
         if cache == "snapshot":
             warning = "no matching address in the offline snapshot"
-            return _envelope(_empty(address), cache, url, warnings=(warning,))
-        return _envelope(None, cache, url, warnings=(warning,))
+            return _envelope(_empty(address), cache, url, warnings=notes + (warning,))
+        return _envelope(None, cache, url, warnings=notes + (warning,))
     record = _record(payload)
     _persist(record)
-    return _envelope(record, cache, url)
+    return _envelope(record, cache, url, warnings=notes)
 
 
 def connector() -> Connector:
@@ -106,6 +117,8 @@ class _InternetDbConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_INTERNETDB_SNAPSHOT"):
+                return Probe(self.key, True, "schema ok, no local copy to check")
             try:
                 payload = _load(_snapshot_text())
             except OSError:
@@ -165,7 +178,8 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[dict | None, int, str
     if snapshot and not force_live:
         path = Path(snapshot)
         if not path.is_file():
-            return None, 0, "snapshot", _unavailable()
+            reason = "the operator-supplied snapshot file could not be read"
+            return None, 0, "snapshot", unavailable(LABEL, reason)
         payload = _load(path.read_text(encoding="utf-8"))
         if payload is None:
             return None, 0, "snapshot", "InternetDB payload was not usable"
@@ -179,13 +193,7 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[dict | None, int, str
             return None, cached.status, state, "InternetDB payload was not usable"
         return payload, cached.status, state, ""
     if offline:
-        shipped = _PACKAGE / "data" / "ip.json"
-        if not shipped.is_file():
-            return None, 0, "snapshot", _unavailable()
-        payload = _load(shipped.read_text(encoding="utf-8"))
-        if payload is None:
-            return None, 0, "snapshot", "InternetDB payload was not usable"
-        return payload, 200, "snapshot", ""
+        return None, 0, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = HttpClient(
         "shodan-internetdb",
@@ -212,7 +220,7 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[dict | None, int, str
             payload = _load(_decode(cached.body))
             if payload is not None:
                 return payload, cached.status, "stale", ""
-        return None, 0, "snapshot", message
+        return None, 0, "snapshot", unavailable(LABEL, f"the live fetch failed ({message})")
     finally:
         client.close()
     payload = _load(_decode(response.body))
@@ -324,9 +332,8 @@ def _persist(record: dict) -> None:
 
 
 def _snapshot_text() -> str:
-    snapshot = os.environ.get("CYBERAU_INTERNETDB_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "ip.json"
-    return path.read_text(encoding="utf-8")
+    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
+    return Path(os.environ["CYBERAU_INTERNETDB_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _response_problem(record: dict) -> str | None:
@@ -363,10 +370,6 @@ def _decode(body: bytes) -> str:
         return body.decode("utf-8")
     except UnicodeDecodeError:
         return ""
-
-
-def _unavailable() -> str:
-    return "InternetDB is unavailable offline and no cached or snapshot record exists"
 
 
 def _denied(status: int) -> str:

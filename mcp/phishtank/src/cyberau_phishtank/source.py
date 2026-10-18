@@ -28,6 +28,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 PUBLIC_URL = "https://data.phishtank.com/data/online-valid.json"
 HOST = "data.phishtank.com"
@@ -42,9 +43,10 @@ _KEY = re.compile(r"[A-Za-z0-9_-]{4,128}")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _HOUR = 3600
 _MAX_RETRY_WAIT = 60
+_LABEL = "PhishTank"
 _SNAPSHOT_WARNING = (
-    "Served from the bundled synthetic snapshot, not live PhishTank data. "
-    "A match or a miss here says nothing about real phishing URLs."
+    "Served from the operator-supplied snapshot file in CYBERAU_PHISHTANK_SNAPSHOT, "
+    "not a live PhishTank download. Check the file before relying on a match or a miss."
 )
 _PLAIN_URL = re.compile(r"https?://\S{1,2048}")
 _PLAIN_FLAG = re.compile(r"yes|no")
@@ -64,7 +66,8 @@ def phishtank_check_url(url: str) -> dict:
         return _envelope([], "snapshot", warnings=(problem,))
     rows, cache, warning = _feed(force_live=False)
     if rows is None:
-        return _envelope([], cache, warnings=(warning or "PhishTank payload was not usable",))
+        reason = warning or "PhishTank payload was not usable"
+        return _envelope([], cache, warnings=(unavailable(_LABEL, reason),))
     matched = _match(rows, url)
     warnings: list[str] = []
     if warning:
@@ -97,8 +100,11 @@ class _PhishtankConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            text = _snapshot_text()
-            problem = schema_drift(_loads(text) if text else None)
+            # Offline schema check reads only the operator snapshot or the cache.
+            text = _snapshot_text() or _cached_text()
+            if text is None:
+                return Probe(self.key, True, "schema ok, no local copy to check")
+            problem = schema_drift(_loads(text))
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -279,7 +285,11 @@ def _stale(cached, reason: str) -> tuple[list | None, str, str]:
 def _snapshot() -> tuple[list | None, str, str]:
     text = _snapshot_text()
     if text is None:
-        return _from_text(None, "snapshot")
+        return (
+            None,
+            "snapshot",
+            "offline mode is on and no cached copy or operator snapshot is stored",
+        )
     rows, cache, warning = _from_text(text, "snapshot", persist=False)
     return rows, cache, (_SNAPSHOT_WARNING if rows is not None else warning)
 
@@ -334,16 +344,8 @@ def _from_body(body: bytes, cache: str) -> tuple[list | None, str, str]:
     return _from_text(text, cache, persist=cache == "miss")
 
 
-def _from_text(
-    text: str | None, cache: str, *, persist: bool = True
-) -> tuple[list | None, str, str]:
+def _from_text(text: str, cache: str, *, persist: bool = True) -> tuple[list | None, str, str]:
     global _PARSED
-    if text is None:
-        return (
-            None,
-            cache,
-            "PhishTank is unavailable offline and no cache or snapshot is stored",
-        )
     digest = hashlib.sha256(text.encode()).hexdigest()
     if _PARSED is not None and _PARSED[0] == digest:
         rows = _PARSED[1]
@@ -579,11 +581,29 @@ def _response_problem(record: dict) -> str | None:
 
 
 def _snapshot_text() -> str | None:
+    """Read the operator snapshot file. Nothing shipped in the repo is ever read."""
     override = os.environ.get("CYBERAU_PHISHTANK_SNAPSHOT")
-    path = Path(override) if override else _PACKAGE / "data" / "online-valid.json"
+    if not override:
+        return None
+    path = Path(override)
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")
+
+
+def _cached_text() -> str | None:
+    target = _request_target()
+    if target is None:
+        return None
+    url, scope = target
+    http_cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cached = http_cache.get(http_cache.key("GET", url, None, b"", scope))
+    if cached is None:
+        return None
+    try:
+        return cached.body.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def _clean(exc: BaseException) -> str:

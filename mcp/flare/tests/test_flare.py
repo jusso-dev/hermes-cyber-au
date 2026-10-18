@@ -446,7 +446,70 @@ def test_offline_without_cache_is_unavailable(monkeypatch):
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     result = flare_tenant_exposure(since="2026-06-01")
     assert result["data"] == []
-    assert result["warnings"] == ["unavailable"]
+    assert len(result["warnings"]) == 1
+    assert "is unavailable" in result["warnings"][0]
+
+
+# Distinctive values from the synthetic fixtures. None may reach the agent
+# unless the operator points CYBERAU_FLARE_FIXTURES at them.
+FIXTURE_VALUES = (
+    "stealer_log/synthetic",
+    "ransomleak/synthetic",
+    "Synthetic stealer log",
+    "Synthetic identifier drill-down",
+    "extra.example.com.au",
+    "combolists",
+    TOKEN,
+)
+
+
+def _assert_every_tool_unavailable():
+    results = {
+        "flare_tenant_exposure": flare_tenant_exposure(since="2026-06-01"),
+        "flare_identifier_events": flare_identifier_events(101),
+        "flare_identifiers": flare_identifiers(),
+        "flare_domain_credentials": flare_domain_credentials("example.com.au"),
+    }
+    for name, result in results.items():
+        assert result["data"] in ([], {}), name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        assert FIXTURE_WARNING not in result["warnings"], name
+        dumped = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            assert value not in dumped, (name, value)
+    # Quota status is a local counter, not feed data. With nothing recorded it
+    # says so rather than inventing a number.
+    quota = flare_quota_status()
+    assert quota["data"]["remaining"] is None
+    assert any("is unavailable" in item for item in quota["warnings"])
+
+
+def test_offline_without_override_serves_no_fixture_rows(monkeypatch, tmp_path):
+    _watchlist(tmp_path)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_every_tool_unavailable()
+
+
+def test_failed_live_fetch_serves_no_fixture_rows(monkeypatch, tmp_path):
+    _watchlist(tmp_path)
+    _clock()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/tokens/generate":
+            return httpx.Response(200, json={"token": "live-token", "refresh_token_exp": 1})
+        if request.url.path.endswith("/identifiers"):
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(503, json={})
+
+    flare_client.TRANSPORT = httpx.MockTransport(handler)
+    _assert_every_tool_unavailable()
+
+
+def test_live_schema_health_does_not_count_fixtures(monkeypatch):
+    # With live=True the probe must not report ok from the local copies.
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    probe = connector().health(live=True, check_schema=True)
+    assert probe.ok is False
 
 
 def test_forbidden_names_the_env_var(monkeypatch):

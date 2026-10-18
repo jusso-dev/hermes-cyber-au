@@ -60,6 +60,10 @@ class Fetch:
     next_cursor: str | None = None
 
 
+_NO_COPY = "offline or unreachable, and there is no cached copy"
+_NO_FIXTURE = "the CYBERAU_FLARE_FIXTURES directory has no usable file for this call"
+
+
 def reset_token() -> None:
     """Drop the in-memory token and session cache. Used between tests."""
     global _TOKEN, _TOKEN_EXPIRES_AT, _CACHE
@@ -221,10 +225,10 @@ def _from_fixture(url: str) -> Fetch:
     directory = fixture_dir()
     name = _fixture_name(url)
     if directory is None or name is None:
-        return Fetch([], "snapshot", ("unavailable",), {})
+        return Fetch([], "snapshot", (_NO_FIXTURE,), {})
     path = directory / name
     if not path.is_file():
-        return Fetch([], "snapshot", ("unavailable",), {})
+        return Fetch([], "snapshot", (_NO_FIXTURE,), {})
     payload = _decode(path.read_bytes())
     if payload is None:
         return Fetch([], "snapshot", ("Flare payload was not usable",), {})
@@ -304,7 +308,7 @@ def _issue_token() -> tuple[str | None, str | None]:
     except (HttpError, EgressDenied, httpx.HTTPError) as exc:
         text = _scrub(str(exc))
         if lookup("CYBERAU_OFFLINE") == "1" or "no cache" in text:
-            return None, "unavailable"
+            return None, _NO_COPY
         return None, text or "unavailable"
     payload = _decode(response.body)
     if response.status in {401, 403}:
@@ -357,7 +361,7 @@ def _call(
     except (HttpError, EgressDenied, httpx.HTTPError) as exc:
         text = _scrub(str(exc))
         if lookup("CYBERAU_OFFLINE") == "1" or "no cache" in text:
-            return Fetch([], "snapshot", ("unavailable",), {})
+            return Fetch([], "snapshot", (_NO_COPY,), {})
         return Fetch([], "snapshot", (text or "unavailable",), {})
     payload = _decode(response.body)
     headers = {name.lower(): value for name, value in response.headers.items()}

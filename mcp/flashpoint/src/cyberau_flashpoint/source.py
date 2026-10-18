@@ -104,6 +104,8 @@ class FlashpointConnector(PremiumConnector):
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_FLASHPOINT_SNAPSHOT"):
+                return Probe(self.key, True, "schema ok, no local copy to check")
             try:
                 payload = _load(_snapshot_text())
             except OSError:
@@ -165,7 +167,7 @@ def _fetch(*, force_live: bool = False) -> tuple[dict | None, str, str]:
             payload = _decode(cached.body)
             state = "hit" if cache.fresh(cached) else "stale"
             return payload, state, ""
-    if offline or (snapshot_env and not force_live):
+    if snapshot_env and not force_live:
         try:
             payload = _load(_snapshot_text())
         except OSError:
@@ -173,6 +175,8 @@ def _fetch(*, force_live: bool = False) -> tuple[dict | None, str, str]:
         if payload is None:
             return None, "snapshot", "Flashpoint snapshot was not usable"
         return payload, "snapshot", ""
+    if offline:
+        return None, "snapshot", "Flashpoint is unavailable: offline mode and no cached copy"
     if token is None:
         return None, "snapshot", "FLASHPOINT_API_TOKEN is not set"
     client = _client(cache)
@@ -307,9 +311,7 @@ def _scope(token: str | None) -> str:
 
 
 def _snapshot_text() -> str:
-    snapshot = os.environ.get("CYBERAU_FLASHPOINT_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "indicator_synthetic.json"
-    return path.read_text(encoding="utf-8")
+    return Path(os.environ["CYBERAU_FLASHPOINT_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _required_fields() -> tuple[str, ...]:
@@ -338,12 +340,7 @@ def _load(text: str) -> dict | None:
 def _notice(cache: str) -> str:
     """Say so when the rows did not come from a fresh live response."""
     if cache == "snapshot":
-        if os.environ.get("CYBERAU_FLASHPOINT_SNAPSHOT"):
-            return "Served from a local snapshot file. This is not a live Flashpoint result."
-        return (
-            "Served from the synthetic snapshot shipped with the connector. "
-            "This is not a live Flashpoint result."
-        )
+        return "Served from a local snapshot file. This is not a live Flashpoint result."
     if cache == "stale":
         return "Stale result: an expired session copy, because Flashpoint could not be reached."
     return ""

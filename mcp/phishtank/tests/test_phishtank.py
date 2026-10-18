@@ -59,7 +59,7 @@ def test_happy_path_normalises_and_stores(tmp_path, monkeypatch):
     assert "\u202e" not in record["target"]
     schema = json.loads((SCHEMA / "phishtank_check_url.response.json").read_text())
     jsonschema.validate(record, schema)
-    assert "synthetic snapshot" in found["warnings"][0]
+    assert "operator-supplied snapshot" in found["warnings"][0]
     assert not (tmp_path / "phishtank.sqlite").exists()
 
     listed = asyncio.run(build_server(connector()).list_tools())
@@ -75,7 +75,7 @@ def test_snapshot_miss_is_also_labelled(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     found = phishtank_check_url("https://absent.example/no")
     assert found["cache"] == "snapshot"
-    assert "synthetic snapshot" in found["warnings"][0]
+    assert "operator-supplied snapshot" in found["warnings"][0]
 
 
 def test_trailing_slash_variant_and_empty_result(monkeypatch):
@@ -462,16 +462,67 @@ def test_live_health_and_hourly_limit(tmp_path, monkeypatch):
     assert calls["n"] == 1
 
 
-def test_offline_without_cache_or_snapshot_warns(tmp_path, monkeypatch):
+# Distinctive values from the synthetic rows in tests/fixtures. None may reach an envelope
+# unless the operator snapshot override points at them.
+FIXTURE_MARKERS = (
+    "1001",
+    "1003",
+    "Example Bank",
+    "Example Shop",
+    "phish_detail.php",
+    "2026-10-05T01:00:00+00:00",
+)
+_LOOKUPS = (
+    "https://login.example.com/verify",
+    "http://example.com/account",
+    "https://example.com/reset?user=ada",
+)
+
+
+def _assert_unavailable(found: dict) -> None:
+    assert found["data"] == []
+    assert found["data_as_of"] is None
+    assert any("is unavailable" in item for item in found["warnings"])
+    rendered = json.dumps(found)
+    for marker in FIXTURE_MARKERS:
+        assert marker not in rendered, marker
+
+
+def test_offline_without_override_or_cache_is_unavailable(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("CYBERAU_PHISHTANK_SNAPSHOT", raising=False)
-    missing = tmp_path / "no-snapshot"
-    monkeypatch.setattr(source, "_PACKAGE", missing)
     source._PARSED = None
-    warned = phishtank_check_url("https://login.example.com/verify")
-    assert warned["data"] == []
-    assert "unavailable" in warned["warnings"][0]
+    for url in _LOOKUPS:
+        found = phishtank_check_url(url)
+        _assert_unavailable(found)
+        assert found["cache"] == "snapshot"
+        assert "offline" in found["warnings"][0]
+    assert not (tmp_path / "phishtank.sqlite").exists()
+
+
+def test_failed_live_fetch_without_override_or_cache_is_unavailable(tmp_path, monkeypatch):
+    _live(monkeypatch, tmp_path)
+
+    def explode(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network down")
+
+    source._TRANSPORT = httpx.MockTransport(explode)
+    for url in _LOOKUPS:
+        found = phishtank_check_url(url)
+        _assert_unavailable(found)
+        with sqlite3.connect(tmp_path / "rate_limit.sqlite") as conn:
+            conn.execute("delete from rolling")
+    assert "network down" in json.dumps(found)
+
+
+def test_offline_schema_check_reads_no_shipped_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("CYBERAU_PHISHTANK_SNAPSHOT", raising=False)
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail
+    assert not (Path(source.__file__).resolve().parents[2] / "data").exists()
 
 
 def test_cassette_replays_without_a_secret():

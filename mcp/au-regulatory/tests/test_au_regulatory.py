@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import ipaddress
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 import cyberau_au_regulatory.source as source
@@ -24,7 +25,10 @@ from cyberau_common.server import build_server
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SCHEMA = Path(__file__).resolve().parents[1] / "schema"
-SNAPSHOT = Path(__file__).resolve().parents[1] / "data" / "obligations-2026-10-17.json"
+SNAPSHOT = sorted((Path(__file__).resolve().parents[1] / "data").glob("obligations-*.json"))[-1]
+SNAPSHOT_DAY = date.fromisoformat(
+    json.loads(SNAPSHOT.read_text(encoding="utf-8"))["retrieved_at"][:10]
+)
 
 
 class _Clock:
@@ -48,10 +52,12 @@ def isolated(tmp_path, monkeypatch):
     source._CLOCK = _Clock()
     source._RESOLVER = lambda _host: [ipaddress.ip_address("1.1.1.1")]
     source._TRANSPORT = None
+    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=1)
     yield
     source._CLOCK = None
     source._RESOLVER = None
     source._TRANSPORT = None
+    source._TODAY = None
 
 
 def _due(record: dict, name: str) -> dict:
@@ -266,9 +272,72 @@ def test_cassettes_replay():
 
 def test_snapshot_answers_warn_they_are_not_live():
     listed = aureg_obligation("soci", "critical_incident")
-    assert any("shipped snapshot, not a live fetch" in note for note in listed["warnings"])
     due = aureg_deadline("soci", "critical_incident", "2026-10-16T10:00:00+11:00")
-    assert any("shipped snapshot, not a live fetch" in note for note in due["warnings"])
+    for record in (listed, due):
+        assert record["data"]
+        assert record["cache"] == "snapshot"
+        assert record["data_as_of"] == SNAPSHOT_DAY.isoformat()
+        assert any(
+            f"shipped Australian reporting obligations snapshot dated {SNAPSHOT_DAY.isoformat()}"
+            in note
+            and "not a live fetch" in note
+            for note in record["warnings"]
+        )
+        assert any("amendments made since the snapshot date" in note for note in record["warnings"])
+
+
+def _expired_answers() -> list[dict]:
+    return [
+        aureg_obligation("soci", "critical_incident"),
+        aureg_obligation("ndb"),
+        aureg_deadline("soci", "critical_incident", "2026-10-16T10:00:00+11:00"),
+    ]
+
+
+def test_expired_shipped_snapshot_is_unavailable():
+    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    for record in _expired_answers():
+        assert record["data"] == []
+        assert record["cache"] == "snapshot"
+        assert record["data_as_of"] is None
+        assert any("is unavailable" in note for note in record["warnings"])
+        assert any("181 days old" in note for note in record["warnings"])
+        text = json.dumps(record)
+        for row in snapshot["obligations"]:
+            assert row["citation"] not in text
+
+
+def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    source._TRANSPORT = httpx.MockTransport(lambda request: httpx.Response(503))
+    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    for record in _expired_answers():
+        assert record["data"] == []
+        assert any("is unavailable" in note for note in record["warnings"])
+
+
+def test_synthetic_shipped_snapshot_is_refused(monkeypatch, tmp_path):
+    package = tmp_path / "package"
+    (package / "data").mkdir(parents=True)
+    document = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    document["note"] = "Synthetic obligations invented for tests"
+    (package / "data" / "obligations-2026-10-17.json").write_text(
+        json.dumps(document), encoding="utf-8"
+    )
+    monkeypatch.setattr(source, "_PACKAGE", package)
+    record = aureg_obligation("ndb")
+    assert record["data"] == []
+    assert any("looks like test data" in note for note in record["warnings"])
+
+
+def test_operator_snapshot_is_labelled_without_an_age_limit(monkeypatch):
+    monkeypatch.setenv("CYBERAU_AUREG_SNAPSHOT", str(SNAPSHOT))
+    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=1000)
+    record = aureg_obligation("ndb")
+    assert record["data"]
+    assert record["data_as_of"] == SNAPSHOT_DAY.isoformat()
+    assert any("operator-supplied" in note for note in record["warnings"])
 
 
 def test_hour_deadlines_are_elapsed_hours_across_sydney_daylight_saving():

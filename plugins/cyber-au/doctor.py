@@ -614,6 +614,13 @@ def _connector_check(
 ) -> Check:
     check_id = f"connector.{name}"
     key = _connector_key(spec, name)
+    enabled = _is_enabled(spec)
+    if not enabled:
+        reason = str(spec.get("off_reason") or "disabled in profile")
+        detail = f"off: {reason}; probes skipped"
+        if external:
+            detail += "; external server"
+        return _item(check_id, "warn", detail)
     if external:
         return _external_check(ctx, check_id, name, spec)
     if not _connector_installed(ctx.root, key):
@@ -875,6 +882,17 @@ def _snapshot_check(ctx: Context, spec: tuple[str, str, tuple[str, ...]]) -> Che
             "warn",
             "not installed",
             f"Install the {label} connector.",
+        )
+    optional_files = {
+        "snapshot.kev": ("kev.json",),
+        "snapshot.attack": ("index.json", "manifest.json"),
+    }.get(check_id)
+    if optional_files and not any((directory / "data" / name).exists() for name in optional_files):
+        return _item(
+            check_id,
+            "warn",
+            f"{label} has no local snapshot; live data is required",
+            f"Fetch {label} data when network access is available.",
         )
     version, day, problem = _read_snapshot(check_id, directory)
     if problem:

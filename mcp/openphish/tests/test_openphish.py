@@ -101,7 +101,8 @@ def test_malformed_payload_warns(monkeypatch):
     warned = phish_check_url(QUERY)
     assert warned["warnings"]
     assert "url" in warned["warnings"][0]
-    assert _row(warned, "openphish")["listed"] is False
+    assert "is unavailable" in warned["warnings"][0]
+    assert warned["data"] == []
     assert schema_drift((FIXTURES / "feed_drift.txt").read_text(encoding="utf-8"))
 
 
@@ -137,7 +138,8 @@ def test_auth_errors_name_the_env_var(tmp_path, monkeypatch):
         warned = phish_check_url(QUERY)
         assert str(status) in warned["warnings"][0]
         assert "env var" in warned["warnings"][0]
-        assert _row(warned, "openphish")["listed"] is False
+        assert "is unavailable" in warned["warnings"][0]
+        assert warned["data"] == []
 
 
 def test_retry_after_then_success(monkeypatch):
@@ -207,6 +209,7 @@ def test_redirect_off_allowlist_is_refused(monkeypatch):
     refused = phish_check_url(QUERY)
     assert refused["warnings"]
     assert "evil.example" in refused["warnings"][0]
+    assert refused["data"] == []
 
 
 def test_github_path_outside_the_feed_is_refused(monkeypatch):
@@ -221,7 +224,8 @@ def test_github_path_outside_the_feed_is_refused(monkeypatch):
     source._TRANSPORT = httpx.MockTransport(redirect)
     refused = phish_check_url(QUERY)
     assert refused["warnings"]
-    assert _row(refused, "openphish")["listed"] is False
+    assert "is unavailable" in refused["warnings"][0]
+    assert refused["data"] == []
 
 
 def test_follows_the_public_feed_redirect(monkeypatch):
@@ -296,11 +300,44 @@ def test_snapshot_is_never_written_to_the_history_store(tmp_path):
     assert not (tmp_path / "openphish.sqlite").exists()
 
 
-def test_bundled_snapshot_is_labelled_synthetic(monkeypatch):
+FIXTURE_VALUES = ("phish.example", "/reset", "/pay")
+
+
+def _assert_unavailable(found):
+    jsonschema.validate(found, ENVELOPE)
+    assert found["data"] == []
+    assert any("OpenPhish feed is unavailable" in item for item in found["warnings"])
+    text = json.dumps(found["data"])
+    assert all(value not in text for value in FIXTURE_VALUES)
+    assert not any("snapshot dated" in item or "synthetic" in item for item in found["warnings"])
+
+
+def test_offline_without_override_serves_nothing(tmp_path, monkeypatch):
     monkeypatch.delenv("CYBERAU_OPENPHISH_SNAPSHOT")
     found = phish_check_url(QUERY)
-    assert found["cache"] == "snapshot"
-    assert any("synthetic" in item and "not live" in item for item in found["warnings"])
+    _assert_unavailable(found)
+    assert "offline" in found["warnings"][0]
+    assert not (tmp_path / "openphish.sqlite").exists()
+    assert not (ROOT / "data").exists()
+
+
+def test_failed_live_without_override_serves_nothing(tmp_path, monkeypatch):
+    _live(monkeypatch)
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network down")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    found = phish_check_url(QUERY)
+    _assert_unavailable(found)
+    assert not (tmp_path / "openphish.sqlite").exists()
+
+
+def test_offline_schema_check_without_local_copy(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OPENPHISH_SNAPSHOT")
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail
 
 
 def test_offline_cache_beats_snapshot_and_missing_snapshot_warns(tmp_path, monkeypatch):
@@ -315,7 +352,11 @@ def test_offline_cache_beats_snapshot_and_missing_snapshot_warns(tmp_path, monke
     monkeypatch.setenv("CYBERAU_OPENPHISH_SNAPSHOT", str(tmp_path / "missing.txt"))
     missing = phish_check_url(QUERY)
     assert missing["warnings"]
-    assert "unavailable" in missing["warnings"][0]
+    assert "is unavailable" in missing["warnings"][0]
+    assert missing["data"] == []
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is False
+    assert "missing" in probe.detail
 
 
 def test_hourly_ceiling_does_not_call_upstream(monkeypatch):
@@ -333,6 +374,8 @@ def test_hourly_ceiling_does_not_call_upstream(monkeypatch):
     warned = phish_check_url(QUERY)
     assert calls["n"] == 0
     assert "hourly" in warned["warnings"][0]
+    assert "is unavailable" in warned["warnings"][0]
+    assert warned["data"] == []
 
 
 def test_live_health_hits_upstream_and_checks_response_schema(tmp_path, monkeypatch):
@@ -463,7 +506,7 @@ def test_unparseable_urls_do_not_raise(monkeypatch):
     monkeypatch.setenv("CYBERAU_OPENPHISH_SNAPSHOT", str(FIXTURES / "feed_badport.txt"))
     warned = phish_check_url(QUERY)
     assert warned["warnings"]
-    assert _row(warned, "openphish")["listed"] is False
+    assert warned["data"] == []
 
 
 def test_encoded_dot_segments_on_github_are_refused(monkeypatch):
@@ -483,4 +526,18 @@ def test_encoded_dot_segments_on_github_are_refused(monkeypatch):
     refused = phish_check_url(QUERY)
     assert seen == [FEED_URL]
     assert refused["warnings"]
-    assert _row(refused, "openphish")["listed"] is False
+    assert "is unavailable" in refused["warnings"][0]
+    assert refused["data"] == []
+
+
+def test_sibling_cache_still_answers_when_feed_is_unavailable(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_OPENPHISH_SNAPSHOT")
+    phish_dir = tmp_path / "phishtank"
+    phish_dir.mkdir()
+    (phish_dir / "online-valid.json").write_text(
+        json.dumps([{"url": "https://bank.example/verify"}]), encoding="utf-8"
+    )
+    found = phish_check_url("https://bank.example/verify")
+    assert "is unavailable" in found["warnings"][0]
+    assert all(row["source"] != "openphish" for row in found["data"])
+    assert _row(found, "phishtank")["listed"] is True

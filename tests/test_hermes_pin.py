@@ -26,7 +26,6 @@ CARRIED = (
     "distribution.yaml",
     "docker/Dockerfile",
     "tools/hermes_pin.txt",
-    ".github/workflows/ci.yml",
     "PR_BODY.md",
 )
 
@@ -78,7 +77,9 @@ def test_repository_pin_is_the_current_release():
     distribution = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'hermes_requires: ">=0.22.2"\n' in distribution
-    assert "nousresearch/hermes-agent:v0.22.2" in ci
+    assert "tools/hermes_pin.py image" in ci
+    assert pin.image(ROOT) == "nousresearch/hermes-agent:v0.22.2"
+    pin.check_ci(ROOT)
 
 
 def test_get_prints_only_the_tag(tmp_path: Path):
@@ -116,7 +117,10 @@ def test_set_updates_every_consumer_and_keeps_the_comment(tmp_path: Path):
     assert "FROM nousresearch/hermes-agent:${HERMES_VERSION}\n" in dockerfile
     for rel in (".github/workflows/ci.yml",):
         updated = (root / rel).read_text(encoding="utf-8")
-        assert "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml" in updated
+        assert "nousresearch/hermes-agent:v0.22.2   # bumped by deps-and-hermes-bump.yml" in updated
+    assert pin.image(root) == "nousresearch/hermes-agent:v9.9.9"
+    with pytest.raises(pin.PinError, match="hardcodes"):
+        pin.check_ci(root)
 
 
 def test_set_is_idempotent_for_the_same_tag(tmp_path: Path):
@@ -147,7 +151,9 @@ def test_set_accepts_the_real_distribution_and_ci_formats(tmp_path: Path):
     ci = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'hermes_requires: ">=9.9.9"\n' in distribution
     assert "name: cyber-au\n" in distribution
-    assert "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml" in ci
+    assert ci == (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert pin.image(root) == "nousresearch/hermes-agent:v9.9.9"
+    pin.check_ci(root)
     assert (ROOT / "distribution.yaml").read_text(encoding="utf-8") != distribution
 
 
@@ -160,11 +166,29 @@ def test_set_writes_nothing_when_a_consumer_is_missing(tmp_path: Path):
     assert (root / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").endswith("v0.22.2\n")
 
 
-def test_set_refuses_a_tree_with_no_ci_workflow(tmp_path: Path):
-    root = _fixture(tmp_path, ci=False)
-    with pytest.raises(pin.PinError, match="ci.yml"):
+@pytest.mark.parametrize(
+    "relative,content",
+    [
+        ("docker/Dockerfile", "ARG HERMES_DIGEST=sha256:" + "a" * 64 + "\n"),
+        (".devcontainer/Dockerfile", "FROM example.invalid/image@sha256:" + "a" * 64 + "\n"),
+        ("install/install.sh", "HERMES_PIN_COMMIT=" + "a" * 40 + "\n"),
+    ],
+)
+def test_version_bump_cannot_leave_immutable_pins_on_old_release(tmp_path, relative, content):
+    root = _fixture(tmp_path)
+    target = root / relative
+    _write(target, (target.read_text() if target.is_file() else "") + content)
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    with pytest.raises(pin.PinError, match="manual pin update"):
         pin.set_pin(root, "v9.9.9")
-    assert (root / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").endswith("v0.22.2\n")
+    assert {path: path.read_bytes() for path in before} == before
+
+
+def test_set_does_not_need_or_create_workflow_files(tmp_path: Path):
+    root = _fixture(tmp_path, ci=False)
+    pin.set_pin(root, "v9.9.9")
+    assert pin.image(root) == "nousresearch/hermes-agent:v9.9.9"
+    assert not (root / ".github").exists()
 
 
 @pytest.mark.parametrize(
@@ -213,13 +237,14 @@ def test_workflow_pins_actions_and_carries_every_pin_file():
         if "./.github/workflows/" in line:
             continue
         assert re.search(r"@[0-9a-f]{40} # v[0-9]+\.[0-9]+\.[0-9]+", line), line
-    assert "include-hidden-files: true" in text
+    assert "\n            .github/workflows/ci.yml" not in text
     match = re.search(r"allowed_paths: '([^']+)'", text)
     assert match is not None
     pattern = match.group(1)
     for rel in CARRIED:
         assert re.search(pattern, rel), rel
     assert re.search(pattern, "changed.txt")
+    assert re.search(pattern, ".github/workflows/ci.yml") is None
     assert re.search(pattern, "SOUL.md") is None
     assert re.search(pattern, "docs/research/hermes-structure.md") is None
 

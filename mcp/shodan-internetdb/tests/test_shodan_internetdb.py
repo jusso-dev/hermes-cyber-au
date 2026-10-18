@@ -83,7 +83,7 @@ def test_empty_invalid_and_malformed(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_INTERNETDB_SNAPSHOT", str(FIXTURES / "ip_drift.json"))
     drifted = internetdb_ip("1.1.1.1")
     assert drifted["data"] is None
-    assert "schema drift" in drifted["warnings"][0]
+    assert any("schema drift" in warning for warning in drifted["warnings"])
     assert schema_drift(json.loads((FIXTURES / "ip_404.json").read_text())) is None
     monkeypatch.setenv("CYBERAU_INTERNETDB_SNAPSHOT", str(FIXTURES / "ip_hit.json"))
     other = internetdb_ip("8.8.8.8")
@@ -123,7 +123,8 @@ def test_offline_cache_snapshot_and_unavailable(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     shipped = internetdb_ip("1.1.1.1")
     assert shipped["cache"] == "snapshot"
-    assert 53 in shipped["data"]["ports"]
+    assert shipped["data"] is None
+    assert any("is unavailable" in item for item in shipped["warnings"])
 
     body = json.dumps(
         {
@@ -418,3 +419,39 @@ def test_live_health_fails_on_a_record_for_another_address(monkeypatch):
     probe = connector().health(live=True)
     assert probe.ok is False
     assert "different address" in probe.detail
+
+
+FIXTURE_VALUES = ("one.one.one.one", "cloudflare", "wireless-login.ucsd.edu", "2096")
+
+
+def _assert_unavailable(result: dict) -> None:
+    jsonschema.validate(result, ENVELOPE)
+    assert result["data"] is None
+    assert any("is unavailable" in item for item in result["warnings"])
+    text = json.dumps(result)
+    for value in FIXTURE_VALUES:
+        assert value not in text, value
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_INTERNETDB_SNAPSHOT")
+    _assert_unavailable(internetdb_ip("1.1.1.1"))
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_INTERNETDB_SNAPSHOT")
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(500))
+    _assert_unavailable(internetdb_ip("1.1.1.1"))
+
+
+def test_override_snapshot_is_labelled():
+    found = internetdb_ip("1.1.1.1")
+    assert any("operator-supplied InternetDB snapshot" in item for item in found["warnings"])
+
+
+def test_offline_schema_check_without_override_reads_no_shipped_file(monkeypatch):
+    monkeypatch.delenv("CYBERAU_INTERNETDB_SNAPSHOT")
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail

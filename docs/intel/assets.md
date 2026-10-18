@@ -66,6 +66,7 @@ cyberau-mcp assets match --cpe 'cpe:2.3:a:examplevendor:edgegate:*:*:*:*:*:*:*:*
 cyberau-mcp assets match --purl 'pkg:pypi/examplelib@2.3.9'
 cyberau-mcp assets match --vendor Examplevendor --product 'Edgegate ADC'
 cyberau-mcp assets list
+cyberau-mcp assets coverage
 ```
 
 Each match names the rule that made it, strongest first:
@@ -77,5 +78,22 @@ Each match names the rule that made it, strongest first:
 | `vendor-product-fuzzy` | The token rule in `skills/daily-briefing/references/matching.md` on vendor and product, with the vendor aliases from the watchlist. Reported as a possible match |
 
 All results are candidates. Versions are not compared, because NVD and KEV publish ranges. The match detail shows the asset version so an analyst can check it before calling an asset affected.
+
+`assets coverage` prints only counts: total tracked software entries, versions recorded, CPEs recorded, purls recorded, and missing versions. Use it after an import to find whether inventory data can support a useful review without printing system, host, owner, or software names.
+
+## Scheduled software watch
+
+`cyberau-software-watch-local` is a deterministic, no-agent check. Every six hours it reads the local CISA KEV snapshot created by the public-feed refresh and writes `plugin-data/cyber-au/software-watch.json`. It starts paused on every new install, makes no network request, and sends no notification. Every row is a candidate, with the locally recorded version and an instruction to confirm affected-version range before treating an asset as affected. The report includes the snapshot file's `snapshot_file_modified_at` timestamp and marks a file older than 12 hours as `stale`; it does not claim that timestamp is an upstream retrieval time. A missing, empty, or stale source is never reported as no issues. An empty inventory is `monitoring: not_configured`, not a clean result.
+
+`cyberau-kev-watch` is the optional model-assisted companion. It also reviews CVEs named in recent ASD ACSC and AusCERT bulletins, material EPSS changes, and available NVD CPE or OSV purl records. It never gives inventory values to a connector and reports a candidate only. It must say when NVD or OSV data is unavailable rather than treating that as no issue.
+
+```bash
+hermes -p cyber-au cron resume cyberau-kev-watch
+hermes -p cyber-au cron run cyberau-kev-watch
+hermes -p cyber-au cron resume cyberau-software-watch-local
+hermes -p cyber-au cron run cyberau-software-watch-local
+```
+
+The local check writes a 0600 report only. The model-assisted routine writes back only to its originating Hermes conversation. Neither sends email, chat, or webhooks. Leave both paused until the inventory and its owner mapping have been reviewed.
 
 Tests: `tests/intel/test_assets.py`, with synthetic fixtures in `tests/fixtures/assets/`.

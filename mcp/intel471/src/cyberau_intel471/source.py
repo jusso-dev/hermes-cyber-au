@@ -21,6 +21,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -83,6 +84,7 @@ _AFFILIATION = {
     "my_customers": "customers",
     "third_parties": "third_parties",
 }
+_LABEL = "Intel 471"
 _SNAPSHOTS = {
     "alerts": "alerts_synthetic.json",
     "breach": "breach_alerts_synthetic.json",
@@ -224,6 +226,8 @@ class Intel471Connector(PremiumConnector):
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not _snapshot_active():
+                return Probe(self.key, True, "no local copy to check")
             payload = _load(_schema_text())
             problem = schema_drift(payload or {})
             if problem:
@@ -624,11 +628,8 @@ def _fetch(
         if os.environ.get("CYBERAU_INTEL471_SNAPSHOT"):
             return None, "snapshot", "Intel 471 snapshot was not usable"
     if not _configured():
-        return (
-            None,
-            "snapshot",
-            ("Intel 471 is not configured. Set INTEL471_EMAIL and INTEL471_API_KEY."),
-        )
+        reason = "it is not configured. Set INTEL471_EMAIL and INTEL471_API_KEY"
+        return None, "snapshot", _failed(reason, force_live)
     root = _data_root()
     cache = _cache_for(root, kind)
     cache_key = cache.key("GET", url, params, b"", _scope())
@@ -639,11 +640,8 @@ def _fetch(
             payload = _load(cached.body.decode("utf-8"))
             state = "hit" if cache.fresh(cached) else "stale"
             return payload, state, ""
-        return (
-            None,
-            "snapshot",
-            ("Intel 471 is unavailable offline and no cached or snapshot response is available."),
-        )
+        reason = "offline mode is on and no cached copy is stored"
+        return None, "snapshot", unavailable(_LABEL, reason)
     client = _client(root, cache)
     try:
         _acquire(root)
@@ -656,36 +654,36 @@ def _fetch(
         )
     except EgressDenied as exc:
         # A refused host is a policy stop. A cached copy must not hide it.
-        return None, "snapshot", _scrub(str(exc))
+        return None, "snapshot", _failed(_scrub(str(exc)), force_live)
     except (HttpError, TimeoutError, RateLimited) as exc:
         cached = None if force_live else cache.get(cache_key)
         if cached is not None:
             payload = _load(cached.body.decode("utf-8"))
             return payload, "stale", ""
-        return None, "snapshot", _scrub(str(exc)) or "Intel 471 is unavailable"
+        return None, "snapshot", _failed(_scrub(str(exc)), force_live)
     finally:
         client.close()
     if response.status in (401, 403):
-        return (
-            None,
-            "snapshot",
-            (
-                f"Intel 471 refused the request (HTTP {response.status}). "
-                "Check INTEL471_EMAIL and INTEL471_API_KEY."
-            ),
+        message = (
+            f"Intel 471 refused the request (HTTP {response.status}). "
+            "Check INTEL471_EMAIL and INTEL471_API_KEY."
         )
+        return None, "snapshot", _failed(message, force_live)
     if response.status == 429:
-        return (
-            None,
-            "snapshot",
-            ("Intel 471 rate limited the request (429). Retry-After was honoured."),
-        )
+        message = "Intel 471 rate limited the request (429). Retry-After was honoured."
+        return None, "snapshot", _failed(message, force_live)
     if response.status >= 400:
-        return None, "snapshot", f"Intel 471 returned HTTP {response.status}"
+        message = f"Intel 471 returned HTTP {response.status}"
+        return None, "snapshot", _failed(message, force_live)
     payload = _load(response.body.decode("utf-8"))
     if payload is None:
         return None, response.cache, "Intel 471 payload was not usable"
     return payload, response.cache, ""
+
+
+def _failed(message: str, force_live: bool) -> str:
+    """Live probes keep the plain message. Tool calls say the source is unavailable."""
+    return message if force_live else unavailable(_LABEL, message)
 
 
 def _guard_request(url: str, params: dict | None) -> str:
@@ -806,6 +804,7 @@ def _snapshot_body(kind: str) -> str | None:
 
 
 def _schema_text() -> str:
+    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     raw = os.environ.get("CYBERAU_INTEL471_SNAPSHOT")
     if raw:
         path = Path(raw)
@@ -813,7 +812,7 @@ def _schema_text() -> str:
             path = path / _SNAPSHOTS["alerts"]
         if path.is_file():
             return path.read_text(encoding="utf-8")
-    return (_PACKAGE / "data" / "alerts.json").read_text(encoding="utf-8")
+    return ""
 
 
 def _load(text: str) -> dict | None:
@@ -1228,8 +1227,8 @@ def _uid(item: dict) -> str:
 def _origin_notes(cache: str) -> tuple[str, ...]:
     if cache == "snapshot" and _snapshot_active():
         return (
-            "Served from a local snapshot (CYBERAU_INTEL471_SNAPSHOT), not a live "
-            "Intel 471 result. Nothing was stored.",
+            "Served from the operator-supplied snapshot in CYBERAU_INTEL471_SNAPSHOT, not a "
+            "live Intel 471 result. Nothing was stored.",
         )
     if cache == "stale":
         return ("Served from a cached copy that has expired. Intel 471 was not reached.",)

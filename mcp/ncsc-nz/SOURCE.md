@@ -11,6 +11,8 @@ The list selectors the schema check requires are `explore--alert` or `card--aler
 
 Rows are written to `$CYBERAU_DATA_DIR/ncsc_alerts.sqlite` until the shared intel store exists. A row is kept after it leaves the first page of the list.
 
+The fallback ladder is live fetch, then the HTTP cache (and, for an alert page, the stored alert), then unavailable. When every rung fails the tools return empty data with an "is unavailable" warning. No snapshot ships with the connector, so sample alerts are never served as NCSC NZ data. The synthetic list and alert pages used by the tests live under `tests/fixtures/`. An operator can set `CYBERAU_NCSC_SNAPSHOT` to a directory holding `alerts_page.html` (and an optional `items.json` URL to file map for alert pages). The tools then read those files instead of the network, and every answer with data carries a warning that it came from the operator-supplied snapshot, not a live fetch.
+
 ## Operator guide
 
 Read-only alerts from the public NCSC NZ alerts list. The site does not publish an RSS feed, so this connector reads the HTML list and one alert page.

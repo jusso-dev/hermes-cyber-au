@@ -14,6 +14,7 @@ from cyberau_common.http import HttpClient, HttpError, Response
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 API = "https://api.osv.dev/v1"
@@ -28,7 +29,10 @@ PROBE_ID = "GHSA-jfh8-c2jp-5v3q"
 RECORD_TTL = 24 * 3600
 QUERY_TTL = 6 * 3600
 _TRANSPORT = None
-_PACKAGE = Path(__file__).resolve().parents[2]
+LABEL = "OSV.dev"
+SNAPSHOT_NOTE = (
+    "served the operator-supplied OSV snapshot file (CYBERAU_OSV_SNAPSHOT), not a live fetch"
+)
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _ECOSYSTEM = re.compile(r"^[A-Za-z][A-Za-z0-9._:+-]{0,63}$")
@@ -40,8 +44,6 @@ _Ecosystem = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9._:+-]{0,63}$")]
 _Package = Annotated[str, Field(min_length=1, max_length=214)]
 _Version = Annotated[str, Field(min_length=1, max_length=128)]
 _Queries = Annotated[list[dict], Field(min_length=1, max_length=100)]
-
-_SNAPSHOTS = {"vuln": "vuln.json", "query": "query.json", "batch": "batch.json"}
 
 
 def osv_query(ecosystem: _Ecosystem, package: _Package, version: _Version | None = None) -> dict:
@@ -58,6 +60,7 @@ def osv_query(ecosystem: _Ecosystem, package: _Package, version: _Version | None
     vulns = payload.get("vulns") or []
     warnings: list[str] = []
     if cache == "snapshot":
+        warnings.append(SNAPSHOT_NOTE)
         vulns = [item for item in vulns if _affects(item, ecosystem, package)]
         if version:
             warnings.append("offline snapshot is not filtered by version")
@@ -83,19 +86,20 @@ def osv_get(id: _Id) -> dict:
     drift = schema_drift(payload or {}) if payload is not None else "OSV record was not usable"
     if drift:
         return _envelope(None, cache, urls=[url], warnings=(drift,))
+    notes = (SNAPSHOT_NOTE,) if cache == "snapshot" else ()
     if "id" not in payload or (cache == "snapshot" and not _same_id(payload["id"], id)):
         return _envelope(
             None,
             cache,
             urls=[url],
-            warnings=("no matching record in the offline snapshot or cache",),
+            warnings=("no matching record in the offline snapshot or cache", *notes),
         )
     try:
         row = _record(payload)
     except (AttributeError, TypeError):
         return _envelope(None, cache, urls=[url], warnings=("OSV record was not usable",))
     _persist([row])
-    return _envelope(row, cache, urls=[url])
+    return _envelope(row, cache, urls=[url], warnings=notes)
 
 
 def osv_batch(queries: _Queries) -> dict:
@@ -110,7 +114,8 @@ def osv_batch(queries: _Queries) -> dict:
         return _envelope([], cache, warnings=(warning,))
     warnings: list[str] = []
     if cache == "snapshot":
-        pool = _load(_snapshot_text("query"))
+        warnings.append(SNAPSHOT_NOTE)
+        pool = _load(_snapshot_text())
         problem = schema_drift(pool) if pool is not None else "snapshot is not JSON"
         if problem:
             return _envelope([], cache, warnings=(problem,))
@@ -168,11 +173,12 @@ class _OsvConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            for text in _snapshot_texts():
-                payload = _load(text)
-                problem = schema_drift(payload) if payload is not None else "snapshot is not JSON"
-                if problem:
-                    return Probe(self.key, False, problem)
+            if not os.environ.get("CYBERAU_OSV_SNAPSHOT"):
+                return Probe(self.key, True, "schema ok, no local copy to check")
+            payload = _load(_snapshot_text())
+            problem = schema_drift(payload) if payload is not None else "snapshot is not JSON"
+            if problem:
+                return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
@@ -237,7 +243,7 @@ def _fetch(
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
     if os.environ.get("CYBERAU_OSV_SNAPSHOT") and not force_live:
-        return _load(_snapshot_text(kind)), "snapshot", ""
+        return _load(_snapshot_text()), "snapshot", ""
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     data_dir = _data_dir()
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
@@ -260,8 +266,10 @@ def _fetch(
             response = client.get(url, ttl=ttl, skip_cache=force_live)
     except (HttpError, EgressDenied, TimeoutError) as exc:
         if offline:
-            return _load(_snapshot_text(kind)), "snapshot", ""
-        return None, "snapshot", "OSV unavailable: " + redact(str(exc))
+            return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
+        if force_live:
+            return None, "snapshot", "OSV unavailable: " + redact(str(exc))
+        return None, "snapshot", unavailable(LABEL, f"the live fetch failed ({redact(str(exc))})")
     finally:
         client.close()
     warning = _status_warning(response)
@@ -468,16 +476,9 @@ def _persist_ids(items: list[dict]) -> None:
             handle.write(json.dumps(item, sort_keys=True) + "\n")
 
 
-def _snapshot_text(kind: str) -> str:
-    snapshot = os.environ.get("CYBERAU_OSV_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / _SNAPSHOTS[kind]
-    return path.read_text(encoding="utf-8")
-
-
-def _snapshot_texts() -> list[str]:
-    if os.environ.get("CYBERAU_OSV_SNAPSHOT"):
-        return [_snapshot_text("vuln")]
-    return [_snapshot_text(kind) for kind in _SNAPSHOTS]
+def _snapshot_text() -> str:
+    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
+    return Path(os.environ["CYBERAU_OSV_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _load(text: str) -> dict | None:

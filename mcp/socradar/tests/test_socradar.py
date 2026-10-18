@@ -92,6 +92,7 @@ def test_happy_path_maps_confirmed_types(monkeypatch):
     found = socradar_incidents(**arguments)
     _validate_envelope(found)
     assert found["cache"] == "snapshot"
+    assert any("operator-supplied snapshot" in item for item in found["warnings"])
     assert [row["kind"] for row in found["data"]] == ["brand_impersonation"]
     assert "<<untrusted source=socradar>>" in found["data"][0]["summary"]
     assert "Synthetic impersonation notice." in found["data"][0]["summary"]
@@ -281,7 +282,8 @@ def test_offline_uses_cache_or_reports_unavailable(tmp_path, monkeypatch):
     missing = socradar_incidents()
     assert missing["cache"] == "snapshot"
     assert missing["data"] == []
-    assert missing["warnings"] == ["unavailable"]
+    assert len(missing["warnings"]) == 1
+    assert "SOCRadar is unavailable" in missing["warnings"][0]
 
 
 def test_schema_drift_fails_health(monkeypatch):
@@ -423,7 +425,7 @@ def test_snapshot_is_warned_and_never_stored(tmp_path, monkeypatch):
     assert found["data"]
     assert any("not a live SOCRadar result" in item for item in found["warnings"])
     assert not (tmp_path / "intel.sqlite").exists()
-    with pytest.raises(ValueError, match="Snapshot copy"):
+    with pytest.raises(ValueError, match="operator-supplied snapshot file"):
         connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1))
     assert not (tmp_path / "intel.sqlite").exists()
 
@@ -512,3 +514,63 @@ def test_redirect_off_allowlist_sends_nothing_and_same_host_drops_key(monkeypatc
     socradar_incidents()
     assert seen[0][1] == KEY
     assert seen[1] == ("/elsewhere", None)
+
+
+_FIXTURE_VALUES = (
+    "Synthetic",
+    "203.0.113.10",
+    "example.com.au",
+    "2026-06-01",
+    "brand_impersonation",
+)
+
+
+def _assert_unavailable(result: dict) -> None:
+    _validate_envelope(result)
+    assert result["data"] == []
+    assert any("is unavailable" in item for item in result["warnings"])
+    text = json.dumps(result)
+    for value in _FIXTURE_VALUES:
+        assert value not in text
+
+
+def test_offline_without_override_serves_no_fixture_rows(monkeypatch):
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise AssertionError("offline must not use the network")
+
+    source._TRANSPORT = httpx.MockTransport(handler)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(socradar_incidents())
+    monkeypatch.setenv("SOCRADAR_API_KEY", KEY)
+    monkeypatch.setenv("SOCRADAR_COMPANY_ID", "1001")
+    _assert_unavailable(socradar_incidents())
+    _assert_unavailable(socradar_incidents(since="2026-05-01", severity="HIGH"))
+
+
+@pytest.mark.parametrize("failure", ["connect", "timeout", "500"])
+def test_failed_live_fetch_without_override_serves_no_fixture_rows(monkeypatch, failure):
+    monkeypatch.setenv("SOCRADAR_API_KEY", KEY)
+    monkeypatch.setenv("SOCRADAR_COMPANY_ID", "1001")
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        if failure == "connect":
+            raise httpx.ConnectError("connection refused")
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(500)
+
+    source._TRANSPORT = httpx.MockTransport(handler)
+    _assert_unavailable(socradar_incidents())
+    with pytest.raises(ValueError, match="is unavailable"):
+        connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1))
+
+
+def test_live_health_never_reads_the_test_fixture(monkeypatch):
+    monkeypatch.setenv("SOCRADAR_API_KEY", KEY)
+    monkeypatch.setenv("SOCRADAR_COMPANY_ID", "1001")
+    monkeypatch.setattr(source, "_SCHEMA_FIXTURE", FIXTURES / "incidents_v4_renamed.json")
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(500))
+    probe = connector().health(live=True, check_schema=True)
+    assert probe.ok is False
+    assert "alarm_id" not in probe.detail
+    assert connector().health(live=False, check_schema=True).ok is False

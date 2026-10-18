@@ -321,15 +321,13 @@ def test_cassettes_replay():
         assert played.json()["data"]
 
 
-def test_offline_without_a_snapshot_uses_the_package_or_says_unavailable(monkeypatch, tmp_path):
+def test_offline_without_an_operator_snapshot_reports_unavailable(monkeypatch, tmp_path):
     monkeypatch.delenv("CYBERAU_ABUSEIPDB_SNAPSHOT", raising=False)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     found = abuseipdb_check_ip("118.25.6.39")
     assert found["cache"] == "snapshot"
-    assert found["data"]["ip"] == "118.25.6.39"
-    other = abuseipdb_check_ip("1.1.1.1")
-    assert other["data"] is None
-    assert other["warnings"]
+    assert found["data"] is None
+    assert "unavailable" in found["warnings"][0].lower()
     monkeypatch.setenv("CYBERAU_ABUSEIPDB_SNAPSHOT", str(tmp_path / "missing.json"))
     unavailable = abuseipdb_check_ip("8.8.8.8")
     assert "unavailable" in unavailable["warnings"][0].lower()

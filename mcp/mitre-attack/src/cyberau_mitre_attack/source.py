@@ -16,6 +16,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 INDEX_URL = "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/index.json"
@@ -69,9 +70,8 @@ _PLATFORMS = frozenset(
         "Windows",
     }
 )
-_SHIPPED_NOTE = (
-    "served the excerpt shipped with the package, which is hand-written test data and not "
-    "current ATT&CK content; run with network access to read the real bundles"
+_PINNED_NOTE = (
+    "served the operator-supplied ATT&CK snapshot in CYBERAU_ATTACK_SNAPSHOT, not a live fetch"
 )
 _VERSION = re.compile(r"\d+(\.\d+)*")
 _SOFTWARE = ("malware", "tool")
@@ -222,6 +222,8 @@ class _AttackConnector(Connector):
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
             payload, problem = _snapshot_payload("enterprise")
+            if payload is None and problem is None:
+                return Probe(self.key, True, "no local copy to check")
             problem = problem or schema_drift(payload)
             if problem:
                 return Probe(self.key, False, problem)
@@ -541,16 +543,16 @@ def _timestamp(value) -> str:
 def _load(domain: str, *, force_live: bool = False) -> _Loaded:
     pinned = os.environ.get("CYBERAU_ATTACK_SNAPSHOT")
     if not force_live and pinned:
-        return _from_root(Path(pinned), domain, "snapshot", [])
+        return _from_root(Path(pinned), domain, "snapshot", [_PINNED_NOTE])
     if not force_live and os.environ.get("CYBERAU_OFFLINE") == "1":
-        return _stored_or_shipped(domain, [])
+        return _stored_or_unavailable(domain, [], offline=True)
     text, cache, warning = _http(INDEX_URL, ttl=3600, stale_if_error=7 * 86400)
     if text is None:
-        return _stored_or_shipped(domain, [warning])
+        return _stored_or_unavailable(domain, [warning])
     index = _loads(text)
     version = _latest(index, domain)
     if not version:
-        return _stored_or_shipped(domain, [f"ATT&CK index has no {domain} version"])
+        return _stored_or_unavailable(domain, [f"ATT&CK index has no {domain} version"])
     warnings = (
         ["ATT&CK index was served from cache after the live fetch failed"]
         if (cache == "stale")
@@ -566,15 +568,17 @@ def _load(domain: str, *, force_live: bool = False) -> _Loaded:
     url = BUNDLE_URL.format(domain=domain)
     body, _cache, warning = _http(url, ttl=86400, stale_if_error=0)
     if body is None:
-        return _stored_or_shipped(domain, [*warnings, warning])
+        return _stored_or_unavailable(domain, [*warnings, warning])
     model, problem = _build(_loads(body), domain, version)
     if model is None:
-        return _stored_or_shipped(domain, [*warnings, f"{domain} bundle was not usable: {problem}"])
+        return _stored_or_unavailable(
+            domain, [*warnings, f"{domain} bundle was not usable: {problem}"]
+        )
     _store(path, body)
     return _Loaded(model, version, "stale" if cache == "stale" else "miss", [*urls, url], warnings)
 
 
-def _stored_or_shipped(domain: str, warnings: list[str]) -> _Loaded:
+def _stored_or_unavailable(domain: str, warnings: list[str], *, offline: bool = False) -> _Loaded:
     kept = _stored_versions(domain)
     for version in kept:
         model, problem = _parse_file(_stored(version, domain), domain, version)
@@ -582,10 +586,13 @@ def _stored_or_shipped(domain: str, warnings: list[str]) -> _Loaded:
             note = [*warnings, f"served stored ATT&CK {version} {domain} snapshot"]
             return _Loaded(model, version, "stale", [INDEX_URL], [w for w in note if w])
         warnings = [*warnings, f"stored {domain} {version} was not usable: {problem}"]
-    shipped = _from_root(_PACKAGE / "data", domain, "snapshot", [w for w in warnings if w])
-    if shipped.model is not None:
-        shipped.warnings.append(_SHIPPED_NOTE)
-    return shipped
+    reason = (
+        "offline mode is on and no ATT&CK version is stored"
+        if offline
+        else "the live fetch failed and no ATT&CK version is stored"
+    )
+    note = unavailable(f"ATT&CK {domain} data", reason)
+    return _Loaded(None, "", "snapshot", [INDEX_URL], [*[w for w in warnings if w], note])
 
 
 def _from_root(root: Path, domain: str, cache: str, warnings: list[str]) -> _Loaded:
@@ -624,11 +631,20 @@ def _parse_file(path: Path, domain: str, version: str) -> tuple[_Model | None, s
 
 
 def _snapshot_payload(domain: str) -> tuple[object, str | None]:
-    root = Path(os.environ.get("CYBERAU_ATTACK_SNAPSHOT") or _PACKAGE / "data")
-    version = _latest(_loads_file(root / "index.json"), domain) or _newest_dir(root, domain)
-    if not version:
-        return None, f"no {domain} snapshot is available"
-    payload = _loads_file(root / version / f"{domain}-attack.json")
+    """Read the pinned snapshot, else the newest stored bundle. Never a test fixture."""
+    pinned = os.environ.get("CYBERAU_ATTACK_SNAPSHOT")
+    if pinned:
+        root = Path(pinned)
+        version = _latest(_loads_file(root / "index.json"), domain) or _newest_dir(root, domain)
+        if not version:
+            return None, f"no {domain} snapshot is available"
+        path = root / version / f"{domain}-attack.json"
+    else:
+        kept = _stored_versions(domain)
+        if not kept:
+            return None, None
+        path = _stored(kept[0], domain)
+    payload = _loads_file(path)
     return payload, None if payload is not None else f"{domain} snapshot is not valid JSON"
 
 

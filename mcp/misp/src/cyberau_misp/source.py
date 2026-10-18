@@ -24,6 +24,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 PIN_REPO = "https://github.com/MISP/misp-mcp"
@@ -36,9 +37,14 @@ DOCTOR_NOTE = "off by default: licence terms. See docs/connectors/misp.md."
 RATE = 30 / 60
 BURST = 30
 TTL = 300
+LABEL = "MISP"
+OPERATOR_NOTE = (
+    "served the operator-supplied MISP snapshot file (CYBERAU_MISP_SNAPSHOT), not a live fetch"
+)
 
 _PACKAGE = Path(__file__).resolve().parents[2]
-_DEFAULT_SNAPSHOT = _PACKAGE / "tests" / "fixtures" / "event_three_attributes.json"
+# Read only by the offline schema-drift probe. Never served to a tool caller.
+_SCHEMA_FIXTURE = _PACKAGE / "tests" / "fixtures" / "event_three_attributes.json"
 _SCHEMA = _PACKAGE / "schema"
 _HOST = re.compile(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?")
 _EVENT_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
@@ -85,7 +91,7 @@ def search_attributes(
     if cache != "snapshot":
         _persist(rows)
     warnings = ("no matching MISP records",) if not rows else _handling(rows)
-    return _envelope(rows, cache, urls=urls, warnings=warnings)
+    return _envelope(rows, cache, urls=urls, warnings=_noted(cache, warnings))
 
 
 def get_event(event_id: _EventId) -> dict:
@@ -101,11 +107,14 @@ def get_event(event_id: _EventId) -> dict:
         return _envelope(None, cache, urls=urls, warnings=(problem,))
     chosen = [item for item in events if item["id"] == event_id or item["uuid"] == event_id]
     if not chosen:
-        return _envelope(None, cache, urls=urls, warnings=("no matching MISP records",))
+        return _envelope(
+            None, cache, urls=urls, warnings=_noted(cache, ("no matching MISP records",))
+        )
     event = chosen[0]
     if cache != "snapshot":
         _persist([event])
-    return _envelope(event, cache, urls=urls, as_of=_as_of([event]), warnings=_handling([event]))
+    warnings = _noted(cache, _handling([event]))
+    return _envelope(event, cache, urls=urls, as_of=_as_of([event]), warnings=warnings)
 
 
 def search_events(days: _Days = 7, limit: _Limit = 20, published_only: bool = True) -> dict:
@@ -129,6 +138,7 @@ def search_events(days: _Days = 7, limit: _Limit = 20, published_only: bool = Tr
     if cache != "snapshot":
         _persist(events)
     warnings = ("no matching MISP records",) if not events else _handling(events)
+    warnings = _noted(cache, warnings)
     return _envelope(events, cache, urls=urls, as_of=_as_of(events), warnings=warnings)
 
 
@@ -201,7 +211,7 @@ class _MispConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            text = _snapshot_text()
+            text = _snapshot_text() or _read(_SCHEMA_FIXTURE)
             payload = None if text is None else _load(text)
             if not payload:
                 return Probe(self.key, False, "MISP snapshot was not usable")
@@ -277,10 +287,12 @@ def _fetch(path: str, body: dict, *, force_live: bool = False) -> tuple[dict | N
     if offline and _config_problem() == "":
         payload, cache, warning = _live(path, body, offline=True)
         if payload is None:
-            return _from_snapshot()
+            return None, "snapshot", unavailable(LABEL, "offline and no cached copy exists")
         return payload, cache, warning
-    if offline or (lookup("MISP_URL") is None and lookup("MISP_API_KEY") is None):
-        return _from_snapshot()
+    if offline:
+        return None, "snapshot", unavailable(LABEL, "offline and no cached copy exists")
+    if lookup("MISP_URL") is None and lookup("MISP_API_KEY") is None:
+        return None, "snapshot", unavailable(LABEL, "set MISP_URL and MISP_API_KEY")
     problem = _config_problem()
     if problem:
         return None, "snapshot", problem
@@ -290,7 +302,7 @@ def _fetch(path: str, body: dict, *, force_live: bool = False) -> tuple[dict | N
 def _from_snapshot() -> tuple[dict | None, str, str]:
     text = _snapshot_text()
     if text is None:
-        return None, "snapshot", "unavailable: no MISP snapshot or cache"
+        return None, "snapshot", unavailable(LABEL, "the CYBERAU_MISP_SNAPSHOT file is missing")
     payload = _load(text)
     if payload is None:
         return None, "snapshot", "MISP payload was not usable"
@@ -321,7 +333,8 @@ def _live(path: str, body: dict, *, offline: bool) -> tuple[dict | None, str, st
     try:
         tool_request("misp")
     except RateLimited:
-        return None, "snapshot", "unavailable: MISP tool budget is exhausted for this profile"
+        reason = "the tool budget is exhausted for this profile"
+        return None, "snapshot", unavailable(LABEL, reason)
     host = urlsplit(base).hostname or ""
     client = HttpClient(
         "misp",
@@ -665,7 +678,7 @@ def _clean(exc: BaseException, secret: str | None) -> str:
     kept = ("not allowlisted", "only https", "ip literal", "blocked address", "userinfo")
     if any(part in lowered for part in kept):
         return message
-    return "unavailable: MISP could not be reached and no cached copy exists"
+    return unavailable(LABEL, "the instance could not be reached and no cached copy exists")
 
 
 def _check_bound(value: int, cap: int, label: str) -> str:
@@ -776,11 +789,24 @@ def _persist(records: list[dict]) -> None:
 
 
 def _snapshot_text() -> str | None:
+    """The operator-supplied snapshot file. There is no shipped default."""
     snapshot = os.environ.get("CYBERAU_MISP_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _DEFAULT_SNAPSHOT
+    if not snapshot:
+        return None
+    return _read(Path(snapshot))
+
+
+def _read(path: Path) -> str | None:
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")
+
+
+def _noted(cache: str, warnings: tuple[str, ...]) -> tuple[str, ...]:
+    """Mark answers that came from the operator-supplied snapshot file."""
+    if cache == "snapshot" and os.environ.get("CYBERAU_MISP_SNAPSHOT"):
+        return (OPERATOR_NOTE, *warnings)
+    return warnings
 
 
 def _load(text: str) -> dict | None:

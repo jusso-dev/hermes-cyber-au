@@ -22,7 +22,6 @@ No credential variable is declared for this connector.
 
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
-| `CYBERAU_ASD_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
 
@@ -215,7 +214,7 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-Creative Commons Attribution 4.0 International, except the Coat of Arms, the ACSC logo, third-party content, and other excluded material. Attribute as © Commonwealth of Australia 2026. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
+Creative Commons Attribution 4.0 International, except the Coat of Arms, the ACSC logo, third-party content, and other excluded material. Attribute as © Commonwealth of Australia 2026. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../reference/data-sources.md).
 
 Attribution returned with each result:
 
@@ -228,6 +227,8 @@ From this Mac, `https://www.cyber.gov.au/rss/alerts` failed before any bytes arr
 - HTTP/2: curl exit 92, stream was not closed cleanly (INTERNAL_ERROR).
 - HTTP/1.1 with a project User-Agent and an XML Accept header: curl exit 28, timeout after 40 seconds, 0 bytes.
 
-The connector therefore keeps a synthetic shipped snapshot for offline tests and a manual import path. A live health check from a network that can reach cyber.gov.au is still required before treating the feed as current. The fallback ladder is direct fetch, then HTTP/1.1 with browser-like headers that still include `hermes-cyber-au` in the User-Agent, then the last stored poll, then the shipped snapshot.
+A live health check from a network that can reach cyber.gov.au is still required before treating the feed as current. The fallback ladder is direct fetch, then HTTP/1.1 with browser-like headers that still include `hermes-cyber-au` in the User-Agent, then the HTTP cache, then the last stored poll, then unavailable. When every rung fails the tools return empty data with an "is unavailable" warning. No snapshot ships with the package, so the connector never serves sample rows as ASD data. `asd_search` only searches items stored from real polls or imports, and `asd_get_item` only serves a live, cached or stored page.
+
+The synthetic feeds and item page used by the tests live under `tests/fixtures/`. An operator can point `CYBERAU_ASD_SNAPSHOT` at a directory of `<feed>.xml` files (and an optional `items.json` URL to file map for item pages). When set, the tools read those files instead of the network and every answer with data carries a warning that it came from the operator-supplied snapshot, not a live fetch. `import_feed` (the `import asd` CLI command) is the other manual path.
 
 Items are stored in `$CYBERAU_DATA_DIR/asd_advisories.sqlite` (table `advisories`, id `asd:<feed>:<sha1(link)>`) until the shared intel store exists. Rows are not deleted when they leave the rolling RSS window.

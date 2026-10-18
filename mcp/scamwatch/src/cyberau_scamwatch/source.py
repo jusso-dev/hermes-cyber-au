@@ -26,6 +26,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 HOME = "https://www.scamwatch.gov.au/"
@@ -68,7 +69,12 @@ _MONTHS = {
 _ALERT_PREFIX = "/about-us/news-and-alerts/"
 _Limit = Annotated[int, Field(ge=1, le=50)]
 _Url = Annotated[str, Field(pattern=r"^https://www\.scamwatch\.gov\.au/")]
-_PACKAGE = Path(__file__).resolve().parents[2]
+_LABEL = "Scamwatch alerts"
+_OVERRIDE_NOTE = (
+    "served from an operator-supplied Scamwatch snapshot file "
+    "(CYBERAU_SCAMWATCH_SNAPSHOT or CYBERAU_SCAMWATCH_PAGES), not a live fetch"
+)
+_NO_COPY = "offline mode, and there is no cached copy"
 _TRANSPORT = None
 _SLEEP = time.sleep
 
@@ -104,6 +110,8 @@ def scamwatch_list_alerts(limit: _Limit = 10) -> dict:
         warnings.append(warning)
     if not public and not warnings:
         warnings.append("Scamwatch listed no alerts")
+    if public and cache == "snapshot" and os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT"):
+        warnings.append(_OVERRIDE_NOTE)
     return _envelope(public, cache, warnings=tuple(warnings), as_of=_newest(alerts))
 
 
@@ -175,7 +183,12 @@ class _ScamwatchConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            problem = schema_drift(_snapshot_text() or "")
+            # Offline schema check: the operator override, else the HTTP cache. A file
+            # shipped in the package is never read.
+            text = _snapshot_text() or _cached(HOME)[0]
+            if not text:
+                return Probe(self.key, True, "no local copy to check")
+            problem = schema_drift(text)
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -223,7 +236,7 @@ def _fetch_url(url: str, *, force_live: bool) -> tuple[str | None, str, str]:
     mapped = _mapped_page(url)
     pages = os.environ.get("CYBERAU_SCAMWATCH_PAGES")
     if mapped is not None and not force_live and (offline or pages):
-        return mapped, "snapshot", ""
+        return mapped, "snapshot", _OVERRIDE_NOTE
     if offline:
         cached, state = _cached(url)
         if cached is not None:
@@ -231,7 +244,7 @@ def _fetch_url(url: str, *, force_live: bool) -> tuple[str | None, str, str]:
         stored = _stored_body(_canonical(url))
         if stored:
             return stored, "stale", ""
-        return None, "snapshot", "unavailable: Scamwatch has no cached or snapshot copy"
+        return None, "snapshot", _NO_COPY
     cached, state = _cached(url)
     if cached is not None and state == "hit" and not force_live:
         return cached, "hit", ""
@@ -242,10 +255,7 @@ def _offline_home() -> tuple[str | None, str, str]:
     cached, state = _cached(HOME)
     if cached is not None:
         return cached, state, ""
-    shipped = _shipped_home()
-    if shipped:
-        return shipped, "snapshot", ""
-    return None, "snapshot", "unavailable: Scamwatch has no cached or snapshot copy"
+    return None, "snapshot", _NO_COPY
 
 
 def _live(url: str, *, force_live: bool, fallback: bool) -> tuple[str | None, str, str]:
@@ -753,15 +763,11 @@ def _cached(url: str) -> tuple[str | None, str]:
 
 
 def _snapshot_text() -> str:
+    # Only the operator override is read. Nothing shipped in the package is served.
     override = os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT")
-    path = Path(override) if override else _PACKAGE / "data" / "homepage.html"
-    if not path.is_file():
+    if not override:
         return ""
-    return path.read_text(encoding="utf-8")
-
-
-def _shipped_home() -> str:
-    path = _PACKAGE / "data" / "homepage.html"
+    path = Path(override)
     if not path.is_file():
         return ""
     return path.read_text(encoding="utf-8")
@@ -815,9 +821,9 @@ def _looks_blocked(html: str) -> bool:
 
 
 def _unavailable(warning: str) -> str:
-    if warning:
+    if "is unavailable" in warning:
         return warning
-    return "unavailable: Scamwatch could not be fetched"
+    return unavailable(_LABEL, warning or "Scamwatch could not be fetched")
 
 
 def _join(left: str, right: str) -> str:

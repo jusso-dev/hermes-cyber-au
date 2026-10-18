@@ -39,7 +39,9 @@ Nothing in this connector is shared outside the profile, and nothing is exported
 
 Search text is hostile. Snippets and titles are wrapped as untrusted text and capped. They are not written to the intel store. Links in that text are removed. URLs found in a result are never requested.
 
-When `CYBERAU_DARKOWL_SNAPSHOT` points at a local file, the answer comes from that file, carries `cache: snapshot` and a warning, and is neither stored nor turned into exposure findings. A live health check fails when either key is missing.
+Fallback ladder: live search, then the session cache (fresh or stale), then unavailable. There is no shipped snapshot. When a term has no live or cached answer, or a key is missing, the tool returns no rows for it and a "DarkOwl is unavailable" warning.
+
+When `CYBERAU_DARKOWL_SNAPSHOT` points at an operator-supplied file, the answer comes from that file, carries `cache: snapshot` and a warning saying so, and is neither stored nor turned into exposure findings. Test fixtures live under `tests/fixtures/` and are only read by tests and the offline schema-drift check. A live health check fails when either key is missing.
 
 ### Licence
 

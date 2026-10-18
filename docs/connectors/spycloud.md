@@ -222,6 +222,10 @@ Commercial licence. Off by default. Session cache for records. Breach catalogue 
 
 No attribution string is set in the connector source.
 
+## Fallback and fixtures
+
+The fallback ladder is a live fetch, then the connector's own session cache (a stale copy after a failed fetch, or any cached copy in offline mode), then unavailable. No snapshot ships with the connector. When there is no live or cached answer, every tool returns empty data with a warning that the SpyCloud source is unavailable. An operator may point `CYBERAU_SPYCLOUD_WATCHLIST_SNAPSHOT`, `CYBERAU_SPYCLOUD_CATALOG_SNAPSHOT` or `CYBERAU_SPYCLOUD_IDENTIFIERS_SNAPSHOT` at a saved response. Answers from it carry a warning that they came from the operator-supplied snapshot file, not a live fetch, and are never stored as findings. The synthetic test fixtures live under `tests/fixtures/`. Only the offline schema check (`check_schema` without `live`) reads them when no snapshot variable is set, and it never returns them as data. A live health check only counts a fresh upstream answer.
+
 ## Operator guide
 
 Read-only breach and malware exposure for the domains on your SpyCloud watchlist. The connector ships disabled. You bring your own licence in `SPYCLOUD_API_KEY` and set `enabled: true` in your profile `config.yaml`. `hermes profile update` keeps that choice. No licence key is bundled.

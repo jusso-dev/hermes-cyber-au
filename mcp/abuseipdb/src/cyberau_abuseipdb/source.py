@@ -280,10 +280,10 @@ def _fetch(
         if cached and (offline or cache.fresh(cached)):
             state = "hit" if cache.fresh(cached) else "stale"
             return _load(cached.body.decode("utf-8")), state, ""
-        if offline:
-            return _offline_snapshot(endpoint)
     if not force_live and snapshot_env:
         return _offline_snapshot(endpoint)
+    if offline:
+        return None, "snapshot", "AbuseIPDB is unavailable offline and no cached check exists"
 
     secret = (lookup(_ENV_KEY) or "").strip()
     if not secret:
@@ -584,11 +584,8 @@ def _safe(message: str, secret: str | None) -> str:
 
 
 def _snapshot_text(endpoint: str) -> str:
-    override = os.environ.get("CYBERAU_ABUSEIPDB_SNAPSHOT")
-    if override:
-        return Path(override).read_text(encoding="utf-8")
-    name = "check_ip.json" if endpoint == "check" else "check_block.json"
-    return (_PACKAGE / "data" / name).read_text(encoding="utf-8")
+    del endpoint
+    return Path(os.environ["CYBERAU_ABUSEIPDB_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _load(text: str) -> dict | None:

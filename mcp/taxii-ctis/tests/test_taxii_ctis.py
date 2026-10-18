@@ -608,13 +608,14 @@ def test_poll_limit_and_live_health(tmp_path, monkeypatch):
     assert "TAXII_API_ROOT" in missing.detail
 
 
-def test_shipped_snapshot_and_cassettes(vcr_config):
+def test_offline_without_an_operator_snapshot_is_unavailable_and_cassettes_replay(vcr_config):
     os.environ.pop("CYBERAU_TAXII_SNAPSHOT", None)
     os.environ["CYBERAU_OFFLINE"] = "1"
     os.environ.pop("TAXII_API_ROOT", None)
     listed = taxii_list_collections()
     assert listed["cache"] == "snapshot"
-    assert listed["data"][0]["id"] == "synthetic-collection-alpha"
+    assert listed["data"] == []
+    assert "unavailable" in listed["warnings"][0].lower()
     assert "authorization" in vcr_config["filter_headers"]
     import vcr
     from vcr.serialize import deserialize
@@ -815,14 +816,15 @@ def test_indicator_that_expired_after_storage_is_not_a_match(tmp_path, monkeypat
     assert any("expired" in warning for warning in missed["warnings"])
 
 
-def test_shipped_sample_is_labelled_and_never_stored(monkeypatch):
+def test_offline_without_an_operator_snapshot_never_stores_sample_data(monkeypatch):
     monkeypatch.delenv("CYBERAU_TAXII_SNAPSHOT", raising=False)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     listed = taxii_list_collections()
     got = taxii_get_objects()
-    assert got["data"]
-    assert source.SAMPLE_WARNING in listed["warnings"]
-    assert source.SAMPLE_WARNING in got["warnings"]
+    assert listed["data"] == []
+    assert got["data"] == []
+    assert "unavailable" in listed["warnings"][0].lower()
+    assert "unavailable" in got["warnings"][0].lower()
     assert taxii_lookup_indicator("203.0.113.10")["data"] == []
     assert export_stix(override=True)["objects"] == []
 

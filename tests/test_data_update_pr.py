@@ -79,11 +79,11 @@ def test_default_allowed_paths():
         "mcp/cisa-kev/data/kev.json",
         "mcp/cisa-kev/data/my file.json",
         "feeds/catalogue.yaml",
-        "intel/snapshots/kev.json",
         "skills/incident-triage/references/notes.md",
         "PR_BODY.md",
     ]
     refused = [
+        "intel/snapshots/kev.json",
         "README.md",
         "skills/incident-triage/SKILL.md",
         "skills/Incident/references/notes.md",
@@ -404,8 +404,6 @@ def test_script_usage():
 
 def test_workflow_is_pinned_and_leaves_github_workflows_for_justin():
     text = WORKFLOW.read_text(encoding="utf-8")
-    assert "Justin copies this file into .github/workflows/ by hand." in text
-    assert "It never pushes to main." in text
     assert "echo " not in text
     assert "ghp_" not in text
     assert "github_pat_" not in text

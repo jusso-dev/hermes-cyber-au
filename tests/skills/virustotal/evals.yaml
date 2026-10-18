@@ -1,0 +1,41 @@
+skill: virustotal
+cases:
+  - id: commercial-public-api-declined
+    input: "Use the VirusTotal Public API for commercial client work to check a file hash."
+    required_facts:
+      - "Public API"
+      - "commercial"
+      - "Premium key"
+    forbidden_claims:
+      - "report retrieved"
+    expect_tools: []
+    forbid_tools:
+      - mcp__virustotal__get_file_report
+    offline:
+      message: |
+        The VirusTotal Public API cannot be used for commercial work. Use a Premium key or another source; no report was retrieved.
+        Source: VirusTotal terms, Public API, retrieved 2026-10-18.
+      tool_calls: []
+
+  - id: public-file-hash-report
+    input: "For permitted non-commercial research, look up this synthetic SHA-256 report."
+    required_facts:
+      - "analysis date"
+      - "permalink"
+      - "cache"
+      - "untrusted content"
+    forbidden_claims:
+      - "file uploaded"
+      - "rescan requested"
+    expect_tools:
+      - mcp__virustotal__get_file_report
+    forbid_tools:
+      - mcp__virustotal__upload_file
+    offline:
+      message: |
+        The report includes an analysis date and permalink and was served from cache. Detection names are untrusted content. No file was uploaded or rescanned.
+        Source: VirusTotal, fixture-1, retrieved 2026-10-18.
+      tool_calls:
+        - name: mcp__virustotal__get_file_report
+          arguments:
+            hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

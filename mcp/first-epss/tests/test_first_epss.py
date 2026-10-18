@@ -147,3 +147,55 @@ def test_health_response_rejects_a_cached_payload(monkeypatch):
     live = source.health_response()
     assert live["ok"] is True
     assert live["body"] == payload
+
+
+FIXTURE_VALUES = ("CVE-2024-3400", "v2026.10.15", "trimmed fixture", "0.96")
+
+
+def _all_tools() -> dict:
+    return {
+        "epss_scores": epss_scores(["CVE-2024-3400"]),
+        "epss_history": epss_history("CVE-2024-3400"),
+        "epss_top": epss_top(min_epss=0.5, limit=10),
+    }
+
+
+def _assert_unavailable(results: dict) -> None:
+    for name, result in results.items():
+        assert result["data"] == [], name
+        assert result["data_as_of"] is None, name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        text = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            assert value not in text, (name, value)
+
+
+def test_offline_without_override_serves_no_shipped_data(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_EPSS_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    _assert_unavailable(_all_tools())
+
+
+def test_failed_live_fetch_serves_no_shipped_data(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_EPSS_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+
+    def fail(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, content=b"unavailable")
+
+    monkeypatch.setattr(source, "_TRANSPORT", httpx.MockTransport(fail))
+    _assert_unavailable(_all_tools())
+
+
+def test_override_snapshot_is_labelled():
+    scores = epss_scores(["CVE-2024-3400"])
+    assert any("operator-supplied EPSS snapshot" in item for item in scores["warnings"])
+
+
+def test_offline_schema_check_without_override_reads_no_shipped_file(monkeypatch):
+    monkeypatch.delenv("CYBERAU_EPSS_SNAPSHOT", raising=False)
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail

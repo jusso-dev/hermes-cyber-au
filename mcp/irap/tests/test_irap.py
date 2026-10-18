@@ -2,7 +2,9 @@ import asyncio
 import hashlib
 import json
 import random
+import re
 import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
 
 import cyberau_irap.source as source
@@ -19,6 +21,12 @@ from cyberau_irap.source import (
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 ROOT = Path(__file__).resolve().parents[1]
+SHIPPED_DAY = max(
+    date.fromisoformat(
+        re.search(r'data-retrieved="([^"]+)"', path.read_text(encoding="utf-8")).group(1)
+    )
+    for path in (ROOT / "data").glob("*.html")
+)
 TIMELINES = (
     "Define assessment timelines (start / end dates and milestones) "
     "to be agreed with the IRAP assessor."
@@ -37,10 +45,12 @@ def isolated(tmp_path, monkeypatch):
     source._NOW = 0.0
     source._RNG = lambda: 0.0
     source._TRANSPORT = None
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=1)
     yield
     source._NOW = None
     source._RNG = random.random
     source._TRANSPORT = None
+    source._TODAY = None
 
 
 def test_search_and_checklist_quote_the_guide():
@@ -124,11 +134,16 @@ def test_stopword_only_queries_are_not_covered():
 
 def test_snapshot_is_labelled_as_search_index_passages():
     for result in (irap_search_guidance("three quotes"), irap_consumer_checklist()):
-        note = [w for w in result["warnings"] if w.startswith("Shipped snapshot")]
+        note = [w for w in result["warnings"] if w.startswith("Snapshot:")]
         assert len(note) == 1
         assert "search index" in note[0]
-        assert "16 October 2026" in note[0]
         assert "not a full fetch" in note[0]
+        dated = [w for w in result["warnings"] if "operator-supplied" in w]
+        assert dated == [
+            "served the operator-supplied IRAP guidance snapshot dated 2026-10-16 from "
+            "CYBERAU_IRAP_SNAPSHOT, not a live fetch"
+        ]
+        assert result["data_as_of"] == "2026-10-16"
     missed = irap_search_guidance("What dollar amount does ASD charge?")
     assert any("search index" in warning for warning in missed["warnings"])
 
@@ -409,3 +424,57 @@ def test_cassettes_have_no_secrets_and_replay():
             played = httpx.get(uri)
         assert played.status_code == 200
         assert "data-sentence" in played.text
+
+
+def _shipped_sentences() -> list[str]:
+    found = []
+    for path in (ROOT / "data").glob("*.html"):
+        found.extend(re.findall(r'data-sentence="([^"]+)"', path.read_text(encoding="utf-8")))
+    return found
+
+
+def _assert_unavailable(record: dict) -> None:
+    assert not record["data"]
+    assert record["cache"] == "snapshot"
+    assert record["data_as_of"] is None
+    assert any("is unavailable" in item for item in record["warnings"])
+    text = json.dumps(record)
+    for sentence in _shipped_sentences():
+        assert sentence not in text
+
+
+def test_expired_shipped_snapshot_is_unavailable_offline(monkeypatch):
+    monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    for record in (irap_search_guidance("assessment timelines"), irap_consumer_checklist()):
+        _assert_unavailable(record)
+        assert any("181 days old" in item for item in record["warnings"])
+        assert "not covered" not in json.dumps(record["data"])
+
+
+def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("unreachable")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    for record in (irap_search_guidance("assessment timelines"), irap_consumer_checklist()):
+        _assert_unavailable(record)
+        source._NOW = (source._NOW or 0.0) + 100.0
+
+
+def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
+    monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=10)
+    for record in (irap_search_guidance("assessment timelines"), irap_consumer_checklist()):
+        assert record["data"]
+        assert record["cache"] == "snapshot"
+        assert record["data_as_of"] == SHIPPED_DAY.isoformat()
+        notes = [item for item in record["warnings"] if item.startswith("served the shipped")]
+        assert notes == [
+            f"served the shipped IRAP guidance snapshot dated {SHIPPED_DAY.isoformat()}, "
+            "not a live fetch. Check the source before relying on it"
+        ]

@@ -16,10 +16,16 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 COMMUNITY_API = "https://api.greynoise.io/v3/community"
 ATTRIBUTION = "GreyNoise Community. Cite GreyNoise."
 REQUIRED = ("ip", "noise", "riot")
+LABEL = "GreyNoise"
+SNAPSHOT_NOTE = (
+    "served the operator-supplied GreyNoise snapshot file (CYBERAU_GREYNOISE_SNAPSHOT), "
+    "not a live fetch"
+)
 _PACKAGE = Path(__file__).resolve().parents[2]
 _RESPONSE_SCHEMA = _PACKAGE / "schema" / "greynoise_ip.response.json"
 _TRANSPORT = None
@@ -86,6 +92,8 @@ class _GreyNoiseConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_GREYNOISE_SNAPSHOT"):
+                return Probe(self.key, True, "schema ok, no local copy to check")
             payload = _load(_snapshot_text())
             problem = schema_drift(payload or {})
             if problem:
@@ -140,7 +148,7 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
         state = "hit" if cache.fresh(cached) else "stale"
         return _load(cached.body.decode("utf-8")), state, ""
     if offline:
-        return _offline_snapshot(ip)
+        return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     headers = {"key": secret} if secret else None
     client = HttpClient(
@@ -165,33 +173,25 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
             cached = cache.get(cache_key)
             if cached:
                 return _load(cached.body.decode("utf-8")), "stale", ""
+            reason = f"the live fetch failed ({_clean(exc, secret)})"
+            return None, "snapshot", unavailable(LABEL, reason)
         return None, "snapshot", _clean(exc, secret)
     finally:
         client.close()
     if response.status in (401, 403):
-        return (
-            None,
-            response.cache,
-            f"GreyNoise refused the request ({response.status}). Check GREYNOISE_API_KEY.",
-        )
+        reason = f"GreyNoise refused the request ({response.status}). Check GREYNOISE_API_KEY"
+        return None, response.cache, unavailable(LABEL, reason)
     if response.status == 429:
         wait = response.headers.get("retry-after", "").strip()
-        hint = f" Retry after {wait} seconds." if wait.isdigit() else ""
-        return None, response.cache, "GreyNoise rate limit reached." + hint
+        hint = f". Retry after {wait} seconds" if wait.isdigit() else ""
+        return None, response.cache, unavailable(LABEL, "GreyNoise rate limit reached" + hint)
     if response.status >= 400 and response.status != 404:
-        return None, response.cache, f"GreyNoise upstream status {response.status}"
+        reason = f"GreyNoise upstream status {response.status}"
+        return None, response.cache, unavailable(LABEL, reason)
     payload = _load(response.body.decode("utf-8"))
     if payload is None:
         return None, response.cache, "GreyNoise response was not usable"
     return payload, response.cache, ""
-
-
-def _offline_snapshot(ip: str) -> tuple[dict | None, str, str]:
-    unavailable = "GreyNoise is unavailable offline and no cached or snapshot record exists"
-    payload, problem = _read(_PACKAGE / "data" / "community.json")
-    if problem or payload is None or not _same_ip(payload.get("ip"), ip):
-        return None, "snapshot", unavailable
-    return payload, "snapshot", ""
 
 
 def _record(payload: dict) -> dict:
@@ -295,9 +295,8 @@ def _data_dir() -> Path:
 
 
 def _snapshot_text() -> str:
-    snapshot = os.environ.get("CYBERAU_GREYNOISE_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "community.json"
-    return path.read_text(encoding="utf-8")
+    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
+    return Path(os.environ["CYBERAU_GREYNOISE_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _read(path: Path) -> tuple[dict | None, str]:
@@ -328,6 +327,8 @@ def _envelope(
     as_of = None
     if payload and _DATE.fullmatch(str(payload.get("last_seen") or "")):
         as_of = str(payload["last_seen"])
+    if payload is not None and cache == "snapshot":
+        warnings = (*warnings, SNAPSHOT_NOTE)
     return envelope(
         "greynoise",
         data,

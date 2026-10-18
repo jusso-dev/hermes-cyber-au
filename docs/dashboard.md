@@ -17,6 +17,10 @@ Open <http://127.0.0.1:8765/>.
 | `/conversations/<profile>/<session>` | A longer snapshot of one stored conversation |
 | `/sources` | Feed freshness and provenance |
 
+## Conversation history
+
+The dashboard reads the selected profile and sibling profiles in the same Hermes installation. A fresh Cyber AU profile can be empty even when another Hermes installation has conversations. Separate containers or data volumes do not share history, and chats in other applications are not imported. Check the profile path shown on the dashboard before treating an empty page as lost history.
+
 ## Allowed hosts
 
 The dashboard has no login, so it checks who a request is addressed to. A request is served only when its `Host` header names one of:

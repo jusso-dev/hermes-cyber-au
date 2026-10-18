@@ -204,13 +204,14 @@ def test_query_retry_redirect_auth_and_timeout(tmp_path, monkeypatch):
     assert "502" in failed["warnings"][0]
 
 
-def test_offline_cache_and_shipped_snapshot(tmp_path, monkeypatch):
-    monkeypatch.delenv("CYBERAU_CRTSH_SNAPSHOT")
+def test_offline_cache_and_operator_snapshot(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
-    shipped = crtsh_certs("example.com")
-    assert shipped["cache"] == "snapshot"
-    assert shipped["data"]
+    supplied = crtsh_certs("example.com")
+    assert supplied["cache"] == "snapshot"
+    assert supplied["data"]
+    assert any("operator-supplied snapshot" in warning for warning in supplied["warnings"])
+    monkeypatch.delenv("CYBERAU_CRTSH_SNAPSHOT")
     params = source._params("other.example", include_subdomains=False, include_expired=False)
     cache = HttpCache(tmp_path / "http_cache.sqlite")
     key = cache.key("GET", source.API, params, b"", "anonymous")
@@ -423,3 +424,41 @@ def test_live_shaped_rows_without_entry_timestamp(tmp_path, monkeypatch):
     assert [row["serial_number"] for row in found["data"]] == ["01ee", "02ff"]
     assert found["data"][0]["logged_at"] == ""
     assert connector().health(live=True).ok is True
+
+
+# Distinctive values from tests/fixtures/crtsh_example.json that must never reach the agent.
+FIXTURE_VALUES = ("Example CA R3", "abc123", "deadbeef", "1001")
+
+
+def _assert_unavailable(found: dict) -> None:
+    assert found["data"] == []
+    assert any("is unavailable" in warning for warning in found["warnings"])
+    text = json.dumps(found).lower()
+    for value in FIXTURE_VALUES:
+        assert value.lower() not in text
+
+
+def test_offline_without_override_serves_no_fixture(monkeypatch):
+    monkeypatch.delenv("CYBERAU_CRTSH_SNAPSHOT")
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(crtsh_certs("example.com"))
+    _assert_unavailable(crtsh_certs("example.com", include_expired=True))
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail
+
+
+@pytest.mark.parametrize("failure", ["status", "error"])
+def test_failed_live_fetch_without_override_serves_no_fixture(tmp_path, monkeypatch, failure):
+    _live(monkeypatch, tmp_path)
+
+    def broken(request: httpx.Request) -> httpx.Response:
+        if failure == "error":
+            raise httpx.ConnectError("network down", request=request)
+        return httpx.Response(503, content=b"down")
+
+    source._TRANSPORT = httpx.MockTransport(broken)
+    _assert_unavailable(crtsh_certs("example.com"))
+    _assert_unavailable(crtsh_certs("example.com", include_expired=True))
+    probe = connector().health(live=True)
+    assert probe.ok is False

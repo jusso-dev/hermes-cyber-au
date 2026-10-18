@@ -11,6 +11,7 @@ import yaml
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     HealthResult,
@@ -97,7 +98,7 @@ TERMS_NOTICE = (
 )
 _UNCONFIRMED = "The ransomware leak site claim is unconfirmed."
 FIXTURE_WARNING = (
-    "Synthetic fixture data from CYBERAU_FLARE_FIXTURES. This is not a live Flare result."
+    "Served from the operator-supplied CYBERAU_FLARE_FIXTURES files, not a live Flare fetch."
 )
 _HOST = re.compile(
     r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$",
@@ -118,6 +119,12 @@ def _envelope(data, cache: str, warnings: tuple[str, ...] | list[str] = (), urls
         warnings=warnings,
         attribution=get_vendor("flare").terms.attribution,
     )
+
+
+def _unavailable(label: str, warnings) -> tuple[str, ...]:
+    """Empty answer after a failed fetch. Nothing shipped is served in its place."""
+    reason = "; ".join(str(item).rstrip(".") for item in warnings)
+    return (unavailable(label, reason),)
 
 
 def _schema_path(name: str):
@@ -508,7 +515,8 @@ def flare_tenant_exposure(
         limit=limit,
     )
     if fetched.warnings and not fetched.items:
-        return _envelope([], fetched.cache, fetched.warnings, urls=[TENANT_EVENTS_URL])
+        warned = _unavailable("Flare tenant events", fetched.warnings)
+        return _envelope([], fetched.cache, warned, urls=[TENANT_EVENTS_URL])
     watchlist = load_watchlist()
     records, findings = _events(
         fetched,
@@ -549,7 +557,8 @@ def flare_identifier_events(
         limit=100,
     )
     if fetched.warnings and not fetched.items:
-        return _envelope([], fetched.cache, fetched.warnings, urls=[url])
+        warned = _unavailable("Flare identifier events", fetched.warnings)
+        return _envelope([], fetched.cache, warned, urls=[url])
     watchlist = load_watchlist()
     records, findings = _events(
         fetched,
@@ -565,7 +574,8 @@ def flare_identifier_events(
 def flare_identifiers() -> dict:
     fetched = fetch_identifiers()
     if fetched.warnings and not fetched.items:
-        return _envelope({}, fetched.cache, fetched.warnings, urls=[IDENTIFIERS_URL])
+        warned = _unavailable("Flare identifiers", fetched.warnings)
+        return _envelope({}, fetched.cache, warned, urls=[IDENTIFIERS_URL])
     watchlist = load_watchlist()
     rows = []
     for item in fetched.items:
@@ -647,7 +657,8 @@ def flare_domain_credentials(domain: str, since: str | None = None) -> dict:
 
     fetched = fetch_domain_credentials(domain_query(domain, since=since_iso, size=100), gate=gate)
     if fetched.warnings and not fetched.items:
-        return _envelope([], fetched.cache, fetched.warnings, urls=[CREDENTIALS_URL])
+        warned = _unavailable("Flare domain credentials", fetched.warnings)
+        return _envelope([], fetched.cache, warned, urls=[CREDENTIALS_URL])
     rows = aggregate_credentials(fetched.items, since=since)
     return _envelope(rows, fetched.cache, fetched.warnings, urls=[CREDENTIALS_URL])
 
@@ -656,7 +667,9 @@ def flare_quota_status() -> dict:
     view = quota_view()
     warnings = ()
     if view["remaining"] is None:
-        warnings = ("No global search has been recorded yet.",)
+        warnings = (
+            unavailable("Flare Global Search quota", "no global search has been recorded yet"),
+        )
     return _envelope(view, "snapshot", warnings)
 
 
@@ -735,7 +748,9 @@ class FlareConnector(PremiumConnector):
         return HealthResult(configured=True, ok=ok, detail=detail)
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
-        if check_schema:
+        if check_schema and not live:
+            # Offline schema check only. The local copies are compared against the
+            # schema and never returned as Flare data.
             problems = []
             drift = schema_drift(load_schema_sample())
             if drift:

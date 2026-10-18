@@ -1,9 +1,11 @@
-# Proposed: .github/workflows/data-update-pr.yml
 # Reusable workflow. Callers regenerate data into the working tree, upload it as an artifact,
 # and this workflow commits it to a dated branch and opens or updates one pull request.
-# It never pushes to main.
-# Justin copies this file into .github/workflows/ by hand. The token for this repo
-# cannot push files under .github/workflows/.
+# It never pushes to main, and it refuses any path under .github/, so callers never need a
+# token with the workflows permission.
+# Token: set the DATA_PR_TOKEN repository secret to a fine-grained token (or GitHub App token)
+# with Contents and Pull requests write on this repository, so the PR triggers CI. Without it
+# the run falls back to GITHUB_TOKEN, which only works when the repository allows GitHub
+# Actions to create pull requests, and its PRs do not trigger CI.
 # The script is copied to RUNNER_TEMP before the artifact download so the artifact
 # cannot replace the checks that decide what gets committed.
 name: data-update-pr
@@ -33,7 +35,7 @@ on:
         description: Extended regex of paths the caller may change
         required: false
         type: string
-        default: '^(mcp/[a-z0-9-]+/data/|feeds/|intel/snapshots/|skills/[a-z0-9-]+/references/|PR_BODY\.md$)'
+        default: '^(mcp/[a-z0-9-]+/data/|feeds/|skills/[a-z0-9-]+/references/|PR_BODY\.md$)'
     secrets:
       DATA_PR_TOKEN:
         description: Optional fine-grained token or GitHub App token so the PR triggers CI. Falls back to GITHUB_TOKEN.
@@ -47,6 +49,14 @@ jobs:
   pr:
     runs-on: ubuntu-latest
     steps:
+      - name: Say which token opens the pull request
+        env:
+          HAS_DATA_PR_TOKEN: ${{ secrets.DATA_PR_TOKEN != '' }}
+        run: |
+          if [ "$HAS_DATA_PR_TOKEN" != "true" ]; then
+            printf '%s\n' "::warning title=DATA_PR_TOKEN is not set::Falling back to GITHUB_TOKEN. The pull request will not trigger CI, and opening it fails unless the repository allows GitHub Actions to create pull requests."
+          fi
+
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

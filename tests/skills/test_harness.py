@@ -279,3 +279,20 @@ def test_fixture_scrub_flags_secrets_and_real_addresses(tmp_path: Path):
 def test_results_directory_is_gitignored():
     text = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "tests/skills/results/" in text
+
+
+def test_every_shipped_skill_has_an_eval_and_ci_runs_the_full_set():
+    skills = {
+        path.name
+        for path in (ROOT / "skills").iterdir()
+        if path.is_dir() and (path / "SKILL.md").is_file()
+    }
+    evaluated = {path.parent.name for path in harness.discover_eval_files()}
+    assert evaluated == skills
+
+    workflow = CI.read_text(encoding="utf-8")
+    eval_step = workflow.split("Offline skill evals (no model key)", 1)[1].split(
+        "STIX export validates", 1
+    )[0]
+    assert "python tests/skills/harness.py" in eval_step
+    assert "--evals" not in eval_step

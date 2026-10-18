@@ -366,13 +366,15 @@ def test_snapshot_answer_carries_snapshot_warning(tmp_path, monkeypatch):
     for query in ("app passwords", "zzzz-not-a-setting"):
         found = blueprint_search(query)
         assert found["cache"] == "snapshot"
-        warning = next(item for item in found["warnings"] if "shipped Blueprint snapshot" in item)
-        assert "2026-10-17T01:25:00Z" in warning
-        assert "not a live page fetch" in warning
+        warning = next(
+            item for item in found["warnings"] if "operator-supplied ASD Blueprint snapshot" in item
+        )
+        assert "2026-10-17" in warning
+        assert "not a live fetch" in warning
     saved = json.loads(
         (tmp_path / "blueprint-observations.jsonl").read_text(encoding="utf-8").splitlines()[0]
     )
-    assert saved["data_as_of"] == "2026-10-17T01:25:00Z"
+    assert saved["data_as_of"] == "2026-10-17"
 
 
 def test_parser_skips_nav_header_footer_aside_form_and_noscript():

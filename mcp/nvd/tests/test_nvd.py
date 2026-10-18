@@ -159,3 +159,56 @@ def test_v3_severity_is_not_hidden_by_v4(tmp_path, monkeypatch):
 
 def test_nvd_vcr_config_filters_api_key(vcr_config):
     assert "apiKey" in vcr_config["filter_headers"]
+
+
+FIXTURE_VALUES = ("CVE-2024-3400", "trimmed fixture", "Initial Analysis", "2026-10-16T00:00:00")
+
+
+def _all_tools() -> dict:
+    return {
+        "nvd_get_cve": nvd_get_cve("CVE-2024-3400"),
+        "nvd_search": nvd_search(keyword="injection"),
+        "nvd_cve_history": nvd_cve_history("CVE-2024-3400"),
+    }
+
+
+def _assert_unavailable(results: dict) -> None:
+    for name, result in results.items():
+        assert result["data"] in (None, []), name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        text = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            assert value not in text, (name, value)
+
+
+def test_offline_without_override_serves_no_shipped_data(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_NVD_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    _assert_unavailable(_all_tools())
+
+
+def test_failed_live_fetch_serves_no_shipped_data(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_NVD_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.delenv("NVD_API_KEY", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+
+    def fail(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, content=b"unavailable")
+
+    monkeypatch.setattr(nvd_source, "_TRANSPORT", httpx.MockTransport(fail))
+    _assert_unavailable(_all_tools())
+
+
+def test_override_snapshot_is_labelled():
+    record = nvd_get_cve("CVE-2024-3400")
+    assert record["cache"] == "snapshot"
+    assert any("operator-supplied NVD snapshot" in item for item in record["warnings"])
+
+
+def test_offline_schema_check_without_override_reads_no_shipped_file(monkeypatch):
+    monkeypatch.delenv("CYBERAU_NVD_SNAPSHOT", raising=False)
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail

@@ -315,10 +315,9 @@ def test_offline_without_snapshot_uses_cache_or_warns(tmp_path, monkeypatch):
     monkeypatch.delenv("CYBERAU_SCAMWATCH_SNAPSHOT", raising=False)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "none"))
-    monkeypatch.setattr(source, "_shipped_home", lambda: "")
     missing = scamwatch_list_alerts()
     assert missing["cache"] == "snapshot"
-    assert missing["warnings"]
+    assert "is unavailable" in missing["warnings"][0]
     assert missing["data"] == []
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     html = (FIXTURES / "homepage_three_alerts.html").read_text(encoding="utf-8")
@@ -376,3 +375,48 @@ def _input(name: str) -> dict:
 
 def _output(name: str) -> dict:
     return json.loads((SCHEMA / f"{name}.response.json").read_text(encoding="utf-8"))
+
+
+FIXTURE_VALUES = ("Example alert", "Synthetic", "example-parcel-fee", "example-mygov", "Decoy")
+
+
+def _assert_unavailable(result: dict, empty) -> None:
+    assert result["data"] == empty
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    encoded = json.dumps(result["data"]) + json.dumps(result["warnings"])
+    for value in FIXTURE_VALUES:
+        assert value not in encoded
+
+
+def test_offline_without_override_serves_no_shipped_data(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.delenv("CYBERAU_SCAMWATCH_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_SCAMWATCH_PAGES", raising=False)
+    _assert_unavailable(scamwatch_list_alerts(), [])
+    _assert_unavailable(scamwatch_get_alert(PAGE), None)
+    assert connector().health(live=False, check_schema=True).ok is True
+
+
+def test_failed_live_fetch_serves_no_shipped_data(tmp_path, monkeypatch):
+    _live(monkeypatch, tmp_path)
+
+    def fail(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network unreachable")
+
+    source._TRANSPORT = httpx.MockTransport(fail)
+    try:
+        _assert_unavailable(scamwatch_list_alerts(), [])
+        _assert_unavailable(scamwatch_get_alert(PAGE), None)
+    finally:
+        source._TRANSPORT = None
+
+
+def test_override_snapshot_is_marked(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    listed = scamwatch_list_alerts()
+    assert listed["data"]
+    assert any("operator-supplied" in warning for warning in listed["warnings"])
+    monkeypatch.setenv("CYBERAU_SCAMWATCH_PAGES", str(FIXTURES / "pages"))
+    page = scamwatch_get_alert(PAGE)
+    assert any("operator-supplied" in warning for warning in page["warnings"])

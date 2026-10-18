@@ -177,18 +177,26 @@ def test_direct_dependencies_have_upper_bounds():
             assert "<" in spec, f"{path.relative_to(ROOT)}: {spec}"
 
 
-def test_dependabot_covers_uv_and_actions():
+def test_dependabot_covers_uv_actions_and_docker():
     text = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
     data = yaml.safe_load(text)
     updates = data["updates"]
-    by_eco = {item["package-ecosystem"]: item for item in updates}
-    assert set(by_eco) == {"uv", "github-actions"}
-    assert by_eco["uv"]["directory"] == "/mcp"
-    assert by_eco["github-actions"]["directory"] == "/"
-    assert by_eco["uv"]["open-pull-requests-limit"] == 5
-    assert text.count('time: "09:00"') == 2
-    assert text.count('timezone: "Australia/Sydney"') == 2
-    assert text.count('day: "monday"') == 2
+    by_target = {(item["package-ecosystem"], item["directory"]): item for item in updates}
+    assert set(by_target) == {
+        ("uv", "/mcp"),
+        ("github-actions", "/"),
+        ("docker", "/docker"),
+        ("docker", "/dashboard"),
+    }
+    assert len(updates) == len(by_target)
+    assert by_target[("uv", "/mcp")]["open-pull-requests-limit"] == 5
+    for item in updates:
+        assert item["schedule"] == {
+            "interval": "weekly",
+            "time": "09:00",
+            "timezone": "Australia/Sydney",
+            "day": "monday",
+        }
 
 
 def test_docs_recommend_install_ref_over_main():

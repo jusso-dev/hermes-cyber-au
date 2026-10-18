@@ -14,12 +14,16 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 CVE_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 HISTORY_API = "https://services.nvd.nist.gov/rest/json/cvehistory/2.0"
 ATTRIBUTION = "This product uses data from the NVD API but is not endorsed or certified by the NVD."
-_PACKAGE = Path(__file__).resolve().parents[2]
+LABEL = "NVD"
+SNAPSHOT_NOTE = (
+    "served the operator-supplied NVD snapshot file (CYBERAU_NVD_SNAPSHOT), not a live fetch"
+)
 _CVE = re.compile(r"^CVE-\d{4}-\d{4,}$")
 _CveId = Annotated[str, Field(pattern=r"^CVE-\d{4}-\d{4,}$")]
 _TRANSPORT = None
@@ -144,6 +148,8 @@ class _NvdConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_NVD_SNAPSHOT"):
+                return Probe(self.key, True, "schema ok, no local copy to check")
             payload = _load(_snapshot_text())
             problem = schema_drift(payload or {})
             if problem:
@@ -198,7 +204,7 @@ def _fetch(
         state = "hit" if cache.fresh(cached) else "stale"
         return _load(cached.body.decode("utf-8")), state, ""
     if offline:
-        return _load((_PACKAGE / "data" / "cve.json").read_text(encoding="utf-8")), "snapshot", ""
+        return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     secret = lookup("NVD_API_KEY")
     burst = 50 if secret else 5
@@ -232,7 +238,7 @@ def _fetch(
         cached = cache.get(cache_key)
         if cached:
             return _load(cached.body.decode("utf-8")), "stale", ""
-        return None, "snapshot", message
+        return None, "snapshot", unavailable(LABEL, f"the live fetch failed ({message})")
     finally:
         client.close()
     return _load(response.body.decode("utf-8")), response.cache, ""
@@ -287,9 +293,8 @@ def _validate_search(start: str | None, end: str | None, severity: str | None, l
 
 
 def _snapshot_text() -> str:
-    snapshot = os.environ.get("CYBERAU_NVD_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "cve.json"
-    return path.read_text(encoding="utf-8")
+    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
+    return Path(os.environ["CYBERAU_NVD_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _cve(cve: dict) -> dict:
@@ -336,6 +341,8 @@ def _envelope(
     payload: dict | None = None,
     warnings: tuple[str, ...] = (),
 ) -> dict:
+    if payload is not None and cache == "snapshot":
+        warnings = (*warnings, SNAPSHOT_NOTE)
     return envelope(
         "nvd",
         data,

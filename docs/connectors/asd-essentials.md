@@ -6,7 +6,7 @@ Read-only Essential Eight and ASD Essentials connector.
 
 - Key: `asd-essentials`
 - Server: `e8`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://www.cyber.gov.au/publication/what-is-the-essentials
 - Verified: 2026-10-17
 - Egress hosts: www.cyber.gov.au, www.asd.gov.au, raw.githubusercontent.com

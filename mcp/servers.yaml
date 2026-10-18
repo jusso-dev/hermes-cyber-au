@@ -3,17 +3,6 @@
 # blank in the profile .env is rendered with enabled: false.
 # enabled_by_default: false stays disabled even when its variable is set.
 servers:
-  stub:
-    connector: stub
-    args:
-    - serve
-    - stub
-    env: []
-    trust: untrusted
-    lazy: true
-    timeout: 30
-    enabled_by_default: true
-    required_env: []
   kev:
     connector: cisa-kev
     args:
@@ -57,7 +46,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   asd:
     connector: asd-acsc
@@ -81,8 +71,7 @@ servers:
     lazy: true
     timeout: 120
     enabled_by_default: true
-    required_env:
-    - NVD_API_KEY
+    required_env: []
   attack:
     connector: mitre-attack
     args:
@@ -103,7 +92,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   datagov:
     connector: datagov-au
@@ -142,7 +132,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env:
     - ABUSEIPDB_API_KEY
   otx:
@@ -178,7 +169,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   cloudflare_radar:
     connector: cloudflare-radar
@@ -193,6 +185,7 @@ servers:
     lazy: true
     timeout: 120
     enabled_by_default: false
+    off_reason: licence terms
     required_env: []
     docs: docs/connectors/cloudflare-radar.md
   cfscan:
@@ -208,6 +201,7 @@ servers:
     timeout: 120
     supports_parallel_tool_calls: true
     enabled_by_default: false
+    off_reason: licence terms
     default_enabled: false
     required_env:
     - CLOUDFLARE_URLSCAN_API_TOKEN
@@ -221,7 +215,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   ghsa:
     connector: github-advisories
@@ -243,7 +238,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 60
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: requires local setup
     required_env:
     - GITHUB_ADVISORY_TOKEN
   greynoise:
@@ -353,7 +349,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   opencti:
     connector: opencti
@@ -380,7 +377,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   osv:
     connector: osv
@@ -402,7 +400,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   ransomlive:
     connector: ransomware-live
@@ -415,6 +414,7 @@ servers:
     lazy: true
     timeout: 120
     enabled_by_default: false
+    off_reason: licence terms
     default_enabled: false
     required_env: []
   scamwatch:
@@ -426,7 +426,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   internetdb:
     connector: shodan-internetdb
@@ -437,7 +438,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   sigma:
     connector: sigma
@@ -460,7 +462,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: licence terms
     required_env: []
   taxii:
     connector: taxii-ctis
@@ -492,7 +495,8 @@ servers:
     trust: untrusted
     lazy: true
     timeout: 120
-    enabled_by_default: true
+    enabled_by_default: false
+    off_reason: requires local setup
     required_env: []
   virustotal:
     wrap: true

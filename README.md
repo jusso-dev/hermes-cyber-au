@@ -1,5 +1,7 @@
 # hermes-cyber-au
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/jusso-dev/hermes-cyber-au)
+
 A [Hermes Agent](https://github.com/NousResearch/hermes-agent) distribution for Australian cyber security teams.
 
 Install it once and you get an analyst assistant that knows the ISM, the Essential Eight and ASD Essentials, reads ASD's ACSC and AusCERT, pulls in global threat intel, keeps a local intel store, and can write a briefing. It proposes actions. It does not take them.
@@ -37,19 +39,35 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 
 The Hermes details behind this design (manifest fields, what an update replaces, MCP config, plugin hooks, cron rules) are written up with sources in [docs/research/hermes-structure.md](docs/research/hermes-structure.md).
 
-## Install
+## Quick start
 
-`install/install.sh` installs Hermes if needed, then this profile. `main` is not a release tag. For a pinned install, prefer `bash install/install.sh --ref <tag>` with a release tag or commit. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md).
+You need Linux, macOS or WSL2 with `git`, `curl`, Python 3.11 or newer and [uv](https://docs.astral.sh/uv/). On Debian or Ubuntu also install `libatomic1`, which the Hermes installer needs. Hermes 0.22.2 or newer is installed for you if it is missing. No key is needed.
 
 ```bash
-bash install/install.sh
-cp ~/.hermes/profiles/cyber-au/.env.EXAMPLE ~/.hermes/profiles/cyber-au/.env
-hermes -p cyber-au model
-hermes -p cyber-au cyber-au doctor --offline
-hermes -p cyber-au cron resume cyberau-morning-brief
+git clone https://github.com/jusso-dev/hermes-cyber-au.git
+cd hermes-cyber-au
+bash install/install.sh                           # Hermes if missing, the profile, keyless connectors
+hermes -p cyber-au cyber-au doctor --offline      # public connectors show as enabled
+hermes -p cyber-au cyber-au demo triage           # a sourced answer now: no keys, no model, DEMO data
+hermes -p cyber-au model                          # choose a model provider
+hermes -p cyber-au chat                           # then ask one of the prompts below
 ```
 
-Public sources answer with no keys. A free key (abuse.ch, NVD, OTX, GreyNoise, or a Cloudflare Radar read token) raises limits or turns on a source that ships disabled. The profile still needs a model before `chat` or a briefing job can run. The morning briefing, KEV watch, and weekly summary deliver to `origin`, which is the chat you are in, or the job's last output when no channel is configured. `hermes -p cyber-au cron list` shows that output. Details are in [docs/operations/routines.md](docs/operations/routines.md).
+`demo triage` triages a synthetic sample alert offline and labels all of its output as demo. It never reads or writes your real intel store. The full walk-through, with output from a clean Ubuntu 24.04 container, is in [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md). To try it with nothing installed, open the repository in GitHub Codespaces or a VS Code dev container: see [docs/getting-started/codespaces.md](docs/getting-started/codespaces.md).
+
+`main` is not a release tag. For a pinned install use `bash install/install.sh --ref <tag>`. Supply-chain checks are in [docs/operations/supply-chain.md](docs/operations/supply-chain.md). Scheduled jobs arrive paused; `hermes -p cyber-au cron resume cyberau-morning-brief` turns on the 07:30 Sydney briefing. Details are in [docs/operations/routines.md](docs/operations/routines.md).
+
+## What can I ask it?
+
+No keys needed. Run the chat from the root of your checkout so the `examples/` paths resolve. The files in [examples/](examples/) are synthetic demo data.
+
+- Triage the alert in examples/edr-alert.json. It is demo data.
+- Is CVE-2023-4966 in the CISA KEV catalogue, and what is its EPSS score?
+- Which ISM controls cover multi-factor authentication for privileged users? Cite the ISM release.
+- What does Essential Eight Maturity Level 2 require for patching applications?
+- Using examples/incident-timeline.md, could this be an eligible data breach under the NDB scheme, and when does the 30 day assessment window end?
+
+Ten prompts, the skill each one uses and what a good answer looks like are in [docs/getting-started/first-hour.md](docs/getting-started/first-hour.md).
 
 ## Connectors
 
@@ -59,25 +77,25 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Connector | Server | Auth | Default | Docs |
 |---|---|---|---|---|
 | Abuse.ch connector: URLhaus, ThreatFox, MalwareBazaar and Feodo Tracker | `abusech` | `ABUSECH_AUTH_KEY` | off: licence terms | [docs/connectors/abusech.md](docs/connectors/abusech.md) |
-| AbuseIPDB IP reputation. Reporting an address is not implemented | `abuseipdb` | `ABUSEIPDB_API_KEY` | on | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
+| AbuseIPDB IP reputation. Reporting an address is not implemented | `abuseipdb` | `ABUSEIPDB_API_KEY` | off: licence terms | [docs/connectors/abuseipdb.md](docs/connectors/abuseipdb.md) |
 | ASD ACSC alerts, advisories and publications | `asd` | none | on | [docs/connectors/asd-acsc.md](docs/connectors/asd-acsc.md) |
-| ASD Blueprint for Secure Cloud lookup | `blueprint` | none | on | [docs/connectors/asd-blueprint.md](docs/connectors/asd-blueprint.md) |
-| Essential Eight and ASD Essentials connector | `e8` | none | on | [docs/connectors/asd-essentials.md](docs/connectors/asd-essentials.md) |
+| ASD Blueprint for Secure Cloud lookup | `blueprint` | none | off: licence terms | [docs/connectors/asd-blueprint.md](docs/connectors/asd-blueprint.md) |
+| Essential Eight and ASD Essentials connector | `e8` | none | off: licence terms | [docs/connectors/asd-essentials.md](docs/connectors/asd-essentials.md) |
 | Information Security Manual OSCAL catalogue | `ism` | `GITHUB_TOKEN` (optional) | on | [docs/connectors/asd-ism.md](docs/connectors/asd-ism.md) |
 | Australian reporting obligations | `aureg` | none | on | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
-| AusCERT public security bulletins | `auscert` | none | on | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
+| AusCERT public security bulletins | `auscert` | none | off: licence terms | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
 | CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [docs/connectors/cisa-kev.md](docs/connectors/cisa-kev.md) |
-| cloudflare-radar | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
-| Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
+| cloudflare-radar | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
+| Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
 | CrowdStrike Falcon Adversary Intelligence Recon connector | `csrecon` | `FALCON_CLIENT_ID` (optional), `FALCON_CLIENT_SECRET` (optional), `FALCON_BASE_URL` (optional) | off | [docs/connectors/crowdstrike-recon.md](docs/connectors/crowdstrike-recon.md) |
-| Crt.sh certificate transparency search | `crtsh` | none | on | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
+| Crt.sh certificate transparency search | `crtsh` | none | off: licence terms | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
 | CVE Program records from the CVE Services API | `cve` | none | on | [docs/connectors/cve-program.md](docs/connectors/cve-program.md) |
 | DarkOwl Vision search | `darkowl` | none | off | [docs/connectors/darkowl.md](docs/connectors/darkowl.md) |
 | Data.gov.au CKAN catalogue | `datagov` | none | on | [docs/connectors/datagov-au.md](docs/connectors/datagov-au.md) |
 | FIRST EPSS scores | `epss` | none | on | [docs/connectors/first-epss.md](docs/connectors/first-epss.md) |
 | Flare tools. Tenant searches are the default. Nothing here creates identifiers | `flare` | `FLARE_API_KEY` (optional), `FLARE_TENANT_ID` (optional) | off | [docs/connectors/flare.md](docs/connectors/flare.md) |
 | Flashpoint Ignite indicators | `flashpoint` | `FLASHPOINT_API_TOKEN` | off | [docs/connectors/flashpoint.md](docs/connectors/flashpoint.md) |
-| github-advisories | `ghsa` | `GITHUB_ADVISORY_TOKEN` | on | [docs/connectors/github-advisories.md](docs/connectors/github-advisories.md) |
+| github-advisories | `ghsa` | `GITHUB_ADVISORY_TOKEN` | off: requires local setup | [docs/connectors/github-advisories.md](docs/connectors/github-advisories.md) |
 | Google Threat Intelligence Digital Threat Monitoring connector | `gtidtm` | `GTI_API_KEY` | off | [docs/connectors/google-ti-dtm.md](docs/connectors/google-ti-dtm.md) |
 | GreyNoise Community IP classification | `greynoise` | `GREYNOISE_API_KEY` (optional) | on | [docs/connectors/greynoise.md](docs/connectors/greynoise.md) |
 | Read-only, pinned wrap of the official Have I Been Pwned MCP server | `hibp` | `HIBP_API_KEY` | on | [docs/connectors/hibp.md](docs/connectors/hibp.md) |
@@ -88,25 +106,25 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Junction (Microsoft Graph, Defender, Sentinel) | `junction` | none | off | [docs/connectors/junction.md](docs/connectors/junction.md) |
 | MISP connector for a user-supplied instance, including AusMISP | `misp` | `MISP_URL`, `MISP_API_KEY` | off | [docs/connectors/misp.md](docs/connectors/misp.md) |
 | MITRE ATT&CK (STIX 2.1) connector | `attack` | none | on | [docs/connectors/mitre-attack.md](docs/connectors/mitre-attack.md) |
-| NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | none | on | [docs/connectors/ncsc-nz.md](docs/connectors/ncsc-nz.md) |
+| NCSC NZ alerts (formerly CERT NZ) | `ncscnz` | none | off: licence terms | [docs/connectors/ncsc-nz.md](docs/connectors/ncsc-nz.md) |
 | NIST National Vulnerability Database CVE API | `nvd` | `NVD_API_KEY` (optional) | on | [docs/connectors/nvd.md](docs/connectors/nvd.md) |
 | GraphQL client for a user-supplied OpenCTI instance | `opencti` | `OPENCTI_URL`, `OPENCTI_TOKEN` | off | [docs/connectors/opencti.md](docs/connectors/opencti.md) |
-| OpenPhish community feed. Never requests the URL under test | `phish` | none | on | [docs/connectors/openphish.md](docs/connectors/openphish.md) |
+| OpenPhish community feed. Never requests the URL under test | `phish` | none | off: licence terms | [docs/connectors/openphish.md](docs/connectors/openphish.md) |
 | OSV.dev open source vulnerabilities | `osv` | none | on | [docs/connectors/osv.md](docs/connectors/osv.md) |
 | AlienVault OTX indicators and subscribed pulses | `otx` | `OTX_API_KEY` | on | [docs/connectors/otx.md](docs/connectors/otx.md) |
-| PhishTank verified-online phishing URL database | `phish` | `PHISHTANK_APP_KEY` (optional) | not listed | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
-| Status tool for the shared premium interface. It does not call a vendor | `premium` | none | not listed | [docs/connectors/premium.md](docs/connectors/premium.md) |
-| Protective Security Policy Framework quotations | `pspf` | none | on | [docs/connectors/pspf.md](docs/connectors/pspf.md) |
-| Ransomware.live victim claims for Australia | `ransomlive` | `RANSOMWARE_LIVE_API_KEY` (optional) | off | [docs/connectors/ransomware-live.md](docs/connectors/ransomware-live.md) |
+| PhishTank verified-online phishing URL database | `phish` | `PHISHTANK_APP_KEY` (optional) | off: no entry in `mcp/servers.yaml` | [docs/connectors/phishtank.md](docs/connectors/phishtank.md) |
+| Status tool for the shared premium interface. It does not call a vendor | `premium` | none | off: no entry in `mcp/servers.yaml` | [docs/connectors/premium.md](docs/connectors/premium.md) |
+| Protective Security Policy Framework quotations | `pspf` | none | off: licence terms | [docs/connectors/pspf.md](docs/connectors/pspf.md) |
+| Ransomware.live victim claims for Australia | `ransomlive` | `RANSOMWARE_LIVE_API_KEY` (optional) | off: licence terms | [docs/connectors/ransomware-live.md](docs/connectors/ransomware-live.md) |
 | Recorded Future tools on the shared premium client | `recordedfuture`, `recordedfuture_mcp` | `RECORDED_FUTURE_API_TOKEN` (optional), `RECORDED_FUTURE_ORG_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_ID` (optional), `RECORDED_FUTURE_MCP_CLIENT_SECRET` (optional) | off | [docs/connectors/recorded-future.md](docs/connectors/recorded-future.md) |
-| Scamwatch homepage alerts | `scamwatch` | none | on | [docs/connectors/scamwatch.md](docs/connectors/scamwatch.md) |
-| Shodan InternetDB lookups | `internetdb` | none | on | [docs/connectors/shodan-internetdb.md](docs/connectors/shodan-internetdb.md) |
+| Scamwatch homepage alerts | `scamwatch` | none | off: licence terms | [docs/connectors/scamwatch.md](docs/connectors/scamwatch.md) |
+| Shodan InternetDB lookups | `internetdb` | none | off: licence terms | [docs/connectors/shodan-internetdb.md](docs/connectors/shodan-internetdb.md) |
 | SigmaHQ detection rules | `sigma` | `GITHUB_TOKEN` (optional) | on | [docs/connectors/sigma.md](docs/connectors/sigma.md) |
 | SOCRadar company incidents connector | `socradar` | `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID` | off | [docs/connectors/socradar.md](docs/connectors/socradar.md) |
-| Spamhaus DROP, DROPv6 and ASN-DROP lists | `drop` | none | on | [docs/connectors/spamhaus-drop.md](docs/connectors/spamhaus-drop.md) |
+| Spamhaus DROP, DROPv6 and ASN-DROP lists | `drop` | none | off: licence terms | [docs/connectors/spamhaus-drop.md](docs/connectors/spamhaus-drop.md) |
 | SpyCloud Enterprise Protection connector | `spycloud` | `SPYCLOUD_API_KEY` | off | [docs/connectors/spycloud.md](docs/connectors/spycloud.md) |
 | TAXII 2.1 client for a user-supplied API root | `taxii` | `TAXII_USERNAME`, `TAXII_PASSWORD` | off | [docs/connectors/taxii-ctis.md](docs/connectors/taxii-ctis.md) |
-| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` (optional) | on | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
+| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` (optional) | off: requires local setup | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
 | UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [docs/connectors/upguard.md](docs/connectors/upguard.md) |
 | virustotal | `virustotal` | `VTAI_TOKEN` | off: licence terms | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
 <!-- connectors:end -->

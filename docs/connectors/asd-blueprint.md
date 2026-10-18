@@ -6,7 +6,7 @@ Read-only ASD Blueprint for Secure Cloud lookup.
 
 - Key: `asd-blueprint`
 - Server: `blueprint`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://blueprint.asd.gov.au/
 - Verified: 2026-10-17
 - Egress hosts: blueprint.asd.gov.au

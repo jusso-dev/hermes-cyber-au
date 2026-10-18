@@ -6,7 +6,7 @@ Read-only NCSC NZ alerts (formerly CERT NZ).
 
 - Key: `ncsc-nz`
 - Server: `ncscnz`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://www.ncsc.govt.nz/alerts/ HTML list (`?start=N`, 12 alerts a page). No RSS. cert.govt.nz redirects here.
 - Verified: 2026-10-16 the alerts page returned 200 from the build box. On 2026-10-17 live health returned ok from this host over HTTP/1.1 and the first page parsed to 12 alerts. An HTTP/2 GET from this host received a bot-check 403.
 - Egress hosts: www.ncsc.govt.nz
@@ -24,7 +24,6 @@ No credential variable is declared for this connector.
 |---|---|---|---|---|
 | `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_NCSC_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits
@@ -208,6 +207,8 @@ Attribution returned with each result:
 The list selectors the schema check requires are `explore--alert` or `card--alert`, and on each card `card__link`, `card__title` and `card__date`. Alerts whose titles start with `UPDATED:` and share a URL are stored once.
 
 Rows are written to `$CYBERAU_DATA_DIR/ncsc_alerts.sqlite` until the shared intel store exists. A row is kept after it leaves the first page of the list.
+
+The fallback ladder is live fetch, then the HTTP cache (and, for an alert page, the stored alert), then unavailable. When every rung fails the tools return empty data with an "is unavailable" warning. No snapshot ships with the connector, so sample alerts are never served as NCSC NZ data. The synthetic list and alert pages used by the tests live under `tests/fixtures/`. An operator can set `CYBERAU_NCSC_SNAPSHOT` to a directory holding `alerts_page.html` (and an optional `items.json` URL to file map for alert pages). The tools then read those files instead of the network, and every answer with data carries a warning that it came from the operator-supplied snapshot, not a live fetch.
 
 ## Operator guide
 

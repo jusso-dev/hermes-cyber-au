@@ -68,11 +68,14 @@ def test_empty_config_renders_keyless_and_disables_keyed(tmp_path: Path) -> None
         home.resolve() / "mcp" / "egress-allowlist.yaml"
     )
     nvd = loaded["mcp_servers"]["nvd"]
-    assert nvd["enabled"] is False
+    assert nvd.get("enabled", True) is True
     assert nvd["env"]["NVD_API_KEY"] == "${NVD_API_KEY}"
     assert loaded["mcp_servers"]["ism"]["env"]["GITHUB_TOKEN"] == "${GITHUB_TOKEN}"
     assert "enabled" not in loaded["mcp_servers"]["ism"]
-    assert "NVD_API_KEY is unset" in proc.stdout
+    assert "NVD_API_KEY is unset" not in proc.stdout
+    assert "stub" not in loaded["mcp_servers"]
+    for name in ("internetdb", "ghsa", "threatsieve"):
+        assert loaded["mcp_servers"][name]["enabled"] is False
     assert MARKER not in config.read_text(encoding="utf-8")
 
 

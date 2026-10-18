@@ -16,8 +16,13 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 API = "https://crt.sh/"
+LABEL = "crt.sh certificate search"
+SNAPSHOT_NOTE = (
+    "served from the operator-supplied snapshot file in CYBERAU_CRTSH_SNAPSHOT, not a live fetch"
+)
 ATTRIBUTION = "Public certificate transparency data from crt.sh."
 # One request every 5 seconds is the public ceiling. Burst 1 does not run ahead of it.
 RATE = 1 / 5
@@ -79,10 +84,9 @@ def crtsh_certs(
     if skipped:
         warnings.append(f"{skipped} crt.sh rows skipped, serial number was not hexadecimal")
     if problem:
-        warnings.append(problem)
-        return _envelope([], cache, warnings=tuple(warnings))
+        return _envelope([], cache, warnings=(problem, *warnings))
     if not rows and cache == "snapshot":
-        warnings.append("no matching certificate in the offline snapshot or cache")
+        warnings.append("no matching certificate in the operator-supplied snapshot file")
     _persist(host, rows)
     newest = (rows[0]["logged_at"] or None) if rows else None
     return _envelope(rows, cache, warnings=tuple(warnings), data_as_of=newest)
@@ -111,7 +115,8 @@ class _CrtshConnector(Connector):
         if check_schema and not live:
             text = _snapshot_text()
             if text is None:
-                return Probe(self.key, False, "crt.sh snapshot is missing")
+                # No operator snapshot to check. Shipped fixtures are never read here.
+                return Probe(self.key, True, "no local copy to check")
             problem = schema_drift(_load(text))
             if problem:
                 return Probe(self.key, False, problem)
@@ -169,14 +174,17 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str,
             if not isinstance(payload, list):
                 return None, state, "crt.sh cache entry was not usable"
             return payload, state, ""
-    if offline or (snapshot and not force_live):
+    if snapshot and not force_live:
         text = _snapshot_text()
         if text is None:
-            return None, "snapshot", "crt.sh is unavailable and no cache or snapshot matches"
+            reason = "the operator-supplied snapshot file in CYBERAU_CRTSH_SNAPSHOT is missing"
+            return None, "snapshot", unavailable(LABEL, reason)
         payload = _load(text)
         if not isinstance(payload, list):
             return None, "snapshot", "crt.sh payload was not usable"
-        return payload, "snapshot", ""
+        return payload, "snapshot", SNAPSHOT_NOTE
+    if offline:
+        return None, "snapshot", unavailable(LABEL, "offline mode and no cached answer")
     client = HttpClient(
         "crtsh",
         policy=EgressPolicy(_allowlist_path(), "crtsh"),
@@ -417,7 +425,7 @@ def _failed(cache, key: str, force_live: bool, message: str, *, warn_with_cache:
             payload = _decode(cached.body)
             if isinstance(payload, list):
                 return payload, "stale", message if warn_with_cache else ""
-    return None, "snapshot", message
+    return None, "snapshot", unavailable(LABEL, message)
 
 
 def _schema_mismatch(rows: list[dict]) -> str | None:
@@ -438,8 +446,11 @@ def _response_schema() -> dict:
 
 
 def _snapshot_text() -> str | None:
+    # Only an operator-supplied snapshot is read. The package ships no data file.
     snapshot = os.environ.get("CYBERAU_CRTSH_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "certs.json"
+    if not snapshot:
+        return None
+    path = Path(snapshot)
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")

@@ -21,7 +21,6 @@
 version: 1
 
 excluded_servers:
-  stub: Test stub server. It has no upstream data source.
   junction: >-
     Microsoft 365 tool runner started from the operator's own JUNCTION_BIN.
     It reads the operator's tenant, not a threat intel feed, and has no
@@ -114,7 +113,7 @@ feeds:
     format: html
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: P1D
     licence: Not confirmed in SOURCE.md. Published by ASD. Record the ISM release tag and page SHA-256.
     region: AU
@@ -128,7 +127,7 @@ feeds:
     format: html
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: P7D
     licence: Not confirmed. Published by ASD. Not endorsed by ASD.
     region: AU
@@ -162,7 +161,7 @@ feeds:
     format: rss
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT30M
     refresh: auscert
     refresh_supported: true
@@ -196,7 +195,7 @@ feeds:
     format: html
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: P7D
     licence: Not confirmed. Quote short passages with attribution.
     region: AU
@@ -209,7 +208,7 @@ feeds:
     format: html
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT6H
     licence: Not confirmed. Quote short passages with attribution.
     region: AU
@@ -238,7 +237,7 @@ feeds:
     format: html
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT1H
     licence: Not confirmed. Quote short passages only.
     region: global
@@ -338,7 +337,7 @@ feeds:
     format: json
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: P1D
     licence: Not confirmed. Public certificate transparency data from crt.sh.
     region: global
@@ -351,7 +350,7 @@ feeds:
     format: json
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: P1D
     licence: Free for non-commercial use. Commercial use needs a Shodan enterprise licence.
     region: global
@@ -368,7 +367,7 @@ feeds:
     format: json
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: P1D
     licence: Provided free of charge. Formal licence text not confirmed. Attribute Spamhaus.
     region: global
@@ -384,7 +383,7 @@ feeds:
     format: text
     auth: {type: none}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT1H
     licence: Not confirmed. The community feed is a small sample.
     region: global
@@ -444,7 +443,7 @@ feeds:
     format: json
     auth: {type: header, header: Key, env: ABUSEIPDB_API_KEY}
     keyed: true
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT6H
     licence: Not confirmed. Attribute AbuseIPDB.
     region: global
@@ -537,7 +536,7 @@ feeds:
     format: mcp
     auth: {type: passthrough, env: GITHUB_ADVISORY_TOKEN}
     keyed: true
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT0S
     licence: CC BY 4.0. Attribute the GitHub Advisory Database.
     region: global
@@ -603,7 +602,7 @@ feeds:
     format: json
     auth: {type: bearer, env: THREATSIEVE_API_KEY, env_also: [THREATSIEVE_URL], optional: true}
     keyed: false
-    enabled_by_default: true
+    enabled_by_default: false
     poll: PT15M
     licence: ThreatSieve's own licence.
     region: global

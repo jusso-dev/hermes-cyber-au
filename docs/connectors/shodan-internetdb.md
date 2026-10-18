@@ -6,7 +6,7 @@ Read-only Shodan InternetDB lookups.
 
 - Key: `shodan-internetdb`
 - Server: `internetdb`
-- Default: on
+- Default: off: licence terms
 - Upstream: https://internetdb.shodan.io/
 - Verified: 2026-10-17
 - Egress hosts: internetdb.shodan.io

@@ -27,6 +27,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -66,11 +67,13 @@ _OVERVIEW_TIMES = (
     "last_employee_uploaded",
     "last_user_uploaded",
 )
-_UNAVAILABLE = "Hudson Rock is unavailable and no cached or snapshot result is available."
+_UNAVAILABLE = "Hudson Rock could not be reached and there is no cached copy."
 _UNUSABLE = "Hudson Rock payload was not usable."
-_SNAPSHOT = "Served from a snapshot file. This is not a live Hudson Rock result."
+_SNAPSHOT = "Served from the operator-supplied snapshot file, not a live Hudson Rock fetch."
 _SERVED_STALE = "Served from the session cache copy. This is not a live Hudson Rock result."
 _LIVE_STATES = ("miss", "hit")
+_EXPOSURE = "Hudson Rock domain exposure"
+_OVERVIEW = "Hudson Rock domain overview"
 
 _TRANSPORT = None
 _SLEEPER = None
@@ -92,6 +95,7 @@ def reset_client_state() -> None:
 
 
 def schema_fixture_dir() -> Path:
+    """Copies for the offline schema check only. Never served as Hudson Rock data."""
     return _PACKAGE / "tests" / "fixtures"
 
 
@@ -111,7 +115,7 @@ def hudsonrock_domain_exposure(
     if problem:
         return _envelope([], "snapshot", (problem,))
     if lookup(KEY_ENV) is None:
-        return _envelope([], "snapshot", (f"{KEY_ENV} is not set.",))
+        return _envelope([], "snapshot", (unavailable(_EXPOSURE, f"{KEY_ENV} is not set"),))
     watchlist, problem = _load_watchlist()
     if problem or watchlist is None:
         return _envelope([], "snapshot", (problem,))
@@ -128,7 +132,9 @@ def hudsonrock_domain_exposure(
         _search_body(cleaned, selected, since_text),
     )
     if payload is None:
-        return _envelope([], cache if cache == "stale" else "snapshot", (warning,))
+        # No live, cached or operator-supplied data. Never fall back to fixtures.
+        state = cache if cache == "stale" else "snapshot"
+        return _envelope([], state, (unavailable(_EXPOSURE, warning),))
     findings, build_warning = _search_findings(payload, cleaned, selected, since_text)
     warning = warning or build_warning
     if build_warning and not findings:
@@ -150,7 +156,7 @@ def hudsonrock_domain_overview(domain: str) -> dict:
     if cleaned is None:
         return _envelope([], "snapshot", ("domain must be a fully qualified domain name.",))
     if lookup(KEY_ENV) is None:
-        return _envelope([], "snapshot", (f"{KEY_ENV} is not set.",))
+        return _envelope([], "snapshot", (unavailable(_OVERVIEW, f"{KEY_ENV} is not set"),))
     watchlist, problem = _load_watchlist()
     if problem or watchlist is None:
         return _envelope([], "snapshot", (problem,))
@@ -163,7 +169,8 @@ def hudsonrock_domain_overview(domain: str) -> dict:
         )
     payload, cache, warning = _collect(OVERVIEW_URL, {"domains": [cleaned]})
     if payload is None:
-        return _envelope([], cache if cache == "stale" else "snapshot", (warning,))
+        state = cache if cache == "stale" else "snapshot"
+        return _envelope([], state, (unavailable(_OVERVIEW, warning),))
     findings, build_warning = _overview_findings(payload, cleaned)
     warning = warning or build_warning
     if build_warning and not findings:

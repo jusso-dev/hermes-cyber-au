@@ -1,0 +1,62 @@
+[
+  {
+    "skill": "incident-triage",
+    "prompt": "Triage the alert in examples/edr-alert.json. It is demo data.",
+    "keys": "none",
+    "good_answer": "Restates the alert in Sydney time, defangs 203[.]0[.]113[.]45 and update[.]example[.]net, maps the beacon to T1071.001, gives a local severity with reasons, lists containment as Proposal: lines, checks NDB, SOCI and ransomware payment triggers, and ends with Source: lines."
+  },
+  {
+    "skill": "phishing-analysis",
+    "prompt": "Analyse the email in examples/phishing-email.eml. Is it phishing, and what should we look for in our mail logs?",
+    "keys": "none",
+    "good_answer": "Points out the SPF and DMARC failures, the Reply-To mismatch and the lookalike payroll domain, lists the indicators defanged, and suggests log searches. It does not open the link or detonate the attachment."
+  },
+  {
+    "skill": "ioc-enrichment",
+    "prompt": "Enrich the indicators in examples/iocs.txt and give one verdict per indicator with sources.",
+    "keys": "none",
+    "good_answer": "One row per indicator with the sources it checked. The documentation-range addresses and example domains come back with no data, and the answer says so instead of guessing. Keyed sources that are off are named as missing."
+  },
+  {
+    "skill": "vuln-prioritisation",
+    "prompt": "Is CVE-2023-4966 in the CISA KEV catalogue, and what is its EPSS score?",
+    "keys": "none",
+    "good_answer": "Yes or no from the live KEV catalogue with the catalogue version, the EPSS score and percentile with its date, and Source: lines for both."
+  },
+  {
+    "skill": "vuln-prioritisation",
+    "prompt": "Prioritise patching for the assets in examples/assets.csv using KEV, EPSS and the Essential Eight patching timeframes.",
+    "keys": "none",
+    "good_answer": "Ranks the internet-facing NetScaler and Log4j hosts first because their CVEs are in KEV, gives the Essential Eight timeframe for each, and cites KEV, EPSS and the Essential Eight source."
+  },
+  {
+    "skill": "ism-control-lookup",
+    "prompt": "Which ISM controls cover multi-factor authentication for privileged users? Cite the ISM release.",
+    "keys": "none",
+    "good_answer": "Lists control ids and text from the bundled ISM release with its version. If a control is not in the snapshot it says it does not know."
+  },
+  {
+    "skill": "essentials-assessment",
+    "prompt": "What does Essential Eight Maturity Level 2 require for patching applications?",
+    "keys": "none",
+    "good_answer": "Quotes the Maturity Level 2 requirements for patching applications with timeframes, and cites the Essential Eight maturity model release it used."
+  },
+  {
+    "skill": "daily-briefing",
+    "prompt": "Write this morning's briefing from public sources only.",
+    "keys": "none",
+    "good_answer": "A short briefing in Sydney time from ASD's ACSC, AusCERT and new KEV entries, each item with a source line. Sources that could not be reached are listed as missing."
+  },
+  {
+    "skill": "ndb-breach-notification",
+    "prompt": "Using examples/incident-timeline.md, could this be an eligible data breach under the NDB scheme, and when does the 30 day assessment window end?",
+    "keys": "none",
+    "good_answer": "Says personal information (bank details) may have been accessed, that serious harm has not been ruled out, works out the 30 calendar day assessment window from the awareness time in Sydney time, and says it is not legal advice and that a person decides and submits."
+  },
+  {
+    "skill": "soci-reporting",
+    "prompt": "Using examples/incident-timeline.md and examples/assets.csv, does this incident trigger a SOCI Act report?",
+    "keys": "none",
+    "good_answer": "Notes that the SOCI asset SCADA-DEMO-03 shows no sign of access, explains which facts would open the 12 and 72 hour clocks in Sydney time, and does not submit anything."
+  }
+]

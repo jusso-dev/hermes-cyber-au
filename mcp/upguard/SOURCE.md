@@ -7,6 +7,10 @@
 - Verified: 2026-10-17
 - Egress hosts: cyber-risk.upguard.com
 
+## Fallback and fixtures
+
+The fallback ladder is a live fetch, then the connector's own cache (the session cache for breaches and data leaks, the 12 hour cache for typosquats), then unavailable. No snapshot ships with the connector. When the live fetch fails, the key is missing or rejected, or the answer is rate limited or has drifted, and there is no cached copy, every tool returns empty data with a warning that the UpGuard source is unavailable. In offline mode (`CYBERAU_OFFLINE=1`) an operator may point `CYBERAU_UPGUARD_FIXTURES` at a directory of saved responses. Answers from it carry a warning that they came from the operator-supplied snapshot files, not a live fetch. The synthetic test fixtures live under `tests/fixtures/`. Only the offline schema check (`check_schema` without `live`) reads them, and it never returns them as data. A live health check always makes a fresh call.
+
 ## Operator guide
 
 Read-only identity breaches, data leak disclosures and typosquat domains from UpGuard CyberRisk. Paid, bring your own licence. The server ships disabled (`enabled: false`). Bootstrap leaves it disabled even when `UPGUARD_API_KEY` is set. You turn it on with `enabled: true` in your profile `config.yaml`, which `hermes profile update` keeps.

@@ -109,7 +109,7 @@ def test_v2_shape_and_watchlist_match(tmp_path, monkeypatch):
     both = ransom_watchlist_match(days=90)
     assert [row["discovered"] for row in both["data"]] == ["2026-10-15", "2026-09-01"]
     assert both["cache"] == "snapshot"
-    assert "not live data" in both["warnings"][0]
+    assert "operator-supplied" in both["warnings"][0]
     assert not (tmp_path / "ransomlive-metadata.jsonl").exists()
     missing = tmp_path / "missing.yaml"
     monkeypatch.setenv("CYBERAU_ORG_WATCHLIST", str(missing))
@@ -419,18 +419,57 @@ def test_live_failure_without_a_cache_is_unavailable_not_a_snapshot(failure, tmp
     found = ransom_au_victims()
     assert found["data"] == []
     assert found["cache"] == "snapshot"
-    assert "unavailable" in found["warnings"][0]
+    assert "is unavailable" in found["warnings"][0]
     assert not (tmp_path / "ransomlive-metadata.jsonl").exists()
 
 
-def test_offline_snapshot_and_stale_copies_carry_a_warning(tmp_path, monkeypatch):
+def test_no_package_data_ships_with_the_connector():
+    assert not (ROOT / "mcp" / "ransomware-live" / "data").exists()
+
+
+@pytest.mark.parametrize("mode", ["offline", "timeout", "http500", "http429"])
+def test_every_tool_is_unavailable_without_live_or_cached_data(mode, tmp_path, monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if mode == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(429 if mode == "http429" else 500)
+
+    _live(monkeypatch, tmp_path, handler)
+    if mode == "offline":
+        monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.setenv("CYBERAU_ORG_WATCHLIST", str(FIXTURES / "org-exposure.yaml"))
+    results = [
+        ransom_au_victims(),
+        ransom_au_victims(sector="Education"),
+        ransom_watchlist_match(90),
+    ]
+    for result in results:
+        jsonschema.validate(result, ENVELOPE)
+        assert result["data"] == []
+        assert result["cache"] == "snapshot"
+        assert any("is unavailable" in item for item in result["warnings"])
+        text = json.dumps(result)
+        for marker in (
+            "Wattle Sample",
+            "Harbour Sample",
+            "samplegroup",
+            "wattlesample",
+            "2026-10-15",
+        ):
+            assert marker not in text, marker
+    assert not (tmp_path / "ransomlive-metadata.jsonl").exists()
+
+
+def test_offline_without_a_cache_is_unavailable_and_stale_copies_carry_a_warning(
+    tmp_path, monkeypatch
+):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "snap"))
     monkeypatch.delenv("CYBERAU_RANSOMLIVE_SNAPSHOT", raising=False)
     monkeypatch.setenv("CYBERAU_RANSOMLIVE_TODAY", "2026-10-17")
     found = ransom_au_victims()
     assert found["cache"] == "snapshot"
-    assert found["data"]
-    assert "not live data" in found["warnings"][0]
+    assert found["data"] == []
+    assert "is unavailable" in found["warnings"][0]
     assert ransom_watchlist_match()["warnings"]
     cache = HttpCache(tmp_path / "stale" / "http_cache.sqlite")
     cache.put(

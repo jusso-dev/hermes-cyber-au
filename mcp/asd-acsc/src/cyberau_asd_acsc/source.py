@@ -24,6 +24,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 FEEDS = ("alerts", "advisories", "publications", "threats", "news")
@@ -39,7 +40,10 @@ ATTRIBUTION = (
     "Confirm the current licence at https://www.cyber.gov.au/about-us/copyright. "
     "This connector is not endorsed by ASD."
 )
-_PACKAGE = Path(__file__).resolve().parents[2]
+_OVERRIDE = "CYBERAU_ASD_SNAPSHOT"
+_OVERRIDE_NOTE = (
+    "served from the operator-supplied ASD snapshot files in CYBERAU_ASD_SNAPSHOT, not a live fetch"
+)
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _CVE = re.compile(r"CVE-\d{4}-\d{4,}")
 _ATTACK = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
@@ -90,6 +94,8 @@ def asd_list_items(
     rows.sort(key=lambda row: row["published"] or "", reverse=True)
     if not rows and not warnings:
         warnings.append("no ASD items matched")
+    if rows and os.environ.get(_OVERRIDE):
+        warnings.append(_OVERRIDE_NOTE)
     return _envelope(rows[:limit], _merge_cache(caches), urls, newest or None, tuple(warnings))
 
 
@@ -106,7 +112,7 @@ def asd_get_item(url: _Url) -> dict:
             None,
             cache,
             [url],
-            warnings=(warning or "ASD item page was not usable",),
+            warnings=(unavailable("ASD item page", warning or "the page was not usable"),),
         )
     warnings = (warning,) if warning else ()
     return _envelope(_public_page(url, page), cache, [url], warnings=warnings)
@@ -123,7 +129,7 @@ def asd_search(
         return _envelope([], "snapshot", warnings=("since must be YYYY-MM-DD",))
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:
         return _envelope([], "snapshot", warnings=("limit must be between 1 and 50",))
-    _hydrate_snapshots()
+    _hydrate_override()
     needle = f"%{query.strip().lower()}%"
     with _db() as conn:
         found = conn.execute(
@@ -138,6 +144,9 @@ def asd_search(
             (needle, needle, needle, needle, needle, since, since or "", limit),
         ).fetchall()
     if not found:
+        if not _has_items():
+            reason = "no ASD items have been stored from a live poll yet"
+            return _envelope([], "snapshot", warnings=(unavailable("ASD search", reason),))
         return _envelope([], "snapshot", warnings=(f"no stored ASD items match {query!r}",))
     newest = ""
     rows = []
@@ -146,7 +155,8 @@ def asd_search(
         rows.append(_public(item))
         if item["published"] and item["published"] > newest:
             newest = item["published"]
-    return _envelope(rows, "snapshot", [_feed_url("alerts")], newest or None)
+    warnings = (_OVERRIDE_NOTE,) if os.environ.get(_OVERRIDE) else ()
+    return _envelope(rows, "snapshot", [_feed_url("alerts")], newest or None, warnings)
 
 
 def asd_feed_status(feeds: list[_Feed] | None = None) -> dict:
@@ -226,8 +236,12 @@ class _AsdConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            text = _read_snapshot("alerts")
-            problem = schema_drift(text or "")
+            # Offline schema check: read the operator override or the HTTP cache,
+            # never a file shipped in the package.
+            text = _read_snapshot("alerts") or _cached_body(_feed_url("alerts"))
+            if text is None:
+                return Probe(self.key, True, "no local copy to check")
+            problem = schema_drift(text)
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -292,13 +306,7 @@ def _items_for_feed(feed: str) -> tuple[list[dict], str, str, str]:
             note = f"{feed} fetch failed: {problem}"
             _persist(feed, stored, method="stale", warning=note, cache="stale", replace=False)
             return stored, "stale", note, "stale"
-        shipped = _read_snapshot(feed)
-        if shipped and shipped != text and not _feed_problem(shipped):
-            items = _parse_feed(shipped, feed)
-            note = f"{feed} fetch failed: {problem}; served shipped snapshot"
-            _persist(feed, items, method="snapshot", warning=note, cache="snapshot", replace=False)
-            return items, "snapshot", note, "snapshot"
-        return [], "snapshot", problem, method
+        return [], "snapshot", _unavailable(feed, problem), method
     items = _parse_feed(text, feed)
     note = warning
     if not items and not note:
@@ -316,7 +324,7 @@ def _items_for_feed(feed: str) -> tuple[list[dict], str, str, str]:
 
 def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, str]:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    pinned = bool(os.environ.get("CYBERAU_ASD_SNAPSHOT")) and not force_live
+    pinned = bool(os.environ.get(_OVERRIDE)) and not force_live
     if pinned:
         return _pinned_snapshot(feed)
     if offline:
@@ -324,7 +332,9 @@ def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, st
     try:
         _limit(f"asd:feed:{feed}", rate=2 / 600, burst=2)
     except Exception as exc:
-        return None, "snapshot", redact(str(exc)), "direct"
+        if _has_poll(feed):
+            return None, "stale", f"{feed} fetch skipped: {redact(str(exc))}", "stale"
+        return None, "snapshot", _unavailable(feed, redact(str(exc))), "direct"
     direct = _http(_feed_url(feed), _DIRECT, ttl=15 * 60, skip_cache=force_live)
     accepted = _accept_feed(direct)
     if accepted is not None:
@@ -339,15 +349,7 @@ def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, st
     message = _feed_failure(fallback) or _feed_failure(direct) or "fetch failed"
     if _has_poll(feed):
         return None, "stale", f"{feed} fetch failed: {message}", "stale"
-    shipped = _read_snapshot(feed)
-    if shipped and not _feed_problem(shipped):
-        return (
-            shipped,
-            "snapshot",
-            f"{feed} fetch failed: {message}; served shipped snapshot",
-            "snapshot",
-        )
-    return None, "snapshot", f"{feed} fetch failed: {message}", "direct"
+    return None, "snapshot", _unavailable(feed, f"fetch failed: {message}"), "direct"
 
 
 def _pinned_snapshot(feed: str) -> tuple[str | None, str, str, str]:
@@ -366,13 +368,12 @@ def _offline_feed(feed: str) -> tuple[str | None, str, str, str]:
     cached = _cached_feed(feed)
     if cached is not None and not _feed_problem(cached[0]):
         return cached[0], cached[1], f"{feed} served from the HTTP cache", "stale"
-    text = _read_snapshot(feed)
-    if text is None:
-        return None, "snapshot", f"{feed} snapshot is missing", "snapshot"
-    problem = _feed_problem(text)
-    if problem:
-        return None, "snapshot", problem, "snapshot"
-    return text, "snapshot", "", "snapshot"
+    reason = "offline mode, and there is no stored poll or cached copy"
+    return None, "snapshot", _unavailable(feed, reason), "snapshot"
+
+
+def _unavailable(feed: str, reason: str) -> str:
+    return unavailable(f"ASD {feed}", reason)
 
 
 def _accept_feed(result: tuple[str | None, str, str]) -> tuple[str, str, str] | None:
@@ -433,28 +434,24 @@ def _http(url: str, headers: dict, *, ttl: int, skip_cache: bool) -> tuple[str |
 
 def _page(url: str) -> tuple[dict | None, str, str]:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1"
-    mapped = _mapped_html(url)
-    if offline or os.environ.get("CYBERAU_ASD_SNAPSHOT"):
+    if offline or os.environ.get(_OVERRIDE):
         cached = _cached_page(url)
         if cached:
             return _parse_html(cached, url), "stale", "served from the HTTP cache"
         saved = _stored_by_link(url)
         if saved and saved.get("body"):
             return _page_from_row(saved), "stale", "served from the stored page"
+        mapped = _mapped_html(url)
         if mapped is None:
             return None, "snapshot", "no stored page for this URL"
-        return _parse_html(mapped, url), "snapshot", ""
+        return _parse_html(mapped, url), "snapshot", _OVERRIDE_NOTE
     try:
         _limit("asd:item", rate=1 / 5, burst=1)
     except Exception as exc:
-        if mapped is not None:
-            return _parse_html(mapped, url), "stale", redact(str(exc))
         return None, "snapshot", redact(str(exc))
     text, warning, cache = _http(url, _DIRECT, ttl=7 * 86400, skip_cache=False)
     if text is None:
         note = warning or "item fetch failed"
-        if mapped is not None:
-            return _parse_html(mapped, url), "stale", note
         saved = _stored_by_link(url)
         if saved and saved.get("body"):
             return _page_from_row(saved), "stale", note
@@ -741,10 +738,14 @@ def _latest_poll(feed: str) -> list[dict]:
     return [_row_item(row) for row in rows]
 
 
-def _hydrate_snapshots() -> None:
+def _has_items() -> bool:
     with _db() as conn:
-        count = conn.execute("SELECT COUNT(*) AS n FROM advisories").fetchone()["n"]
-    if count:
+        return conn.execute("SELECT 1 FROM advisories LIMIT 1").fetchone() is not None
+
+
+def _hydrate_override() -> None:
+    # Only the operator-supplied CYBERAU_ASD_SNAPSHOT files may seed an empty store.
+    if not os.environ.get(_OVERRIDE) or _has_items():
         return
     for feed in FEEDS:
         text = _read_snapshot(feed)
@@ -800,29 +801,31 @@ def _public_page(url: str, page: dict) -> dict:
 
 
 def _read_snapshot(feed: str) -> str | None:
-    override = os.environ.get("CYBERAU_ASD_SNAPSHOT")
-    root = Path(override) if override else _PACKAGE / "data"
-    path = root / f"{feed}.xml"
+    # Only the operator override is read. Nothing shipped in the package is served.
+    override = os.environ.get(_OVERRIDE)
+    if not override:
+        return None
+    path = Path(override) / f"{feed}.xml"
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")
 
 
 def _mapped_html(url: str) -> str | None:
-    override = os.environ.get("CYBERAU_ASD_SNAPSHOT")
-    roots = [Path(override)] if override else []
-    roots.append(_PACKAGE / "data")
-    for root in roots:
-        index = root / "items.json"
-        if not index.is_file():
-            continue
-        mapping = json.loads(index.read_text(encoding="utf-8"))
-        name = mapping.get(url)
-        if not name:
-            continue
-        page = root / name
-        if page.is_file():
-            return page.read_text(encoding="utf-8")
+    override = os.environ.get(_OVERRIDE)
+    if not override:
+        return None
+    root = Path(override)
+    index = root / "items.json"
+    if not index.is_file():
+        return None
+    mapping = json.loads(index.read_text(encoding="utf-8"))
+    name = mapping.get(url)
+    if not name:
+        return None
+    page = root / name
+    if page.is_file():
+        return page.read_text(encoding="utf-8")
     return None
 
 

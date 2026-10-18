@@ -171,9 +171,10 @@ def test_advertised_schema_and_drift(monkeypatch):
 
 def test_offline_cache_snapshot_and_unavailable(monkeypatch):
     monkeypatch.delenv("CYBERAU_DATAGOV_SNAPSHOT")
-    shipped = datagov_search("cyber")
-    assert shipped["cache"] == "snapshot"
-    assert shipped["data"][0]["id"] == "pkg-cyber-au-example"
+    nothing = datagov_search("cyber")
+    assert nothing["cache"] == "snapshot"
+    assert nothing["data"] == []
+    assert "is unavailable" in nothing["warnings"][0]
     data = Path(os.environ["CYBERAU_DATA_DIR"])
     cache = HttpCache(data / "http_cache.sqlite")
     params = {"q": "cached-only", "rows": "10"}
@@ -408,10 +409,11 @@ def test_stale_and_snapshot_copies_carry_a_warning(monkeypatch):
     assert any("stale" in warning for warning in stale["warnings"])
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(Path(os.environ["CYBERAU_DATA_DIR"]) / "fresh"))
-    shipped = datagov_search("cyber")
-    assert shipped["cache"] == "snapshot"
-    assert "synthetic" in shipped["warnings"][0]
-    assert "not live data" in shipped["warnings"][0]
+    monkeypatch.setenv("CYBERAU_DATAGOV_SNAPSHOT", str(FIXTURES / "package_search.json"))
+    pinned = datagov_search("cyber")
+    assert pinned["cache"] == "snapshot"
+    assert "operator-supplied" in pinned["warnings"][0]
+    assert "not a live result" in pinned["warnings"][0]
 
 
 def test_snapshot_rows_are_not_written_to_the_observation_store():
@@ -497,3 +499,36 @@ def test_live_health_fails_on_every_bad_answer(monkeypatch):
     assert connector().health(live=True).ok is False
     _transport(monkeypatch, lambda _r: httpx.Response(200, content=good))
     assert connector().health(live=True).ok is True
+
+
+FIXTURE_VALUES = ("pkg-cyber-au-example", "pkg-water-example", "Synthetic", "Example Agency")
+
+
+def _assert_unavailable(result: dict, empty) -> None:
+    assert result["data"] == empty
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    encoded = json.dumps(result)
+    for value in FIXTURE_VALUES:
+        assert value not in encoded
+
+
+def _all_tools_unavailable() -> None:
+    _assert_unavailable(datagov_search("cyber"), [])
+    _assert_unavailable(datagov_search("water"), [])
+    _assert_unavailable(datagov_get_package("cyber-au-example-dataset"), None)
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_DATAGOV_SNAPSHOT")
+    _all_tools_unavailable()
+    assert connector().health(live=False, check_schema=True).ok is True
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    _live(monkeypatch)
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network unreachable")
+
+    _transport(monkeypatch, down)
+    _all_tools_unavailable()

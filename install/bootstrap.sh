@@ -1,10 +1,10 @@
 #!/bin/sh
 # Idempotent cyber-au profile bootstrap. Safe to run more than once.
-# hermes cyber-au doctor and the intel store are separate tickets. When those
-# commands are not in this checkout, this script says so and continues.
+# Connector reference data stays in its source directory. The intel store
+# holds observations, advisories and vulnerabilities, not framework controls.
 set -eu
 
-PROFILE=cyber-au
+PROFILE=${CYBERAU_PROFILE:-cyber-au}
 PROFILE_HOME=""
 OFFLINE=0
 NONINTERACTIVE=0
@@ -79,9 +79,6 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -n "${CYBERAU_PROFILE:-}" ]; then
-  PROFILE=$CYBERAU_PROFILE
-fi
 
 unset CDPATH
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -210,7 +207,7 @@ install_plugin_dependencies
 
 if ! hermes -p "$PROFILE" plugins enable cyber-au; then
   if [ ! -f "$PROFILE_HOME/plugins/cyber-au/plugin.yaml" ] && [ ! -f "$REPO_ROOT/plugins/cyber-au/plugin.yaml" ]; then
-    printf '%s\n' "The cyber-au plugin skeleton is not in this checkout. Plugin enable was skipped. That ticket is separate." >&2
+    printf '%s\n' "The cyber-au plugin manifest is missing. Reinstall the distribution." >&2
   else
     die "Could not enable the cyber-au plugin."
   fi
@@ -218,38 +215,31 @@ fi
 
 init_store() {
   bin=$PROFILE_HOME/mcp/.venv/bin/cyberau-mcp
-  if [ ! -x "$bin" ]; then
-    printf '%s\n' "cyberau-mcp store init is not available yet. The intel store is a separate ticket." >&2
-    return 0
+  [ -x "$bin" ] || die "cyberau-mcp is missing. Re-run bootstrap to create the connector environment."
+  "$bin" store init || die "Could not initialise the intel store. Fix the error above and re-run bootstrap."
+  printf '%s\n' "Initialised the intel store."
+  kev=$PROFILE_HOME/mcp/cisa-kev/data/kev.json
+  if [ -f "$kev" ]; then
+    "$bin" store ingest-kev "$kev" || die "Could not load the KEV snapshot. Fix the error above."
+  else
+    printf '%s\n' "No local KEV snapshot. Run cyberau-mcp refresh --sources kev --store when online."
   fi
-  set +e
-  "$bin" store init >/dev/null 2>&1
-  status=$?
-  set -e
-  if [ "$status" -eq 0 ]; then
-    printf '%s\n' "Initialised the intel store."
-    load_snapshot kev "$PROFILE_HOME/mcp/cisa-kev/data/kev.json"
-    load_snapshot ism "$PROFILE_HOME/mcp/asd-ism/data"
-    load_snapshot e8 "$PROFILE_HOME/mcp/asd-e8/data"
-    load_snapshot attack "$PROFILE_HOME/mcp/attack/data"
-    return 0
-  fi
-  printf '%s\n' "cyberau-mcp store init is not available yet. The intel store is a separate ticket." >&2
+  require_reference "$PROFILE_HOME/mcp/asd-ism/data" 'releases.json' ISM
+  require_reference "$PROFILE_HOME/mcp/asd-essentials/data" 'e8-maturity-*.json' 'Essential Eight maturity'
+  require_reference "$PROFILE_HOME/mcp/asd-essentials/data" 'essentials-*.json' 'Essential Eight guidance'
+  printf '%s\n' "ISM and Essential Eight reference files are read by their connectors, not imported as threat intel."
+  printf '%s\n' "ATT&CK is fetched by its connector when online; bootstrap does not import an ATT&CK snapshot."
 }
 
-load_snapshot() {
-  name=$1
-  path=$2
-  if [ ! -e "$path" ]; then
-    return 0
-  fi
-  set +e
-  "$PROFILE_HOME/mcp/.venv/bin/cyberau-mcp" store load "$name" "$path" >/dev/null 2>&1
-  status=$?
-  set -e
-  if [ "$status" -ne 0 ]; then
-    printf '%s\n' "cyberau-mcp store load is not available for ${name}. Skipping." >&2
-  fi
+require_reference() {
+  directory=$1
+  pattern=$2
+  label=$3
+  [ -d "$directory" ] || die "$label reference directory is missing: $directory. Reinstall the distribution."
+  for reference in "$directory"/$pattern; do
+    [ ! -f "$reference" ] || return 0
+  done
+  die "$label reference files are missing in $directory. Reinstall the distribution."
 }
 
 init_store
@@ -261,7 +251,7 @@ run_doctor() {
     set -e
     return 0
   fi
-  printf '%s\n' "hermes cyber-au doctor is not in this checkout. The doctor check is a separate ticket." >&2
+  printf '%s\n' "cyber-au doctor is missing. Reinstall the distribution to restore offline diagnostics." >&2
 }
 
 run_doctor

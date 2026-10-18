@@ -166,7 +166,9 @@ def test_url_hosts_are_allowlisted_for_the_connector(feeds, allowlist):
 def test_refresh_keys_match_cyberau_mcp_refresh(feeds):
     keyed = {feed["refresh"]: feed for feed in feeds if "refresh" in feed}
     assert len(keyed) == len([feed for feed in feeds if "refresh" in feed])
-    assert sorted(keyed) == sorted(refresh.SUPPORTED + refresh.NOT_YET)
+    assert sorted(key for key, feed in keyed.items() if feed["refresh_supported"]) == sorted(
+        refresh.SUPPORTED
+    )
     for key, feed in keyed.items():
         assert feed["refresh_supported"] is (key in refresh.SUPPORTED), key
     for feed in feeds:
@@ -185,3 +187,18 @@ def test_catalogue_holds_no_secret_values():
     assert not re.search(
         r"(?i)(?:key|token|secret|password)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{20,}", text
     )
+
+
+def test_default_sources_have_confirmed_commercial_terms(feeds):
+    for feed in feeds:
+        if feed["enabled_by_default"]:
+            assert "not confirmed" not in feed["licence"].lower(), feed["id"]
+            assert "non-commercial" not in feed["licence"].lower(), feed["id"]
+
+
+def test_terms_reference_covers_every_feed(feeds):
+    text = (ROOT / "docs/reference/data-sources.md").read_text()
+    for feed in feeds:
+        assert f"({feed['id']})" in text
+        assert feed["licence"] in text
+    assert "not in this checkout" not in text

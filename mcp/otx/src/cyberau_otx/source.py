@@ -20,6 +20,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 API_ROOT = "https://otx.alienvault.com/api/v1"
@@ -53,6 +54,10 @@ _SECTION_MARKERS = {
     "passive_dns": ("passive_dns",),
 }
 _PACKAGE = Path(__file__).resolve().parents[2]
+_LABEL = "OTX"
+_SNAPSHOT_NOTE = (
+    "Served from the operator-supplied snapshot file (CYBERAU_OTX_SNAPSHOT), not a live OTX call"
+)
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _UTC = ZoneInfo("UTC")
 _TRANSPORT = None
@@ -81,14 +86,18 @@ def otx_indicator(
     found = payload.get("indicator")
     if cache == "snapshot":
         if section != "general" or not _same_indicator(kind, found, value):
-            note = "no matching indicator in the offline snapshot or cache"
+            note = "no matching indicator in the operator-supplied snapshot file"
             return _envelope(None, cache, [url], warnings=(note,))
     elif (section == "general" or found is not None) and not _same_indicator(kind, found, value):
         return _envelope(None, cache, [url], warnings=("OTX returned a different indicator",))
     record = _indicator_record(payload, kind, value, section)
-    if cache != "snapshot":
+    notes: tuple[str, ...] = ()
+    if cache == "snapshot":
+        notes = (_SNAPSHOT_NOTE,)
+    else:
         _persist([_indicator_observation(record)])
-    return _envelope(record, cache, [url], _latest([item["modified"] for item in record["pulses"]]))
+    latest = _latest([item["modified"] for item in record["pulses"]])
+    return _envelope(record, cache, [url], latest, notes)
 
 
 def otx_pulses(modified_since: _Date | None = None, limit: _Limit = 20) -> dict:
@@ -105,7 +114,9 @@ def otx_pulses(modified_since: _Date | None = None, limit: _Limit = 20) -> dict:
     if warning and not rows:
         return _envelope([], cache, [PULSES_URL], warnings=(warning,))
     warnings = (warning,) if warning else ()
-    if cache != "snapshot":
+    if cache == "snapshot":
+        warnings = (*warnings, _SNAPSHOT_NOTE)
+    else:
         _persist([_pulse_observation(row) for row in rows])
     return _envelope(
         rows, cache, [PULSES_URL], _latest([row["modified"] for row in rows]), warnings
@@ -130,6 +141,9 @@ class _OtxConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            # Only an operator-supplied snapshot is checked offline. Test fixtures are not.
+            if not os.environ.get("CYBERAU_OTX_SNAPSHOT"):
+                return Probe(self.key, True, "no local copy to check")
             payload = _load(_snapshot_text() or "")
             problem = schema_drift(payload or {})
             if problem:
@@ -345,7 +359,11 @@ def _fetch(
     if snapshot and not force_live:
         text = _read_text(Path(snapshot))
         if text is None:
-            return None, "snapshot", "OTX is unavailable offline"
+            return (
+                None,
+                "snapshot",
+                unavailable(_LABEL, "the operator-supplied snapshot is missing"),
+            )
         return _load(text), "snapshot", ""
     data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-otx"))
     cache = HttpCache(data_dir / "http_cache.sqlite")
@@ -357,13 +375,9 @@ def _fetch(
         state = "hit" if cache.fresh(cached) else "stale"
         return _load(cached.body.decode("utf-8")), state, ""
     if offline:
-        packaged = _packaged_snapshot(url)
-        text = _read_text(packaged)
-        if text is None:
-            return None, "snapshot", "OTX is unavailable offline"
-        return _load(text), "snapshot", ""
+        return None, "snapshot", unavailable(_LABEL, "offline and no cached copy is stored")
     if not secret:
-        return None, "snapshot", "OTX_API_KEY is not set"
+        return None, "snapshot", unavailable(_LABEL, "OTX_API_KEY is not set")
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = HttpClient(
         "otx",
@@ -390,16 +404,22 @@ def _fetch(
             stale = cache.get(cache_key)
             if stale:
                 return _load(stale.body.decode("utf-8")), "stale", ""
-            return None, "snapshot", _safe(exc, secret)
+            return None, "snapshot", unavailable(_LABEL, _safe(exc, secret))
     finally:
         client.close()
     if response.status in (401, 403):
-        return None, "snapshot", f"OTX returned {response.status}. Check OTX_API_KEY."
+        return (
+            None,
+            "snapshot",
+            unavailable(_LABEL, f"OTX returned {response.status}. Check OTX_API_KEY"),
+        )
     if response.status == 429:
         stale = None if force_live else cache.get(cache_key)
         if stale:
             return _load(stale.body.decode("utf-8")), "stale", ""
-        return None, "snapshot", "OTX returned 429 after backing off"
+        return None, "snapshot", unavailable(_LABEL, "OTX returned 429 after backing off")
+    if response.status >= 500:
+        return None, "snapshot", unavailable(_LABEL, f"OTX returned {response.status}")
     if response.status >= 400:
         return None, "snapshot", f"OTX returned {response.status}"
     try:
@@ -726,15 +746,9 @@ def _response_problem(name: str, record: dict) -> str | None:
 
 
 def _snapshot_text() -> str | None:
+    """Read the operator-supplied snapshot. Nothing shipped in the package is ever read."""
     snapshot = os.environ.get("CYBERAU_OTX_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "indicator_ipv4_general.json"
-    return _read_text(path)
-
-
-def _packaged_snapshot(url: str) -> Path:
-    if "/pulses/" in url:
-        return _PACKAGE / "data" / "pulses_subscribed_page1.json"
-    return _PACKAGE / "data" / "indicator_ipv4_general.json"
+    return _read_text(Path(snapshot)) if snapshot else None
 
 
 def _read_text(path: Path) -> str | None:

@@ -23,8 +23,15 @@ from cyberau_spamhaus_drop.source import (
     schema_drift,
 )
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+PACKAGE = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+_SNAPSHOT_FILES = {
+    "drop_v4.json": "drop_v4_head.json",
+    "drop_v6.json": "drop_v6_head.json",
+    "asndrop.json": "asndrop_head.json",
+}
+# Values only the synthetic fixtures carry, so a leak into a served envelope shows up.
+_FIXTURE_VALUES = ("SBL100001", "SBL100002", "SBL100003", "DOCUMENTATION-AS", "example.net")
 _BODIES = {
     DROP_V4: (FIXTURES / "drop_v4_head.json").read_bytes(),
     DROP_V6: (FIXTURES / "drop_v6_head.json").read_bytes(),
@@ -34,9 +41,13 @@ _BODIES = {
 
 @pytest.fixture(autouse=True)
 def isolated(tmp_path, monkeypatch):
+    snapshot = tmp_path / "operator-snapshot"
+    snapshot.mkdir()
+    for name, fixture in _SNAPSHOT_FILES.items():
+        (snapshot / name).write_bytes((FIXTURES / fixture).read_bytes())
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
-    monkeypatch.setenv("CYBERAU_DROP_SNAPSHOT", str(DATA))
+    monkeypatch.setenv("CYBERAU_DROP_SNAPSHOT", str(snapshot))
     source._TRANSPORT = None
     source._SLEEP = lambda _seconds: None
     source._RESOLVER = lambda _host: [ip_address("1.1.1.1")]
@@ -92,10 +103,51 @@ def test_offline_hits_misses_and_attribution():
     assert drop_check_asn(True)["warnings"]
 
 
-def test_head_fixtures_match_the_snapshot():
-    assert (FIXTURES / "drop_v4_head.json").read_bytes() == (DATA / "drop_v4.json").read_bytes()
-    assert (FIXTURES / "drop_v6_head.json").read_bytes() == (DATA / "drop_v6.json").read_bytes()
-    assert (FIXTURES / "asndrop_head.json").read_bytes() == (DATA / "asndrop.json").read_bytes()
+def test_operator_snapshot_is_labelled():
+    served = drop_check_ip("203.0.113.10")
+    assert served["data"]
+    assert any("operator-supplied" in warning for warning in served["warnings"])
+
+
+def test_no_data_dir_is_shipped():
+    assert not (PACKAGE / "data").exists()
+
+
+def _assert_unavailable(envelopes):
+    for result in envelopes:
+        assert all(row.get("entries", 0) == 0 for row in result["data"])
+        if result is not envelopes[-1]:
+            assert result["data"] == []
+        assert any("is unavailable" in warning for warning in result["warnings"])
+        text = json.dumps(result)
+        for value in _FIXTURE_VALUES:
+            assert value not in text
+
+
+def _every_tool():
+    return [drop_check_ip("203.0.113.10"), drop_check_asn(64496), drop_list_status()]
+
+
+def test_offline_without_override_serves_nothing(monkeypatch):
+    monkeypatch.delenv("CYBERAU_DROP_SNAPSHOT")
+    _assert_unavailable(_every_tool())
+
+
+def test_failed_live_fetch_without_override_serves_nothing(monkeypatch):
+    _online(monkeypatch)
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    _assert_unavailable(_every_tool())
+
+
+def test_offline_schema_check_without_local_copy(monkeypatch):
+    monkeypatch.delenv("CYBERAU_DROP_SNAPSHOT")
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail
 
 
 def test_empty_and_malformed_payloads_warn(monkeypatch, tmp_path):
@@ -116,7 +168,7 @@ def test_empty_and_malformed_payloads_warn(monkeypatch, tmp_path):
 
 def test_schema_drift_fails_health(tmp_path, monkeypatch):
     assert schema_drift((FIXTURES / "drop_v4_drift.json").read_text(encoding="utf-8"))
-    assert schema_drift((DATA / "drop_v4.json").read_text(encoding="utf-8")) is None
+    assert schema_drift((FIXTURES / "drop_v4_head.json").read_text(encoding="utf-8")) is None
     ok = connector().health(live=False, check_schema=True)
     drift = tmp_path / "drift"
     drift.mkdir()
@@ -124,8 +176,8 @@ def test_schema_drift_fails_health(tmp_path, monkeypatch):
         (FIXTURES / "drop_v4_drift.json").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
-    (drift / "drop_v6.json").write_bytes((DATA / "drop_v6.json").read_bytes())
-    (drift / "asndrop.json").write_bytes((DATA / "asndrop.json").read_bytes())
+    (drift / "drop_v6.json").write_bytes((FIXTURES / "drop_v6_head.json").read_bytes())
+    (drift / "asndrop.json").write_bytes((FIXTURES / "asndrop_head.json").read_bytes())
     monkeypatch.setenv("CYBERAU_DROP_SNAPSHOT", str(drift))
     failed = connector().health(live=False, check_schema=True)
     assert ok.ok is True
@@ -229,11 +281,9 @@ def test_live_health_and_response_schemas(monkeypatch):
     listed = drop_check_ip("203.0.113.10")
     asn = drop_check_asn(64496)
     status = drop_list_status()
-    ip_schema = json.loads((DATA.parent / "schema" / "drop_check_ip.response.json").read_text())
-    asn_schema = json.loads((DATA.parent / "schema" / "drop_check_asn.response.json").read_text())
-    status_schema = json.loads(
-        (DATA.parent / "schema" / "drop_list_status.response.json").read_text()
-    )
+    ip_schema = json.loads((PACKAGE / "schema" / "drop_check_ip.response.json").read_text())
+    asn_schema = json.loads((PACKAGE / "schema" / "drop_check_asn.response.json").read_text())
+    status_schema = json.loads((PACKAGE / "schema" / "drop_list_status.response.json").read_text())
     jsonschema.validate(listed["data"][0], ip_schema)
     jsonschema.validate(asn["data"][0], asn_schema)
     jsonschema.validate(status["data"][0], status_schema)
@@ -281,7 +331,9 @@ def test_hostile_free_text_is_wrapped(tmp_path, monkeypatch):
     row = drop_check_ip("198.51.100.5")["data"][0]
     assert row["sbl_id"].startswith("<<untrusted source=spamhaus-drop>>")
     assert drop_check_asn(64496)["data"][0]["cc"].startswith("<<untrusted source=spamhaus-drop>>")
-    assert drop_check_asn(64496)["warnings"] == []
+    warnings = drop_check_asn(64496)["warnings"]
+    assert len(warnings) == 1
+    assert "operator-supplied" in warnings[0]
 
 
 def test_redirect_host_in_warning_is_wrapped(monkeypatch, tmp_path):

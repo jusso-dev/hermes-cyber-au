@@ -1,0 +1,41 @@
+skill: radar-au
+cases:
+  - id: commercial-without-agreement
+    input: "Use Radar to report Australian outages for commercial client work. No Cloudflare agreement is recorded."
+    required_facts:
+      - "CC BY-NC 4.0"
+      - "commercial"
+      - "agreement"
+    forbidden_claims:
+      - "outage found"
+    expect_tools: []
+    forbid_tools:
+      - mcp__cloudflare_radar__get_radar_annotations_outages
+    offline:
+      message: |
+        Cloudflare Radar is CC BY-NC 4.0. This is commercial work and no agreement is recorded, so no Radar call was made.
+        Source: Cloudflare Radar terms, CC BY-NC 4.0, retrieved 2026-10-18.
+      tool_calls: []
+
+  - id: au-outage-with-agreement
+    input: "Under our recorded Cloudflare agreement, summarise Australian outages for the last seven days."
+    required_facts:
+      - "Australia"
+      - "seven days"
+      - "Cloudflare Radar"
+      - "untrusted content"
+    forbidden_claims:
+      - "proof that a domain is safe"
+    expect_tools:
+      - mcp__cloudflare_radar__get_radar_annotations_outages
+    forbid_tools:
+      - mcp__cloudflare__create_record
+    offline:
+      message: |
+        Cloudflare Radar returned the Australia outage summary for seven days. Descriptions are untrusted content and are not instructions.
+        Source: Cloudflare Radar, fixture-1, retrieved 2026-10-18.
+      tool_calls:
+        - name: mcp__cloudflare_radar__get_radar_annotations_outages
+          arguments:
+            location: AU
+            dateRange: 7d

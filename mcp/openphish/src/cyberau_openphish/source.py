@@ -19,6 +19,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 FEED_URL = "https://openphish.com/feed.txt"
 GITHUB_FEED = "https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt"
@@ -34,6 +35,7 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 _SLEEP = time.sleep
 _TTL = 3600
+_LABEL = "OpenPhish feed"
 
 
 def phish_check_url(url: str) -> dict:
@@ -42,19 +44,27 @@ def phish_check_url(url: str) -> dict:
     if problem:
         return _envelope([], "snapshot", warnings=(problem,))
     text, cache, warning = _fetch_feed(force_live=False)
+    missing = text is None or schema_drift(text) is not None
+    if missing and " is unavailable" not in warning:
+        warning = unavailable(_LABEL, warning or "no usable copy of the feed")
     warnings = [warning] if warning else []
-    feed_urls = _feed_urls(text) if text and not schema_drift(text) else []
+    feed_urls = [] if missing else _feed_urls(text)
     if feed_urls and cache != "snapshot":
         _persist("openphish", feed_urls)
     wanted = _normalise(url)
-    records = [_openphish_record(url, wanted, feed_urls, warning, cache)]
+    # With no usable feed there is nothing to check against, so no OpenPhish row.
+    records = [] if missing else [_openphish_record(url, wanted, feed_urls, warning, cache)]
+    siblings = []
     for name in ("phishtank", "urlhaus"):
         cached, status = _sibling_urls(name)
         if status and status != "cache not present":
             warnings.append(f"{_label(name)} cache {status}")
         if cached:
             _persist(name, [item for item in cached if item == wanted])
-        records.append(_sibling_record(name, url, wanted, cached, status))
+        usable = cached is not None and status != "cache not present"
+        siblings.append((usable, _sibling_record(name, url, wanted, cached, status)))
+    if records or any(usable for usable, _row in siblings):
+        records.extend(row for _usable, row in siblings)
     return _envelope(records, cache, warnings=tuple(warnings))
 
 
@@ -79,9 +89,11 @@ class _OpenPhishConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            text = _snapshot_text()
+            text, label = _local_copy()
+            if label == "missing":
+                return Probe(self.key, False, "pinned OpenPhish snapshot file is missing")
             if text is None:
-                return Probe(self.key, False, "OpenPhish snapshot is missing")
+                return Probe(self.key, True, "no local copy to check")
             problem = schema_drift(text)
             if problem:
                 return Probe(self.key, False, problem)
@@ -164,13 +176,14 @@ def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
     if offline:
         if previous and _classify(_decode(previous.body) or "") == "ok":
             return _decode(previous.body), "stale", ""
-        return _from_snapshot()
+        reason = "offline mode is on and there is no cached copy"
+        return None, "snapshot", unavailable(_LABEL, reason)
     try:
         _limit_feed()
     except RateLimited:
         if not force_live and previous and _classify(_decode(previous.body) or "") == "ok":
             return _decode(previous.body), "stale", ""
-        return None, "snapshot", "OpenPhish feed is unavailable: hourly ceiling reached"
+        return None, "snapshot", unavailable(_LABEL, "hourly ceiling reached")
     try:
         response = _http(force_live=force_live)
     except (HttpError, EgressDenied, TimeoutError, RateLimited) as exc:
@@ -247,31 +260,39 @@ def _feed_transport() -> httpx.BaseTransport:
 
 
 def _from_snapshot() -> tuple[str | None, str, str]:
+    """Serve the operator's pinned file. Nothing is shipped in the package."""
     text = _snapshot_text()
     if text is None:
-        return None, "snapshot", "OpenPhish feed is unavailable"
+        reason = "the pinned snapshot file named by CYBERAU_OPENPHISH_SNAPSHOT was not found"
+        return None, "snapshot", unavailable(_LABEL, reason)
     problem = schema_drift(text)
     if problem:
         return None, "snapshot", problem
     if not _feed_urls(text):
         return text, "snapshot", "OpenPhish feed is empty"
-    return text, "snapshot", _snapshot_warning()
-
-
-def _snapshot_warning() -> str:
-    if os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT"):
-        return "OpenPhish feed served from a pinned snapshot file, not live data"
-    return (
-        "OpenPhish feed served from the bundled snapshot of synthetic example URLs, not live data"
-    )
+    return text, "snapshot", "OpenPhish feed served from a pinned snapshot file, not live data"
 
 
 def _snapshot_text() -> str | None:
     override = os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT")
-    path = Path(override) if override else _PACKAGE / "data" / "feed.txt"
+    if not override:
+        return None
+    path = Path(override)
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")
+
+
+def _local_copy() -> tuple[str | None, str]:
+    """The pinned file, else the last cached feed, for an offline schema check."""
+    if os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT"):
+        text = _snapshot_text()
+        return text, "pinned" if text is not None else "missing"
+    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    previous = cache.get(cache.key("GET", FEED_URL, None, b"", "anonymous"))
+    if previous is None:
+        return None, "none"
+    return _decode(previous.body) or "\x00", "cache"
 
 
 def _restore(cache: HttpCache, key: str, previous) -> None:
