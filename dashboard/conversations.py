@@ -244,6 +244,11 @@ def list_sessions(profile: Path) -> tuple[list[dict], str | None]:
         conn.close()
 
 
+def session_count(profile: Path) -> int:
+    """Number of visible session snapshots the dashboard can show."""
+    return sum(len(list_sessions(root)[0]) for root in profile_roots(profile))
+
+
 def find_session(profile: Path, session_id: str) -> dict | None:
     if not SESSION_ID_RE.fullmatch(session_id):
         return None

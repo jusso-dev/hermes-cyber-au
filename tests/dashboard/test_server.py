@@ -339,6 +339,7 @@ def test_sibling_role_snapshot(tmp_path: Path) -> None:
     assert "Claimed the item" in body
     assert ">watcher<" in body
     assert ">analyst<" in body
+    assert "2 stored chat session snapshot(s) found." in body
 
 
 def test_no_session_store_says_so(profile: Path) -> None:
@@ -350,11 +351,13 @@ def test_sessions_message(profile: Path) -> None:
     _, body = _get(profile, "/")
     assert "No chat has been opened yet" in body
     (profile / "sessions").mkdir()
-    _, body = _get(profile, "/")
-    assert "No chat has been opened yet" in body
     (profile / "sessions" / "s1.json").write_text("{}", encoding="utf-8")
     _, body = _get(profile, "/")
+    assert "No chat has been opened yet" in body
+    _write_session(profile, "s1", [("user", "stored chat", None)])
+    _, body = _get(profile, "/")
     assert "No chat has been opened yet" not in body
+    assert "1 stored chat session snapshot(s) found." in body
 
 
 def test_default_profile_resolution(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

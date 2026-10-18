@@ -248,14 +248,6 @@ def load_handoffs(path: Path) -> tuple[list[dict], int]:
     return records, bad
 
 
-def session_summary(profile: Path) -> int:
-    """Number of entries in <profile>/sessions, 0 when absent or empty."""
-    try:
-        return sum(1 for _ in (profile / "sessions").iterdir())
-    except OSError:
-        return 0
-
-
 # --- markdown and HTML --------------------------------------------------------------
 
 _HEADING_RE = re.compile(r"(#{1,6})[ \t]+(.*?)[ \t#]*$")
@@ -532,13 +524,13 @@ def render_index(profile: Path) -> bytes:
     parts.append(render_conversation_snapshots(profile))
 
     parts.append("<h2>Chat</h2>")
-    count = session_summary(profile)
+    count = conversations.session_count(profile)
     if count == 0:
         parts.append(
             f"<p>No chat has been opened yet. Start one with:</p><pre>{esc(CHAT_COMMAND)}</pre>"
         )
     else:
-        parts.append(f"<p>{count} chat session record(s) found in <code>sessions</code>.</p>")
+        parts.append(f"<p>{count} stored chat session snapshot(s) found.</p>")
 
     parts.append(
         '<p class="muted">Read-only view. Do not publish this page on the public internet.</p>'
