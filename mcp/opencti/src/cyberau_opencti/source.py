@@ -18,6 +18,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 ATTRIBUTION = (
     "OpenCTI Community Edition is Apache-2.0. Enterprise Edition has its own licence. "
@@ -30,6 +31,7 @@ DOCTOR_DOCS = "docs/connectors/opencti.md"
 RATE = 2.0
 BURST = 10
 _PACKAGE = Path(__file__).resolve().parents[2]
+_LABEL = "OpenCTI"
 _ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 _TYPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 _TOKEN = re.compile(r"^[A-Za-z0-9_.:-]{1,40}$")
@@ -142,7 +144,8 @@ class _OpenCTIConnector(Connector):
         )
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
-        if check_schema:
+        # A live probe never checks the test fixtures. It checks the live answers below.
+        if check_schema and (not live or os.environ.get("CYBERAU_OPENCTI_SNAPSHOT")):
             problem = _fixture_drift()
             if problem:
                 return Probe(self.key, False, problem)
@@ -302,9 +305,9 @@ def _graphql(
     url = lookup("OPENCTI_URL")
     token = lookup("OPENCTI_TOKEN")
     if not url:
-        return None, "snapshot", "unavailable: OPENCTI_URL is not set", ""
+        return None, "snapshot", unavailable(_LABEL, "OPENCTI_URL is not set"), ""
     if not token:
-        return None, "snapshot", "unavailable: OPENCTI_TOKEN is not set", ""
+        return None, "snapshot", unavailable(_LABEL, "OPENCTI_TOKEN is not set"), ""
     endpoint, problem = _endpoint(url)
     if problem:
         return None, "snapshot", problem, ""
@@ -342,23 +345,28 @@ def _graphql(
     except HttpError as exc:
         message = _safe(str(exc), token)
         if "offline and no cache" in message:
-            message = "unavailable: no cached OpenCTI response"
-        return None, "snapshot", message, endpoint
+            message = "offline and no cached OpenCTI response exists"
+        return None, "snapshot", unavailable(_LABEL, message), endpoint
     except Exception as exc:
-        return None, "snapshot", _safe(str(exc), token), endpoint
+        return None, "snapshot", unavailable(_LABEL, _safe(str(exc), token)), endpoint
     finally:
         client.close()
     if response.status in (401, 403):
         return (
             None,
             "miss",
-            f"OpenCTI refused the request (HTTP {response.status}). Check OPENCTI_TOKEN.",
+            unavailable(
+                _LABEL,
+                f"OpenCTI refused the request (HTTP {response.status}). Check OPENCTI_TOKEN",
+            ),
             endpoint,
         )
     if response.status == 429:
-        return None, "miss", "OpenCTI rate limited the request (HTTP 429).", endpoint
+        reason = "OpenCTI rate limited the request (HTTP 429)"
+        return None, "miss", unavailable(_LABEL, reason), endpoint
     if response.status >= 400:
-        return None, "miss", f"OpenCTI returned HTTP {response.status}.", endpoint
+        reason = f"OpenCTI returned HTTP {response.status}"
+        return None, "miss", unavailable(_LABEL, reason), endpoint
     payload = _load_bytes(response.body)
     if payload is None:
         return None, response.cache, "OpenCTI payload was not usable", endpoint
@@ -545,6 +553,9 @@ def _looks_like_indicator(payload: dict) -> bool:
 
 
 def _live_problem(tool: str, payload: dict) -> str:
+    if payload.get("cache") == "snapshot" and not payload.get("data") and payload.get("warnings"):
+        # The empty unavailable envelope also carries cache "snapshot". Report why.
+        return str(payload["warnings"][0])
     if payload.get("cache") in {"stale", "snapshot"}:
         return f"{tool} was answered from a {payload['cache']} copy, not a live fetch"
     if payload.get("warnings"):
@@ -578,7 +589,8 @@ def _provenance(state: str) -> tuple[str, ...]:
     """Say so when a result did not come from a live fetch of the user's instance."""
     if state == "snapshot":
         return (
-            "Served from the local snapshot in CYBERAU_OPENCTI_SNAPSHOT, not your live instance.",
+            "Served from the operator-supplied snapshot file in CYBERAU_OPENCTI_SNAPSHOT, "
+            "not a live fetch of your instance.",
         )
     if state == "stale":
         return ("Served from a cached OpenCTI response, not a live fetch.",)

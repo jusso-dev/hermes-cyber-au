@@ -9,7 +9,8 @@ import json
 import os
 import re
 import time
-from datetime import UTC, datetime, timedelta
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -23,6 +24,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
 from pydantic import Field
 
 ORIGIN = "https://blueprint.asd.gov.au/"
@@ -42,6 +44,12 @@ _LABELS = {
     "mfa": "MFA",
 }
 _PACKAGE = Path(__file__).resolve().parents[2]
+SNAPSHOT_FILE = "blueprint_two_pages.json"
+# The shipped snapshot is refused once its retrieved_at date is older than this.
+SNAPSHOT_MAX_AGE_DAYS = 180
+LABEL = "ASD Blueprint"
+# Tests set this to simulate another day when the snapshot age is checked.
+_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _SLEEP = time.sleep
 _CLOCK = time.monotonic
@@ -59,24 +67,28 @@ def blueprint_search(query: _Query) -> dict:
     if problem or document is None:
         return _envelope([], cache, warnings=(problem or "Blueprint snapshot was not usable",))
     provenance = _provenance(document, cache)
+    as_of = _as_of(document)
+    if cache == "snapshot":
+        day = parse_day(as_of)
+        as_of = day.isoformat() if day else None
     drift = schema_drift(document)
     if drift:
-        return _envelope([], cache, warnings=(drift, *provenance), as_of=_as_of(document))
+        return _envelope([], cache, warnings=(drift, *provenance), as_of=as_of)
     rows = _match(document, text)
     if not rows:
         return _envelope(
             [],
             cache,
             warnings=("no matching Blueprint setting", *provenance),
-            as_of=_as_of(document),
+            as_of=as_of,
         )
-    _persist(rows, _as_of(document))
+    _persist(rows, as_of)
     return _envelope(
         [_present(row) for row in rows],
         cache,
         urls=_urls(rows),
         warnings=provenance,
-        as_of=_as_of(document),
+        as_of=as_of,
     )
 
 
@@ -90,22 +102,7 @@ def refresh_index() -> dict:
     drift = schema_drift(document)
     if drift:
         return _envelope([], "snapshot", warnings=(drift,))
-    pages = []
-    warnings: list[str] = []
-    for page in document["pages"]:
-        url = str(page.get("url") or "")
-        if not _allowed_page(url):
-            warnings.append("skipped a page outside blueprint.asd.gov.au")
-            continue
-        body, state, note = _fetch(url, force_live=True)
-        if not body or state != "miss":
-            warnings.append(f"{url}: {note or 'Blueprint page was not a live fetch'}")
-            continue
-        parsed = parse_html(body, url)
-        if not parsed["title"] or not parsed["settings"]:
-            warnings.append(f"{url}: Blueprint page had no title or settings")
-            continue
-        pages.append(parsed)
+    pages, warnings = _refetch(document)
     if warnings or not pages:
         # A partial index would drop the failed pages from search, so keep the previous one.
         return _envelope([], "snapshot", warnings=tuple(warnings or ("Blueprint refresh failed",)))
@@ -128,6 +125,56 @@ def refresh_index() -> dict:
         urls=_urls(rows),
         as_of=refreshed["retrieved_at"],
     )
+
+
+def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
+    """Refetch the snapshot's pages live and rewrite the shipped snapshot file.
+
+    Uses the same HTTP client, pacing and egress policy as refresh_index. Nothing
+    is written unless every page was fetched live and parsed.
+    """
+    destination = destination or (_PACKAGE / "data")
+    current = destination / SNAPSHOT_FILE
+    document, problem = _read_json(current if current.is_file() else _snapshot_path())
+    if problem or document is None:
+        raise RuntimeError(problem or "Blueprint snapshot was not usable")
+    drift = schema_drift(document)
+    if drift:
+        raise RuntimeError(drift)
+    pages, warnings = _refetch(document)
+    if warnings or not pages:
+        raise RuntimeError("; ".join(warnings) or "Blueprint refresh failed")
+    rebuilt = {"retrieved_at": _now(), "pages": pages}
+    destination.mkdir(parents=True, exist_ok=True)
+    staged = current.with_suffix(".json.tmp")
+    staged.write_text(json.dumps(rebuilt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    staged.replace(current)
+    return {
+        "retrieved_at": rebuilt["retrieved_at"],
+        "pages": len(pages),
+        "settings": sum(len(page["settings"]) for page in pages),
+    }
+
+
+def _refetch(document: dict) -> tuple[list[dict], list[str]]:
+    """Fetch every page URL in ``document`` live. Return parsed pages and problems."""
+    pages = []
+    warnings: list[str] = []
+    for page in document["pages"]:
+        url = str(page.get("url") or "")
+        if not _allowed_page(url):
+            warnings.append("skipped a page outside blueprint.asd.gov.au")
+            continue
+        body, state, note = _fetch(url, force_live=True)
+        if not body or state != "miss":
+            warnings.append(f"{url}: {note or 'Blueprint page was not a live fetch'}")
+            continue
+        parsed = parse_html(body, url)
+        if not parsed["title"] or not parsed["settings"]:
+            warnings.append(f"{url}: Blueprint page had no title or settings")
+            continue
+        pages.append(parsed)
+    return pages, warnings
 
 
 def connector() -> Connector:
@@ -401,8 +448,24 @@ def _load_document() -> tuple[dict | None, str, str]:
     if stored is not None and schema_drift(stored) is None:
         state = "stale" if offline or not _fresh(stored) else "hit"
         return stored, state, ""
+    text = None
+    try:
+        text = _snapshot_path().read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        pass
     document, problem = _read_json(_snapshot_path())
-    return document, "snapshot", problem
+    if problem or document is None or text is None:
+        return None, "snapshot", unavailable(LABEL, problem or "the shipped snapshot is missing")
+    refused = check_shipped(
+        text,
+        document.get("retrieved_at"),
+        label=LABEL,
+        max_age_days=SNAPSHOT_MAX_AGE_DAYS,
+        today=_TODAY() if _TODAY else None,
+    )
+    if refused:
+        return None, "snapshot", unavailable(LABEL, refused)
+    return document, "snapshot", ""
 
 
 def _pinned_or_shipped() -> tuple[dict | None, str]:
@@ -636,10 +699,14 @@ def _fresh(document: dict) -> bool:
 def _provenance(document: dict, cache: str) -> tuple[str, ...]:
     when = _as_of(document) or "an unknown date"
     if cache == "snapshot":
-        return (
-            f"Answered from the shipped Blueprint snapshot dated {when}. "
-            "This is not a live page fetch and the Blueprint may have changed since.",
-        )
+        if os.environ.get("CYBERAU_BLUEPRINT_SNAPSHOT"):
+            day = parse_day(document.get("retrieved_at"))
+            return (
+                f"served the operator-supplied {LABEL} snapshot dated "
+                f"{day.isoformat() if day else 'an unknown date'} from "
+                "CYBERAU_BLUEPRINT_SNAPSHOT, not a live fetch",
+            )
+        return (snapshot_note(LABEL, document.get("retrieved_at")),)
     return (
         f"Answered from the stored Blueprint index retrieved {when}. "
         "This is not a live page fetch and the Blueprint may have changed since.",
@@ -660,7 +727,7 @@ def _squash(parts: list[str]) -> str:
 
 
 def _snapshot_path() -> Path:
-    return _PACKAGE / "data" / "blueprint_two_pages.json"
+    return _PACKAGE / "data" / SNAPSHOT_FILE
 
 
 def _data_dir() -> Path:

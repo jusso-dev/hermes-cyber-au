@@ -22,6 +22,7 @@ from cyberau_common.cli import main
 from cyberau_common.server import build_server
 
 FIXTURES = Path(__file__).parent / "fixtures"
+SNAPSHOT = FIXTURES / "snapshot.json"
 ROOT = Path(__file__).resolve().parents[3]
 ACCOUNT = "0123456789abcdef0123456789abcdef"
 API_TOKEN = "cfscan-test-token"
@@ -50,7 +51,7 @@ def _isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(source, "_RNG", lambda: 0.0)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
-    monkeypatch.delenv("CYBERAU_CFSCAN_SNAPSHOT", raising=False)
+    monkeypatch.setenv("CYBERAU_CFSCAN_SNAPSHOT", str(SNAPSHOT))
     monkeypatch.delenv("CLOUDFLARE_URLSCAN_API_TOKEN", raising=False)
     monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
 
@@ -60,6 +61,7 @@ def test_offline_submit_and_result_match_schemas():
     submitted = urlscan_submit_unlisted(URL, approval)
     _assert_envelope(submitted)
     assert submitted["cache"] == "snapshot"
+    assert any("operator-supplied snapshot file" in item for item in submitted["warnings"])
     assert submitted["attribution"].startswith("Cloudflare URL Scanner")
     record = submitted["data"][0]
     assert record["visibility"] == "Unlisted"
@@ -106,6 +108,7 @@ def test_approval_is_refused_before_any_network(monkeypatch):
     assert "CLOUDFLARE_URLSCAN_API_TOKEN" in missing["warnings"][0]
     assert calls["n"] == 0
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.setenv("CYBERAU_CFSCAN_SNAPSHOT", str(SNAPSHOT))
     again = urlscan_submit_unlisted(URL, valid)
     assert again["data"][0]["scan_id"] == SCAN_ID
 
@@ -267,7 +270,7 @@ def test_offline_cache_unavailable_and_schema_drift(monkeypatch, tmp_path):
     assert missing["cache"] == "snapshot"
     assert "unavailable" in missing["warnings"][0]
 
-    monkeypatch.delenv("CYBERAU_CFSCAN_SNAPSHOT")
+    monkeypatch.setenv("CYBERAU_CFSCAN_SNAPSHOT", str(SNAPSHOT))
     other = urlscan_get_result(OTHER_SCAN)
     assert other["data"] == []
     assert "no matching scan" in other["warnings"][0]
@@ -509,3 +512,43 @@ def test_token_absent_from_cache_and_logs(monkeypatch, tmp_path):
             blob = path.read_bytes()
             assert API_TOKEN.encode() not in blob
             assert token.encode() not in blob
+
+
+_FIXTURE_VALUES = ("095be615", "example.com/login/final", "203.0.113.10", "AS64500", "EXAMPLE-NET")
+
+
+def _assert_unavailable(result: dict) -> None:
+    assert result["data"] == []
+    assert any("Cloudflare URL Scanner is unavailable" in item for item in result["warnings"])
+    text = json.dumps(result)
+    for value in _FIXTURE_VALUES:
+        assert value not in text
+
+
+def test_no_shipped_snapshot_is_served_offline(monkeypatch):
+    monkeypatch.delenv("CYBERAU_CFSCAN_SNAPSHOT", raising=False)
+    assert not (ROOT / "mcp" / "cloudflare-urlscanner" / "data").exists()
+    _assert_unavailable(urlscan_get_result(SCAN_ID))
+    _assert_unavailable(urlscan_submit_unlisted(URL, issue_unlisted_approval(URL)))
+    monkeypatch.setenv("CLOUDFLARE_URLSCAN_API_TOKEN", API_TOKEN)
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", ACCOUNT)
+    _assert_unavailable(urlscan_get_result(SCAN_ID))
+    _assert_unavailable(urlscan_submit_unlisted(URL, issue_unlisted_approval(URL)))
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert probe.detail == "no local copy to check"
+
+
+def test_no_shipped_snapshot_is_served_when_live_fails(monkeypatch):
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    _arm(monkeypatch, down)
+    _assert_unavailable(urlscan_get_result(SCAN_ID))
+    _assert_unavailable(urlscan_submit_unlisted(URL, issue_unlisted_approval(URL)))
+
+    _arm(monkeypatch, lambda _request: httpx.Response(429, headers={"retry-after": "0"}))
+    _assert_unavailable(urlscan_get_result(SCAN_ID))
+
+    monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID")
+    _assert_unavailable(urlscan_get_result(SCAN_ID))

@@ -9,6 +9,10 @@
 
 State these terms before the first call in a session. The connector returns counts and overview statistics. It does not return passwords, cookies or other credential values.
 
+## Fallback and fixtures
+
+The fallback ladder is a live fetch, then the connector's own session cache (a stale copy after a failed fetch, or any cached copy in offline mode), then unavailable. No snapshot ships with the connector. When there is no live or cached answer, or the key is missing or rejected, every tool returns empty data with a warning that the Hudson Rock source is unavailable. An operator may point `CYBERAU_HUDSONROCK_SEARCH_SNAPSHOT` or `CYBERAU_HUDSONROCK_OVERVIEW_SNAPSHOT` at a saved response. Answers from it carry a warning that they came from the operator-supplied snapshot file, not a live fetch, and are never stored as findings. The synthetic test fixtures live under `tests/fixtures/`. Only the offline schema check (`check_schema` without `live`) reads them, and it never returns them as data. A live health check always makes a fresh call.
+
 ## Operator guide
 
 Read-only infostealer exposure counts for domains on your org-exposure watchlist. The server ships disabled. Bring your own paid Cavalier licence in `HUDSONROCK_API_KEY`. Do not use the free preview key for the older Cavalier v2 base.

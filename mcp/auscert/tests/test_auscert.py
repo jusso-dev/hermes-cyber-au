@@ -175,12 +175,45 @@ def test_schema_drift_fails_the_health_probe(monkeypatch):
     assert connector().health(live=False).ok is True
 
 
-def test_offline_without_cache_serves_the_shipped_snapshot(monkeypatch):
+FIXTURE_VALUES = (
+    "ESB-2026.900",
+    "Example Gateway",
+    "Example Library",
+    "Synthetic",
+    "CVE-2024-3400",
+)
+
+
+def assert_unavailable(result: dict) -> None:
+    assert result["data"] == []
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    encoded = json.dumps(result)
+    for value in FIXTURE_VALUES:
+        assert value not in encoded
+
+
+def test_offline_without_cache_serves_no_shipped_data(monkeypatch):
     monkeypatch.delenv("CYBERAU_AUSCERT_SNAPSHOT", raising=False)
     result = auscert_bulletins()
     assert result["cache"] == "snapshot"
+    assert_unavailable(result)
+    assert_unavailable(auscert_bulletins(query="CVE-2024-3400"))
+    assert connector().health(live=False, check_schema=True).ok is True
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    def fail(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network unreachable", request=request)
+
+    live(monkeypatch, fail)
+    assert_unavailable(auscert_bulletins())
+    assert_unavailable(auscert_bulletins(query="Example"))
+
+
+def test_override_snapshot_is_marked():
+    result = auscert_bulletins()
     assert result["data"]
-    assert "shipped snapshot" in result["warnings"][0]
+    assert "operator-supplied" in result["warnings"][-1]
 
 
 def test_live_fetch_caches_records_and_is_etag_aware(monkeypatch, tmp_path):
@@ -354,7 +387,7 @@ def test_cassette_replays():
 
 
 def test_no_secret_is_present_in_fixtures_or_output():
-    for path in [*FIXTURES.iterdir(), PACKAGE / "data" / "bulletins.xml"]:
+    for path in FIXTURES.iterdir():
         text = path.read_text(encoding="utf-8").lower()
         assert "authorization" not in text
         assert "api-key" not in text

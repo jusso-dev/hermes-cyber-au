@@ -7,6 +7,10 @@
 - Verified: 2026-10-16
 - Egress hosts: api.flare.io
 
+## Fallback and fixtures
+
+The fallback ladder is a live fetch, then the connector's own session cache, then unavailable. No snapshot ships with the connector. When the live fetch fails, the key is missing or rejected, or offline mode (`CYBERAU_OFFLINE=1`) is on with no cached copy, every tool returns empty data with a warning that the Flare source is unavailable. An operator may point `CYBERAU_FLARE_FIXTURES` at a directory of saved responses. Answers from it carry a warning that they came from the operator-supplied files, not a live fetch. The synthetic test fixtures live under `tests/fixtures/`. Only the offline schema check (`check_schema` without `live`) reads them, or `CYBERAU_FLARE_SCHEMA_FIXTURE` when set, and it never returns them as data. A live health check never counts fixture data as ok.
+
 ## Operator guide
 
 Read-only events and credential counts from the Flare API. The connector ships off until you set `enabled: true` in your profile `config.yaml`. `doctor` lists it as off by default: licence terms (`off (paid, bring your own licence)`).

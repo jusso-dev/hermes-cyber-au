@@ -3,6 +3,10 @@
 Each source adapter fetches through its connector, so egress checks, caching
 and rate limits stay in one place. A source that only answered from a stale
 cache or a shipped snapshot counts as failed: refresh exists to get new data.
+
+Refresh does not write feed rows into the repository. Live intel goes into the
+profile's intel store (``--store``), where connectors and skills read it, and
+only per-source status is written beside the feed catalogue.
 """
 
 from __future__ import annotations
@@ -21,9 +25,6 @@ from pathlib import Path
 from cyberau_common.secrets import redact
 
 SUPPORTED = ("asd", "kev", "epss", "auscert", "feodo")
-# Named by the nightly workflow but not refreshed here yet. They are reported
-# as skipped so a run still covers every source it can.
-NOT_YET = ("attack", "nvd", "abusech", "otx", "radar")
 _LIVE = {"miss", "hit", "direct", "http11"}
 _EPSS_BATCH = 100
 
@@ -55,7 +56,6 @@ def refresh_main(argv: list[str]) -> int:
     parser.add_argument("--sources", required=True, help="Comma separated source keys")
     parser.add_argument("--optional-sources", default="", help="Sources whose failure is a warning")
     parser.add_argument("--store", action="store_true", help="Load results into the intel store")
-    parser.add_argument("--snapshot-dir", help="Write one <source>.json per refreshed source")
     parser.add_argument("--catalogue", help="Feed catalogue path; status.json is written beside it")
     parser.add_argument("--status", help="Write per-source status JSON here")
     parser.add_argument("--summary", help="Write a Markdown summary here")
@@ -66,7 +66,7 @@ def refresh_main(argv: list[str]) -> int:
 
     required = _split(args.sources)
     optional = [key for key in _split(args.optional_sources) if key not in required]
-    unknown = [key for key in required + optional if key not in SUPPORTED + NOT_YET]
+    unknown = [key for key in required + optional if key not in SUPPORTED]
     if not required:
         print("refresh failed: --sources is empty", file=sys.stderr)
         return 2
@@ -91,16 +91,12 @@ def refresh_main(argv: list[str]) -> int:
         status_path = Path(args.catalogue).parent / "status.json"
     if status_path is not None:
         _write_status(status_path, results)
-    if args.snapshot_dir:
-        _write_snapshots(Path(args.snapshot_dir), results)
     if args.summary:
         Path(args.summary).write_text(_summary(results, failed), encoding="utf-8")
     return 1 if failed else 0
 
 
 def _refresh_one(key: str, run: _Run) -> Result:
-    if key in NOT_YET:
-        return Result(key, status="skipped", detail="no refresh adapter yet")
     adapter = _ADAPTERS[key]
     result = Result(key)
     try:
@@ -378,8 +374,6 @@ def _write_status(path: Path, results: list[Result]) -> None:
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     sources = dict(previous) if isinstance(previous, dict) else {}
     for result in results:
-        if result.status == "skipped":
-            continue
         entry = dict(sources.get(result.source) or {})
         entry["last_run"] = now
         entry["status"] = result.status
@@ -393,15 +387,6 @@ def _write_status(path: Path, results: list[Result]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"generated_at": now, "sources": dict(sorted(sources.items()))}
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def _write_snapshots(directory: Path, results: list[Result]) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
-    for result in results:
-        if result.status != "ok":
-            continue
-        text = json.dumps(result.rows, indent=1, sort_keys=True, default=str)
-        (directory / f"{result.source}.json").write_text(text + "\n", encoding="utf-8")
 
 
 def _summary(results: list[Result], failed: list[Result]) -> str:

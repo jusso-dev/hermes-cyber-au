@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """Read and update the pinned Hermes release.
 
-tools/hermes_pin.txt is the single source. ``get`` prints that tag.
+tools/hermes_pin.txt is the single source. ``get`` prints that tag and
+``image`` prints the Docker image CI runs (``nousresearch/hermes-agent:<tag>``).
 ``set`` writes the same tag into:
 
 - distribution.yaml ``hermes_requires`` (lower bound, without the leading v)
 - docker/Dockerfile ``HERMES_VERSION``
-- ``HERMES_IMAGE`` in .github/workflows/ci.yml
 
 A missing consumer is an error, and nothing is written until every consumer
 can be updated. That keeps the pins from drifting apart.
+
+``set`` never edits files under .github/. Pushing a workflow file needs a token
+with the workflows permission, which the data pull request token does not have.
+CI reads the image with ``hermes_pin.py image`` at run time instead. ``check``
+fails if .github/workflows/ci.yml still hardcodes a different tag.
 """
 
 from __future__ import annotations
@@ -23,7 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PIN_REL = Path("tools/hermes_pin.txt")
 DIST_REL = Path("distribution.yaml")
 DOCKER_REL = Path("docker/Dockerfile")
-CI_RELS = (Path(".github/workflows/ci.yml"),)
+CI_REL = Path(".github/workflows/ci.yml")
+IMAGE = "nousresearch/hermes-agent"
 
 TAG_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 DIST_RE = re.compile(
@@ -139,20 +145,6 @@ def _plan(root: Path, tag: str) -> list[tuple[Path, str]]:
         )
     )
 
-    ci_found = False
-    for rel in CI_RELS:
-        path = _inside(root, rel)
-        if not path.is_file():
-            continue
-        ci_found = True
-
-        def ci_repl(match: re.Match[str], release: str = tag) -> str:
-            return f"{match.group('prefix')}{release}{match.group('suffix') or ''}"
-
-        planned.append((rel, _replace_exact(path.read_text(encoding="utf-8"), CI_RE, ci_repl, rel)))
-    if not ci_found:
-        looked = ", ".join(rel.as_posix() for rel in CI_RELS)
-        raise PinError(f"Missing ci.yml. Looked for {looked}")
     return planned
 
 
@@ -165,6 +157,24 @@ def _atomic_write(path: Path, text: str) -> None:
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def image(root: Path) -> str:
+    return f"{IMAGE}:{read_pin(root)}"
+
+
+def check_ci(root: Path) -> None:
+    """Refuse a ci.yml that hardcodes a Hermes tag other than the pin."""
+    path = _inside(root, CI_REL)
+    if not path.is_file():
+        return
+    tag = read_pin(root)
+    for match in CI_RE.finditer(path.read_text(encoding="utf-8")):
+        if match.group("tag") != tag:
+            raise PinError(
+                f"{CI_REL.as_posix()} hardcodes HERMES_IMAGE {_shown(match.group('tag'))}, "
+                f"but the pin is {tag}. Read it with tools/hermes_pin.py image instead."
+            )
 
 
 def set_pin(root: Path, tag: str) -> None:
@@ -180,12 +190,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=ROOT)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("get", help="Print the pinned release tag")
+    sub.add_parser("image", help="Print the pinned Hermes Docker image")
+    sub.add_parser("check", help="Fail if ci.yml hardcodes a different Hermes tag")
     set_parser = sub.add_parser("set", help="Write a release tag through every pin")
     set_parser.add_argument("tag")
     args = parser.parse_args(argv)
     try:
         if args.command == "get":
             print(read_pin(args.root))
+            return 0
+        if args.command == "image":
+            print(image(args.root))
+            return 0
+        if args.command == "check":
+            check_ci(args.root)
             return 0
         set_pin(args.root, args.tag)
     except PinError as exc:

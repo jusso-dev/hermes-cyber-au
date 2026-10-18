@@ -475,13 +475,8 @@ def test_cache_hit_keeps_the_link_header(live):
     assert len(second["data"]) == 2
 
 
-def test_offline_bundled_snapshot_is_labelled_and_never_stored(tmp_path, monkeypatch):
-    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
-    monkeypatch.delenv("CYBERAU_GTI_DTM_ALERTS", raising=False)
-    monkeypatch.delenv("CYBERAU_GTI_DTM_MONITORS", raising=False)
-    monkeypatch.delenv("GTI_API_KEY", raising=False)
+def test_operator_snapshot_is_labelled_and_never_stored(offline, tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
-    source._CACHES.clear()
     path = tmp_path / "watchlists" / "org-exposure.yaml"
     path.parent.mkdir()
     path.write_text(yaml.safe_dump({"domains": ["example.com.au"]}), encoding="utf-8")
@@ -489,9 +484,54 @@ def test_offline_bundled_snapshot_is_labelled_and_never_stored(tmp_path, monkeyp
         _assert_envelope(result)
         assert result["cache"] == "snapshot"
         assert result["data"]
-        assert any("snapshot" in item and "not live" in item for item in result["warnings"])
+        assert any(
+            "operator-supplied snapshot" in item and "not live" in item
+            for item in result["warnings"]
+        )
     assert not (tmp_path / "intel.sqlite").exists()
     assert connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1)) == []
+
+
+def _fixture_values() -> list[str]:
+    alerts = json.loads((FIXTURES / "dtm_alerts_synthetic.json").read_text())
+    monitors = json.loads((FIXTURES / "dtm_monitors_synthetic.json").read_text())
+    return [item["id"] for item in alerts["alerts"]] + [item["id"] for item in monitors["monitors"]]
+
+
+def _assert_unavailable(result: dict) -> None:
+    _assert_envelope(result)
+    assert result["data"] == []
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    text = json.dumps(result)
+    for value in _fixture_values():
+        assert value not in text, value
+
+
+def test_offline_without_snapshot_is_unavailable_not_synthetic(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.delenv("CYBERAU_GTI_DTM_ALERTS", raising=False)
+    monkeypatch.delenv("CYBERAU_GTI_DTM_MONITORS", raising=False)
+    monkeypatch.setenv("GTI_API_KEY", TEST_KEY)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    source._CACHES.clear()
+    _assert_unavailable(gti_dtm_alerts())
+    _assert_unavailable(gti_dtm_monitors())
+    assert connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1)) == []
+    assert not (Path(source.__file__).resolve().parent / "data").exists()
+
+
+def test_failed_live_fetch_without_snapshot_is_unavailable(live):
+    def boom(_request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("timed out")
+
+    source._TRANSPORT = httpx.MockTransport(boom)
+    source._SLEEPER = lambda _seconds: None
+    _assert_unavailable(gti_dtm_alerts())
+    _assert_unavailable(gti_dtm_monitors())
+    source._CACHES.clear()
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(503))
+    _assert_unavailable(gti_dtm_alerts())
+    _assert_unavailable(gti_dtm_monitors())
 
 
 def test_offline_prefers_stale_cache_over_the_bundled_snapshot(live, monkeypatch):

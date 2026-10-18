@@ -14,6 +14,7 @@ from cyberau_common.server import build_server
 from cyberau_misp.source import (
     ATTRIBUTION,
     DOCTOR_NOTE,
+    OPERATOR_NOTE,
     PIN_COMMIT,
     READ_TOOLS,
     TERMS,
@@ -44,6 +45,8 @@ def setup_function():
 def test_happy_path_wraps_free_text_and_galaxies():
     event = get_event("example")
     assert event["cache"] == "snapshot"
+    assert event["warnings"][0] == OPERATOR_NOTE
+    assert "operator-supplied" in OPERATOR_NOTE
     assert event["attribution"] == ATTRIBUTION
     assert event["untrusted"] is True
     assert len(event["data"]["attributes"]) == 3
@@ -303,7 +306,8 @@ def test_offline_uses_cache_then_snapshot(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(other))
     fallback = get_event("example")
     assert fallback["cache"] == "snapshot"
-    assert fallback["data"]["id"] == "example"
+    assert fallback["data"] is None
+    assert any("is unavailable" in item for item in fallback["warnings"])
 
 
 def test_cassettes_are_redacted(vcr_config):
@@ -366,7 +370,7 @@ def test_tlp_and_sharing_group_are_surfaced(tmp_path, monkeypatch):
     path.write_text(json.dumps(payload), encoding="utf-8")
     calm = get_event("example")
     assert calm["data"]["tlp"] == "green"
-    assert calm["warnings"] == []
+    assert calm["warnings"] == [OPERATOR_NOTE]
 
 
 def test_restricted_records_stay_in_the_profile_data_dir(tmp_path, monkeypatch):
@@ -437,3 +441,64 @@ def _arm(monkeypatch, tmp_path: Path) -> None:
 def _validate(record: dict, name: str) -> None:
     schema = json.loads((MCP / "misp" / "schema" / name).read_text(encoding="utf-8"))
     jsonschema.validate(record, schema)
+
+
+_FIXTURE_VALUES = (
+    "Synthetic",
+    "203.0.113.10",
+    "example.test",
+    "Example CERT",
+    "00000000-0000-4000-8000-000000000042",
+)
+
+
+def _assert_unavailable(results: list[dict]) -> None:
+    for result in results:
+        assert result["data"] in ([], None)
+        assert any("is unavailable" in item for item in result["warnings"])
+        text = json.dumps(result)
+        for value in _FIXTURE_VALUES:
+            assert value not in text
+
+
+def _all_tools() -> list[dict]:
+    return [search_attributes(), get_event("example"), search_events()]
+
+
+def test_offline_without_override_serves_no_fixture_rows(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_MISP_SNAPSHOT", raising=False)
+    monkeypatch.delenv("MISP_URL", raising=False)
+    monkeypatch.delenv("MISP_API_KEY", raising=False)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(_all_tools())
+    _arm(monkeypatch, tmp_path)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(_all_tools())
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("MISP_URL")
+    monkeypatch.delenv("MISP_API_KEY")
+    _assert_unavailable(_all_tools())
+
+
+def test_failed_live_fetch_without_override_serves_no_fixture_rows(tmp_path, monkeypatch):
+    _arm(monkeypatch, tmp_path)
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    source._SLEEPER = lambda _delay: None
+    try:
+        _assert_unavailable(_all_tools())
+    finally:
+        source._TRANSPORT = None
+        source._SLEEPER = None
+
+
+def test_offline_schema_probe_never_counts_fixture_as_live(monkeypatch):
+    monkeypatch.delenv("CYBERAU_MISP_SNAPSHOT", raising=False)
+    monkeypatch.delenv("MISP_URL", raising=False)
+    monkeypatch.delenv("MISP_API_KEY", raising=False)
+    assert connector().health(live=False, check_schema=True).ok is True
+    assert connector().health(live=True).ok is False

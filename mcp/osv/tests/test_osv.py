@@ -345,7 +345,7 @@ def test_timeout_without_cache_is_unavailable_warning(monkeypatch):
     assert "unavailable" in result["warnings"][0]
 
 
-def test_offline_prefers_cache_then_snapshot(monkeypatch):
+def test_offline_prefers_cache_then_unavailable(monkeypatch):
     seen = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -363,7 +363,8 @@ def test_offline_prefers_cache_then_snapshot(monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", os.environ["CYBERAU_DATA_DIR"] + "-empty")
     fallback = osv_get("GHSA-jfh8-c2jp-5v3q")
     assert fallback["cache"] == "snapshot"
-    assert fallback["data"]["id"] == "GHSA-jfh8-c2jp-5v3q"
+    assert fallback["data"] is None
+    assert any("is unavailable" in item for item in fallback["warnings"])
     unknown = osv_get("GHSA-0000-0000-0000")
     assert unknown["data"] is None and unknown["warnings"]
     assert len(seen) == 1
@@ -435,5 +436,51 @@ def test_cassettes_replay_and_hold_no_secrets():
 
 def test_no_secret_shaped_text_in_fixtures():
     pattern = re.compile(r"(?i)(authorization|x-api-key|apikey|bearer)\s*[:=]")
-    for path in list(FIXTURES.glob("*")) + list((SCHEMAS.parent / "data").glob("*")):
+    for path in FIXTURES.glob("*"):
         assert not pattern.search(path.read_text(encoding="utf-8")), path.name
+
+
+FIXTURE_VALUES = ("GHSA-jfh8-c2jp-5v3q", "GHSA-462w-v97r-4m45", "Jinja2 sandbox escape", "Log4j")
+
+
+def _all_tools() -> dict:
+    return {
+        "osv_query": osv_query("PyPI", "jinja2"),
+        "osv_get": osv_get("GHSA-jfh8-c2jp-5v3q"),
+        "osv_batch": osv_batch([{"ecosystem": "PyPI", "package": "jinja2"}]),
+    }
+
+
+def _assert_unavailable(results: dict) -> None:
+    for name, result in results.items():
+        _check(result)
+        assert result["data"] in (None, []), name
+        assert result["data_as_of"] is None, name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        text = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            if name == "osv_get" and value == "GHSA-jfh8-c2jp-5v3q":
+                continue  # the requested id is echoed in the source URL
+            assert value not in text, (name, value)
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OSV_SNAPSHOT", raising=False)
+    _assert_unavailable(_all_tools())
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    _live(monkeypatch, lambda request: httpx.Response(500, content=b"down"))
+    _assert_unavailable(_all_tools())
+
+
+def test_override_snapshot_is_labelled():
+    found = osv_query("PyPI", "jinja2")
+    assert any("operator-supplied OSV snapshot" in item for item in found["warnings"])
+
+
+def test_offline_schema_check_without_override_reads_no_shipped_file(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OSV_SNAPSHOT", raising=False)
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert "no local copy" in probe.detail

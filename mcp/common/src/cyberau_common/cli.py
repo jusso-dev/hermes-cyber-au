@@ -61,10 +61,11 @@ def main(argv: list[str] | None = None) -> int:
     imported.add_argument("path")
     imported.add_argument("--feed", default="alerts")
 
-    regen = sub.add_parser("regen", help="Regenerate local skill data")
+    regen = sub.add_parser("regen", help="Regenerate shipped reference data")
     regen.add_argument("source")
     regen.add_argument("--keep", type=int, default=2)
     regen.add_argument("--force", action="store_true")
+    regen.add_argument("--fetch", action="store_true", help="Download upstream data first")
 
     parser_check = sub.add_parser("parser-check", help="Re-check advisory parsers")
     parser_check.add_argument("--sources", default="")
@@ -116,6 +117,8 @@ def main(argv: list[str] | None = None) -> int:
         forwarded = [args.source, "--keep", str(args.keep)]
         if args.force:
             forwarded.append("--force")
+        if args.fetch:
+            forwarded.append("--fetch")
         return regen_main(forwarded)
     if args.command == "parser-check":
         from cyberau_common.regen import parser_check_main

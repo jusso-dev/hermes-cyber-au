@@ -60,6 +60,12 @@ def _keys(monkeypatch):
     monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
     monkeypatch.delenv("FALCON_BASE_URL", raising=False)
     monkeypatch.delenv("CYBERAU_CSRECON_SNAPSHOT", raising=False)
+    monkeypatch.delenv("CYBERAU_CSRECON_RULES_SNAPSHOT", raising=False)
+
+
+def _operator_snapshots(monkeypatch):
+    monkeypatch.setenv("CYBERAU_CSRECON_SNAPSHOT", str(FIXTURES / "notifications_synthetic.json"))
+    monkeypatch.setenv("CYBERAU_CSRECON_RULES_SNAPSHOT", str(FIXTURES / "rules_synthetic.json"))
 
 
 def _transport(handler):
@@ -222,7 +228,10 @@ def test_auth_errors_name_the_env_vars(tmp_path, monkeypatch):
     _keys(monkeypatch)
     monkeypatch.delenv("FALCON_CLIENT_SECRET", raising=False)
     secret = cs_recon_rules()
-    assert secret["warnings"][0] == "FALCON_CLIENT_SECRET is not set"
+    assert secret["warnings"][0] == (
+        "CrowdStrike Recon rules is unavailable: FALCON_CLIENT_SECRET is not set. "
+        "No live, cached or shipped data was served"
+    )
 
     def denied(status: int):
         def handler(request: httpx.Request) -> httpx.Response:
@@ -313,12 +322,16 @@ def test_schema_drift_and_offline_snapshot(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     _keys(monkeypatch)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _operator_snapshots(monkeypatch)
     offline = cs_recon_notifications(since="2026-06-01")
     assert offline["cache"] == "snapshot"
     assert offline["data"][0]["id"] == "notif-example-1"
     assert cs_recon_rules()["data"][0]["id"] == "rule-example-1"
     probe = connector().health(live=False, check_schema=True)
     assert probe.ok is True
+    monkeypatch.delenv("CYBERAU_CSRECON_SNAPSHOT")
+    fixture_probe = connector().health(live=False, check_schema=True)
+    assert fixture_probe.ok is True
     drift = tmp_path / "drift.json"
     drift.write_text(
         json.dumps({"resources": [{"id": "notif-example-1", "rule_label": "renamed"}]}),
@@ -456,11 +469,8 @@ def test_docs_fixtures_and_tool_contract():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "[docs/connectors/crowdstrike-recon.md](docs/connectors/crowdstrike-recon.md)" in readme
     assert "\u2014" not in doc.read_text(encoding="utf-8")
-    bundled = source._DATA / "notifications_synthetic.json"
-    fixture = FIXTURES / "notifications_synthetic.json"
-    assert bundled.read_text(encoding="utf-8") == fixture.read_text(encoding="utf-8")
-    rules = source._DATA / "rules_synthetic.json"
-    assert rules.read_text(encoding="utf-8") == (FIXTURES / "rules_synthetic.json").read_text()
+    # Synthetic copies live only under tests/fixtures. Nothing ships in the package.
+    assert not (Path(source.__file__).resolve().parent / "data").exists()
     for path in FIXTURES.iterdir():
         text = path.read_text(encoding="utf-8")
         assert SECRET not in text
@@ -480,13 +490,16 @@ def test_snapshot_and_stale_results_carry_a_warning(tmp_path, monkeypatch):
     _keys(monkeypatch)
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _operator_snapshots(monkeypatch)
     snap = cs_recon_notifications(since="2026-06-01")
     assert snap["cache"] == "snapshot"
     assert snap["data"]
-    assert any("synthetic" in warning for warning in snap["warnings"])
+    assert any("operator-supplied snapshot" in warning for warning in snap["warnings"])
     rules = cs_recon_rules()
     assert rules["cache"] == "snapshot"
-    assert any("synthetic" in warning for warning in rules["warnings"])
+    assert any("CYBERAU_CSRECON_RULES_SNAPSHOT" in warning for warning in rules["warnings"])
+    monkeypatch.delenv("CYBERAU_CSRECON_SNAPSHOT")
+    monkeypatch.delenv("CYBERAU_CSRECON_RULES_SNAPSHOT")
     monkeypatch.delenv("CYBERAU_OFFLINE")
     _transport(_ok_handler([]))
     assert cs_recon_notifications(limit=10)["warnings"] == []
@@ -500,6 +513,7 @@ def test_snapshot_never_becomes_a_stored_finding(tmp_path, monkeypatch):
     _keys(monkeypatch)
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _operator_snapshots(monkeypatch)
     watch = Watchlist(domains=["example.com.au"])
     assert connector().exposure_for(watch, date(2026, 6, 1)) == []
     path = tmp_path / "watchlists"
@@ -543,3 +557,52 @@ def test_since_must_be_a_real_date(tmp_path, monkeypatch):
         found = cs_recon_notifications(since=bad)
         assert found["data"] == []
         assert "YYYY-MM-DD" in found["warnings"][0]
+
+
+def _fixture_values() -> list[str]:
+    values = [item["id"] for item in NOTIFICATIONS["resources"]]
+    values += [item["id"] for item in RULES["resources"]]
+    values += [item["rule_name"] for item in NOTIFICATIONS["resources"] if item.get("rule_name")]
+    values += [item["name"] for item in RULES["resources"] if item.get("name")]
+    return values
+
+
+def _assert_unavailable(found: dict) -> None:
+    assert found["data"] == []
+    assert any("is unavailable" in warning for warning in found["warnings"])
+    text = json.dumps(found)
+    for value in _fixture_values():
+        assert value not in text, value
+
+
+def test_offline_without_snapshot_is_unavailable_not_synthetic(tmp_path, monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(cs_recon_notifications(since="2026-06-01"))
+    _assert_unavailable(cs_recon_rules())
+    watch = Watchlist(domains=["example.com.au"])
+    assert connector().exposure_for(watch, date(2026, 6, 1)) == []
+
+
+def test_failed_live_fetch_without_snapshot_is_unavailable(tmp_path, monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+
+    def time_out(_request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("timed out")
+
+    _transport(time_out)
+    _assert_unavailable(cs_recon_notifications(limit=10))
+    _assert_unavailable(cs_recon_rules())
+
+    def server_error(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/oauth2/token"):
+            return httpx.Response(201, json={"access_token": TOKEN, "expires_in": 1799})
+        return httpx.Response(500, json={"errors": [{"code": 500, "message": "down"}]})
+
+    source._CACHE = None
+    clear_session_caches()
+    _transport(server_error)
+    _assert_unavailable(cs_recon_notifications(limit=10))
+    _assert_unavailable(cs_recon_rules())

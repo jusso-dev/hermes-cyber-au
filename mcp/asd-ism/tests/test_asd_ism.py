@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import cyberau_asd_ism.source as source
@@ -16,8 +17,10 @@ from cyberau_asd_ism.source import (
 from cyberau_common.cache import HttpCache
 from cyberau_common.server import build_server
 
-DATA = Path(__file__).resolve().parents[1] / "data"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+# Small excerpts of real releases, laid out like the shipped data directory.
+DATA = FIXTURES
+SHIPPED = Path(__file__).resolve().parents[1] / "data"
 RELEASES = "https://api.github.com/repos/AustralianCyberSecurityCentre/ism-oscal/releases"
 
 
@@ -131,3 +134,83 @@ def test_past_release_is_kept():
     gone = ism_get_control("ism-0521", release="v2026.09.4")
     assert gone["data"] is None
     assert gone["warnings"]
+
+
+def _shipped_retrieved_on():
+    return date.fromisoformat(json.loads((SHIPPED / "releases.json").read_text())["retrieved_on"])
+
+
+def test_shipped_catalogue_is_full_and_labelled(monkeypatch):
+    monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
+    monkeypatch.setattr(source, "_TODAY", _shipped_retrieved_on)
+    record = ism_get_control("ism-1546")
+    assert record["data"]["control_id"] == "ism-1546"
+    assert record["cache"] == "snapshot"
+    assert record["data_as_of"] == "v2026.09.4"
+    assert any("served the shipped ISM" in warning for warning in record["warnings"])
+    listed = ism_list_baseline("TOP_SECRET")
+    assert len(listed["data"][0]["control_ids"]) > 100
+
+
+def test_expired_shipped_release_list_is_refused(monkeypatch):
+    monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
+    expired = _shipped_retrieved_on() + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    monkeypatch.setattr(source, "_TODAY", lambda: expired)
+    refused = ism_get_control("ism-1546")
+    assert refused["data"] is None
+    assert "ISM release list is unavailable" in refused["warnings"][0]
+    assert "day limit" in refused["warnings"][0]
+    # A named release is a published, unchanging catalogue, so it is still answered.
+    pinned = ism_get_control("ism-1546", release="v2026.09.4")
+    assert pinned["data"]["control_id"] == "ism-1546"
+
+
+def test_failed_fetch_without_shipped_copy_is_unavailable(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(503))
+    missing = ism_get_control("ism-1546", release="v2025.01.1")
+    assert missing["data"] is None
+    assert "is unavailable" in missing["warnings"][0]
+
+
+def test_rebuild_shipped_snapshot_writes_full_releases(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
+    catalog = (FIXTURES / "v2026.09.4" / "ISM_catalog.json").read_bytes()
+    profile = (FIXTURES / "v2026.09.4" / "ISM_E8_ML1-baseline_profile.json").read_bytes()
+    releases = json.dumps(
+        [
+            {"tag_name": "v2026.09.4", "published_at": "2026-09-03T23:39:10Z"},
+            {"tag_name": "v2026.06.18", "published_at": "2026-06-18T09:23:52Z"},
+            {"tag_name": "v2026.03.24", "published_at": "2026-03-24T08:35:10Z"},
+        ]
+    ).encode()
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.github.com":
+            return httpx.Response(200, content=releases)
+        if request.url.path.endswith("ISM_catalog.json"):
+            return httpx.Response(200, content=catalog)
+        return httpx.Response(200, content=profile)
+
+    source._TRANSPORT = httpx.MockTransport(upstream)
+    destination = tmp_path / "data"
+    (destination / "v2025.12.9").mkdir(parents=True)
+    (destination / "v2025.12.9" / "ISM_catalog.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(source, "_TODAY", lambda: date(2026, 10, 18))
+    summary = source.rebuild_shipped_snapshot(destination, keep=2)
+    assert summary["kept"] == ["v2026.09.4", "v2026.06.18"]
+    assert summary["removed"] == ["v2025.12.9"]
+    written = json.loads((destination / "releases.json").read_text())
+    assert written["retrieved_on"] == "2026-10-18"
+    assert len(list((destination / "v2026.06.18").glob("ISM_*-baseline_profile.json"))) == 8
+
+
+def test_rebuild_shipped_snapshot_writes_nothing_on_failure(tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(503))
+    with pytest.raises(RuntimeError):
+        source.rebuild_shipped_snapshot(tmp_path / "data")
+    assert not (tmp_path / "data").exists()

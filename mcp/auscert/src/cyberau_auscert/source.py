@@ -24,6 +24,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 FEED_URL = "https://portal.auscert.org.au/rss/bulletins/"
@@ -42,6 +43,10 @@ _CVSS = re.compile(r"CVSS \(Max\):\s*(\d{1,2}(?:\.\d)?)")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _PUBLIC_CVES = 50
 _PACKAGE = Path(__file__).resolve().parents[2]
+_LABEL = "AusCERT bulletin feed"
+_OVERRIDE_NOTE = (
+    "served from the operator-supplied snapshot file in CYBERAU_AUSCERT_SNAPSHOT, not a live fetch"
+)
 _TRANSPORT = None
 
 _Since = Annotated[
@@ -60,6 +65,7 @@ class _Feed:
     cache: str
     warnings: tuple[str, ...] = ()
     persist: bool = False
+    override: bool = False
 
 
 def auscert_bulletins(
@@ -95,7 +101,12 @@ class _AuscertConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            problem = schema_drift(_read(_snapshot_path()))
+            # Offline schema check: the operator override, else the HTTP cache. A file
+            # shipped in the package is never read.
+            text = _local_copy()
+            if text is None:
+                return Probe(self.key, True, "no local copy to check")
+            problem = schema_drift(text)
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -144,6 +155,8 @@ def _collect(
             _persist(records)
         except (OSError, sqlite3.Error) as exc:
             warnings.append(f"could not record bulletins locally: {redact(str(exc))}")
+    if feed.override:
+        warnings.append(_OVERRIDE_NOTE)
     chosen = _select(records, since, query)[:limit]
     return _envelope(
         [_public(row) for row in chosen],
@@ -156,7 +169,7 @@ def _collect(
 def _fetch(*, force_live: bool = False) -> _Feed:
     snapshot = os.environ.get("CYBERAU_AUSCERT_SNAPSHOT")
     if snapshot and not force_live:
-        return _Feed(_read(Path(snapshot)), "snapshot")
+        return _Feed(_read(Path(snapshot)), "snapshot", override=True)
     data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-auscert"))
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", FEED_URL, None, b"", "anonymous")
@@ -167,8 +180,8 @@ def _fetch(*, force_live: bool = False) -> _Feed:
                 return _Feed(_decode(cached.body), "hit", persist=True)
             note = "offline, served the cached feed past its 30 minute lifetime"
             return _Feed(_decode(cached.body), "stale", (note,), persist=True)
-        note = "offline and nothing cached, served the shipped snapshot"
-        return _Feed(_read(_snapshot_path()), "snapshot", (note,))
+        reason = "offline mode, and nothing is cached"
+        return _Feed(None, "snapshot", (unavailable(_LABEL, reason),))
     if cached and cache.fresh(cached) and not force_live:
         return _Feed(_decode(cached.body), "hit", persist=True)
     wait = _backoff_remaining(data_dir)
@@ -226,7 +239,7 @@ def _fallback(cached, reason: str) -> _Feed:
             (f"{reason}; served the stale cached feed",),
             persist=True,
         )
-    return _Feed(None, "snapshot", (f"{reason}; AusCERT bulletins are unavailable",))
+    return _Feed(None, "snapshot", (unavailable(_LABEL, reason),))
 
 
 def _root(text: str | None) -> tuple[ET.Element | None, str | None]:
@@ -443,9 +456,14 @@ def _backoff_remaining(data_dir: Path) -> float:
     return max(0.0, until - time.time())
 
 
-def _snapshot_path() -> Path:
+def _local_copy() -> str | None:
     snapshot = os.environ.get("CYBERAU_AUSCERT_SNAPSHOT")
-    return Path(snapshot) if snapshot else _PACKAGE / "data" / "bulletins.xml"
+    if snapshot:
+        return _read(Path(snapshot))
+    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-auscert"))
+    cache = HttpCache(data_dir / "http_cache.sqlite")
+    cached = cache.get(cache.key("GET", FEED_URL, None, b"", "anonymous"))
+    return _decode(cached.body) if cached else None
 
 
 def _read(path: Path) -> str:

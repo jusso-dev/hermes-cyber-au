@@ -21,6 +21,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 DEFAULT_BASE = "http://127.0.0.1:8787"
 ASSESS_PATH = "/v1/assess"
@@ -40,9 +41,10 @@ _RNG = None
 _MAX_INDICATOR = 8192
 # Identifiers and enums pass through. Any other upstream string is free text and gets wrapped.
 _TOKEN = re.compile(r"^[A-Za-z0-9_.:+\-]{1,64}$")
+_LABEL = "ThreatSieve"
 _SNAPSHOT_WARNING = (
-    "Served from the offline snapshot, which is a synthetic fixture and not a live "
-    "ThreatSieve assessment"
+    "Served from the operator-supplied snapshot file (CYBERAU_THREATSIEVE_SNAPSHOT), "
+    "not a live ThreatSieve assessment"
 )
 _DEMO_WARNING = "ThreatSieve marked this assessment as demo data, not a real assessment"
 _STALE_WARNING = "ThreatSieve was unreachable, so this is a cached copy that may be out of date"
@@ -67,7 +69,7 @@ def threatsieve_assess(indicator: str) -> dict:
         return _envelope([], cache, warnings=(problem,))
     if not _matches(payload, text):
         note = (
-            "no matching assessment in the offline snapshot or cache"
+            "no matching assessment in the operator-supplied snapshot file"
             if cache == "snapshot"
             else "ThreatSieve returned a different observable"
         )
@@ -107,10 +109,13 @@ class _ThreatSieveConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            # Only an operator-supplied snapshot is checked offline. Test fixtures are not.
+            if not os.environ.get("CYBERAU_THREATSIEVE_SNAPSHOT"):
+                return Probe(self.key, True, "no local copy to check")
             try:
                 payload = _load_text(_snapshot_text())
             except OSError:
-                return Probe(self.key, False, "ThreatSieve is unavailable")
+                return Probe(self.key, False, "ThreatSieve snapshot file is unreadable")
             if payload is None:
                 return Probe(self.key, False, "snapshot was not usable")
             problem = schema_drift(payload)
@@ -174,10 +179,13 @@ def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, st
         state = "hit" if cache.fresh(cached) else "stale"
         return _load_text(_decode(cached.body)), state, ""
     if offline:
-        payload, problem = _read_snapshot()
-        return payload, "snapshot", problem
+        return None, "snapshot", unavailable(_LABEL, "offline and no cached assessment is stored")
     if not secret:
-        return None, "snapshot", "Set THREATSIEVE_API_KEY to a ThreatSieve scoped API key"
+        return (
+            None,
+            "snapshot",
+            unavailable(_LABEL, "set THREATSIEVE_API_KEY to a ThreatSieve scoped API key"),
+        )
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = HttpClient(
         "threatsieve",
@@ -202,25 +210,29 @@ def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, st
             skip_cache=force_live,
         )
     except EgressDenied as exc:
-        return None, "snapshot", _safe(str(exc), secret)
+        return None, "snapshot", unavailable(_LABEL, _safe(str(exc), secret))
     except (HttpError, TimeoutError) as exc:
         if force_live:
             return None, "snapshot", "ThreatSieve is unavailable"
         cached = cache.get(key)
         if cached:
             return _load_text(_decode(cached.body)), "stale", _STALE_WARNING
-        return None, "snapshot", "ThreatSieve is unavailable: " + _safe(str(exc), secret)
+        return None, "snapshot", unavailable(_LABEL, _safe(str(exc), secret))
     finally:
         client.close()
     if response.status in (401, 403):
-        return None, "snapshot", _auth_warning(response.status, _error_code(response))
+        return (
+            None,
+            "snapshot",
+            unavailable(_LABEL, _auth_warning(response.status, _error_code(response))),
+        )
     if response.status == 429:
         if force_live:
             return None, "snapshot", "ThreatSieve rate limit exceeded"
         cached = cache.get(key)
         if cached:
             return _load_text(_decode(cached.body)), "stale", _STALE_WARNING
-        return None, "snapshot", "ThreatSieve rate limit exceeded"
+        return None, "snapshot", unavailable(_LABEL, "ThreatSieve rate limit exceeded")
     if response.status >= 400:
         code = _error_code(response)
         detail = f"{response.status} {code}".strip()
@@ -233,13 +245,15 @@ def _read_snapshot() -> tuple[dict | None, str]:
     try:
         return _load_text(_snapshot_text()), ""
     except OSError:
-        return None, "ThreatSieve is unavailable"
+        return None, unavailable(_LABEL, "the operator-supplied snapshot file is unreadable")
 
 
 def _snapshot_text() -> str:
+    """Read the operator-supplied snapshot. Nothing shipped in the package is ever read."""
     snapshot = os.environ.get("CYBERAU_THREATSIEVE_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "assess_domain.json"
-    return path.read_text(encoding="utf-8")
+    if not snapshot:
+        raise FileNotFoundError("CYBERAU_THREATSIEVE_SNAPSHOT is not set")
+    return Path(snapshot).read_text(encoding="utf-8")
 
 
 def _assess_url() -> str:

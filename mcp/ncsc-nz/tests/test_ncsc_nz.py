@@ -304,7 +304,7 @@ def test_redirect_off_allowlist_is_refused(monkeypatch):
     assert "evil.example" in refused["warnings"][0]
 
 
-def test_offline_prefers_cache_over_the_shipped_snapshot(tmp_path, monkeypatch):
+def test_offline_prefers_cache_over_the_operator_snapshot(tmp_path, monkeypatch):
     monkeypatch.delenv("CYBERAU_NCSC_SNAPSHOT")
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     body = (FIXTURES / "alerts_page.html").read_text(encoding="utf-8")
@@ -323,7 +323,6 @@ def test_offline_without_cache_or_snapshot_is_unavailable(tmp_path, monkeypatch)
     empty = tmp_path / "empty-data"
     empty.mkdir()
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(empty))
-    monkeypatch.setattr(source, "_PACKAGE", empty)
     missing = source.ncscnz_list_alerts()
     assert missing["data"] == []
     assert "unavailable" in missing["warnings"][0]
@@ -456,3 +455,44 @@ def test_live_health_fails_when_the_rate_limit_message_is_blank(monkeypatch):
 
     monkeypatch.setattr(source, "_limit", refuse)
     assert source.connector().health(live=True).ok is False
+
+
+FIXTURE_VALUES = ("Synthetic", "synthetic", "Repeated", "CVE-2024-3400", "CVE-2025-0001")
+
+
+def _assert_unavailable(result: dict, empty) -> None:
+    assert result["data"] == empty
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    encoded = json.dumps(result["data"]) + json.dumps(result["warnings"])
+    for value in FIXTURE_VALUES:
+        assert value not in encoded
+
+
+def _all_tools_unavailable() -> None:
+    _assert_unavailable(source.ncscnz_list_alerts(), [])
+    for url in (EDGE, DATED, UNDATED, REPEATED):
+        _assert_unavailable(source.ncscnz_get_alert(url), None)
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.delenv("CYBERAU_NCSC_SNAPSHOT")
+    _all_tools_unavailable()
+    assert source.connector().health(live=False, check_schema=True).ok is True
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    _live(monkeypatch)
+
+    def fail(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network unreachable")
+
+    source._TRANSPORT = httpx.MockTransport(fail)
+    _all_tools_unavailable()
+
+
+def test_override_snapshot_is_marked():
+    listed = source.ncscnz_list_alerts()
+    assert listed["data"]
+    assert any("operator-supplied" in warning for warning in listed["warnings"])
+    page = source.ncscnz_get_alert(DATED)
+    assert any("operator-supplied" in warning for warning in page["warnings"])

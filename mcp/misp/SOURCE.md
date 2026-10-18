@@ -14,6 +14,8 @@ Included tools, frozen from that commit: `search_attributes`, `get_event`, `sear
 
 Live health reports ok only when the answer came from the instance. A cached copy, a failed fetch or a missing key is not ok.
 
+Fallback ladder: live instance, then the local HTTP cache (fresh or stale), then unavailable. There is no shipped snapshot. When nothing is left, each tool returns empty data with a "MISP is unavailable" warning. `CYBERAU_MISP_SNAPSHOT` may point at an operator-supplied JSON file; answers from it carry a warning that they came from that file, not a live fetch. Test fixtures live under `tests/fixtures/` and are only read by tests and the offline schema-drift check.
+
 ## Operator guide
 
 Read-only search of a MISP instance you run, or AusMISP if you are an AusCERT member. Ships off.

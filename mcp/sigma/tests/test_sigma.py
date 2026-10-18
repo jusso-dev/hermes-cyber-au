@@ -42,6 +42,7 @@ def test_search_filters_and_attribution():
     found = sigma_search(query="powershell")
     assert [row["id"] for row in found["data"]] == [POWERSHELL]
     assert found["cache"] == "snapshot"
+    assert any("operator-supplied" in item for item in found["warnings"])
     assert found["data_as_of"] == "2026-07-09T14:51:34Z"
     assert found["attribution"].startswith("Sigma rules by SigmaHQ")
     assert found["untrusted"] is True
@@ -111,7 +112,7 @@ def test_get_returns_yaml_and_keeps_author():
 def test_convert_targets_and_unsupported_modifier():
     for target in ("kusto", "splunk", "elasticsearch"):
         converted = sigma_convert(target=target, rule_id=POWERSHELL)
-        assert converted["warnings"] == []
+        assert converted["warnings"] == [source._PINNED_NOTE]
         assert converted["data"]["id"] == POWERSHELL
         assert "Ada Fixture" in converted["data"]["author"]
         assert converted["data"]["target"] == target
@@ -158,6 +159,10 @@ def test_schema_and_live_health(tmp_path, monkeypatch):
     assert failed.ok is False
     assert "tag_name" in failed.detail
     assert schema_drift({"release_tag": "r2026-07-01", "files": []})
+    monkeypatch.delenv("CYBERAU_SIGMA_SNAPSHOT")
+    nothing = connector().health(live=False, check_schema=True)
+    assert nothing.ok is True and nothing.detail == "no local copy to check"
+    monkeypatch.setenv("CYBERAU_SIGMA_SNAPSHOT", str(drift))
 
     monkeypatch.delenv("CYBERAU_OFFLINE")
     monkeypatch.delenv("CYBERAU_SIGMA_SNAPSHOT")
@@ -230,6 +235,9 @@ def test_timeout_falls_back_to_cache(tmp_path, monkeypatch):
     cache = HttpCache(tmp_path / "http_cache.sqlite")
     key = cache.key("GET", RELEASES_LATEST, None, b"", "anonymous")
     cache.put(key, status=200, headers={}, body=json.dumps(RELEASE).encode(), ttl=0)
+    saved = tmp_path / "r2026-07-01" / "sigma_core.zip"
+    saved.parent.mkdir()
+    saved.write_bytes((FIXTURES / "rules_subset.zip").read_bytes())
 
     def handler(_request: httpx.Request) -> httpx.Response:
         raise httpx.TimeoutException("timed out")
@@ -239,6 +247,47 @@ def test_timeout_falls_back_to_cache(tmp_path, monkeypatch):
     assert found["cache"] == "stale"
     assert found["data"][0]["id"] == POWERSHELL
     assert found["warnings"]
+
+
+def test_no_package_data_ships_with_the_connector():
+    assert not (Path(__file__).resolve().parents[1] / "data").exists()
+
+
+@pytest.mark.parametrize("mode", ["offline", "timeout", "refused"])
+def test_no_live_or_stored_rules_is_unavailable_never_fixture_rows(monkeypatch, tmp_path, mode):
+    monkeypatch.delenv("CYBERAU_SIGMA_SNAPSHOT")
+    if mode != "offline":
+        monkeypatch.delenv("CYBERAU_OFFLINE")
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if mode == "timeout":
+                raise httpx.ConnectTimeout("timed out", request=request)
+            return httpx.Response(503)
+
+        source._TRANSPORT = httpx.MockTransport(handler)
+    results = [
+        sigma_search(query="powershell"),
+        sigma_search(technique_id="T1059"),
+        sigma_get(POWERSHELL),
+        sigma_convert(target="kusto", rule_id=POWERSHELL),
+    ]
+    for result in results:
+        assert result["data"] in (None, [])
+        assert any("is unavailable" in item for item in result["warnings"])
+        text = json.dumps(result)
+        for marker in (POWERSHELL, "Ada Fixture", "r2026-07-01", "2026-07-09", "PowerShell"):
+            assert marker not in text, marker
+
+
+def test_offline_serves_packages_this_connector_saved(monkeypatch, tmp_path):
+    monkeypatch.delenv("CYBERAU_SIGMA_SNAPSHOT")
+    saved = tmp_path / "r2026-07-01" / "sigma_core.zip"
+    saved.parent.mkdir()
+    saved.write_bytes((FIXTURES / "rules_subset.zip").read_bytes())
+    found = sigma_search(query="powershell")
+    assert found["cache"] == "stale"
+    assert found["data"][0]["id"] == POWERSHELL
+    assert any("stored Sigma release r2026-07-01" in item for item in found["warnings"])
 
 
 def test_malformed_payload_warns(monkeypatch):

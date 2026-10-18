@@ -1,8 +1,8 @@
 """Commit data updates onto a dated branch and open or update one pull request.
 
-``.github/workflows/data-update-pr.yml`` calls this script. Justin copies that
-workflow into ``.github/workflows/`` by hand, because the token for this
-repository cannot push files under ``.github/workflows/``.
+``.github/workflows/data-update-pr.yml`` calls this script. Data updates never
+touch ``.github/``: those paths are refused, because pushing a workflow file
+needs a token with the workflows permission, which the data token does not have.
 
 Paths outside the caller's allowed data directories are refused, as are
 symlinks and other non-regular entries inside them. The script
@@ -24,7 +24,7 @@ from pathlib import Path, PurePosixPath
 from zoneinfo import ZoneInfo
 
 DEFAULT_ALLOWED = (
-    r"^(mcp/[a-z0-9-]+/data/|feeds/|intel/snapshots/|"
+    r"^(mcp/[a-z0-9-]+/data/|feeds/|"
     r"skills/[a-z0-9-]+/references/|PR_BODY\.md$)"
 )
 

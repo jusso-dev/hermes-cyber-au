@@ -11,6 +11,7 @@ from pathlib import Path
 import cyberau_hudson_rock.source as source
 import httpx
 import pytest
+from cyberau_common.snapshot import unavailable
 from cyberau_hudson_rock.source import (
     connector,
     hudsonrock_domain_exposure,
@@ -113,10 +114,14 @@ def test_empty_and_malformed_payloads(monkeypatch, tmp_path):
     monkeypatch.setenv("CYBERAU_HUDSONROCK_SEARCH_SNAPSHOT", str(broken))
     warned = hudsonrock_domain_exposure(["example.com.au"])
     assert warned["data"] == []
-    assert warned["warnings"] == ["Hudson Rock payload was not usable."]
+    assert warned["warnings"] == [
+        unavailable("Hudson Rock domain exposure", "Hudson Rock payload was not usable.")
+    ]
     monkeypatch.setenv("CYBERAU_HUDSONROCK_OVERVIEW_SNAPSHOT", str(broken))
     overview = hudsonrock_domain_overview("example.com.au")
-    assert overview["warnings"] == ["Hudson Rock payload was not usable."]
+    assert overview["warnings"] == [
+        unavailable("Hudson Rock domain overview", "Hudson Rock payload was not usable.")
+    ]
 
 
 def test_auth_errors_name_the_env_var(monkeypatch, tmp_path):
@@ -396,7 +401,9 @@ def test_missing_key_and_docs(monkeypatch):
     assert live.ok is False
     assert "HUDSONROCK_API_KEY" in live.detail
     missing = hudsonrock_domain_overview("example.com.au")
-    assert missing["warnings"] == ["HUDSONROCK_API_KEY is not set."]
+    assert missing["warnings"] == [
+        unavailable("Hudson Rock domain overview", "HUDSONROCK_API_KEY is not set")
+    ]
     with pytest.raises(RuntimeError, match="HUDSONROCK_API_KEY"):
         connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 1, 1))
     allow = repo_root() / "mcp" / "egress-allowlist.yaml"
@@ -454,7 +461,10 @@ def test_retry_after_is_not_echoed_as_free_text(monkeypatch, tmp_path):
         lambda _request: httpx.Response(429, headers={"Retry-After": hostile})
     )
     result = hudsonrock_domain_exposure(["example.com.au"])
-    assert result["warnings"] == ["Hudson Rock rate limit (HTTP 429)."]
+    assert result["warnings"] == [
+        unavailable("Hudson Rock domain exposure", "Hudson Rock rate limit (HTTP 429).")
+    ]
+    assert "ignore previous" not in json.dumps(result)
 
 
 def test_filtered_counts_do_not_overwrite_the_unfiltered_row(monkeypatch, tmp_path):
@@ -469,3 +479,51 @@ def test_filtered_counts_do_not_overwrite_the_unfiltered_row(monkeypatch, tmp_pa
     assert len(rows) == 3
     counts = sorted(len(json.loads(row["counts_json"])) for row in rows)
     assert counts == [1, 3, 3]
+
+
+# Distinctive values from the synthetic fixtures. None may reach the agent
+# unless the operator points a CYBERAU_HUDSONROCK_*_SNAPSHOT variable at them.
+FIXTURE_VALUES = (
+    "synthetic-stealer-1",
+    "synthetic-overview-1",
+    "vpn.example.com.au",
+    "partner.example.com.au",
+    "2026-01-15",
+    "2026-02-01",
+)
+
+
+def _assert_every_tool_unavailable():
+    results = {
+        "hudsonrock_domain_exposure": hudsonrock_domain_exposure(["example.com.au"]),
+        "hudsonrock_domain_overview": hudsonrock_domain_overview("example.com.au"),
+    }
+    for name, result in results.items():
+        assert result["data"] == [], name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        assert source._SNAPSHOT not in result["warnings"], name
+        dumped = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            assert value not in dumped, (name, value)
+
+
+def test_offline_without_override_serves_no_fixture_rows(monkeypatch, tmp_path):
+    _ready(monkeypatch, tmp_path)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    source._TRANSPORT = httpx.MockTransport(
+        lambda _request: pytest.fail("offline mode must not call Hudson Rock")
+    )
+    _assert_every_tool_unavailable()
+
+
+@pytest.mark.parametrize("failure", ["timeout", "503"])
+def test_failed_live_fetch_serves_no_fixture_rows(monkeypatch, tmp_path, failure):
+    _ready(monkeypatch, tmp_path)
+
+    def broken(_request: httpx.Request) -> httpx.Response:
+        if failure == "timeout":
+            raise httpx.ConnectTimeout("timed out")
+        return httpx.Response(503)
+
+    source._TRANSPORT = httpx.MockTransport(broken)
+    _assert_every_tool_unavailable()

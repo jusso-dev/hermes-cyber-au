@@ -105,11 +105,11 @@ def test_empty_malformed_and_drift(monkeypatch, tmp_path):
     empty = otx_pulses()
     _assert_envelope(empty)
     assert empty["data"] == []
-    assert empty["warnings"] == []
+    assert empty["warnings"] == [source._SNAPSHOT_NOTE]
     monkeypatch.setenv("CYBERAU_OTX_SNAPSHOT", str(FIXTURES / "pulses_subscribed_page1.json"))
     future = otx_pulses(modified_since="2099-01-01")
     assert future["data"] == []
-    assert future["warnings"] == []
+    assert future["warnings"] == [source._SNAPSHOT_NOTE]
     monkeypatch.setenv("CYBERAU_OTX_SNAPSHOT", str(FIXTURES / "otx_malformed.json"))
     malformed = otx_indicator("IPv4", "203.0.113.10")
     assert malformed["data"] is None
@@ -309,11 +309,13 @@ def test_auth_retry_timeout_and_redirect(monkeypatch, tmp_path):
 
 def test_offline_cache_and_unavailable(monkeypatch, tmp_path):
     monkeypatch.delenv("CYBERAU_OTX_SNAPSHOT", raising=False)
-    packaged = otx_indicator("IPv4", "203.0.113.10")
-    assert packaged["cache"] == "snapshot"
-    assert packaged["data"]["value"] == "203.0.113.10"
+    nothing = otx_indicator("IPv4", "203.0.113.10")
+    assert nothing["cache"] == "snapshot"
+    assert nothing["data"] is None
+    assert "OTX is unavailable" in nothing["warnings"][0]
     pulses = otx_pulses(limit=1)
-    assert pulses["data"][0]["id"] == "pulse-new"
+    assert pulses["data"] == []
+    assert "OTX is unavailable" in pulses["warnings"][0]
     url = source._indicator_url("IPv4", "198.51.100.8", "general")
     cache = HttpCache(tmp_path / "http_cache.sqlite")
     body = json.dumps(
@@ -486,3 +488,44 @@ def test_live_results_are_persisted_but_snapshots_are_not(monkeypatch, tmp_path)
     stored = (tmp_path / "otx-observations.jsonl").read_text(encoding="utf-8")
     assert "pulse-new" in stored
     assert "exfiltrate" not in stored
+
+
+_FIXTURE_VALUES = ("pulse-new", "pulse-old", "pulse-doc-1", "203.0.113.10")
+
+
+def _assert_unavailable(result: dict, empty) -> None:
+    assert result["data"] == empty
+    assert any("OTX is unavailable" in item for item in result["warnings"])
+    text = json.dumps(result)
+    for value in _FIXTURE_VALUES:
+        assert value not in text
+
+
+def test_no_shipped_snapshot_is_served_offline(monkeypatch):
+    monkeypatch.delenv("CYBERAU_OTX_SNAPSHOT", raising=False)
+    assert not (PACKAGE / "data").exists()
+    _assert_unavailable(otx_indicator("IPv4", "198.51.100.8"), None)
+    _assert_unavailable(otx_pulses(limit=5), [])
+    monkeypatch.setenv("OTX_API_KEY", "super-secret-value")
+    _assert_unavailable(otx_indicator("domain", "example.org"), None)
+    _assert_unavailable(otx_pulses(limit=5), [])
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is True
+    assert probe.detail == "no local copy to check"
+
+
+def test_no_shipped_snapshot_is_served_when_live_fails(monkeypatch):
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    _live(monkeypatch, down)
+    _assert_unavailable(otx_indicator("IPv4", "198.51.100.8"), None)
+    _assert_unavailable(otx_pulses(limit=5), [])
+
+    _live(monkeypatch, lambda request: httpx.Response(503, content=b"busy"))
+    _assert_unavailable(otx_indicator("IPv4", "198.51.100.8"), None)
+    _assert_unavailable(otx_pulses(limit=5), [])
+
+    monkeypatch.delenv("OTX_API_KEY")
+    _assert_unavailable(otx_indicator("IPv4", "198.51.100.8"), None)
+    _assert_unavailable(otx_pulses(limit=5), [])

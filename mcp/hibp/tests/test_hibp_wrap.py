@@ -10,6 +10,7 @@ import httpx
 import jsonschema
 import pytest
 import yaml
+from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.server import build_server
 from cyberau_hibp.source import (
     GATED_TOOLS,
@@ -100,7 +101,7 @@ def _approve(monkeypatch, tool: str, subject: str) -> str:
 
 
 def _offline(monkeypatch):
-    monkeypatch.setenv("CYBERAU_HIBP_SNAPSHOT", str(PACKAGE / "data" / "snapshot.json"))
+    monkeypatch.setenv("CYBERAU_HIBP_SNAPSHOT", str(FIXTURES / "snapshot.json"))
 
 
 def test_tool_list_is_frozen_and_read_only():
@@ -138,6 +139,7 @@ def test_public_tools_offline_match_schemas(monkeypatch):
         result = fn(**arguments)
         jsonschema.validate(result["data"], _schema(name, "response"))
         assert result["cache"] == "snapshot"
+        assert any("operator-supplied" in item for item in result["warnings"])
         assert result["attribution"].startswith("Breach data from Have I Been Pwned")
         assert "CC BY 4.0" in result["attribution"]
         assert result["untrusted"] is True
@@ -185,7 +187,7 @@ def test_recorded_cassettes_drive_every_public_tool(monkeypatch):
 def test_range_fixture_matches_the_recorded_text():
     lines = (FIXTURES / "range_21BD1.txt").read_text(encoding="utf-8").splitlines()
     assert all(re.fullmatch(r"[0-9A-F]{35}:\d+", line) for line in lines)
-    snapshot = json.loads((PACKAGE / "data" / "snapshot.json").read_text(encoding="utf-8"))
+    snapshot = json.loads((FIXTURES / "snapshot.json").read_text(encoding="utf-8"))
     assert [f"{row['hashSuffix']}:{row['count']}" for row in snapshot["ranges"]["21BD1"]] == lines
 
 
@@ -196,7 +198,7 @@ def test_empty_results_are_clean(monkeypatch):
     assert empty["data"]["total_count"] == 0
     missing = hibp_get_breach("NoSuchBreach")
     assert missing["data"] is None
-    assert "offline snapshot" in missing["warnings"][0]
+    assert "operator-supplied HIBP snapshot" in missing["warnings"][0]
     absent = hibp_get_pwned_passwords_range("FFFFF")
     assert absent["data"] is None
     assert absent["warnings"]
@@ -250,7 +252,10 @@ def test_schema_drift_is_named():
 
 
 def test_health_flags_schema_drift(monkeypatch):
-    assert connector().health(live=False, check_schema=True).ok is True
+    nothing = connector().health(live=False, check_schema=True)
+    assert nothing.ok is True and nothing.detail == "no local copy to check"
+    _offline(monkeypatch)
+    assert connector().health(live=False, check_schema=True).detail == "schema ok"
     monkeypatch.setenv("CYBERAU_HIBP_SNAPSHOT", str(FIXTURES / "drift.json"))
     drifted = connector().health(live=False, check_schema=True)
     assert drifted.ok is False
@@ -343,7 +348,10 @@ def test_429_that_never_clears_reports_the_wait(monkeypatch):
     monkeypatch.setattr(source, "_TRANSPORT", transport)
     result = hibp_get_breach("Adobe")
     assert result["data"] is None
-    assert result["warnings"] == ["HIBP rate limited this call. Retry after 30 seconds."]
+    assert result["warnings"] == [
+        "HIBP is unavailable: HIBP rate limited this call. Retry after 30 seconds. "
+        "No live, cached or shipped data was served"
+    ]
     assert len(calls) == 4
 
 
@@ -369,7 +377,7 @@ def test_timeout_falls_back_to_cache(monkeypatch, isolated):
     assert nothing["warnings"][0].startswith("HIBP is unavailable")
 
 
-def test_offline_prefers_cache_then_snapshot(monkeypatch, isolated):
+def test_offline_prefers_cache_then_unavailable(monkeypatch, isolated):
     record = json.loads((FIXTURES / "breaches.json").read_text(encoding="utf-8"))["breaches"][1]
     transport, _ = _fixed(200, _reply({"breach": record}))
     monkeypatch.setattr(source, "_TRANSPORT", transport)
@@ -378,13 +386,77 @@ def test_offline_prefers_cache_then_snapshot(monkeypatch, isolated):
     monkeypatch.setattr(source, "_TRANSPORT", None)
     cached = hibp_get_breach("LinkedIn")
     assert cached["cache"] == "hit"
-    snapshot = hibp_get_breach("Adobe")
-    assert snapshot["cache"] == "snapshot"
-    assert snapshot["data"]["name"] == "Adobe"
+    missing = hibp_get_breach("Adobe")
+    assert missing["cache"] == "snapshot"
+    assert missing["data"] is None
+    assert "is unavailable" in missing["warnings"][0]
+    _offline(monkeypatch)
+    pinned = hibp_get_breach("Adobe")
+    assert pinned["cache"] == "snapshot" and pinned["data"]["name"] == "Adobe"
     assert hibp_get_breach("NoSuchBreach")["warnings"]
     account = _approve(monkeypatch, "hibp_get_breached_account", ACCOUNT)
     unavailable = hibp_get_breached_account(ACCOUNT, approval_token=account)
-    assert "unavailable offline" in unavailable["warnings"][0]
+    assert "is unavailable" in unavailable["warnings"][0]
+
+
+def test_no_package_data_ships_with_the_connector():
+    assert not (PACKAGE / "data").exists()
+
+
+class _FastLimiter(RateLimiter):
+    """Rate limiter on a fake clock, so waits pass instantly."""
+
+    def __init__(self, path, **_kwargs):
+        now = [1_000_000.0]
+
+        def sleep(seconds: float) -> None:
+            now[0] += seconds
+
+        super().__init__(path, clock=lambda: now[0], sleeper=sleep)
+
+
+@pytest.mark.parametrize("mode", ["offline", "timeout", "server_error"])
+def test_no_live_or_cached_data_is_unavailable_never_fixture_rows(monkeypatch, mode):
+    monkeypatch.setattr(source, "RateLimiter", _FastLimiter)
+    if mode == "offline":
+        monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    else:
+
+        def fail(request: httpx.Request) -> httpx.Response:
+            if mode == "timeout":
+                raise httpx.ConnectTimeout("timed out", request=request)
+            return httpx.Response(503)
+
+        monkeypatch.setattr(source, "_TRANSPORT", httpx.MockTransport(fail))
+    results = [
+        hibp_list_breaches(),
+        hibp_list_breaches(domain="adobe.com"),
+        hibp_get_breach("Adobe"),
+        hibp_get_pwned_passwords_range("21BD1"),
+    ]
+    for result in results:
+        assert result["data"] in (None, [])
+        assert any("is unavailable" in item for item in result["warnings"])
+    gated = [
+        hibp_get_breached_account(
+            ACCOUNT, approval_token=_approve(monkeypatch, "hibp_get_breached_account", ACCOUNT)
+        ),
+        hibp_get_breached_domain(
+            "hibp-integration-tests.com",
+            approval_token=_approve(
+                monkeypatch, "hibp_get_breached_domain", "hibp-integration-tests.com"
+            ),
+        ),
+    ]
+    for result in gated:
+        assert result["data"] is None
+        assert any("is unavailable" in item for item in result["warnings"])
+    snapshot = json.loads((FIXTURES / "snapshot.json").read_text(encoding="utf-8"))
+    text = json.dumps(results + gated)
+    for marker in ("LinkedIn", "Dropbox", "152445165", snapshot["data_as_of"]):
+        assert marker not in text, marker
+    for suffix in snapshot["ranges"]["21BD1"][:3]:
+        assert suffix["hashSuffix"] not in text
 
 
 def test_redirect_to_another_host_is_refused(monkeypatch):

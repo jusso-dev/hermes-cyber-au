@@ -1,0 +1,27 @@
+{
+  "profile": {
+    "metadata": {
+      "title": "PROTECTED excerpt",
+      "version": "2026.09.4"
+    },
+    "imports": [
+      {
+        "href": "#catalog",
+        "include-controls": [
+          {
+            "with-ids": [
+              "ism-1173",
+              "ism-0009",
+              "ism-0714",
+              "ism-1071",
+              "ism-1997",
+              "ism-principle-gov-01",
+              "ism-0027",
+              "ism-0039"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

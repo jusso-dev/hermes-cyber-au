@@ -22,6 +22,7 @@ from cyberau_abusech.source import (
 from cyberau_common.server import build_server
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+SNAPSHOT_FILE = FIXTURES / "snapshot.json"
 PACKAGE = Path(__file__).resolve().parents[1]
 REPO = Path(__file__).resolve().parents[3]
 KEY = "SENTINELKEY0123456789"
@@ -337,6 +338,7 @@ def test_upstream_failure_falls_back_to_cache(monkeypatch, failure):
     assert other["cache"] == "snapshot"
     assert other["data"]["records"] == []
     assert other["warnings"]
+    assert all("is unavailable" in warning for warning in other["warnings"])
 
 
 def test_malformed_upstream_payloads_warn_instead_of_raising():
@@ -427,10 +429,11 @@ def test_feodo_blocklist_filters_by_country():
     assert feodo_blocklist(country="au")["warnings"]
 
 
-def test_offline_answers_from_cache_then_snapshot_then_unavailable(monkeypatch):
+def test_offline_answers_from_cache_then_operator_snapshot_then_unavailable(monkeypatch):
     serve(all_routes())
     abusech_lookup(SHA256)
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.setenv("CYBERAU_ABUSECH_SNAPSHOT", str(SNAPSHOT_FILE))
     monkeypatch.delenv(ENV_KEY)
     source._TRANSPORT = httpx.MockTransport(refuse_network)
     cached = abusech_lookup(SHA256)
@@ -445,9 +448,65 @@ def test_offline_answers_from_cache_then_snapshot_then_unavailable(monkeypatch):
     assert unknown["cache"] == "snapshot"
     assert unknown["data"]["records"] == []
     assert set(unknown["data"]["platforms"].values()) == {"unavailable"}
-    assert "unavailable" in unknown["warnings"][0]
-    assert len(feodo_blocklist(country="US")["data"]) == 1
+    assert "is unavailable" in unknown["warnings"][0]
+    assert source.SNAPSHOT_WARNING not in unknown["warnings"]
+    operator_feodo = feodo_blocklist(country="US")
+    assert len(operator_feodo["data"]) == 1
+    assert "operator-supplied snapshot file" in operator_feodo["warnings"][0]
     assert len(threatfox_recent(malware="cobalt")["data"]) == 1
+
+
+# Values that appear only in the synthetic snapshot fixture, never in a real answer.
+FIXTURE_VALUES = (
+    "SYNTHETIC-AS",
+    "synthetic_reporter",
+    "malware.example.test",
+    "192.0.2.10",
+    "5001",
+)
+
+
+def assert_all_tools_unavailable() -> None:
+    results = [
+        abusech_lookup(URL),
+        abusech_lookup(HOST),
+        abusech_lookup(SHA256),
+        abusech_lookup(SHA1),
+        threatfox_recent(),
+        feodo_blocklist(),
+        feodo_blocklist(country="US"),
+    ]
+    for result in results:
+        data = result["data"]
+        rows = data["records"] if isinstance(data, dict) else data
+        assert rows == []
+        if isinstance(data, dict):
+            assert set(data["platforms"].values()) == {"unavailable"}
+        assert result["warnings"]
+        assert all("is unavailable" in warning for warning in result["warnings"])
+        assert source.SNAPSHOT_WARNING not in result["warnings"]
+        body = json.dumps(result["data"])
+        for value in FIXTURE_VALUES:
+            assert value not in body, value
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    source._TRANSPORT = httpx.MockTransport(refuse_network)
+    assert_all_tools_unavailable()
+    monkeypatch.delenv(ENV_KEY)
+    assert_all_tools_unavailable()
+
+
+@pytest.mark.parametrize("failure", ["connect", "http_503"])
+def test_failed_live_fetch_without_override_serves_no_shipped_data(failure):
+    def down(_request: httpx.Request) -> httpx.Response:
+        if failure == "connect":
+            raise httpx.ConnectError("connection refused")
+        return httpx.Response(503, content=b"unavailable")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    assert_all_tools_unavailable()
 
 
 def test_offline_stale_cache_is_labelled_stale(monkeypatch):
@@ -498,7 +557,13 @@ def test_intel_store_keeps_changes_without_duplicates(tmp_path, monkeypatch):
 
 def test_schema_drift_health_offline(monkeypatch):
     assert connector().health(live=False).ok is True
-    assert connector().health(live=False, check_schema=True).ok is True
+    unchecked = connector().health(live=False, check_schema=True)
+    assert unchecked.ok is True
+    assert "no local copy" in unchecked.detail
+    monkeypatch.setenv("CYBERAU_ABUSECH_SNAPSHOT", str(SNAPSHOT_FILE))
+    checked = connector().health(live=False, check_schema=True)
+    assert checked.ok is True
+    assert checked.detail == "schema ok"
     monkeypatch.setenv("CYBERAU_ABUSECH_SNAPSHOT", str(FIXTURES / "drift"))
     failed = connector().health(live=False, check_schema=True)
     assert failed.ok is False
@@ -595,7 +660,8 @@ def test_text_cannot_close_the_untrusted_wrapper():
 def test_files_contain_no_secrets_or_sample_downloads():
     pattern = re.compile(r"(?i)auth-key\s*[:=]\s*(?!\[REDACTED\]|\s*$)\S+")
     checked = 0
-    for folder in ("data", "schema", "tests/fixtures"):
+    assert not (PACKAGE / "data").exists()
+    for folder in ("schema", "tests/fixtures"):
         for path in (PACKAGE / folder).rglob("*"):
             if path.is_file():
                 text = path.read_text(encoding="utf-8")
@@ -603,7 +669,7 @@ def test_files_contain_no_secrets_or_sample_downloads():
                 assert KEY not in text
                 checked += 1
     assert checked >= 20
-    shipped = (PACKAGE / "data" / "snapshot.json").read_text(encoding="utf-8")
+    shipped = SNAPSHOT_FILE.read_text(encoding="utf-8")
     assert "urlhaus_download" not in shipped
     assert "/download/" not in shipped
     code = (PACKAGE / "src" / "cyberau_abusech" / "source.py").read_text(encoding="utf-8")

@@ -1,14 +1,17 @@
-"""Refresh public threat intel snapshots and refuse paths outside the data directories.
+"""Check that the public threat intel feeds still refresh live, and record their status.
 
-Calls ``cyberau-mcp refresh`` and ``cyberau-mcp store snapshot --public``.
-Keyed sources are included only when their secret is set. If either command
-is not part of the shared library yet, say so, and still refuse paths outside
-the data directories.
+Calls ``cyberau-mcp refresh`` for the keyless public sources that have a refresh
+adapter. Live intel is not committed to the repository: each install refreshes
+into its own intel store, and a copy in git would only go stale. The run writes
+per-source status to ``feeds/status.json`` (beside the feed catalogue) and asks
+for a pull request only when a source's status changed, not for new timestamps.
+A required source that fails makes the run fail.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -22,26 +25,16 @@ from cyberau_common.secrets import redact
 
 ROOT = Path(__file__).resolve().parents[2]
 
-PUBLIC_SOURCES = "asd,kev,epss,auscert,attack,feodo"
-OPTIONAL_SOURCES = "nvd,abusech,otx,radar"
-
-KEYED_SECRETS = {
-    "nvd": "NVD_API_KEY",
-    "abusech": "ABUSECH_AUTH_KEY",
-    "otx": "OTX_API_KEY",
-    "radar": "CLOUDFLARE_RADAR_API_TOKEN",
-}
+# Every public source with a refresh adapter in cyberau_common.refresh.
+PUBLIC_SOURCES = "asd,kev,epss,auscert,feodo"
 
 ABSENT_MARKER = "is not part of the shared library yet"
 REFRESH_ABSENT = f"cyberau-mcp refresh {ABSENT_MARKER}."
-STORE_ABSENT = f"cyberau-mcp store snapshot {ABSENT_MARKER}."
 ROOT_USAGE = "usage: cyberau-mcp [-h]"
 REFUSAL_PREFIX = "Refusing paths outside the data directories:"
 
-STORE_ARGS = ["store", "snapshot", "--public"]
-
-_EXACT_PATHS = frozenset({"PR_BODY.md", "feeds", "intel/snapshots"})
-_PREFIXES = ("feeds/", "intel/snapshots/")
+_EXACT_PATHS = frozenset({"PR_BODY.md", "feeds"})
+_PREFIXES = ("feeds/",)
 _MCP_DATA = re.compile(r"mcp/[a-z0-9-]+/data(?:/.*)?")
 _SKILL_REF = re.compile(r"skills/[a-z0-9-]+/references(?:/.*)?")
 
@@ -55,18 +48,6 @@ class CommandResult:
 
 def split_csv(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
-
-
-def keyed_sources(requested: Sequence[str], env: Mapping[str, str]) -> list[str]:
-    """Return keyed sources whose secret is set to a non-blank value."""
-    selected: list[str] = []
-    for name in requested:
-        variable = KEYED_SECRETS.get(name)
-        if variable is None:
-            raise ValueError(f"Unknown keyed source: {name}. It was not refreshed.")
-        if env.get(variable, "").strip():
-            selected.append(name)
-    return selected
 
 
 def repo_relative(path: str) -> str | None:
@@ -139,12 +120,7 @@ def git_changes(root: Path) -> list[str]:
 
 
 def is_absent(result: CommandResult) -> bool:
-    """True only when the shared library has no such command (exit 2).
-
-    The library registers refresh and store as placeholders. Argparse rejects the
-    leading flags at the top level parser, so refresh is absent when that parser
-    complains. A flag error from a command's own parser is a real failure.
-    """
+    """True only when the shared library has no such command (exit 2)."""
     if result.code != 2:
         return False
     if ABSENT_MARKER in result.stderr:
@@ -152,49 +128,24 @@ def is_absent(result: CommandResult) -> bool:
     return "unrecognized arguments" in result.stderr and ROOT_USAGE in result.stderr
 
 
-def scrub(text: str, env: Mapping[str, str]) -> str:
-    cleaned = redact(text)
-    for variable in KEYED_SECRETS.values():
-        value = env.get(variable, "")
-        if len(value) >= 8 and value in cleaned:
-            cleaned = cleaned.replace(value, "[REDACTED]")
-    return cleaned
+def status_signature(path: Path) -> dict[str, str]:
+    """Each source's ok/fail status, without timestamps or counts."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+    sources = payload.get("sources") if isinstance(payload, dict) else None
+    if not isinstance(sources, dict):
+        return {}
+    return {
+        str(name): str(entry.get("status") or "")
+        for name, entry in sources.items()
+        if isinstance(entry, dict)
+    }
 
 
-def scrub_summary(root: Path, summary: str, env: Mapping[str, str]) -> None:
-    """Remove secret values from the PR body in place, if refresh wrote one."""
-    rel = repo_relative(summary)
-    if rel is None:
-        return
-    path = root / rel
-    if not path.is_file():
-        return
-    text = path.read_text(encoding="utf-8", errors="replace")
-    cleaned = scrub(text, env)
-    if cleaned != text:
-        path.write_text(cleaned, encoding="utf-8")
-
-
-def refresh_args(
-    sources: str,
-    optional: Sequence[str],
-    outputs: Mapping[str, str] | None,
-) -> list[str]:
-    args = ["refresh", "--sources", sources]
-    if optional:
-        args.extend(["--optional-sources", ",".join(optional)])
-    if outputs is not None:
-        args.extend(
-            [
-                "--snapshot-dir",
-                outputs["snapshot_dir"],
-                "--catalogue",
-                outputs["catalogue"],
-                "--summary",
-                outputs["summary"],
-            ]
-        )
-    return args
+def refresh_args(sources: str, catalogue: str, summary: str) -> list[str]:
+    return ["refresh", "--sources", sources, "--catalogue", catalogue, "--summary", summary]
 
 
 def run_cyberau(args: Sequence[str], env: Mapping[str, str]) -> CommandResult:
@@ -223,8 +174,6 @@ def set_output(name: str, value: str) -> None:
 def execute(
     *,
     sources: str,
-    optional_sources: str,
-    snapshot_dir: str,
     catalogue: str,
     summary: str,
     env: Mapping[str, str] | None = None,
@@ -236,68 +185,53 @@ def execute(
     call = runner or (lambda args: run_cyberau(args, current))
     list_changes = changes or (lambda: git_changes(root))
 
-    try:
-        optional = keyed_sources(split_csv(optional_sources), current)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
+    bad_outputs = outside_data_dirs([catalogue, summary])
+    if bad_outputs:
+        print(f"{REFUSAL_PREFIX} {', '.join(bad_outputs)}", file=sys.stderr)
         set_output("open_pr", "false")
         return 1
+    status_path = root / (repo_relative(catalogue) or "feeds/catalogue.yaml")
+    status_path = status_path.parent / "status.json"
+    before = status_signature(status_path)
 
-    outputs = {
-        "snapshot_dir": snapshot_dir,
-        "catalogue": catalogue,
-        "summary": summary,
-    }
-    bad_outputs = outside_data_dirs(outputs.values())
-    refresh_result = call(refresh_args(sources, optional, None if bad_outputs else outputs))
-    store_result = call(list(STORE_ARGS))
-
-    exit_code = 0
-    for label, result in (
-        (REFRESH_ABSENT, refresh_result),
-        (STORE_ABSENT, store_result),
-    ):
-        if is_absent(result):
-            print(f"::warning title=Intel refresh not run::{label}")
-            continue
-        if result.code != 0:
-            detail = scrub(result.stderr or result.stdout, current).strip()
-            if detail:
-                print(detail, file=sys.stderr)
-            exit_code = result.code
-
-    if not bad_outputs:
-        scrub_summary(root, summary, current)
+    result = call(refresh_args(sources, catalogue, summary))
+    if is_absent(result):
+        print(f"::error title=Intel refresh not run::{REFRESH_ABSENT}")
+        set_output("open_pr", "false")
+        return 1
+    if result.stdout.strip():
+        print(redact(result.stdout.strip()))
+    if result.code != 0:
+        detail = redact(result.stderr or result.stdout).strip()
+        if detail:
+            print(detail, file=sys.stderr)
 
     try:
         changed = list_changes()
     except RuntimeError as exc:
-        print(scrub(str(exc), current), file=sys.stderr)
+        print(redact(str(exc)), file=sys.stderr)
         set_output("open_pr", "false")
         return 1
-
-    bad = sorted(set(bad_outputs) | set(outside_data_dirs(changed)))
+    bad = outside_data_dirs(changed)
     if bad:
         print(f"{REFUSAL_PREFIX} {', '.join(bad)}", file=sys.stderr)
         set_output("open_pr", "false")
         return 1
-    if exit_code != 0:
-        set_output("open_pr", "false")
-        return exit_code
-    # The PR body is never committed, so it alone is not a data change.
-    summary_path = repo_relative(summary)
-    data_changed = [path for path in changed if repo_relative(path) != summary_path]
-    set_output("open_pr", "true" if data_changed else "false")
-    return 0
+
+    after = status_signature(status_path)
+    status_changed = before != after
+    if status_changed:
+        print("Feed status changed. Asking for a pull request.")
+    set_output("open_pr", "true" if status_changed else "false")
+    # A failed source still records its new status in the pull request, then fails the run.
+    return result.code
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Refresh public threat intel snapshots and the feed catalogue."
+        description="Check the public intel feeds refresh live and record their status."
     )
     parser.add_argument("--sources", default=PUBLIC_SOURCES)
-    parser.add_argument("--optional-sources", default=OPTIONAL_SOURCES)
-    parser.add_argument("--snapshot-dir", default="intel/snapshots")
     parser.add_argument("--catalogue", default="feeds/catalogue.yaml")
     parser.add_argument("--summary", default="PR_BODY.md")
     return parser.parse_args(list(argv) if argv is not None else None)
@@ -305,13 +239,7 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    return execute(
-        sources=args.sources,
-        optional_sources=args.optional_sources,
-        snapshot_dir=args.snapshot_dir,
-        catalogue=args.catalogue,
-        summary=args.summary,
-    )
+    return execute(sources=args.sources, catalogue=args.catalogue, summary=args.summary)
 
 
 if __name__ == "__main__":

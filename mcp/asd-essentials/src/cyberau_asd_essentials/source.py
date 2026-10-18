@@ -8,6 +8,8 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Callable
+from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated, Literal
@@ -20,6 +22,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
 from pydantic import Field
 
 _Strategy = Literal[
@@ -52,6 +55,12 @@ CHAPTERS = {
 TRANSITION_URL = "https://www.cyber.gov.au/publication/transitioning-from-the-essential-eight"
 LAUNCH_URL = "https://www.asd.gov.au/news/2026-10-15-asd-essentials-evolving-our-approach-cyber-security-resilience"
 _PACKAGE = Path(__file__).resolve().parents[2]
+# The shipped snapshot is refused once its retrieval date is older than this.
+SNAPSHOT_MAX_AGE_DAYS = 180
+MATURITY_LABEL = "Essential Eight requirements"
+ESSENTIALS_LABEL = "ASD Essentials"
+# Tests set this to simulate another day when the snapshot age is checked.
+_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _SLEEP = __import__("time").sleep
 _PHASE = re.compile(r"^Priority phase (\d+)\s*:\s*(.+)$", re.IGNORECASE)
@@ -161,7 +170,7 @@ def e8_requirements(strategy: _Strategy, maturity_level: _Level) -> dict:
         },
         cache,
         urls,
-        maturity.get("retrieved_on"),
+        _data_as_of(maturity),
         tuple(item for item in warnings if item),
     )
 
@@ -191,8 +200,11 @@ def essentials_chapter(chapter: _Chapter, domain: _Domain | None = None) -> dict
             _chapter_body(chapter, page, actions=[], domain=selected),
             cache,
             [page.get("url") or CHAPTERS[chapter]],
-            essentials.get("retrieved_on"),
-            (f"no domain named {selected!r}. Chapters name: {names}",),
+            _data_as_of(essentials),
+            tuple(
+                item for item in (warning, f"no domain named {selected!r}. Chapters name: {names}")
+                if item
+            ),
         )
     for action in page.get("actions") or []:
         if selected and not _action_in_domain(action, matched):
@@ -205,7 +217,7 @@ def essentials_chapter(chapter: _Chapter, domain: _Domain | None = None) -> dict
         _chapter_body(chapter, page, actions=actions, domain=selected or None),
         cache,
         [page.get("url") or CHAPTERS[chapter]],
-        essentials.get("retrieved_on"),
+        _data_as_of(essentials),
         tuple(item for item in warnings if item),
     )
 
@@ -258,7 +270,7 @@ def essentials_transition(strategy: str) -> dict:
         },
         cache,
         [transition.get("url") or TRANSITION_URL],
-        essentials.get("retrieved_on"),
+        _data_as_of(essentials),
         (warning,) if warning else (),
     )
 
@@ -1155,40 +1167,70 @@ def _visible_text(events: list[tuple]) -> str:
 
 
 def _maturity() -> tuple[dict | None, str, str]:
-    maturity, _essentials_doc, problem = _snapshot_pair()
-    if problem and maturity is None:
-        return None, "snapshot", problem
-    return maturity, "snapshot", ""
+    return _snapshot_doc("e8-maturity-*.json", MATURITY_LABEL)
 
 
 def _essentials() -> tuple[dict | None, str, str]:
-    _maturity_doc, essentials, problem = _snapshot_pair()
-    if problem and essentials is None:
-        return None, "snapshot", problem
-    return essentials, "snapshot", ""
+    return _snapshot_doc("essentials-*.json", ESSENTIALS_LABEL)
+
+
+def _snapshot_doc(pattern: str, label: str) -> tuple[dict | None, str, str]:
+    """Load one snapshot file. Return (document, cache, warning).
+
+    A document comes back with a warning that labels it as a snapshot. When the
+    shipped file is refused, the document is None and the warning says why.
+    """
+    override = os.environ.get("CYBERAU_E8_SNAPSHOT")
+    root = Path(override) if override else _PACKAGE / "data"
+    path = _latest(root, pattern)
+    if path is None:
+        return None, "snapshot", unavailable(label, f"the {label} snapshot is missing")
+    text = path.read_text(encoding="utf-8")
+    document = _loads(text)
+    if not isinstance(document, dict):
+        return None, "snapshot", unavailable(label, f"the {label} snapshot was not usable")
+    as_of = document.get("retrieved_on")
+    if override:
+        return document, "snapshot", _override_note(label, as_of)
+    problem = check_shipped(
+        text, as_of, label=label, max_age_days=SNAPSHOT_MAX_AGE_DAYS, today=_today()
+    )
+    if problem:
+        return None, "snapshot", unavailable(label, problem)
+    return document, "snapshot", snapshot_note(label, as_of)
+
+
+def _override_note(label: str, as_of: object) -> str:
+    day = parse_day(as_of)
+    when = day.isoformat() if day else "an unknown date"
+    return (
+        f"served the operator-supplied {label} snapshot dated {when} from "
+        "CYBERAU_E8_SNAPSHOT, not a live fetch. Check the source before relying on it"
+    )
+
+
+def _today() -> date | None:
+    return _TODAY() if _TODAY else None
+
+
+def _data_as_of(document: dict) -> str | None:
+    day = parse_day(document.get("retrieved_on"))
+    return day.isoformat() if day else None
 
 
 def _snapshot_pair() -> tuple[dict | None, dict | None, str]:
-    root = _root()
-    maturity_path = _latest(root, "e8-maturity-*.json")
-    essentials_path = _latest(root, "essentials-*.json")
-    if maturity_path is None or essentials_path is None:
-        return None, None, "Essential Eight snapshot is missing"
-    maturity = _loads(maturity_path.read_text(encoding="utf-8"))
-    essentials = _loads(essentials_path.read_text(encoding="utf-8"))
-    if not isinstance(maturity, dict) or not isinstance(essentials, dict):
-        return None, None, "Essential Eight snapshot was not usable"
+    maturity, _cache, maturity_warning = _maturity()
+    essentials, _cache, essentials_warning = _essentials()
+    if maturity is None:
+        return None, essentials, maturity_warning
+    if essentials is None:
+        return maturity, None, essentials_warning
     return maturity, essentials, ""
 
 
 def _latest(root: Path, pattern: str) -> Path | None:
     found = sorted(root.glob(pattern))
     return found[-1] if found else None
-
-
-def _root() -> Path:
-    override = os.environ.get("CYBERAU_E8_SNAPSHOT")
-    return Path(override) if override else _PACKAGE / "data"
 
 
 def _loads(text: str):
@@ -1270,6 +1312,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     """Download the pinned public sources and write the shipped JSON snapshot."""
     destination = destination or (_PACKAGE / "data")
     destination.mkdir(parents=True, exist_ok=True)
+    retrieved_on = (_today() or datetime.now(UTC).date()).isoformat()
     chapters = {}
     for key, url in CHAPTERS.items():
         text, _cache, warning = _http(url, ttl=86400, skip_cache=True)
@@ -1307,7 +1350,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     controls = merge_control_rows(controls)
     unassigned = merge_unassigned_rows(unassigned_rows)
     essentials = {
-        "retrieved_on": "2026-10-17",
+        "retrieved_on": retrieved_on,
         "chapters": chapters,
         "transition": parse_transition(transition_html),
         "launch_url": LAUNCH_URL,
@@ -1317,7 +1360,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
         "transition_url_confirmed": TRANSITION_URL,
     }
     maturity = {
-        "retrieved_on": "2026-10-17",
+        "retrieved_on": retrieved_on,
         "ism_release": ISM_RELEASE,
         "source_urls": urls,
         "source_sha256": hashes,
@@ -1333,10 +1376,15 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
             "strategy are listed in unassigned_control_ids and are not copied onto every strategy."
         ),
     }
-    (destination / "essentials-2026-10-17.json").write_text(
+    essentials_path = destination / f"essentials-{retrieved_on}.json"
+    essentials_path.write_text(
         json.dumps(essentials, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    # Only the newest essentials file is read, so older dated copies are removed.
+    for older in destination.glob("essentials-*.json"):
+        if older != essentials_path:
+            older.unlink()
     (destination / f"e8-maturity-{ISM_RELEASE}.json").write_text(
         json.dumps(maturity, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

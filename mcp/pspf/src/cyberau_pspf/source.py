@@ -6,8 +6,9 @@ import os
 import re
 import sqlite3
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -21,6 +22,14 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import (
+    check_shipped,
+    parse_day,
+    read_shipped,
+    snapshot_note,
+    snapshot_problem,
+    unavailable,
+)
 from pydantic import Field
 
 HOME_URL = "https://www.protectivesecurity.gov.au/"
@@ -38,6 +47,11 @@ ATTRIBUTION = (
     "This connector is not endorsed by the Australian Government."
 )
 _PACKAGE = Path(__file__).resolve().parents[2]
+# The shipped snapshot is refused once its as_of date is older than this.
+SNAPSHOT_MAX_AGE_DAYS = 180
+LABEL = "PSPF"
+# Tests set this to simulate another day when the snapshot age is checked.
+_TODAY: Callable[[], date] | None = None
 _WEEK = 7 * 24 * 3600
 _DIRECTION_FIELDS = ("id", "title", "published", "url")
 _REQUIREMENT_FIELDS = ("id", "title", "url")
@@ -87,7 +101,7 @@ def pspf_search(query: _Query) -> dict:
     if payload is None:
         return _envelope([], cache, warnings=(warning or "PSPF snapshot was not usable",))
     _persist(payload)
-    rows = _search_store(query.strip().lower())
+    rows = [row for row in _search_store(query.strip().lower()) if _servable(row)]
     warnings = [warning] if warning else []
     if not rows:
         warnings.append(
@@ -200,21 +214,23 @@ def schema_drift(payload) -> str | None:
 def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     pinned = bool(os.environ.get("CYBERAU_PSPF_SNAPSHOT")) and not force_live
-    if pinned or offline:
+    if pinned:
         payload = _load_snapshot_file()
         if payload is None:
             return None, "snapshot", "PSPF snapshot was not usable", "snapshot"
         problem = schema_drift(payload)
         if problem:
             return None, "snapshot", problem, "snapshot"
-        if offline and not pinned and _has_live_records():
-            return _payload_from_store(), "stale", "served from the last stored poll", "stored"
         return (
             _stamp(_normalise(payload), "snapshot", payload.get("as_of")),
             "snapshot",
-            "",
+            _override_note(payload.get("as_of")),
             "snapshot",
         )
+    if offline:
+        if _has_live_records():
+            return _payload_from_store(), "stale", "served from the last stored poll", "stored"
+        return _shipped_answer("offline")
     if force_live or not all(_fresh_cached(url) for _name, url in PAGES):
         try:
             _limit("pspf:regen", rate=2 / _WEEK, burst=2)
@@ -227,10 +243,7 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
                     f"{note}; served from the last stored poll",
                     "stale",
                 )
-            shipped = _shipped()
-            if shipped is None:
-                return None, "snapshot", note, "snapshot"
-            return shipped, "snapshot", f"{note}; served shipped snapshot", "snapshot"
+            return _shipped_answer(note)
     bodies: dict[str, str] = {}
     warnings: list[str] = []
     caches: list[str] = []
@@ -267,11 +280,39 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
     if not force_live and _has_live_records():
         note = "; ".join(warnings) or "served from the last stored poll"
         return _payload_from_store(), "stale", note, "stale"
-    shipped = _shipped()
-    message = "; ".join(warnings) or "fetch failed"
-    if shipped is not None:
-        return shipped, "snapshot", f"{message}; served shipped snapshot", "snapshot"
-    return None, "snapshot", message, "direct"
+    payload, cache, note, method = _shipped_answer("; ".join(warnings) or "fetch failed")
+    return payload, cache, note, method if payload is not None else "direct"
+
+
+def _shipped_answer(reason: str) -> tuple[dict | None, str, str, str]:
+    """Serve the shipped snapshot after ``reason``, or say PSPF is unavailable."""
+    shipped, problem = _shipped()
+    if shipped is None:
+        return None, "snapshot", unavailable(LABEL, f"{reason}; {problem}"), "snapshot"
+    note = snapshot_note(LABEL, shipped.get("as_of"))
+    return shipped, "snapshot", f"{reason}; {note}", "snapshot"
+
+
+def _servable(row: dict) -> bool:
+    """Stored shipped-snapshot rows past the maximum age are not served again."""
+    if row.get("origin") == "live" or os.environ.get("CYBERAU_PSPF_SNAPSHOT"):
+        return True
+    problem = snapshot_problem(
+        row.get("retrieved_at"),
+        max_age_days=SNAPSHOT_MAX_AGE_DAYS,
+        label=LABEL,
+        today=_TODAY() if _TODAY else None,
+    )
+    return not problem
+
+
+def _override_note(as_of: object) -> str:
+    day = parse_day(as_of)
+    when = day.isoformat() if day else "an unknown date"
+    return (
+        f"served the operator-supplied {LABEL} snapshot dated {when} from "
+        "CYBERAU_PSPF_SNAPSHOT, not a live fetch"
+    )
 
 
 def _fetch_page(
@@ -564,9 +605,12 @@ def _has_content(payload: dict) -> bool:
 
 
 def _fill_gaps(payload: dict) -> tuple[dict, list[str]]:
-    shipped = _shipped()
     notes: list[str] = []
+    if payload["directions"] and payload["requirements"]:
+        return payload, notes
+    shipped, problem = _shipped()
     if shipped is None:
+        notes.append(f"the live pages were incomplete and {problem}")
         return payload, notes
     if not payload["directions"]:
         payload["directions"] = shipped["directions"]
@@ -574,6 +618,7 @@ def _fill_gaps(payload: dict) -> tuple[dict, list[str]]:
     if not payload["requirements"]:
         payload["requirements"] = shipped["requirements"]
         notes.append("requirements served from the shipped snapshot")
+    notes.append(snapshot_note(LABEL, shipped.get("as_of")))
     return payload, notes
 
 
@@ -705,12 +750,27 @@ def _payload_from_store() -> dict:
     return {"as_of": None, "requirements": requirements, "directions": directions}
 
 
-def _shipped() -> dict | None:
-    path = _PACKAGE / "data" / "snapshot.json"
-    payload = _read_json(path)
-    if payload is None or schema_drift(payload):
-        return None
-    return _stamp(_normalise(payload), "snapshot", payload.get("as_of"))
+def _shipped() -> tuple[dict | None, str]:
+    """Return the shipped snapshot, or None and the reason it was refused."""
+    text = read_shipped(_PACKAGE / "data" / "snapshot.json")
+    if text is None:
+        return None, f"the shipped {LABEL} snapshot is missing"
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = None
+    if not isinstance(payload, dict) or schema_drift(payload):
+        return None, f"the shipped {LABEL} snapshot was not usable"
+    problem = check_shipped(
+        text,
+        payload.get("as_of"),
+        label=LABEL,
+        max_age_days=SNAPSHOT_MAX_AGE_DAYS,
+        today=_TODAY() if _TODAY else None,
+    )
+    if problem:
+        return None, problem
+    return _stamp(_normalise(payload), "snapshot", payload.get("as_of")), ""
 
 
 def _load_snapshot_file() -> dict | None:
@@ -754,8 +814,9 @@ def _iso_date(value: str) -> str | None:
 
 
 def _as_of(payload: dict) -> str | None:
-    if payload.get("as_of"):
-        return str(payload["as_of"])
+    day = parse_day(payload.get("as_of"))
+    if day:
+        return day.isoformat()
     dates = [
         row["published"]
         for row in [*payload.get("requirements", []), *payload.get("directions", [])]

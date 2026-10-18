@@ -22,6 +22,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -111,7 +112,7 @@ _PI_KEYS = {
     "credit_card",
     "form_post_data",
 }
-_SNAPSHOT_NOTE = "Served from a snapshot file, not a live SpyCloud result."
+_SNAPSHOT_NOTE = "Served from the operator-supplied snapshot file, not a live SpyCloud fetch."
 _OFFLINE_NOTE = "Offline, so this came from the local cache and not a live SpyCloud result."
 
 _TRANSPORT = None
@@ -346,7 +347,11 @@ def _fetch_json(
                     return None, state, problem
                 return payload, state, _OFFLINE_NOTE if offline else ""
         if offline:
-            return None, "snapshot", "unavailable"
+            return (
+                None,
+                "snapshot",
+                f"offline mode is on, there is no cached copy and {snapshot_var} is not set",
+            )
         body, state, warning = _http_get(
             url,
             params,
@@ -829,6 +834,10 @@ def spycloud_watchlist_exposure(
         record_type=type,
         limit=limit,
     )
+    if data is None:
+        # No live, cached or operator-supplied records. Never fall back to fixtures.
+        reason = "; ".join(item.rstrip(".") for item in warnings)
+        warnings = (unavailable("SpyCloud watchlist exposure", reason),)
     return _envelope(data, cache, warnings=warnings)
 
 
@@ -890,7 +899,8 @@ def spycloud_breach_info(breach_id: str) -> dict:
         snapshot_var="CYBERAU_SPYCLOUD_CATALOG_SNAPSHOT",
     )
     if warning and payload is None:
-        return _envelope(None, cache, warnings=(warning,), url=url)
+        reason = unavailable("SpyCloud breach catalogue", warning)
+        return _envelope(None, cache, warnings=(reason,), url=url)
     record = _catalog_record(payload or {})
     if not record:
         return _envelope(

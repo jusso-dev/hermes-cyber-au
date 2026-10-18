@@ -279,3 +279,7 @@ Set `CLOUDFLARE_URLSCAN_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the profile `.
 A fresh install still renders `enabled: false` under `mcp_servers.cfscan` when those variables are set. Turn the server on with `enabled: true` in the profile `config.yaml`. `hermes profile update` keeps that choice and does not switch the server back on or off.
 
 Polling a result that is not finished returns HTTP 404. Wait 10 to 30 seconds and call `urlscan_get_result` again. Page titles and verdict categories are untrusted text.
+
+### When Cloudflare cannot be reached
+
+Fallback ladder: a live call, then the connector's own cache, then unavailable. Offline mode with nothing cached, missing credentials, a failed request or a 429 returns no record and a warning that Cloudflare URL Scanner is unavailable. No shipped snapshot is served. An operator can pin a saved submit and result document with `CYBERAU_CFSCAN_SNAPSHOT`; it is read only in offline mode, and answers from it carry a warning that they came from the operator-supplied snapshot file, not a live call. Synthetic test fixtures live under `tests/fixtures/` and are never read at runtime.

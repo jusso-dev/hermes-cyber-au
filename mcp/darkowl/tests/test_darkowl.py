@@ -102,7 +102,7 @@ def test_search_snapshot_wraps_text_and_stores_counts_only(tmp_path, monkeypatch
     assert record["snippet"].endswith("<<end untrusted>>")
     assert "Synthetic forum title" in record["title"]
     assert "Older synthetic paste" not in json.dumps(result)
-    assert any("snapshot" in warning for warning in result["warnings"])
+    assert any("operator-supplied snapshot" in warning for warning in result["warnings"])
     assert not (tmp_path / "intel.sqlite").exists()
     assert connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 1, 1)) == []
     assert not (tmp_path / "intel.sqlite").exists()
@@ -509,3 +509,57 @@ def test_cassette_replays_without_an_authorization_header():
 
 def test_vcr_config_filters_authorization(vcr_config):
     assert "authorization" in vcr_config["filter_headers"]
+
+
+_FIXTURE_VALUES = (
+    "synthetic-1",
+    "synthetic-2",
+    "Synthetic forum title",
+    "Older synthetic paste",
+    "synthetic mention",
+    "2026-06-02",
+)
+
+
+def _assert_unavailable(result: dict) -> None:
+    assert result["data"] == []
+    assert any("is unavailable" in warning for warning in result["warnings"])
+    text = json.dumps(result)
+    for value in _FIXTURE_VALUES:
+        assert value not in text
+
+
+def test_offline_without_override_serves_no_fixture_rows(monkeypatch):
+    def handler(_request):
+        raise AssertionError("offline must not use the network")
+
+    _transport(handler)
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(darkowl_search_watchlist(["example.com.au", "Example Brand"]))
+    _keys(monkeypatch)
+    _assert_unavailable(darkowl_search_watchlist(["example.com.au", "Example Brand"]))
+    assert connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 1, 1)) == []
+
+
+@pytest.mark.parametrize("failure", ["connect", "timeout", "503"])
+def test_failed_live_fetch_without_override_serves_no_fixture_rows(monkeypatch, failure):
+    _keys(monkeypatch)
+
+    def handler(_request):
+        if failure == "connect":
+            raise httpx.ConnectError("connection refused")
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(503)
+
+    _transport(handler)
+    _assert_unavailable(darkowl_search_watchlist(["example.com.au", "Example Brand"]))
+
+
+def test_live_health_never_reads_the_test_fixture(monkeypatch):
+    _keys(monkeypatch)
+    monkeypatch.setattr(source, "_SCHEMA_FIXTURE", Path("/nonexistent/fixture.json"))
+    _transport(lambda _request: httpx.Response(503))
+    probe = connector().health(live=True, check_schema=True)
+    assert probe.ok is False
+    assert "snapshot" not in probe.detail

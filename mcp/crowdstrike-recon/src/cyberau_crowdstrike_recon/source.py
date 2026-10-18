@@ -23,6 +23,7 @@ from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -44,7 +45,16 @@ _RATE = 10.0
 _BURST = 20
 _REDIRECTS = {301, 302, 303, 307, 308}
 _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
-_DATA = Path(__file__).resolve().parent / "data"
+# Synthetic test copies. Only the offline schema check reads these, never a tool.
+_FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
+_SNAPSHOT_ENV = {
+    "notifications": "CYBERAU_CSRECON_SNAPSHOT",
+    "rules": "CYBERAU_CSRECON_RULES_SNAPSHOT",
+}
+_LABEL = {
+    "notifications": "CrowdStrike Recon notifications",
+    "rules": "CrowdStrike Recon rules",
+}
 _Date = Annotated[str, Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")]
 _Limit = Annotated[int, Field(ge=1, le=500)]
 
@@ -61,18 +71,18 @@ def cs_recon_notifications(since: _Date | None = None, limit: _Limit = 100) -> d
         return _envelope([], "snapshot", (problem,), "notifications")
     present, raw, state, warning = _records("notifications", _blank(since), int(limit))
     if warning:
-        return _envelope([], state, (warning,), "notifications")
+        return _envelope([], state, (_unavailable("notifications", warning),), "notifications")
     if state != "snapshot":
         _persist(raw, _load_watchlist())
-    return _envelope(present, state, _notice(state), "notifications")
+    return _envelope(present, state, _notice(state, "notifications"), "notifications")
 
 
 def cs_recon_rules() -> dict:
     """Monitoring rules and their topics. Read only."""
     present, _raw, state, warning = _records("rules", None, 500)
     if warning:
-        return _envelope([], state, (warning,), "rules")
-    return _envelope(present, state, _notice(state), "rules")
+        return _envelope([], state, (_unavailable("rules", warning),), "rules")
+    return _envelope(present, state, _notice(state, "rules"), "rules")
 
 
 def connector() -> PremiumConnector:
@@ -107,17 +117,25 @@ class CrowdStrikeRecon(PremiumConnector):
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
         _present, raw, state, warning = _records("notifications", since.isoformat(), 500)
         if warning or not raw or state == "snapshot":
-            # A bundled snapshot is synthetic. It must never become a stored finding.
+            # An operator snapshot file is not live evidence. It never becomes a stored finding.
             return []
         return _persist(raw, watchlist)
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema:
-            problem = schema_drift(_bundled("notifications") or {})
-            if problem:
-                return Probe(self.key, False, problem)
-            if not live:
-                return Probe(self.key, True, "schema ok")
+            payload = _bundled("notifications")
+            if payload is None and not live:
+                # Offline schema check only. The synthetic copy is never served.
+                payload = _load_json(_FIXTURES / "notifications_synthetic.json")
+            if payload is None:
+                if not live:
+                    return Probe(self.key, True, "no local copy to check")
+            else:
+                problem = schema_drift(payload)
+                if problem:
+                    return Probe(self.key, False, problem)
+                if not live:
+                    return Probe(self.key, True, "schema ok")
         missing = _missing_licence()
         if missing:
             if live:
@@ -516,7 +534,7 @@ def _from_snapshot(
     payload = _bundled(kind)
     resources = None if payload is None else payload.get("resources")
     if not isinstance(resources, list):
-        return [], [], "snapshot", "unavailable: no CrowdStrike snapshot or cache"
+        return [], [], "snapshot", "offline and nothing cached this session"
     rows = [row for row in resources if isinstance(row, dict) and row.get("id")]
     if kind == "notifications":
         rows = [_scrub_notification(row) for row in _select(rows, since, limit)]
@@ -726,14 +744,18 @@ def _scope() -> str:
 
 
 def _bundled(kind: str) -> dict | None:
-    if kind == "notifications":
-        override = os.environ.get("CYBERAU_CSRECON_SNAPSHOT")
-        path = Path(override) if override else _DATA / "notifications_synthetic.json"
-    else:
-        path = _DATA / "rules_synthetic.json"
+    """Operator-supplied snapshot file, or None. Nothing shipped is ever served."""
+    override = os.environ.get(_SNAPSHOT_ENV[kind])
+    if not override:
+        return None
+    path = Path(override)
     if not path.is_file():
         return None
     return _load_json(path)
+
+
+def _unavailable(kind: str, reason: str) -> str:
+    return unavailable(_LABEL[kind], reason)
 
 
 def _load_json(path: Path) -> dict | None:
@@ -794,11 +816,11 @@ def _validate(since: str | None, limit) -> str:
     return ""
 
 
-def _notice(state: str) -> tuple[str, ...]:
+def _notice(state: str, kind: str) -> tuple[str, ...]:
     if state == "snapshot":
         return (
-            "Bundled synthetic snapshot, not live CrowdStrike data. "
-            "Nothing here is a real notification or rule.",
+            f"Served from the operator-supplied snapshot file in {_SNAPSHOT_ENV[kind]}, "
+            "not live CrowdStrike data.",
         )
     if state == "stale":
         return ("Cached copy from earlier this session, not a fresh CrowdStrike response.",)

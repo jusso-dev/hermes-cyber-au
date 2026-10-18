@@ -11,28 +11,36 @@ from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
+from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.server import Connector, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 CATALOG_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 ATTRIBUTION = "CISA Known Exploited Vulnerabilities catalog. US Government work."
-_PACKAGE = Path(__file__).resolve().parents[2]
+LABEL = "The CISA KEV catalogue"
+SNAPSHOT_NOTE = (
+    "served the operator-supplied KEV snapshot file (CYBERAU_KEV_SNAPSHOT), not a live fetch"
+)
 
 
 def kev_lookup(cve_ids: list[str] | None = None) -> dict:
     if not cve_ids:
         return _envelope([], "snapshot", warnings=("cve_ids is required",))
-    catalog, cache = _catalog()
+    catalog, cache, notes = _load_catalog()
+    if catalog is None:
+        return _envelope({"found": [], "missing": []}, cache, warnings=notes)
     wanted = {item.upper() for item in cve_ids}
     found = [_entry(row) for row in catalog["vulnerabilities"] if row["cveID"].upper() in wanted]
     present = {row["cve_id"] for row in found}
     missing = sorted(wanted - present)
-    return _envelope({"found": found, "missing": missing}, cache, catalog)
+    return _envelope({"found": found, "missing": missing}, cache, catalog, notes)
 
 
 def kev_recent(days: int = 7, vendor: str | None = None, ransomware_only: bool = False) -> dict:
-    catalog, cache = _catalog()
+    catalog, cache, notes = _load_catalog()
+    if catalog is None:
+        return _envelope([], cache, warnings=notes)
     today = _today()
     rows = []
     for row in catalog["vulnerabilities"]:
@@ -44,13 +52,15 @@ def kev_recent(days: int = 7, vendor: str | None = None, ransomware_only: bool =
         if ransomware_only and row.get("knownRansomwareCampaignUse") != "Known":
             continue
         rows.append(_entry(row))
-    return _envelope(rows, cache, catalog)
+    return _envelope(rows, cache, catalog, notes)
 
 
 def kev_search(query: str | None = None, limit: int = 20) -> dict:
     if not query or len(query) < 2:
         return _envelope([], "snapshot", warnings=("query must be at least 2 characters",))
-    catalog, cache = _catalog()
+    catalog, cache, notes = _load_catalog()
+    if catalog is None:
+        return _envelope([], cache, warnings=notes)
     needle = query.lower()
     rows = []
     for row in catalog["vulnerabilities"]:
@@ -60,7 +70,7 @@ def kev_search(query: str | None = None, limit: int = 20) -> dict:
             rows.append(_entry(row))
         if len(rows) >= limit:
             break
-    return _envelope(rows, cache, catalog)
+    return _envelope(rows, cache, catalog, notes)
 
 
 def connector() -> Connector:
@@ -76,11 +86,26 @@ def connector() -> Connector:
     )
 
 
-def _catalog() -> tuple[dict, str]:
+def _catalog() -> tuple[dict | None, str]:
+    """Return the catalogue and its cache state. The catalogue is None when unavailable.
+
+    cyberau_common.refresh calls this, so keep the shape.
+    """
+    catalog, cache, _notes = _load_catalog()
+    return catalog, cache
+
+
+def _load_catalog() -> tuple[dict | None, str, tuple[str, ...]]:
+    """Return the catalogue, its cache state and warnings.
+
+    The ladder is live, then this connector's own HTTP cache, then an
+    operator-supplied snapshot file. Nothing shipped in the repo is served.
+    When all of them fail the catalogue is None and the warning says why.
+    """
     snapshot = os.environ.get("CYBERAU_KEV_SNAPSHOT")
-    if os.environ.get("CYBERAU_OFFLINE") == "1" or snapshot:
-        path = Path(snapshot) if snapshot else _PACKAGE / "data" / "kev.json"
-        return json.loads(path.read_text(encoding="utf-8")), "snapshot"
+    if snapshot:
+        return json.loads(Path(snapshot).read_text(encoding="utf-8")), "snapshot", (SNAPSHOT_NOTE,)
+    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
     data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-kev"))
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_repo_allowlist())))
     client = HttpClient(
@@ -92,12 +117,21 @@ def _catalog() -> tuple[dict, str]:
         rate=1 / (6 * 3600),
         burst=1,
         window="rolling",
+        offline=offline,
     )
     try:
         response = client.get(CATALOG_URL, ttl=6 * 3600)
+        catalog = json.loads(response.body)
+    except HttpError as exc:
+        reason = "offline mode and no cached copy" if offline else f"the live fetch failed ({exc})"
+        return None, "snapshot", (unavailable(LABEL, reason),)
+    except ValueError:
+        return None, "snapshot", (unavailable(LABEL, "the live response was not valid JSON"),)
     finally:
         client.close()
-    return json.loads(response.body), response.cache
+    if not isinstance(catalog, dict) or not isinstance(catalog.get("vulnerabilities"), list):
+        return None, "snapshot", (unavailable(LABEL, "the live response had no vulnerabilities list"),)
+    return catalog, response.cache, ()
 
 
 def _entry(row: dict) -> dict:

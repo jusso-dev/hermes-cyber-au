@@ -142,32 +142,36 @@ def test_a_stale_source_fails_first_and_the_rest_still_run(feeds, capsys):
     assert "kev ok 2 items" in out
 
 
-def test_optional_and_not_yet_supported_sources_do_not_fail(feeds, capsys):
+def test_optional_sources_do_not_fail(feeds, capsys):
     feeds["asd_method"] = "stale"
-    code = main(["refresh", "--sources", "kev,attack", "--optional-sources", "asd"])
+    code = main(["refresh", "--sources", "kev", "--optional-sources", "asd"])
     out = capsys.readouterr().out.splitlines()
     assert code == 0
-    assert "attack skipped 0 items (no refresh adapter yet)" in out
     assert any(line.startswith("asd fail") for line in out)
 
 
+def test_sources_without_an_adapter_are_refused_not_skipped(capsys):
+    for name in ("attack", "nvd", "abusech", "otx", "radar"):
+        assert main(["refresh", "--sources", "kev", "--optional-sources", name]) == 2
+        assert f"unknown sources: {name}" in capsys.readouterr().err
+
+
 def test_bad_arguments_fail_in_the_refresh_parser(capsys):
+    assert main(["refresh", "--sources", "kev", "--snapshot-dir", "intel/snapshots"]) == 2
+    capsys.readouterr()
     assert main(["refresh"]) == 2
     assert "usage: cyberau-mcp refresh" in capsys.readouterr().err
     assert main(["refresh", "--sources", "kev,nope"]) == 2
     assert "unknown sources: nope" in capsys.readouterr().err
 
 
-def test_nightly_outputs_status_snapshots_and_summary(feeds, tmp_path, capsys):
+def test_nightly_outputs_status_and_summary_but_no_feed_rows(feeds, tmp_path, capsys):
     feeds_dir = tmp_path / "feeds"
-    snapshots = tmp_path / "intel" / "snapshots"
     summary = tmp_path / "PR_BODY.md"
     args = [
         "refresh",
         "--sources",
         "asd,kev",
-        "--snapshot-dir",
-        str(snapshots),
         "--catalogue",
         str(feeds_dir / "catalogue.yaml"),
         "--summary",
@@ -178,7 +182,10 @@ def test_nightly_outputs_status_snapshots_and_summary(feeds, tmp_path, capsys):
     assert status["sources"]["kev"]["item_count"] == 2
     assert status["sources"]["kev"]["last_error"] is None
     assert not (feeds_dir / "catalogue.yaml").exists()
-    assert len(json.loads((snapshots / "kev.json").read_text(encoding="utf-8"))) == 2
+    assert sorted(path.name for path in tmp_path.rglob("*") if path.is_file()) == [
+        "PR_BODY.md",
+        "status.json",
+    ]
     assert "| kev | ok | 2 |" in summary.read_text(encoding="utf-8")
 
     feeds["asd_method"] = "snapshot"

@@ -33,7 +33,6 @@ Server manifest `required_env`: `FALCON_CLIENT_ID`, `FALCON_CLIENT_SECRET`.
 | `FALCON_BASE_URL` | credential | yes | no | `lookup` |
 | `FALCON_CLIENT_ID` | credential | yes | yes | `lookup` |
 | `FALCON_CLIENT_SECRET` | credential | yes | yes | `lookup` |
-| `CYBERAU_CSRECON_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_WATCHLIST` | runtime | no | no | `os.environ.get` |
@@ -335,6 +334,8 @@ No attribution string is set in the connector source.
 ## Notes
 
 Recon calls go through the official FalconPy SDK (`query_notifications`, `get_notifications`, `query_rules`, `get_rules`). Creating rules is out of scope.
+
+Fallback ladder: live Recon call, then the copy cached earlier this session, then unavailable. When none of those has data, a tool returns an empty list and an "is unavailable" warning. No snapshot ships with the package. Synthetic test copies live under `tests/fixtures/` and are never served. An operator can point `CYBERAU_CSRECON_SNAPSHOT` (notifications) or `CYBERAU_CSRECON_RULES_SNAPSHOT` (rules) at a local JSON file. Rows from that file carry a warning that they came from the operator-supplied snapshot, not a live fetch, and they never become stored findings.
 
 ## Operator guide
 

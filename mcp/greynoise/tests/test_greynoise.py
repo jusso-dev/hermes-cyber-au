@@ -144,7 +144,8 @@ def test_offline_cache_and_unavailable(tmp_path, monkeypatch):
     assert "unavailable" in missing["warnings"][0]
     packed = greynoise_ip("1.1.1.1")
     assert packed["cache"] == "snapshot"
-    assert packed["data"]["riot"] is True
+    assert packed["data"] is None
+    assert any("is unavailable" in item for item in packed["warnings"])
 
     monkeypatch.delenv("CYBERAU_OFFLINE")
     cache = HttpCache(tmp_path / "data" / "http_cache.sqlite")
@@ -356,3 +357,39 @@ def test_daily_quota_retry_is_bounded_and_reports_retry_after(monkeypatch):
     assert result["data"] is None
     assert "Retry after 86400 seconds" in result["warnings"][0]
     assert sum(slept) <= 60
+
+
+FIXTURE_VALUES = ("Cloudflare", "viz.greynoise.io", "2020-01-01", "Success")
+
+
+def _assert_unavailable(result: dict) -> None:
+    assert result["data"] is None
+    assert result["data_as_of"] is None
+    assert any("is unavailable" in item for item in result["warnings"])
+    text = json.dumps(result)
+    for value in FIXTURE_VALUES:
+        assert value not in text, value
+
+
+def test_offline_without_override_serves_no_shipped_data(monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    _assert_unavailable(greynoise_ip("1.1.1.1"))
+
+
+def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
+    source._RETRIES = 0
+    source._TRANSPORT = httpx.MockTransport(lambda request: httpx.Response(500))
+    _assert_unavailable(greynoise_ip("1.1.1.1"))
+
+    def timeout(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out")
+
+    source._TRANSPORT = httpx.MockTransport(timeout)
+    _assert_unavailable(greynoise_ip("1.1.1.1"))
+
+
+def test_override_snapshot_is_labelled(monkeypatch):
+    _snapshot("community_riot.json", monkeypatch)
+    riot = greynoise_ip("1.1.1.1")
+    assert riot["data"]["riot"] is True
+    assert any("operator-supplied GreyNoise snapshot" in item for item in riot["warnings"])

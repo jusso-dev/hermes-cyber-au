@@ -22,6 +22,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 LIST_URL = "https://www.ncsc.govt.nz/alerts/"
@@ -29,7 +30,13 @@ ATTRIBUTION = (
     "NCSC NZ alerts (formerly CERT NZ). Licence not confirmed. "
     "Quote short passages only. This connector is not endorsed by the NCSC."
 )
-_PACKAGE = Path(__file__).resolve().parents[2]
+_OVERRIDE = "CYBERAU_NCSC_SNAPSHOT"
+_OVERRIDE_NOTE = (
+    "served from the operator-supplied NCSC NZ snapshot files in CYBERAU_NCSC_SNAPSHOT, "
+    "not a live fetch"
+)
+_LIST_LABEL = "NCSC NZ alert list"
+_PAGE_LABEL = "NCSC NZ alert page"
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _AUCKLAND = ZoneInfo("Pacific/Auckland")
 _LIST_TTL = 3600
@@ -107,7 +114,7 @@ def ncscnz_list_alerts(since: _Date | None = None, limit: _Limit = 20) -> dict:
             [],
             cache,
             [LIST_URL],
-            warnings=_warnings(warning or "NCSC NZ alerts are unavailable"),
+            warnings=_warnings(warning or unavailable(_LIST_LABEL)),
         )
     items = _dedupe(_parse_list(text))
     _persist_alerts(items)
@@ -120,6 +127,8 @@ def ncscnz_list_alerts(since: _Date | None = None, limit: _Limit = 20) -> dict:
     warnings = list(_warnings(warning))
     if not rows and not warnings:
         warnings.append("no NCSC NZ alerts matched")
+    if rows and os.environ.get(_OVERRIDE):
+        warnings.append(_OVERRIDE_NOTE)
     newest = rows[0]["published"] if rows and rows[0]["published"] else None
     public = [_public_alert(row) for row in rows[:limit]]
     return _envelope(public, cache, [LIST_URL], newest, tuple(warnings))
@@ -139,7 +148,7 @@ def ncscnz_get_alert(url: _Url) -> dict:
             None,
             cache,
             [page_url],
-            warnings=_warnings(warning or "NCSC NZ alert page was not usable"),
+            warnings=_warnings(_as_unavailable(_PAGE_LABEL, warning or "the page was not usable")),
         )
     published = parsed["published"] or None
     return _envelope(
@@ -177,8 +186,15 @@ class _NcscConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            # Offline schema check: the operator override, else the HTTP cache. A file
+            # shipped in the package is never read.
             text = _read_list_snapshot()
-            problem = schema_drift(text or "")
+            if text is None:
+                cached = _cached_body(LIST_URL)
+                text = cached[0] if cached is not None else None
+            if text is None:
+                return Probe(self.key, True, "no local copy to check")
+            problem = schema_drift(text)
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -220,7 +236,7 @@ def _validate_list(since: str | None, limit: int) -> str:
 
 
 def _fetch_list(*, force_live: bool) -> tuple[str | None, str, str]:
-    pinned = bool(os.environ.get("CYBERAU_NCSC_SNAPSHOT")) and not force_live
+    pinned = bool(os.environ.get(_OVERRIDE)) and not force_live
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     if pinned:
         return _pinned_list()
@@ -228,7 +244,7 @@ def _fetch_list(*, force_live: bool) -> tuple[str | None, str, str]:
     if offline:
         if cached is not None:
             return cached[0], "stale", "served from the HTTP cache"
-        return _pinned_list()
+        return None, "snapshot", unavailable(_LIST_LABEL, "offline mode, and nothing is cached")
     if cached is not None and cached[1]:
         return cached[0], "hit", ""
     try:
@@ -238,7 +254,7 @@ def _fetch_list(*, force_live: bool) -> tuple[str | None, str, str]:
     text, warning, cache = _http(LIST_URL, ttl=_LIST_TTL, skip_cache=force_live)
     if text is None:
         if _is_auth(warning):
-            return None, "snapshot", warning
+            return None, "snapshot", unavailable(_LIST_LABEL, warning)
         return _fallback_list(warning or "list fetch failed")
     problem = schema_drift(text)
     if problem:
@@ -253,7 +269,7 @@ def _fetch_list(*, force_live: bool) -> tuple[str | None, str, str]:
 def _pinned_list() -> tuple[str | None, str, str]:
     text = _read_list_snapshot()
     if text is None:
-        return None, "snapshot", "NCSC NZ alerts are unavailable"
+        return None, "snapshot", unavailable(_LIST_LABEL, "the snapshot file is missing")
     problem = schema_drift(text)
     if problem:
         return None, "snapshot", problem
@@ -265,22 +281,16 @@ def _fallback_list(warning: str) -> tuple[str | None, str, str]:
     if cached is not None:
         note = warning or "served from the HTTP cache"
         return cached[0], "stale", note
-    text = _read_list_snapshot()
-    if text and not schema_drift(text):
-        note = f"{warning}; served shipped snapshot" if warning else ""
-        return text, "snapshot", note
-    if not warning:
-        warning = "NCSC NZ alerts are unavailable"
-    return None, "snapshot", warning
+    return None, "snapshot", unavailable(_LIST_LABEL, warning)
 
 
 def _fetch_item(url: str) -> tuple[dict | None, str, str]:
-    pinned = bool(os.environ.get("CYBERAU_NCSC_SNAPSHOT"))
+    pinned = bool(os.environ.get(_OVERRIDE))
     offline = os.environ.get("CYBERAU_OFFLINE") == "1"
     if pinned or offline:
         mapped = _mapped_html(url)
         if mapped is not None:
-            return _parse_item(mapped, url), "snapshot", ""
+            return _parse_item(mapped, url), "snapshot", _OVERRIDE_NOTE
         if not pinned:
             cached = _cached_body(url)
             if cached is not None:
@@ -288,26 +298,22 @@ def _fetch_item(url: str) -> tuple[dict | None, str, str]:
         stored = _stored(url)
         if stored is not None:
             return stored, "stale", "served from the stored alert"
-        return None, "snapshot", "NCSC NZ alert page is unavailable"
+        return None, "snapshot", unavailable(_PAGE_LABEL, "no live fetch, cached or stored page")
     try:
         _limit("ncscnz:item", rate=1 / 5, burst=1)
     except Exception as exc:
         stored = _stored(url)
         if stored is not None:
             return stored, "stale", redact(str(exc))
-        return None, "snapshot", redact(str(exc))
+        return None, "snapshot", unavailable(_PAGE_LABEL, redact(str(exc)))
     text, warning, cache = _http(url, ttl=_ITEM_TTL, skip_cache=False)
     if text is None:
         if _is_auth(warning):
-            return None, "snapshot", warning
+            return None, "snapshot", unavailable(_PAGE_LABEL, warning)
         stored = _stored(url)
         if stored is not None:
             return stored, "stale", warning or "item fetch failed"
-        mapped = _mapped_html(url)
-        if mapped is not None:
-            note = warning or ""
-            return _parse_item(mapped, url), "snapshot", note
-        return None, "snapshot", warning or "NCSC NZ alert page is unavailable"
+        return None, "snapshot", unavailable(_PAGE_LABEL, warning or "item fetch failed")
     parsed = _parse_item(text, url)
     if not parsed["title"] and not parsed["passage"]:
         return None, cache if cache == "stale" else "snapshot", "NCSC NZ alert page was not usable"
@@ -690,9 +696,11 @@ def _public_page(page: dict) -> dict:
 
 
 def _read_list_snapshot() -> str | None:
-    override = os.environ.get("CYBERAU_NCSC_SNAPSHOT")
-    root = Path(override) if override else _PACKAGE / "data"
-    path = root / "alerts_page.html"
+    # Only the operator override is read. Nothing shipped in the package is served.
+    override = os.environ.get(_OVERRIDE)
+    if not override:
+        return None
+    path = Path(override) / "alerts_page.html"
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")
@@ -702,20 +710,20 @@ def _mapped_html(url: str) -> str | None:
     wanted = _allowed_page(url)
     if not wanted:
         return None
-    override = os.environ.get("CYBERAU_NCSC_SNAPSHOT")
-    roots = [Path(override)] if override else []
-    roots.append(_PACKAGE / "data")
-    for root in roots:
-        index = root / "items.json"
-        if not index.is_file():
+    override = os.environ.get(_OVERRIDE)
+    if not override:
+        return None
+    root = Path(override)
+    index = root / "items.json"
+    if not index.is_file():
+        return None
+    mapping = json.loads(index.read_text(encoding="utf-8"))
+    for key, name in mapping.items():
+        if _allowed_page(str(key)) != wanted:
             continue
-        mapping = json.loads(index.read_text(encoding="utf-8"))
-        for key, name in mapping.items():
-            if _allowed_page(str(key)) != wanted:
-                continue
-            page = root / str(name)
-            if page.is_file():
-                return page.read_text(encoding="utf-8")
+        page = root / str(name)
+        if page.is_file():
+            return page.read_text(encoding="utf-8")
     return None
 
 
@@ -822,6 +830,10 @@ def _limit(key: str, *, rate: float, burst: int) -> None:
         window="rolling",
         timeout=60,
     )
+
+
+def _as_unavailable(label: str, warning: str) -> str:
+    return warning if "is unavailable" in warning else unavailable(label, warning)
 
 
 def _warnings(*items: str) -> tuple[str, ...]:

@@ -14,6 +14,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 _CVE = re.compile(r"^CVE-\d{4}-\d{4,}$")
@@ -27,7 +28,10 @@ _TRANSPORT = None
 API = "https://api.first.org/data/v1/epss"
 ATTRIBUTION = "FIRST EPSS. Cite the model version and the score date."
 REQUIRED = ("cve", "epss", "percentile", "date")
-_PACKAGE = Path(__file__).resolve().parents[2]
+LABEL = "FIRST EPSS"
+SNAPSHOT_NOTE = (
+    "served the operator-supplied EPSS snapshot file (CYBERAU_EPSS_SNAPSHOT), not a live fetch"
+)
 
 
 def epss_scores(
@@ -118,6 +122,8 @@ class _EpssConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_EPSS_SNAPSHOT"):
+                return Probe(self.key, True, "schema ok, no local copy to check")
             payload, _state = _load(_snapshot_text())
             problem = schema_drift(payload or {})
             if problem:
@@ -163,9 +169,11 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[dict | None, str,
             payload, _state = _load(cached.body.decode("utf-8"))
             state = "hit" if cache.fresh(cached) else "stale"
             return payload, state, ""
-    if offline or (snapshot and not force_live):
+    if snapshot and not force_live:
         payload, _state = _load(_snapshot_text())
         return payload, "snapshot", ""
+    if offline:
+        return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = HttpClient(
         "first-epss",
@@ -185,7 +193,9 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[dict | None, str,
         if cached:
             payload, _state = _load(cached.body.decode("utf-8"))
             return payload, "stale", ""
-        return None, "snapshot", redact(str(exc))
+        if force_live:
+            return None, "snapshot", redact(str(exc))
+        return None, "snapshot", unavailable(LABEL, f"the live fetch failed ({redact(str(exc))})")
     finally:
         client.close()
     payload, _state = _load(response.body.decode("utf-8"))
@@ -285,9 +295,8 @@ def _persist(rows: list[dict]) -> None:
 
 
 def _snapshot_text() -> str:
-    snapshot = os.environ.get("CYBERAU_EPSS_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "epss_batch.json"
-    return path.read_text(encoding="utf-8")
+    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
+    return Path(os.environ["CYBERAU_EPSS_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
 def _note(item: dict) -> str:
@@ -308,6 +317,8 @@ def _envelope(
     if payload and isinstance(payload.get("data"), list) and payload["data"]:
         score_date = str(payload["data"][0].get("date", ""))
     as_of = " ".join(part for part in (version, score_date) if part)
+    if payload is not None and cache == "snapshot":
+        warnings = (*warnings, SNAPSHOT_NOTE)
     return envelope(
         "first-epss",
         data,

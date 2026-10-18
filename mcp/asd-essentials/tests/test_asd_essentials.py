@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import cyberau_asd_essentials.source as source
@@ -36,6 +37,7 @@ def isolated(tmp_path, monkeypatch):
     yield
     source._TRANSPORT = None
     source._SLEEP = time.sleep
+    source._TODAY = None
 
 
 def test_strategy_assignment_follows_section_and_statement():
@@ -271,6 +273,89 @@ def test_shipped_snapshot_when_present():
     assert chapters["ot"]["priority_phases"]
     assert chapters["cloud"]["priority_phases"] == []
     assert chapters["enterprise-it"]["priority_phases_are_not_maturity_levels"] is True
+
+
+def _shipped_day(pattern: str) -> date:
+    found = sorted(DATA.glob(pattern))
+    if not found:
+        pytest.skip("shipped snapshot is built by rebuild_shipped_snapshot")
+    return date.fromisoformat(json.loads(found[-1].read_text(encoding="utf-8"))["retrieved_on"])
+
+
+def _all_tools() -> list[dict]:
+    return [
+        e8_requirements("application_control", 1),
+        essentials_chapter("enterprise-it"),
+        essentials_transition("application_control"),
+    ]
+
+
+def test_expired_shipped_snapshot_is_not_served(monkeypatch):
+    monkeypatch.delenv("CYBERAU_E8_SNAPSHOT")
+    day = max(_shipped_day("e8-maturity-*.json"), _shipped_day("essentials-*.json"))
+    source._TODAY = lambda: day + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    for record in _all_tools():
+        assert record["data"] is None
+        assert record["cache"] == "snapshot"
+        assert any("is unavailable" in item for item in record["warnings"])
+        assert any("181 days old" in item for item in record["warnings"])
+        assert "ism-0843" not in json.dumps(record)
+    probe = connector().health(live=False, check_schema=True)
+    assert probe.ok is False
+
+
+def test_expired_shipped_snapshot_is_not_served_when_live_fails(monkeypatch):
+    monkeypatch.delenv("CYBERAU_E8_SNAPSHOT")
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    source._TRANSPORT = httpx.MockTransport(lambda request: httpx.Response(503))
+    day = max(_shipped_day("e8-maturity-*.json"), _shipped_day("essentials-*.json"))
+    source._TODAY = lambda: day + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    for record in _all_tools():
+        assert record["data"] is None
+        assert any("is unavailable" in item for item in record["warnings"])
+
+
+def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
+    monkeypatch.delenv("CYBERAU_E8_SNAPSHOT")
+    maturity_day = _shipped_day("e8-maturity-*.json")
+    essentials_day = _shipped_day("essentials-*.json")
+    source._TODAY = lambda: max(maturity_day, essentials_day) + timedelta(days=10)
+    requirements, chapter, transition = _all_tools()
+    assert requirements["data"]["controls"]
+    assert requirements["data_as_of"] == maturity_day.isoformat()
+    assert chapter["data"]["actions"]
+    assert chapter["data_as_of"] == essentials_day.isoformat()
+    assert transition["data_as_of"] == essentials_day.isoformat()
+    for record in (requirements, chapter, transition):
+        assert record["cache"] == "snapshot"
+        assert any(
+            item.startswith("served the shipped") and "not a live fetch" in item
+            for item in record["warnings"]
+        )
+
+
+def test_synthetic_shipped_snapshot_is_refused(monkeypatch, tmp_path):
+    monkeypatch.delenv("CYBERAU_E8_SNAPSHOT")
+    package = tmp_path / "package"
+    (package / "data").mkdir(parents=True)
+    _write_fixture_snapshot(package / "data")
+    target = package / "data" / "e8-maturity-v2026.09.4.json"
+    document = json.loads(target.read_text(encoding="utf-8"))
+    document["note"] = "Synthetic rows for parser tests"
+    target.write_text(json.dumps(document), encoding="utf-8")
+    monkeypatch.setattr(source, "_PACKAGE", package)
+    source._TODAY = lambda: date(2026, 10, 18)
+    record = e8_requirements("application_control", 2)
+    assert record["data"] is None
+    assert any("looks like test data" in item for item in record["warnings"])
+
+
+def test_operator_snapshot_is_labelled_without_an_age_limit():
+    source._TODAY = lambda: date(2030, 1, 1)
+    record = e8_requirements("application_control", 2)
+    assert record["data"]["controls"]
+    assert record["data_as_of"] == "2026-10-17"
+    assert any("operator-supplied" in item for item in record["warnings"])
 
 
 def _write_fixture_snapshot(snapshot: Path) -> None:

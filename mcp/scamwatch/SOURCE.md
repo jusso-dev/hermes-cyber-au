@@ -19,7 +19,7 @@ From this host on 17 October 2026, a direct GET of the homepage returned 403 Acc
 
 ## Offline copy
 
-Items are kept in `$CYBERAU_DATA_DIR/scamwatch.sqlite` (table `alerts`) until the shared intel store exists. A change in title, date, summary, or body is also appended to `$CYBERAU_DATA_DIR/scamwatch-alerts.jsonl`. Rows are not deleted when they leave the homepage. Offline mode answers from the HTTP cache, then the shipped synthetic snapshot, and otherwise returns an unavailable warning.
+Items are kept in `$CYBERAU_DATA_DIR/scamwatch.sqlite` (table `alerts`) until the shared intel store exists. A change in title, date, summary, or body is also appended to `$CYBERAU_DATA_DIR/scamwatch-alerts.jsonl`. Rows are not deleted when they leave the homepage. The fallback ladder is live fetch, then the HTTP cache (and, for an alert page, the stored body), then unavailable. Offline mode answers from the HTTP cache. When no live or cached copy exists the tools return empty data with an "is unavailable" warning. No snapshot ships with the connector, so sample alerts are never served as Scamwatch data. The synthetic pages used by the tests live under `tests/fixtures/`. An operator can set `CYBERAU_SCAMWATCH_SNAPSHOT` to a homepage HTML file and `CYBERAU_SCAMWATCH_PAGES` to a directory of `<slug>.html` alert pages. Answers read from those files carry a warning that they came from the operator-supplied snapshot, not a live fetch.
 
 ## Operator guide
 

@@ -20,6 +20,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 RELEASES_LATEST = "https://api.github.com/repos/SigmaHQ/sigma/releases/latest"
@@ -47,7 +48,10 @@ _TECHNIQUE = re.compile(r"(?i)^(?:attack\.)?(t\d{4}(?:\.\d{3})?)$")
 _ATTACK_TAG = re.compile(r"(?i)^attack\.(t\d{4}(?:\.\d{3})?)$")
 _TAG = re.compile(r"^[A-Za-z0-9._+-]+$")
 _LABEL = re.compile(r"^[A-Za-z0-9._+-]{1,64}$")
-_PACKAGE = Path(__file__).resolve().parents[2]
+_LABEL_SET = "The Sigma rule set"
+_PINNED_NOTE = (
+    "served the operator-supplied Sigma snapshot in CYBERAU_SIGMA_SNAPSHOT, not a live fetch"
+)
 _MAX_RULE_BYTES = 1024 * 1024
 _INDEX: dict[str, list[dict]] = {}
 _TRANSPORT = None
@@ -194,7 +198,10 @@ class _SigmaConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            payload = _loads(_release_text(_root()))
+            root = _root()
+            if root is None:
+                return Probe(self.key, True, "no local copy to check")
+            payload = _loads(_release_text(root))
             problem = schema_drift(payload)
             if problem:
                 return Probe(self.key, False, problem)
@@ -310,34 +317,19 @@ def _technique_hit(techniques: list[str], wanted: str) -> bool:
 def _corpus(*, force_live: bool = False) -> _Loaded:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     pinned = bool(os.environ.get("CYBERAU_SIGMA_SNAPSHOT")) and not force_live
-    if offline or pinned:
+    if pinned:
         return _snapshot_corpus()
+    if offline:
+        return _stored_corpus((), offline=True)
     payload, cache, warning = _release(force_live=force_live)
     problem = schema_drift(payload)
     if problem or not isinstance(payload, dict):
-        fallback = _snapshot_corpus()
-        notes = warning + ((problem,) if problem else ()) + fallback.warning
-        if fallback.rules is None:
-            return fallback._replace(warning=notes or ("Sigma rules are unavailable",))
-        state = "stale" if cache == "stale" else fallback.cache
-        return fallback._replace(cache=state, warning=notes)
+        return _stored_corpus(warning + ((problem,) if problem else ()))
     blobs, blob_cache, blob_warning = _packages(payload, force_live=force_live)
     notes = warning + blob_warning
     tag = _safe_tag(str(payload.get("tag_name") or ""))
     if not blobs:
-        fallback = _snapshot_corpus()
-        notes = notes + fallback.warning
-        if fallback.rules is None:
-            return _Loaded(
-                None,
-                "snapshot",
-                notes or ("Sigma rules are unavailable",),
-                tag,
-                _as_of(payload),
-                _urls(payload),
-            )
-        state = "stale" if "stale" in {cache, blob_cache} else fallback.cache
-        return fallback._replace(cache=state, warning=notes)
+        return _stored_corpus(notes)
     rules = _index(tag, blobs)
     if not rules:
         notes = notes + ("rule packages contained no rules",)
@@ -346,8 +338,50 @@ def _corpus(*, force_live: bool = False) -> _Loaded:
     return _Loaded(rules, state, notes, tag, _as_of(payload), _urls(payload))
 
 
+def _stored_corpus(notes: tuple[str, ...], *, offline: bool = False) -> _Loaded:
+    """Serve the newest rule packages this connector saved, or an unavailable result."""
+    found = _newest_saved()
+    if found is not None:
+        tag, blobs = found
+        try:
+            rules = _index(tag, blobs)
+        except zipfile.BadZipFile:
+            rules = []
+        if rules:
+            note = f"served the stored Sigma release {tag}, not a live fetch"
+            return _Loaded(rules, "stale", (*notes, note), tag, tag, [RELEASES_LATEST])
+    reason = (
+        "offline mode is on and no rule package is stored"
+        if offline
+        else "the live fetch failed and no rule package is stored"
+    )
+    note = unavailable(_LABEL_SET, reason)
+    return _Loaded(None, "snapshot", (*notes, note), "", None, [RELEASES_LATEST])
+
+
+def _newest_saved() -> tuple[str, list[tuple[str, bytes]]] | None:
+    root = _data_dir()
+    best: tuple[float, str, list[tuple[str, bytes]]] | None = None
+    for folder in root.iterdir():
+        if not folder.is_dir() or _safe_tag(folder.name) != folder.name:
+            continue
+        blobs = []
+        newest = 0.0
+        for name, package in PACKAGES:
+            blob = _saved_zip(folder.name, name)
+            if blob is not None:
+                blobs.append((package, blob))
+                newest = max(newest, (folder / name).stat().st_mtime)
+        if blobs and (best is None or newest > best[0]):
+            best = (newest, folder.name, blobs)
+    return (best[1], best[2]) if best else None
+
+
 def _snapshot_corpus() -> _Loaded:
+    """Read the operator-supplied snapshot directory in CYBERAU_SIGMA_SNAPSHOT."""
     root = _root()
+    if root is None:
+        return _stored_corpus(())
     text = _release_text(root)
     payload = _loads(text)
     problem = schema_drift(payload) if text is not None else "Sigma release snapshot is missing"
@@ -381,14 +415,14 @@ def _snapshot_corpus() -> _Loaded:
             _as_of(payload),
             urls,
         )
-    notes = (problem,) if problem else ()
+    notes = ((problem,) if problem else ()) + (_PINNED_NOTE,)
     return _Loaded(rules, "snapshot", notes, tag, _as_of(payload), urls)
 
 
 def _release(*, force_live: bool) -> tuple[object, str, tuple[str, ...]]:
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
     pinned = bool(os.environ.get("CYBERAU_SIGMA_SNAPSHOT")) and not force_live
-    if offline or pinned:
+    if pinned:
         text = _release_text(_root())
         if text is None:
             return None, "snapshot", ("Sigma release snapshot is missing",)
@@ -396,16 +430,12 @@ def _release(*, force_live: bool) -> tuple[object, str, tuple[str, ...]]:
         if payload is None:
             return None, "snapshot", ("Sigma release payload was not usable",)
         return payload, "snapshot", ()
+    if offline:
+        return None, "snapshot", ("offline mode is on",)
     body, cache, warning = _http(RELEASES_LATEST, ttl=12 * 3600, skip_cache=force_live)
     if body is None:
         message = _github_warning(warning or "live fetch failed")
-        if force_live:
-            return None, "snapshot", (message,)
-        text = _release_text(_root())
-        payload = _loads(text) if text else None
-        if payload is None:
-            return None, "snapshot", (message or "Sigma rules are unavailable",)
-        return payload, "snapshot", (message,)
+        return None, "snapshot", (message,)
     try:
         text = body.decode("utf-8")
     except UnicodeDecodeError:
@@ -764,9 +794,10 @@ def _loads(text: str | None):
         return None
 
 
-def _root() -> Path:
+def _root() -> Path | None:
+    """The operator-supplied snapshot directory. Nothing is shipped in the package."""
     override = os.environ.get("CYBERAU_SIGMA_SNAPSHOT")
-    return Path(override) if override else _PACKAGE / "data"
+    return Path(override) if override else None
 
 
 def _github_warning(message: str) -> str:

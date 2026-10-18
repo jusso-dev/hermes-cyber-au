@@ -15,6 +15,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 SEARCH = "https://data.gov.au/data/api/3/action/package_search"
@@ -102,7 +103,11 @@ class _DatagovConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
-            payload = _load(_snapshot_text())
+            # Offline schema check reads only the operator override, never a shipped file.
+            text = _snapshot_text()
+            if text is None:
+                return Probe(self.key, True, "no local copy to check")
+            payload = _load(text)
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
@@ -182,7 +187,7 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
     if snapshot and not force_live:
         path = Path(snapshot)
         if not path.is_file():
-            return None, "snapshot", "data.gov.au is unavailable"
+            return None, "snapshot", _gone("the CYBERAU_DATAGOV_SNAPSHOT file is missing")
         return _parsed(path.read_text(encoding="utf-8"), "snapshot")
     data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-datagov-au"))
     cache = _JsonCache(data_dir / "http_cache.sqlite")
@@ -192,10 +197,7 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
         state = "stale" if offline or not cache.fresh(cached) else "hit"
         return _parsed(cached.body.decode("utf-8"), state)
     if offline:
-        shipped = _PACKAGE / "data" / "package_search.json"
-        if shipped.is_file():
-            return _parsed(shipped.read_text(encoding="utf-8"), "snapshot")
-        return None, "snapshot", "data.gov.au is unavailable"
+        return None, "snapshot", _gone("offline mode, and nothing is cached")
     allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     client = _client(data_dir, allowlist, cache)
     try:
@@ -203,21 +205,21 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
     except Exception as exc:
         message = _failure_message(exc)
         if force_live or isinstance(exc, EgressDenied):
-            return None, "snapshot", message
+            return None, "snapshot", _gone(message)
         cached = cache.get(key)
         if cached is not None:
             return _parsed(cached.body.decode("utf-8"), "stale")
-        return None, "snapshot", message
+        return None, "snapshot", _gone(message)
     finally:
         client.close()
     if response.status in (401, 403):
-        return None, response.cache, _refused(response.status)
+        return None, response.cache, _gone(_refused(response.status))
     if response.status >= 400:
         if not force_live:
             cached = cache.get(key)
             if cached is not None:
                 return _parsed(cached.body.decode("utf-8"), "stale")
-        return None, response.cache, f"upstream status {response.status}"
+        return None, response.cache, _gone(f"upstream status {response.status}")
     text = _decode(response.body)
     if text is None:
         return None, response.cache, _UNUSABLE
@@ -225,6 +227,11 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
 
 
 _UNUSABLE = "data.gov.au payload was not usable"
+_LABEL = "data.gov.au catalogue"
+
+
+def _gone(reason: str) -> str:
+    return unavailable(_LABEL, reason)
 
 
 def _parsed(text: str, cache: str) -> tuple[dict | None, str, str]:
@@ -386,12 +393,7 @@ def _provenance(cache: str) -> list[str]:
         return ["answered from a stale cached copy, not a live result"]
     if cache != "snapshot":
         return []
-    if os.environ.get("CYBERAU_DATAGOV_SNAPSHOT"):
-        return ["answered from the CYBERAU_DATAGOV_SNAPSHOT file, not a live result"]
-    return [
-        "answered from the synthetic sample snapshot shipped with this connector, "
-        "not live data from data.gov.au"
-    ]
+    return ["answered from the operator-supplied CYBERAU_DATAGOV_SNAPSHOT file, not a live result"]
 
 
 def _as_text(value) -> str:
@@ -450,9 +452,13 @@ def _persist(rows: list[dict], cache: str) -> None:
             )
 
 
-def _snapshot_text() -> str:
+def _snapshot_text() -> str | None:
     snapshot = os.environ.get("CYBERAU_DATAGOV_SNAPSHOT")
-    path = Path(snapshot) if snapshot else _PACKAGE / "data" / "package_search.json"
+    if not snapshot:
+        return None
+    path = Path(snapshot)
+    if not path.is_file():
+        return None
     return path.read_text(encoding="utf-8")
 
 
@@ -475,7 +481,7 @@ def _failure_message(exc: Exception) -> str:
         return "data.gov.au timed out"
     if "upstream status" in lowered:
         return text
-    return "data.gov.au is unavailable"
+    return "data.gov.au could not be reached"
 
 
 def _refused(status: int) -> str:

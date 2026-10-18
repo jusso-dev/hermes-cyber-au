@@ -61,6 +61,53 @@ def _online(monkeypatch, handler, key="upguard-secret-value", sleeper=None):
 
 def _offline(monkeypatch):
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    monkeypatch.setenv("CYBERAU_UPGUARD_FIXTURES", str(FIXTURES))
+
+
+OPERATOR_NOTE = (
+    "Served from the operator-supplied CYBERAU_UPGUARD_FIXTURES snapshot files, "
+    "not a live UpGuard fetch."
+)
+# Distinctive values from the synthetic fixtures. None may reach the agent
+# unless the operator points CYBERAU_UPGUARD_FIXTURES at them.
+FIXTURE_VALUES = ("Synthetic Breach", "examp1e.example.com.au", "3426", "example-login")
+
+
+def _call_every_tool():
+    return {
+        "upguard_identity_breaches": upguard_identity_breaches(),
+        "upguard_data_leaks": upguard_data_leaks(),
+        "upguard_typosquats": upguard_typosquats("example.com.au"),
+    }
+
+
+def _assert_unavailable(results):
+    for name, result in results.items():
+        assert result["data"] == [], name
+        assert any("is unavailable" in item for item in result["warnings"]), name
+        dumped = json.dumps(result)
+        for value in FIXTURE_VALUES:
+            assert value not in dumped, (name, value)
+
+
+def test_offline_without_override_serves_nothing(monkeypatch):
+    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
+    results = _call_every_tool()
+    _assert_unavailable(results)
+    assert "CYBERAU_UPGUARD_FIXTURES" in results["upguard_data_leaks"]["warnings"][0]
+    with pytest.raises(ValueError):
+        connector().exposure_for(Watchlist(domains=["example.com.au"]), SINCE)
+
+
+@pytest.mark.parametrize("failure", ["timeout", "503"])
+def test_failed_live_fetch_serves_no_fixture_rows(monkeypatch, failure):
+    def broken(_request):
+        if failure == "timeout":
+            raise httpx.TimeoutException("timed out")
+        return httpx.Response(503, content=b"{}")
+
+    _online(monkeypatch, broken)
+    _assert_unavailable(_call_every_tool())
 
 
 def test_offline_happy_path_attribution_and_untrusted_text(monkeypatch):
@@ -101,9 +148,9 @@ def test_offline_happy_path_attribution_and_untrusted_text(monkeypatch):
     assert wrapped_text(row["hostname"]) == "examp1e.example.com.au"
     assert wrapped_text(row["finding"]["source_ref"]) == "examp1e.example.com.au"
     assert row["finding"]["subject"]["value"].startswith("<<untrusted")
-    assert typos["warnings"] == ["Bundled synthetic snapshot, not live UpGuard data."]
-    assert breaches["warnings"] == ["Bundled synthetic snapshot, not live UpGuard data."]
-    assert leaks["warnings"] == ["Bundled synthetic snapshot, not live UpGuard data."]
+    assert typos["warnings"] == [OPERATOR_NOTE]
+    assert breaches["warnings"] == [OPERATOR_NOTE]
+    assert leaks["warnings"] == [OPERATOR_NOTE]
 
 
 def test_empty_and_malformed_do_not_raise(monkeypatch):

@@ -26,6 +26,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -50,17 +51,21 @@ _RATE = 1.0
 _BURST = 2
 _SNIPPET_MAX = 400
 _TERM_MAX = 200
-_NOT_CONFIGURED = "DarkOwl is not configured. Set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY."
-_UNAVAILABLE = "unavailable: offline and no cached DarkOwl result"
+_LABEL = "DarkOwl"
+_NOT_CONFIGURED = unavailable(
+    _LABEL, "not configured. Set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY"
+)
+_UNAVAILABLE = unavailable(_LABEL, "offline and no cached DarkOwl result")
 _SNAPSHOT_WARNING = (
-    "Served from a local snapshot file, not a live DarkOwl result. "
-    "It is not stored and does not feed exposure findings."
+    "Served from the operator-supplied snapshot file (CYBERAU_DARKOWL_SNAPSHOT), "
+    "not a live DarkOwl result. It is not stored and does not feed exposure findings."
 )
 _MISSING_KEYS = "not configured: set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY"
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _PACKAGE = Path(__file__).resolve().parents[2]
 _ALLOWLIST = _PACKAGE.parent / "egress-allowlist.yaml"
-_DEFAULT_FIXTURE = _PACKAGE / "tests" / "fixtures" / "search_synthetic.json"
+# Read only by the offline schema-drift probe. Never served to a tool caller.
+_SCHEMA_FIXTURE = _PACKAGE / "tests" / "fixtures" / "search_synthetic.json"
 _DOMAIN = re.compile(
     r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$",
     re.IGNORECASE,
@@ -165,7 +170,7 @@ class _DarkOwlConnector(PremiumConnector):
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
         if check_schema:
-            problem = _schema_problem()
+            problem = _schema_problem(allow_fixture=not live)
             if problem:
                 return Probe(self.key, False, problem)
             if not live:
@@ -209,7 +214,7 @@ def _collect(
         payload, state, warning = _fetch_search(term, since, count=20, sort="d", detail="snippet")
         states.append(state)
         if warning or payload is None:
-            warnings.append(warning or "DarkOwl payload was not usable")
+            warnings.append(_unavailable(warning or "DarkOwl payload was not usable"))
             continue
         oldest = None
         shown = payload.get("results")
@@ -643,9 +648,21 @@ def _read_snapshot() -> tuple[dict | None, str]:
     return payload, ""
 
 
-def _schema_problem() -> str | None:
+def _unavailable(reason: str) -> str:
+    if "is unavailable" in reason:
+        return reason
+    return unavailable(_LABEL, reason)
+
+
+def _schema_problem(*, allow_fixture: bool) -> str | None:
+    """Check the operator snapshot, or the test fixture for an offline check only."""
     raw = os.environ.get("CYBERAU_DARKOWL_SNAPSHOT")
-    path = Path(raw) if raw else _DEFAULT_FIXTURE
+    if raw:
+        path = Path(raw)
+    elif allow_fixture:
+        path = _SCHEMA_FIXTURE
+    else:
+        return None
     payload = _load_path(path)
     if payload is None:
         return "DarkOwl snapshot was not usable"

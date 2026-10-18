@@ -27,6 +27,7 @@ from cyberau_common.http import HttpClient, HttpError, Response
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from pydantic import Field
 
 SOURCE = "abusech"
@@ -45,14 +46,20 @@ ATTRIBUTION = (
     "harvesting is not allowed. Feodo Tracker datasets are CC0. The operator decides "
     "whether the terms allow their use."
 )
+SNAPSHOT_ENV = "CYBERAU_ABUSECH_SNAPSHOT"
 NO_KEY = (
-    f"{ENV_KEY} is not set, so URLhaus, ThreatFox and MalwareBazaar were not queried. "
-    "Get a free Auth-Key at https://auth.abuse.ch/ and add it to the profile .env."
+    f"{ENV_KEY} is not set. Get a free Auth-Key at https://auth.abuse.ch/ and add it to "
+    "the profile .env"
 )
 SNAPSHOT_WARNING = (
-    "served from the shipped synthetic snapshot, which is fixed test data and not a live "
-    "abuse.ch answer"
+    f"served from the operator-supplied snapshot file ({SNAPSHOT_ENV}), not a live abuse.ch fetch"
 )
+_LABELS = {
+    "urlhaus": "URLhaus",
+    "threatfox": "ThreatFox",
+    "malwarebazaar": "MalwareBazaar",
+    "feodo": "Feodo Tracker",
+}
 
 LOOKUP_TTL = 3600
 RECENT_TTL = 900
@@ -98,6 +105,12 @@ class _Outcome:
     payload: object | None = None
     cache: str = "snapshot"
     warning: str = ""
+    unkeyed: bool = False
+
+
+def _down(platform: str, reason: str, *, unkeyed: bool = False) -> _Outcome:
+    """No live, cached or operator data for this platform: say so and serve nothing."""
+    return _Outcome(warning=unavailable(_LABELS[platform], reason), unkeyed=unkeyed)
 
 
 def abusech_lookup(indicator: _Indicator, type: _IndicatorType | None = None) -> dict:
@@ -234,6 +247,8 @@ class _AbusechConnector(Connector):
             return _live_probe(self.key)
         if check_schema:
             problems = _snapshot_drift()
+            if problems is None:
+                return Probe(self.key, True, "offline ok, no local copy to check")
             if problems:
                 return Probe(self.key, False, "; ".join(problems))
             return Probe(self.key, True, "schema ok")
@@ -252,7 +267,7 @@ def schema_drift(platform: str, payload: object) -> str | None:
 
 
 class _Session:
-    """One tool call's view of the network, cache and shipped snapshot."""
+    """One tool call's view of the network, cache and operator snapshot file."""
 
     def __init__(self, *, force_live: bool = False) -> None:
         self.force_live = force_live
@@ -272,7 +287,7 @@ class _Session:
     def fetch(self, call: _Call) -> _Outcome:
         keyed = call.platform != "feodo"
         if keyed and not self.key and not self.offline:
-            return _Outcome(warning=NO_KEY)
+            return _down(call.platform, NO_KEY, unkeyed=True)
         client = self._client(keyed)
         headers = {"Auth-Key": self.key} if keyed and self.key else None
         try:
@@ -280,7 +295,7 @@ class _Session:
         except Exception as exc:
             if self.offline and isinstance(exc, HttpError):
                 return _snapshot(call)
-            return _Outcome(warning=self._clean(f"{call.platform} request failed: {exc}"))
+            return _down(call.platform, self._clean(f"{call.platform} request failed: {exc}"))
         return self._interpret(call, response)
 
     def _send(self, client: HttpClient, call: _Call, headers: dict | None) -> Response:
@@ -297,25 +312,24 @@ class _Session:
     def _interpret(self, call: _Call, response: Response) -> _Outcome:
         name = call.platform
         if response.status in (401, 403):
-            return _Outcome(
-                warning=(
-                    f"{name} rejected the request with status {response.status}. Check that "
-                    f"{ENV_KEY} holds a valid Auth-Key from https://auth.abuse.ch/."
-                )
+            return _down(
+                name,
+                f"{name} rejected the request with status {response.status}. Check that "
+                f"{ENV_KEY} holds a valid Auth-Key from https://auth.abuse.ch/",
             )
         if response.status == 429:
             wait = response.headers.get("retry-after")
             hint = f", retry after {wait} seconds" if wait else ""
-            return _Outcome(warning=f"{name} rate limited the request with status 429{hint}")
+            return _down(name, f"{name} rate limited the request with status 429{hint}")
         if response.status >= 400:
-            return _Outcome(warning=f"{name} answered with status {response.status}")
+            return _down(name, f"{name} answered with status {response.status}")
         try:
             payload = json.loads(response.body)
         except ValueError:
-            return _Outcome(warning=f"{name} returned a payload that is not JSON")
+            return _down(name, f"{name} returned a payload that is not JSON")
         drift = schema_drift(name, payload)
         if drift:
-            return _Outcome(warning=drift)
+            return _down(name, drift)
         return _Outcome(payload=payload, cache=response.cache)
 
     def _client(self, keyed: bool) -> HttpClient:
@@ -361,24 +375,28 @@ def _offline_resolver(_host: str) -> list:
 
 
 def _snapshot(call: _Call) -> _Outcome:
-    payloads = _snapshot_payloads()
-    payload = payloads.get(call.snapshot_key)
+    """Offline with no cached answer: only an operator-supplied snapshot file may answer."""
+    if not os.environ.get(SNAPSHOT_ENV):
+        return _down(call.platform, "offline mode found no cached answer")
+    payload = _snapshot_payloads().get(call.snapshot_key)
     if payload is None:
-        return _Outcome(
-            warning=(
-                f"{call.platform} is unavailable: offline mode found no cached answer and the "
-                "shipped snapshot does not cover this query"
-            )
+        return _down(
+            call.platform,
+            f"offline mode found no cached answer and the {SNAPSHOT_ENV} file does not "
+            "cover this query",
         )
     drift = schema_drift(call.platform, payload)
     if drift:
-        return _Outcome(warning=drift)
+        return _down(call.platform, drift)
     return _Outcome(payload=payload, cache="snapshot")
 
 
 def _snapshot_payloads() -> dict:
-    override = os.environ.get("CYBERAU_ABUSECH_SNAPSHOT")
-    path = Path(override) if override else _PACKAGE / "data" / "snapshot.json"
+    """Read the operator-supplied snapshot file. Nothing shipped in the package is read."""
+    override = os.environ.get(SNAPSHOT_ENV)
+    if not override:
+        return {}
+    path = Path(override)
     if path.is_dir():
         path = path / "snapshot.json"
     try:
@@ -388,10 +406,13 @@ def _snapshot_payloads() -> dict:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def _snapshot_drift() -> list[str]:
+def _snapshot_drift() -> list[str] | None:
+    """Schema problems in the operator snapshot file, or None when there is none to check."""
+    if not os.environ.get(SNAPSHOT_ENV):
+        return None
     payloads = _snapshot_payloads()
     if not payloads:
-        return ["abuse.ch snapshot is missing or unreadable"]
+        return [f"the {SNAPSHOT_ENV} file is missing or unreadable"]
     problems = []
     for key, payload in payloads.items():
         drift = schema_drift(key.split(":", 1)[0], payload)
@@ -429,7 +450,7 @@ def _live_probe(key: str) -> Probe:
         for call in _PROBES:
             outcome = session.fetch(call)
             if outcome.payload is None:
-                if outcome.warning == NO_KEY:
+                if outcome.unkeyed:
                     unkeyed.append(call.platform)
                 else:
                     problems.append(f"{call.platform}: {outcome.warning}")
@@ -452,7 +473,8 @@ def _read(call: _Call, outcome: _Outcome, parse) -> tuple[str, list[dict], str]:
     if status in _NO_RESULT:
         return "no_results", [], ""
     if status not in {"ok", None}:
-        return "unavailable", [], f"{call.platform} answered query_status {_short(status)}"
+        reason = f"{call.platform} answered query_status {_short(status)}"
+        return "unavailable", [], unavailable(_LABELS[call.platform], reason)
     rows = parse(outcome.payload)
     return ("found" if rows else "no_results"), rows, ""
 

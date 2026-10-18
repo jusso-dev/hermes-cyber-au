@@ -20,6 +20,7 @@ from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -62,11 +63,13 @@ _HOST_NAME = re.compile(
 )
 _REF = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _PACKAGE = Path(__file__).resolve().parents[2]
-_SYNTHETIC = _PACKAGE / "tests" / "fixtures" / "incidents_v4_synthetic.json"
+# Read only by the offline schema-drift probe. Never served to a tool caller.
+_SCHEMA_FIXTURE = _PACKAGE / "tests" / "fixtures" / "incidents_v4_synthetic.json"
 _RESPONSE_SCHEMA = _PACKAGE / "schema" / "socradar_incidents.response.json"
+_LABEL = "SOCRadar"
 _SNAPSHOT_WARNING = (
-    "Snapshot copy from CYBERAU_SOCRADAR_SNAPSHOT, not a live SOCRadar result. "
-    "It is not written to the intel store."
+    "Served from the operator-supplied snapshot file (CYBERAU_SOCRADAR_SNAPSHOT), "
+    "not a live SOCRadar result. It is not written to the intel store."
 )
 _STALE_WARNING = "Served from an expired cache copy because SOCRadar was not reached."
 _CACHE_RANK = {"hit": 0, "miss": 1, "stale": 2, "snapshot": 3}
@@ -92,7 +95,7 @@ def socradar_incidents(
         return _envelope([], "snapshot", (problem,))
     config = _config_error()
     if config:
-        return _envelope([], "snapshot", (config,))
+        return _envelope([], "snapshot", (_unavailable(config),))
     watch, watch_problem = _load_watchlist()
     rows, cache, warnings, _failed = _collect(
         since=since or None,
@@ -163,8 +166,9 @@ class SocradarConnector(PremiumConnector):
         return matched
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
-        if check_schema:
-            problem = schema_problem(_schema_payload())
+        # A live probe never checks the test fixture. It checks the live answer below.
+        if check_schema and (not live or os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT")):
+            problem = schema_problem(_schema_payload(allow_fixture=not live))
             if problem:
                 return Probe(self.key, False, problem)
             if not live:
@@ -268,11 +272,11 @@ def _collect(
         )
         cache = _weaker(cache, page_cache)
         if warning:
-            warnings.append(warning)
+            warnings.append(_unavailable(warning))
             failed = True
             break
         if payload is None:
-            warnings.append("SOCRadar payload was not usable")
+            warnings.append(_unavailable("SOCRadar payload was not usable"))
             failed = True
             break
         page_rows, notes = _map_payload(payload, since, until, severity, watchlist)
@@ -320,7 +324,7 @@ def _fetch_page(
     if offline:
         cached = cache.get(cache_key)
         if cached is None:
-            return None, "snapshot", "unavailable"
+            return None, "snapshot", unavailable(_LABEL, "offline and no cached copy exists")
         state = "hit" if cache.fresh(cached) else "stale"
         payload = _load(cached.body.decode("utf-8", "replace"))
         unusable = _unusable(payload)
@@ -611,20 +615,35 @@ def _session_cache():
 
 
 def _read_snapshot() -> tuple[dict | None, str, str]:
+    """Read the operator-supplied snapshot file. There is no shipped default."""
     raw = os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT")
-    path = Path(raw) if raw else _SYNTHETIC
+    if not raw:
+        return None, "snapshot", unavailable(_LABEL, "no CYBERAU_SOCRADAR_SNAPSHOT file is set")
     try:
-        payload = _load(path.read_text(encoding="utf-8"))
+        payload = _load(Path(raw).read_text(encoding="utf-8"))
     except OSError:
-        return None, "snapshot", "unavailable"
+        reason = "the CYBERAU_SOCRADAR_SNAPSHOT file could not be read"
+        return None, "snapshot", unavailable(_LABEL, reason)
     if payload is None:
         return None, "snapshot", "SOCRadar payload was not usable"
     return payload, "snapshot", ""
 
 
-def _schema_payload() -> dict:
+def _unavailable(reason: str) -> str:
+    if "is unavailable" in reason:
+        return reason
+    return unavailable(_LABEL, reason)
+
+
+def _schema_payload(*, allow_fixture: bool) -> dict:
+    """The operator snapshot, or the test fixture for an offline schema check only."""
     raw = os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT")
-    path = Path(raw) if raw else _SYNTHETIC
+    if raw:
+        path = Path(raw)
+    elif allow_fixture:
+        path = _SCHEMA_FIXTURE
+    else:
+        return {}
     try:
         payload = _load(path.read_text(encoding="utf-8"))
     except OSError:

@@ -570,8 +570,19 @@ A tool that appears upstream and is not in the list is ignored. A listed tool th
 - `hibp_get_breached_account` and `hibp_get_breached_domain` need an approval token bound to the tool and the subject. Without one the call is blocked before any request is made, and the block is logged. The token is `HMAC-SHA256(CYBERAU_APPROVAL_KEY, "<tool>:<sha256 of the lowercased subject>")`, issued by the `cyber-au` plugin `pre_tool_call` guard after a human approves. With no `CYBERAU_APPROVAL_KEY` set, every gated call is blocked.
 - Gated results are never cached on disk, never written to the intel store, and never contain the email address or domain that was searched. The audit log holds a truncated SHA-256 of the subject only.
 
+## Fallback order
+
+1. Live call to the official server (`cache: miss`, or `hit` inside the 24 hour cache).
+2. The cached reply when the live call fails (`cache: stale`, with a warning).
+3. Unavailable: no data (`[]` or `null`, `cache: snapshot`) and a warning saying HIBP is unavailable and why.
+
+The package ships no breach data. A partial breach list would make a missing breach look like "not breached", so there is no shipped snapshot. With `CYBERAU_OFFLINE=1` the live step is skipped and only the cache is read. Account and domain lookups are never cached, so offline they are always unavailable.
+
+`CYBERAU_HIBP_SNAPSHOT` points at an operator-supplied JSON file with `data_as_of`, `breaches` and `ranges`. When it is set the public tools answer from it instead, with a warning that it is the operator-supplied snapshot, not a live fetch, and partial. Tests use it with `tests/fixtures/snapshot.json`. `--schema-drift` checks that file, and reports "no local copy to check" when it is not set.
+
 ## Fixtures
 
+- `snapshot.json` is a hand-picked subset of the breach catalogue (Adobe, LinkedIn, Dropbox) and one Pwned Passwords range, for tests only. It is never served at runtime.
 - `breaches.json`, `range_21BD1.txt` and the three public cassettes were recorded from the live service on 2026-10-17. Breach data is CC BY 4.0, Have I Been Pwned.
 - `account-exists`, `multiple-breaches`, `hibp_401.json` and the two keyed cassettes were built by hand to the server's published output schema. No subscription key was available at build time. They name only HIBP's published test accounts on hibp-integration-tests.com. Re-record them with a key when one is available.
 
@@ -587,7 +598,7 @@ A pinned, read-only wrap of the official HIBP MCP server (`https://haveibeenpwne
 | `hibp_get_breached_account` | Breach names for one email address | `HIBP_API_KEY` and human approval |
 | `hibp_get_breached_domain` | Breached aliases on one verified domain | `HIBP_API_KEY` and human approval |
 
-Breach titles and descriptions, and domain aliases, are untrusted text. The breach list is cached for 24 hours. With `CYBERAU_OFFLINE=1` the connector answers from the cache or a small shipped snapshot and says so in `warnings`.
+Breach titles and descriptions, and domain aliases, are untrusted text. The breach list is cached for 24 hours. With `CYBERAU_OFFLINE=1` the connector answers from its cache only. With no live or cached reply it returns no data and a warning that HIBP is unavailable.
 
 ### Passwords
 

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from cyberau_common.regen import PARSER_CHECK_ABSENT, SKIP_MESSAGES, render_report
+from cyberau_common.regen import PARSER_CHECK_ABSENT, missing_message, render_report
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "build_skill_references.py"
@@ -25,11 +25,11 @@ def test_report_names_absent_sources_and_does_not_invent_skills(tmp_path):
     text = render_report(tmp_path)
     assert "using mcp/asd-ism/data" in text
     assert "skills/ism-control-lookup is absent. Not writing references." in text
-    for source in ("e8", "aureg", "attack", "sigma"):
-        assert SKIP_MESSAGES[source] in text
+    for source in ("e8", "aureg"):
+        assert missing_message(source) in text
     assert PARSER_CHECK_ABSENT in text
     assert "\u2014" not in text
-    assert "Live pages were not fetched." in text
+    assert "egress policy" in text
     assert not (tmp_path / "skills").exists()
 
 
@@ -65,11 +65,10 @@ def test_checkout_report_does_not_create_skill_directories(tmp_path):
     text = destination.read_text(encoding="utf-8")
     assert "using mcp/asd-ism/data" in text
     assert PARSER_CHECK_ABSENT in text
-    for source in ("e8", "aureg", "attack"):
-        assert SKIP_MESSAGES[source] in text
-    # The checkout ships a local Sigma snapshot, so Sigma is regenerated, not skipped.
-    assert "Sigma: using mcp/sigma/data" in text
-    assert SKIP_MESSAGES["sigma"] not in text
+    for source in ("ism", "e8", "aureg"):
+        assert missing_message(source) not in text
+    assert "Essential Eight: using mcp/asd-essentials/data" in text
+    assert "AU reporting obligations: using mcp/au-regulatory/data" in text
     assert "\u2014" not in text
     assert sorted(path.name for path in (ROOT / "skills").iterdir()) == before
     assert not (ROOT / "mcp" / "asd-ism" / "data" / "regen.json").exists()
@@ -87,5 +86,5 @@ def test_script_on_an_empty_root(tmp_path):
     assert completed.returncode == 0, completed.stderr
     text = destination.read_text(encoding="utf-8")
     assert PARSER_CHECK_ABSENT in text
-    assert SKIP_MESSAGES["ism"] in text
+    assert missing_message("ism") in text
     assert "\u2014" not in text

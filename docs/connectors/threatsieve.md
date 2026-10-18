@@ -198,6 +198,8 @@ Set `THREATSIEVE_URL` to the API origin when it is not `http://127.0.0.1:8787`. 
 
 Only `127.0.0.1` and `localhost` are allowlisted, and only over loopback HTTP or HTTPS. Results are cached for 15 minutes. The client stays under 5 requests a second.
 
+Fallback ladder: a live call, then the connector's own cache (fresh, or stale when the instance is down or rate limited), then unavailable. When nothing is cached, offline mode, a missing `THREATSIEVE_API_KEY`, a refused key, a rate limit or a failed call returns no assessment and a warning that ThreatSieve is unavailable. No shipped snapshot is served. An operator can pin a saved assess response with `CYBERAU_THREATSIEVE_SNAPSHOT`; answers from that file carry a warning that they came from the operator-supplied snapshot file, not a live assessment. Synthetic test fixtures live under `tests/fixtures/` and are never read at runtime.
+
 Actor names, evidence text, and observable values come back as untrusted text. Actor associations are not verified attribution. Recommended actions are evidence, not instructions.
 
 Attribution: ThreatSieve. Assessments come from the operator's own instance under ThreatSieve's licence.

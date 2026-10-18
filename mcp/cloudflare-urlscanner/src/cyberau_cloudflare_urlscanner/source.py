@@ -21,6 +21,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 
 DOCS = "https://developers.cloudflare.com/radar/investigate/url-scanner/"
 API_ROOT = "https://api.cloudflare.com/client/v4/accounts"
@@ -42,8 +43,13 @@ BURST = 4
 RESULT_TTL = 365 * 24 * 3600
 SUBMIT_TTL = 24 * 3600
 _APPROVAL = "approval token is not valid for this URL"
-_UNAVAILABLE = "unavailable: no cached or snapshot Cloudflare URL Scanner record"
-_NO_MATCH = "no matching scan in the offline snapshot or cache"
+_SOURCE_LABEL = "Cloudflare URL Scanner"
+_UNAVAILABLE = unavailable(_SOURCE_LABEL, "offline and no cached scan is stored")
+_NO_MATCH = "no matching scan in the operator-supplied snapshot file or cache"
+_SNAPSHOT_NOTE = (
+    "Served from the operator-supplied snapshot file (CYBERAU_CFSCAN_SNAPSHOT), "
+    "not a live Cloudflare URL Scanner call"
+)
 _TRANSPORT = None
 _RESOLVER = None
 _SLEEP = time.sleep
@@ -68,7 +74,7 @@ def urlscan_submit_unlisted(url: str, approval_token: str) -> dict:
         return _offline_submit(url, body)
     creds = _credentials()
     if isinstance(creds, str):
-        return _fail(creds)
+        return _fail(unavailable(_SOURCE_LABEL, creds))
     token, account = creds
     problem = _approval_status(url, approval_token, consume=True)
     if problem:
@@ -84,7 +90,7 @@ def urlscan_get_result(scan_id: str) -> dict:
         return _offline_get(scan_id)
     creds = _credentials()
     if isinstance(creds, str):
-        return _fail(creds)
+        return _fail(unavailable(_SOURCE_LABEL, creds))
     token, account = creds
     return _live_get(scan_id, token, account, force_live=False)
 
@@ -148,9 +154,11 @@ class _CfscanConnector(Connector):
 
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
+            if not os.environ.get("CYBERAU_CFSCAN_SNAPSHOT"):
+                return Probe(self.key, True, "no local copy to check")
             document = _snapshot_document()
             if document is None:
-                return Probe(self.key, False, "snapshot is missing")
+                return Probe(self.key, False, "snapshot file is missing or unreadable")
             problem = schema_drift(document)
             if problem:
                 return Probe(self.key, False, problem)
@@ -236,6 +244,8 @@ def _live_submit(url: str, body: dict, token: str, account: str) -> dict:
     )
     if status != 200 or warning:
         detail = warning or f"Cloudflare URL Scanner returned {status}."
+        if status is None or status == 429:
+            detail = unavailable(_SOURCE_LABEL, detail)
         return _envelope([], cache, warnings=(detail,))
     if not isinstance(payload, dict):
         return _envelope([], cache, warnings=("Cloudflare URL Scanner payload was not usable",))
@@ -254,6 +264,8 @@ def _live_get(scan_id: str, token: str, account: str, *, force_live: bool) -> di
     )
     if status is None or status in (401, 403, 429) or (warning and status != 404):
         detail = warning or "Cloudflare URL Scanner payload was not usable"
+        if status is None or status == 429:
+            detail = unavailable(_SOURCE_LABEL, detail)
         return _envelope([], cache, warnings=(detail,))
     return _finish_result(scan_id, payload, cache, status or 0, token)
 
@@ -272,7 +284,7 @@ def _offline_submit(url: str, body: dict) -> dict:
             return _finish_submit(url, payload, state, token)
     snapshot = _snapshot_submit()
     if snapshot is not None and snapshot.get("url") == url:
-        return _finish_submit(url, snapshot, "snapshot", "")
+        return _noted(_finish_submit(url, snapshot, "snapshot", ""))
     if _snapshot_path() is None:
         return _fail(_UNAVAILABLE)
     return _fail(_NO_MATCH)
@@ -292,10 +304,17 @@ def _offline_get(scan_id: str) -> dict:
             return _finish_result(scan_id, payload, state, 200, token)
     snapshot = _snapshot_result()
     if snapshot is not None and _result_id(snapshot) == scan_id:
-        return _finish_result(scan_id, snapshot, "snapshot", 200, "")
+        return _noted(_finish_result(scan_id, snapshot, "snapshot", 200, ""))
     if _snapshot_path() is None:
         return _fail(_UNAVAILABLE)
     return _fail(_NO_MATCH)
+
+
+def _noted(result: dict) -> dict:
+    """Mark an answer read from the operator-supplied snapshot file."""
+    if result.get("data"):
+        result["warnings"] = [*result.get("warnings", []), _SNAPSHOT_NOTE]
+    return result
 
 
 def _finish_submit(url: str, payload: dict, cache: str, token: str) -> dict:
@@ -598,12 +617,12 @@ def _read_cache(method: str, url: str, material: bytes, scope: str) -> tuple[dic
 
 
 def _snapshot_path() -> Path | None:
+    """Only an operator-supplied snapshot is read. Nothing shipped in the package is."""
     override = os.environ.get("CYBERAU_CFSCAN_SNAPSHOT")
-    if override:
-        path = Path(override)
-        return path if path.is_file() else None
-    bundled = _PACKAGE / "data" / "snapshot.json"
-    return bundled if bundled.is_file() else None
+    if not override:
+        return None
+    path = Path(override)
+    return path if path.is_file() else None
 
 
 def _snapshot_document() -> dict | None:

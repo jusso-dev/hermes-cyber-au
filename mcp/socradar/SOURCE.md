@@ -63,7 +63,9 @@ Findings that match `watchlist.yaml` in the profile data directory are written t
 
 Every file under `mcp/socradar/tests/fixtures/` is synthetic. Nothing was recorded from SOCRadar, because no portal access was available. `socradar_incidents.yaml` is an empty placeholder, not a recorded cassette. Field names and shapes follow the XSOAR parser above and are not confirmed against the live service.
 
-`CYBERAU_SOCRADAR_SNAPSHOT` points the tool at a local JSON file. A result served from it has `cache: snapshot` and a warning that says it is not live. It is never written to the intel store, and `exposure_for` refuses it. A copy served from an expired cache entry has `cache: stale` and a warning.
+Fallback ladder: live API, then the session cache (fresh or stale), then unavailable. There is no shipped snapshot. When nothing is left, or the key or company id is missing, the tool returns no rows and a "SOCRadar is unavailable" warning. Test fixtures under `tests/fixtures/` are only read by tests and the offline schema-drift check.
+
+`CYBERAU_SOCRADAR_SNAPSHOT` points the tool at an operator-supplied JSON file. A result served from it has `cache: snapshot` and a warning that says it came from that file and is not live. It is never written to the intel store, and `exposure_for` refuses it. A copy served from an expired cache entry has `cache: stale` and a warning.
 
 `cyberau-mcp health socradar --live` makes one uncached request and reports ok only for a live response that passes the schema. It reports not ok when the key or company id is missing, when the fetch fails, and when the answer came from a cache or a snapshot. Without `--live` a missing key reports `not configured` as ok.
 
@@ -97,7 +99,7 @@ Doctor lists the server as off until you enable it. Quota calls per day and per 
 
 Free text from the feed is wrapped as untrusted text. Credential values are not stored.
 
-A result with `cache: snapshot` comes from a local file, not SOCRadar. It carries a warning, is never stored, and is refused by `exposure_for`. Test fixtures are synthetic. `health --live` reports not ok when the key is missing, the fetch fails, or the answer is cached.
+When SOCRadar cannot be reached and no cached copy exists, the tool returns no rows and an "is unavailable" warning. No shipped data is served. A result with `cache: snapshot` and rows comes from an operator-supplied file, not SOCRadar. It carries a warning, is never stored, and is refused by `exposure_for`. Test fixtures are synthetic. `health --live` reports not ok when the key is missing, the fetch fails, or the answer is cached.
 
 ### Dates and severity
 

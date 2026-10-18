@@ -29,7 +29,11 @@ Every free text field (URLs, domains, file names, tags, comments, reporters, mal
 
 ## Verified on 16 October 2026
 
-URLhaus and ThreatFox returned 401 without a key. The Feodo JSON returned 200. Response shapes for the keyed platforms follow the abuse.ch API pages and are stored as `schema/*.response.json`. Fixtures and the shipped `data/snapshot.json` are synthetic: documentation address ranges (RFC 5737), `.test` domains and made-up hashes. Offline answers from the snapshot say so in `warnings`.
+URLhaus and ThreatFox returned 401 without a key. The Feodo JSON returned 200. Response shapes for the keyed platforms follow the abuse.ch API pages and are stored as `schema/*.response.json`. The test fixtures under `tests/fixtures/` (including `tests/fixtures/snapshot.json`) are synthetic: documentation address ranges (RFC 5737), `.test` domains and made-up hashes. They are never served at runtime.
+
+## When abuse.ch cannot be reached
+
+The fallback ladder is live fetch, then the HTTP cache (fresh, then stale), then unavailable. No snapshot ships with the connector. When live and cached data are both missing, or the key is missing or rejected, or the answer is rate limited, malformed or drifted, the tool returns empty data with a warning that the platform is unavailable. In offline mode (`CYBERAU_OFFLINE=1`) an operator may point `CYBERAU_ABUSECH_SNAPSHOT` at a snapshot file or a directory holding `snapshot.json`. Answers from that file carry a warning that they came from the operator-supplied snapshot file, not a live fetch. The offline schema check reads the same file, and reports that there is no local copy to check when it is not set.
 
 ## Local history
 

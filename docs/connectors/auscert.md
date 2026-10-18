@@ -223,7 +223,7 @@ Response schema (`schema/auscert_bulletins.response.json`):
 
 ## Terms and attribution
 
-Return title, link, date and the feed summary only. Do not mirror full bulletins. AusCERT's terms were not checked for snapshotting, so the shipped snapshot and every fixture are synthetic. Confirm https://www.auscert.org.au/ before reuse. This connector is not endorsed by AusCERT.
+Return title, link, date and the feed summary only. Do not mirror full bulletins. AusCERT's terms were not checked for snapshotting, so no snapshot ships with the connector and every test fixture under `tests/fixtures/` is synthetic. Confirm https://www.auscert.org.au/ before reuse. This connector is not endorsed by AusCERT.
 
 Attribution returned with each result:
 
@@ -254,7 +254,7 @@ Read-only access to the public AusCERT security bulletin RSS (External Security 
 
 Each record carries the bulletin id, title, link, published time in Australia/Sydney, the feed summary, the highest CVSS score named in the title, and the CVE ids found in the bulletin. The bulletin text itself is never returned or stored. Titles and summaries are untrusted and arrive wrapped in untrusted markers.
 
-No API key and no env var. The feed is fetched at most once every 30 minutes, with a conditional GET, and a `429` response is honoured through its `Retry-After` header. The path `https://www.auscert.org.au/rss/bulletins/` returns a 404 page, so the connector uses `https://portal.auscert.org.au/rss/bulletins/`. If AusCERT cannot be reached, the last cached feed is served and marked `stale`. With `CYBERAU_OFFLINE=1` the connector answers from the cache, then from a small synthetic snapshot.
+No API key. The feed is fetched at most once every 30 minutes, with a conditional GET, and a `429` response is honoured through its `Retry-After` header. The path `https://www.auscert.org.au/rss/bulletins/` returns a 404 page, so the connector uses `https://portal.auscert.org.au/rss/bulletins/`. If AusCERT cannot be reached, the last cached feed is served and marked `stale`. With `CYBERAU_OFFLINE=1` the connector answers from the cache. When neither live nor cached data exists the tool returns no bulletins and an "is unavailable" warning. It never serves sample bulletins. An operator can set `CYBERAU_AUSCERT_SNAPSHOT` to an RSS file to answer from that file instead, and each answer then carries a warning that it came from the operator-supplied snapshot, not a live fetch.
 
 Many bulletins repeat vendor advisories, so deduplicate by CVE id in the intel store. Every poll is recorded in `$CYBERAU_DATA_DIR/auscert_bulletins.sqlite`, so bulletins that leave the rolling feed are kept.
 

@@ -19,6 +19,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -91,7 +92,8 @@ _ALERT_KINDS = {
     "data_leak_disclosure",
 }
 _PACKAGE = Path(__file__).resolve().parent
-_SAMPLES = _PACKAGE / "data" / "schema_samples.json"
+# Synthetic samples for the offline schema check only. Never served by a tool.
+_SAMPLES = _PACKAGE.parents[1] / "tests" / "fixtures" / "schema_samples.json"
 _MCP_TOOLS = _PACKAGE.parents[1] / "tests" / "fixtures" / "mcp_tools_list.json"
 
 _TRANSPORT = None
@@ -258,7 +260,7 @@ def _request(
         return None, "snapshot", "RECORDED_FUTURE_API_TOKEN is not set", None
     offline = os.environ.get("CYBERAU_OFFLINE") == "1"
     if not offline and not _live_allowed():
-        return None, "snapshot", "unavailable", None
+        return None, "snapshot", _unavailable("live calls are turned off"), None
     try:
         _admit(tool)
     except _BudgetStop as exc:
@@ -281,17 +283,17 @@ def _request(
         else:
             response = client.get(url, params=params, headers=headers, ttl=ttl)
     except (HttpError, Exception) as exc:
-        message = "unavailable" if offline else (_safe(str(exc)) or "unavailable")
-        return None, "snapshot", message, None
+        reason = _OFFLINE_REASON if offline else (_safe(str(exc)) or "the request failed")
+        return None, "snapshot", _unavailable(reason), None
     finally:
         client.close()
     state = _cache_state(response.cache)
     if response.status in {401, 403}:
-        return None, "snapshot", "RECORDED_FUTURE_API_TOKEN was rejected", response
+        return None, "snapshot", _unavailable("RECORDED_FUTURE_API_TOKEN was rejected"), response
     if response.status == 429:
-        return None, state, "Recorded Future returned 429", response
+        return None, state, _unavailable("Recorded Future returned 429"), response
     if response.status >= 400:
-        return None, state, f"upstream status {response.status}", response
+        return None, state, _unavailable(f"upstream status {response.status}"), response
     if not parse_json:
         return {}, state, "", response
     if not response.body:
@@ -303,6 +305,13 @@ def _request(
     if not isinstance(payload, dict):
         return None, state, "upstream payload was not usable", response
     return payload, state, "", response
+
+
+_OFFLINE_REASON = "offline and nothing cached this session"
+
+
+def _unavailable(reason: str) -> str:
+    return unavailable("Recorded Future", reason)
 
 
 def _cache_state(state: str) -> str:
@@ -1382,11 +1391,17 @@ class RecordedFutureConnector(PremiumConnector):
 
     def health(self, *, live: bool = False, check_schema: bool = False) -> Probe:
         if check_schema:
-            problem = schema_drift(load_schema_samples())
-            if problem:
-                return Probe(self.key, False, problem)
-            if not live:
-                return Probe(self.key, True, "schema ok")
+            # The bundled samples are synthetic, so only the offline check reads them.
+            samples = load_schema_samples(allow_fixture=not live)
+            if samples is None:
+                if not live:
+                    return Probe(self.key, True, "no local copy to check")
+            else:
+                problem = schema_drift(samples)
+                if problem:
+                    return Probe(self.key, False, problem)
+                if not live:
+                    return Probe(self.key, True, "schema ok")
         basic = self.health_result(live=False)
         if not live:
             return Probe(self.key, True, basic.detail if not basic.configured else "offline ok")
@@ -1473,9 +1488,15 @@ def schema_drift(samples: dict) -> str | None:
     return None
 
 
-def load_schema_samples() -> dict:
+def load_schema_samples(*, allow_fixture: bool = True) -> dict | None:
+    """Operator schema file, else the synthetic test samples. None when neither is there."""
     override = os.environ.get("CYBERAU_RF_SCHEMA_FIXTURE")
-    path = Path(override) if override else _SAMPLES
+    if override:
+        path = Path(override)
+    elif allow_fixture and _SAMPLES.is_file():
+        path = _SAMPLES
+    else:
+        return None
     return json.loads(path.read_text(encoding="utf-8"))
 
 

@@ -286,6 +286,8 @@ Attribution returned with each result:
 
 The static allowlist ships with no hosts because the instance is yours. Private, link-local and carrier-grade NAT addresses stay blocked.
 
+Fallback ladder: live instance, then the local HTTP cache (stale), then unavailable. There is no shipped snapshot. When nothing is left, or `OPENCTI_URL` or `OPENCTI_TOKEN` is missing, each tool returns empty data and an "OpenCTI is unavailable" warning. `CYBERAU_OPENCTI_SNAPSHOT` may point at an operator-supplied JSON file; answers from it carry a warning that they came from that file, not a live fetch. Test fixtures live under `tests/fixtures/` and are only read by tests and the offline schema-drift check.
+
 ## Operator guide
 
 Read-only search of actors, malware, indicators and reports on an OpenCTI instance you run.

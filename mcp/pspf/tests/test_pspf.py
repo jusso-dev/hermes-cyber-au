@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import cyberau_pspf.source as source
@@ -22,6 +23,8 @@ from cyberau_pspf.source import (
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PACKAGE = Path(__file__).resolve().parents[1]
+SHIPPED = json.loads((PACKAGE / "data" / "snapshot.json").read_text(encoding="utf-8"))
+SHIPPED_DAY = date.fromisoformat(SHIPPED["as_of"][:10])
 ENVELOPE = {
     "type": "object",
     "required": ["source", "retrieved_at", "cache", "data", "untrusted"],
@@ -45,9 +48,11 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_PSPF_SNAPSHOT", str(FIXTURES / "pspf_snapshot_two_directions.json"))
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     source._SLEEP = lambda _seconds: None
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=1)
     yield
     source._TRANSPORT = None
     source._SLEEP = time.sleep
+    source._TODAY = None
 
 
 def test_search_and_directions_quote_the_snapshot():
@@ -90,14 +95,14 @@ def test_empty_malformed_and_unknown_query():
     assert pspf_search("x")["warnings"]
     missing = pspf_search("not-a-real-requirement-id")
     assert missing["data"] == []
-    assert "not a PSPF assessment" in missing["warnings"][0]
-    assert "not a finding" in missing["warnings"][0]
+    assert any("not a PSPF assessment" in item for item in missing["warnings"])
+    assert any("not a finding" in item for item in missing["warnings"])
 
     source_env = "CYBERAU_PSPF_SNAPSHOT"
     os.environ[source_env] = str(FIXTURES / "empty.json")
     listed = pspf_list_directions()
     assert listed["data"] == []
-    assert "not a PSPF assessment" in listed["warnings"][0]
+    assert any("not a PSPF assessment" in item for item in listed["warnings"])
 
     os.environ[source_env] = str(FIXTURES / "malformed.txt")
     warned = pspf_search("Cisco")
@@ -228,7 +233,7 @@ def test_timeout_uses_cache_then_snapshot(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "cold"))
     cold = pspf_list_directions()
     assert cold["cache"] == "snapshot"
-    assert "served shipped snapshot" in cold["warnings"][0]
+    assert "served the shipped PSPF snapshot dated 2026-10-17" in cold["warnings"][0]
     assert cold["data"][0]["id"] == "002-2026"
 
 
@@ -331,7 +336,10 @@ def test_shipped_snapshot_is_never_relabelled_as_a_stored_poll():
     second = pspf_list_directions()
     for listed in (first, second):
         assert listed["cache"] == "snapshot"
-        assert listed["warnings"] == []
+        assert listed["warnings"] == [
+            "served the operator-supplied PSPF snapshot dated 2026-10-17 from "
+            "CYBERAU_PSPF_SNAPSHOT, not a live fetch"
+        ]
         assert listed["data_as_of"] == "2026-10-17"
         assert {row["origin"] for row in listed["data"]} == {"snapshot"}
 
@@ -347,7 +355,7 @@ def test_failed_live_fetch_is_not_healthy_and_serves_the_snapshot(monkeypatch):
     assert main(["health", "pspf", "--live"]) == 1
     served = pspf_list_directions()
     assert served["cache"] == "snapshot"
-    assert "served shipped snapshot" in served["warnings"][0]
+    assert "served the shipped PSPF snapshot dated" in served["warnings"][0]
     assert {row["origin"] for row in served["data"]} == {"snapshot"}
     served_again = pspf_list_directions()
     assert served_again["cache"] == "snapshot"
@@ -437,5 +445,76 @@ def test_a_page_without_the_quotation_yields_no_invented_record(monkeypatch):
 def test_search_matches_title_quotation_and_id_only():
     miss = pspf_search("https")
     assert miss["data"] == []
-    assert "not a PSPF assessment" in miss["warnings"][0]
+    assert any("not a PSPF assessment" in item for item in miss["warnings"])
     assert pspf_search("001-2026")["data"][0]["id"] == "001-2026"
+
+
+def _expire_shipped() -> None:
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+
+
+def _assert_unavailable(record: dict) -> None:
+    assert record["data"] == []
+    assert record["cache"] == "snapshot"
+    assert any("PSPF is unavailable" in item for item in record["warnings"])
+    text = json.dumps(record)
+    for row in [*SHIPPED["requirements"], *SHIPPED["directions"]]:
+        assert row["title"] not in text
+
+
+def test_expired_shipped_snapshot_is_unavailable_offline(monkeypatch):
+    monkeypatch.delenv("CYBERAU_PSPF_SNAPSHOT")
+    _expire_shipped()
+    for record in (pspf_list_directions(), pspf_search("Cisco"), pspf_search("PSPF")):
+        _assert_unavailable(record)
+        assert any("181 days old" in item for item in record["warnings"])
+
+
+def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
+    _live(monkeypatch)
+
+    def down(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("timed out")
+
+    source._TRANSPORT = httpx.MockTransport(down)
+    _expire_shipped()
+    for record in (pspf_list_directions(), pspf_search("Cisco")):
+        _assert_unavailable(record)
+
+
+def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
+    monkeypatch.delenv("CYBERAU_PSPF_SNAPSHOT")
+    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=10)
+    listed = pspf_list_directions()
+    assert listed["data"]
+    assert listed["cache"] == "snapshot"
+    assert listed["data_as_of"] == SHIPPED_DAY.isoformat()
+    assert any(
+        f"served the shipped PSPF snapshot dated {SHIPPED_DAY.isoformat()}" in item
+        for item in listed["warnings"]
+    )
+
+
+def test_expired_snapshot_rows_are_not_searched_after_a_live_poll(monkeypatch):
+    monkeypatch.delenv("CYBERAU_PSPF_SNAPSHOT")
+    assert pspf_list_directions()["data"]
+    _expire_shipped()
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    source._TRANSPORT = httpx.MockTransport(_site)
+    found = pspf_search("PSPF on a page")
+    assert all(row["origin"] == "live" for row in found["data"])
+
+
+def test_partial_live_page_does_not_fill_from_an_expired_snapshot(monkeypatch):
+    _live(monkeypatch)
+
+    def partial(request: httpx.Request) -> httpx.Response:
+        if "pspf-page-2026" in str(request.url):
+            return httpx.Response(200, content=(FIXTURES / "requirements.html").read_bytes())
+        return httpx.Response(200, content=b"<html><body><p>Publications</p></body></html>")
+
+    source._TRANSPORT = httpx.MockTransport(partial)
+    _expire_shipped()
+    listed = pspf_list_directions()
+    assert listed["data"] == []
+    assert any("181 days old" in item for item in listed["warnings"])

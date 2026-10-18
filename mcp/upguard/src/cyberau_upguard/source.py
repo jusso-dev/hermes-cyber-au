@@ -25,6 +25,7 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
+from cyberau_common.snapshot import unavailable
 from cyberau_premium.base import (
     ExposureFinding,
     PremiumConnector,
@@ -90,6 +91,13 @@ _KIND_FIXTURE = {
     "disclosures": "disclosures_synthetic.json",
     "typosquat_details": "typosquat_details_synthetic.json",
 }
+_LABELS = {
+    "breaches": "UpGuard identity breaches",
+    "disclosures": "UpGuard data leak disclosures",
+    "typosquat_details": "UpGuard typosquats",
+    "typosquat": "UpGuard typosquat domains",
+}
+_FIXTURES_ENV = "CYBERAU_UPGUARD_FIXTURES"
 _TRANSPORT = None
 _SLEEPER = None
 _RESOLVER = None
@@ -103,7 +111,7 @@ def upguard_identity_breaches(limit: _Limit = 100) -> dict:
         return _envelope([], "snapshot", (BREACHES_URL,), (problem,))
     payload, cache, warning = _load_breaches(limit)
     if payload is None:
-        return _envelope([], cache, (BREACHES_URL,), (warning,))
+        return _envelope([], cache, (BREACHES_URL,), (unavailable(_LABELS["breaches"], warning),))
     records, _findings = _breach_records(payload, watchlist=None, since=None, limit=limit)
     warnings = (warning,) if warning else ()
     return _envelope(records, cache, (BREACHES_URL,), warnings + _served(cache))
@@ -127,7 +135,9 @@ def upguard_data_leaks(
         params["statuses"] = ",".join(statuses)
     payload, cache, warning = _fetch(DISCLOSURES_URL, params, kind="disclosures")
     if warning:
-        return _envelope([], cache, (DISCLOSURES_URL,), (warning,))
+        return _envelope(
+            [], cache, (DISCLOSURES_URL,), (unavailable(_LABELS["disclosures"], warning),)
+        )
     records, _findings = _leak_records(
         payload or {},
         watchlist=None,
@@ -149,7 +159,12 @@ def upguard_typosquats(domain: str) -> dict:
         kind="typosquat_details",
     )
     if warning:
-        return _envelope([], cache, (TYPOSQUAT_DETAILS_URL,), (warning,))
+        return _envelope(
+            [],
+            cache,
+            (TYPOSQUAT_DETAILS_URL,),
+            (unavailable(_LABELS["typosquat_details"], warning),),
+        )
     records = _typosquat_records(payload or {}, domain)
     return _envelope(records, cache, (TYPOSQUAT_DETAILS_URL,), _served(cache))
 
@@ -270,8 +285,13 @@ def bundled_schema_problems() -> str | None:
         ("disclosures.response.json", "disclosures_synthetic.json"),
         ("typosquat_details.response.json", "typosquat_details_synthetic.json"),
     )
+    # Offline schema check only. These copies are compared against the schema and
+    # are never returned to the agent. A missing copy is skipped.
     for schema_name, fixture_name in pairs:
-        problem = schema_problem(schema_name, _read_json(_fixture_path(fixture_name)))
+        path = _schema_fixture_path(fixture_name)
+        if not path.is_file():
+            continue
+        problem = schema_problem(schema_name, _read_json(path))
         if problem:
             return problem
     extra = os.environ.get("CYBERAU_UPGUARD_SCHEMA_FIXTURE")
@@ -302,7 +322,10 @@ def _envelope(data, cache: str, urls: tuple[str, ...], warnings: tuple[str, ...]
 def _served(cache: str) -> tuple[str, ...]:
     """Say so when a result is not a live answer."""
     if cache == "snapshot":
-        return ("Bundled synthetic snapshot, not live UpGuard data.",)
+        return (
+            f"Served from the operator-supplied {_FIXTURES_ENV} snapshot files, "
+            "not a live UpGuard fetch.",
+        )
     if cache == "stale":
         return ("UpGuard could not be reached. This is an older cached copy.",)
     return ()
@@ -374,10 +397,18 @@ def _fetch(
 ) -> tuple[dict | None, str, str]:
     offline = _offline() and not force_live
     if offline:
+        # Offline mode only serves files the operator pointed at. Nothing shipped
+        # in the package is served as UpGuard data.
         fixture = _KIND_FIXTURE.get(kind)
+        root = _override_root()
+        if root is None:
+            return None, "snapshot", f"offline mode is on and {_FIXTURES_ENV} is not set"
         if fixture is None:
-            return None, "snapshot", "no offline snapshot for this UpGuard call"
-        return _read_json(_fixture_path(fixture)), "snapshot", ""
+            return None, "snapshot", "no operator snapshot for this UpGuard call"
+        try:
+            return _read_json(root / fixture), "snapshot", ""
+        except (OSError, ValueError):
+            return None, "snapshot", f"the {_FIXTURES_ENV} snapshot for this call is not usable"
     if lookup("UPGUARD_API_KEY") is None:
         return None, "snapshot", "UPGUARD_API_KEY is not set"
     directory = _data_dir()
@@ -781,9 +812,14 @@ def _ttl_cache(directory: Path):
     return cache_for_terms(directory / "upguard-ttl.sqlite", terms)
 
 
-def _fixture_path(name: str) -> Path:
-    override = os.environ.get("CYBERAU_UPGUARD_FIXTURES")
-    root = Path(override) if override else _PACKAGE / "tests" / "fixtures"
+def _override_root() -> Path | None:
+    override = os.environ.get(_FIXTURES_ENV)
+    return Path(override) if override else None
+
+
+def _schema_fixture_path(name: str) -> Path:
+    """Copy used by the offline schema check only, never served as data."""
+    root = _override_root() or _PACKAGE / "tests" / "fixtures"
     return root / name
 
 
