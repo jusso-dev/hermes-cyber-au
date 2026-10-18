@@ -12,7 +12,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated, Literal
 
-from cyberau_common import USER_AGENT
+from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text

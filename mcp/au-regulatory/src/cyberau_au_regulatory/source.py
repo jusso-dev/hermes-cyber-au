@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
