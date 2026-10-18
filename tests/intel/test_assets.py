@@ -5,9 +5,11 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import socket
 import stat
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -17,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "assets"
 CSV = FIXTURES / "inventory.csv"
 SBOM = FIXTURES / "sbom.cdx.json"
+KEV = ROOT / "tests" / "skills" / "vuln-prioritisation" / "fixtures" / "kev.json"
 BRIEFING = ROOT / "skills" / "daily-briefing" / "scripts" / "briefing.py"
 
 
@@ -172,6 +175,98 @@ def test_cli_import_list_and_match(tmp_path: Path, capsys, no_network) -> None:
     matched = json.loads(capsys.readouterr().out)
     assert [(row["asset"]["product"], row["method"]) for row in matched] == [("tinyzip", "cpe")]
     assert no_network == []
+
+
+def test_coverage_counts_versions_and_match_identifiers(tmp_path: Path, capsys) -> None:
+    path = tmp_path / "assets.yaml"
+    assert assets.main(["import", str(CSV), "--inventory", str(path)]) == 0
+    capsys.readouterr()
+    assert assets.main(["coverage", "--inventory", str(path)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report == {
+        "assets": 4,
+        "cpe_recorded": 1,
+        "purl_recorded": 0,
+        "version_missing": 1,
+        "version_recorded": 3,
+    }
+
+
+def test_local_kev_check_writes_candidate_report(tmp_path: Path, capsys, no_network) -> None:
+    path = tmp_path / "assets.yaml"
+    assets.write_inventory(
+        path,
+        [
+            assets.Asset(
+                "Gateway",
+                "Example",
+                "FixtureGateway",
+                exposure="internet",
+                owner="platform",
+                extra={"version": "1.2.3"},
+            )
+        ],
+    )
+    output = tmp_path / "software-watch.json"
+    assert (
+        assets.main(["check", "--inventory", str(path), "--kev", str(KEV), "--output", str(output)])
+        == 0
+    )
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["source"] == "CISA Known Exploited Vulnerabilities"
+    assert report["candidates"][0]["cve_id"] == "CVE-2024-3400"
+    assert report["candidates"][0]["status"] == "candidate"
+    assert report["candidates"][0]["asset"]["version"] == "1.2.3"
+    assert report["snapshot_status"] == "fresh"
+    assert "snapshot fresh" in capsys.readouterr().out
+    assert oct(output.stat().st_mode & 0o777) == "0o600"
+    assert no_network == []
+
+
+def test_local_kev_check_never_calls_an_empty_inventory_or_snapshot_clear() -> None:
+    no_inventory = assets.check_kev([], {"vulnerabilities": []})
+    assert no_inventory["monitoring"] == "not_configured"
+    assert "not configured" in no_inventory["message"]
+
+    no_records = assets.check_kev(
+        [assets.Asset("Gateway", "Example", "FixtureGateway", owner="platform")],
+        {"vulnerabilities": []},
+    )
+    assert no_records["monitoring"] == "configured"
+    assert "not an all-clear" in no_records["message"]
+
+    stale = assets.check_kev(
+        [assets.Asset("Gateway", "Example", "FixtureGateway", owner="platform")],
+        {"vulnerabilities": []},
+        snapshot_file_modified_at=datetime.now(UTC) - timedelta(hours=13),
+    )
+    assert stale["snapshot_status"] == "stale"
+    assert "incomplete" in stale["freshness_warning"]
+
+
+def test_report_write_is_atomic_when_replace_fails(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "software-watch.json"
+    output.write_text("old report\n", encoding="utf-8")
+
+    def fail_replace(_source, _destination):
+        raise OSError("disk error")
+
+    monkeypatch.setattr(os, "replace", fail_replace)
+    with pytest.raises(OSError, match="disk error"):
+        assets.write_report(output, {"candidates": []})
+    assert output.read_text(encoding="utf-8") == "old report\n"
+    assert not list(tmp_path.glob(".software-watch-*.json"))
+
+
+def test_local_kev_check_rejects_malformed_json(tmp_path: Path, capsys) -> None:
+    inventory = tmp_path / "assets.yaml"
+    assets.write_inventory(
+        inventory, [assets.Asset("Gateway", "Example", "FixtureGateway", owner="platform")]
+    )
+    malformed = tmp_path / "kev.json"
+    malformed.write_text("{", encoding="utf-8")
+    assert assets.main(["check", "--inventory", str(inventory), "--kev", str(malformed)]) == 1
+    assert "KEV JSON is not valid" in capsys.readouterr().err
 
 
 def test_cpe_part_mismatch_is_not_a_product_match() -> None:

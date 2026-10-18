@@ -1,6 +1,6 @@
 # Shipped routines
 
-Installing this distribution adds twelve cron jobs: five feed refreshes that run all day, three agent routines, two nightly store jobs, the weekly maintenance job and the premium exposure watch. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
+Installing this distribution adds thirteen cron jobs: five feed refreshes that run all day, three agent routines, a local software check, two nightly store jobs, the weekly maintenance job and the premium exposure watch. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
 
 On a new install, Hermes stores every new job id as paused. On an update, Hermes refreshes the definition for an id that already exists and keeps that job's pause or resume choice. An id that appears for the first time in a later version starts paused, including on an update.
 
@@ -15,13 +15,16 @@ Times follow `timezone: Australia/Sydney` in `config.yaml`.
 | `cyberau-ingest-kev` | Ingest CISA KEV | every 360 minutes | `local` |
 | `cyberau-ingest-epss` | Ingest EPSS for KEV CVEs | every 720 minutes | `local` |
 | `cyberau-morning-brief` | Morning cyber briefing (AU) | 07:30 every day (`30 7 * * *`) | `origin` |
-| `cyberau-kev-watch` | KEV and EPSS watch for my assets | every 360 minutes | `origin` |
+| `cyberau-kev-watch` | Software vulnerability watch | every 360 minutes | `origin` |
+| `cyberau-software-watch-local` | Local software KEV candidate check | every 360 minutes | `local` |
 | `cyberau-weekly-exec` | Weekly executive summary | 08:00 Monday (`0 8 * * 1`) | `origin` |
 | `cyberau-store-expire` | Expire stale feed data | 02:30 every day (`30 2 * * *`) | `local` |
 | `cyberau-watchlist` | Nightly watchlist matches | 04:00 every day (`0 4 * * *`) | `local` |
 | `cyberau-store-maintenance` | Store vacuum and backup | 03:00 Sunday (`0 3 * * 0`) | `local` |
 
 Hermes does not accept the phrase `every 1d at 07:30`. The morning job uses the cron expression `30 7 * * *`. With `timezone: Australia/Sydney`, that is 07:30.
+
+`cyberau-software-watch-local` reads only `plugin-data/cyber-au/assets.yaml` and the KEV refresh snapshot at `plugin-data/cyber-au/snapshots/kev.json`. It writes `plugin-data/cyber-au/software-watch.json` with mode 0600. The job is deterministic, makes no network request, starts paused, and has `local` delivery.
 
 The commands below were run against Hermes Agent v0.22.2. Each output is what that command printed. Status symbols Hermes prints are shown as text, for example `[warning]`.
 
@@ -61,7 +64,7 @@ hermes -p cyber-au cron run cyberau-morning-brief
     Skills:    acsc-advisory-digest, vuln-prioritisation, executive-briefing
 
   cyberau-kev-watch [paused]
-    Name:      KEV and EPSS watch for my assets
+    Name:      Software vulnerability watch
     Schedule:  every 360m
     Repeat:    ∞
     Next run:  None
@@ -223,7 +226,7 @@ hermes -p cyber-au cron edit cyberau-kev-watch --failure-deliver local
 
 ```text
 Updated job: cyberau-kev-watch
-  Name: KEV and EPSS watch for my assets
+  Name: Software vulnerability watch
   Schedule: every 360m
   Skills: vuln-prioritisation
 ```
@@ -238,7 +241,7 @@ hermes -p cyber-au cron edit cyberau-kev-watch --failure-deliver ''
 
 ```text
 Updated job: cyberau-kev-watch
-  Name: KEV and EPSS watch for my assets
+  Name: Software vulnerability watch
   Schedule: every 360m
   Skills: vuln-prioritisation
 ```
@@ -305,12 +308,12 @@ hermes -p cyber-au cron edit cyberau-kev-watch --schedule "0 8,14,20 * * *"
 Jobs that already use a cron expression, such as `cyberau-morning-brief`, only need the hour changed as in "Change the time".
 
 ```bash
-hermes -p cyber-au cron edit cyberau-kev-watch --prompt 'Check new KEV entries and EPSS jumps above 0.5 against the asset inventory in plugin-data/cyber-au/assets.yaml. Report only matches. If nothing matches, reply with only [SILENT].'
+hermes -p cyber-au cron edit cyberau-kev-watch --prompt 'Check new KEV entries, recent ASD ACSC and AusCERT CVEs, and EPSS jumps against the local asset inventory. Match locally. Report candidates with method and recorded version; confirm affected versions against the source. Do not send inventory values to a connector. If nothing matches, reply with only [SILENT].'
 ```
 
 ```text
 Updated job: cyberau-kev-watch
-  Name: KEV and EPSS watch for my assets
+  Name: Software vulnerability watch
   Schedule: every 360m
   Skills: vuln-prioritisation
 ```
@@ -346,7 +349,7 @@ After the schedule change, the weekly `local` delivery, and the KEV failure over
     [warning] Last failure at 2026-10-17T15:27:23.778129+11:00: RuntimeError: Cron job 'Morning cyber briefing (AU)' has no model configured (job.model=None, HERMES_MODEL='', config.y...
 
   cyberau-kev-watch [paused]
-    Name:      KEV and EPSS watch for my assets
+    Name:      Software vulnerability watch
     Schedule:  every 360m
     Repeat:    ∞
     Next run:  None

@@ -27,7 +27,8 @@ fi
 # One argument picks the sources (comma separated). The per-feed jobs pass
 # one source each so every feed runs on its own cadence.
 sources=${1:-asd,kev,epss,auscert,feodo}
-if ! output=$("$bin" refresh --sources "$sources" --store 2>&1); then
+if ! output=$("$bin" refresh --sources "$sources" --store \
+  --snapshot-dir "${profile}/plugin-data/cyber-au/snapshots" 2>&1); then
   line=${output%%$'\n'*}
   line=${line:0:200}
   printf 'ingest failed: %s\n' "${line:-refresh failed}"

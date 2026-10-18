@@ -123,6 +123,7 @@ class DistributionSkeletonTest(unittest.TestCase):
             "cyberau-ingest-epss",
             "cyberau-morning-brief",
             "cyberau-kev-watch",
+            "cyberau-software-watch-local",
             "cyberau-weekly-exec",
             "cyberau-store-expire",
             "cyberau-watchlist",
