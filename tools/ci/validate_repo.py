@@ -8,10 +8,12 @@ Run from the repository root:
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -79,7 +81,17 @@ _DURATION = re.compile(
     r"^P(?=\d|T)(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+S)?)?$"
 )
 _FEED_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_ALLOWLIST_WITHOUT_PACKAGE = {"stub"}
+_NO_UPSTREAM = re.compile(r"^[-*]\s+Upstream:\s*none\b", re.MULTILINE | re.IGNORECASE)
+# Links a connector shows the user (terms, docs, attribution, sign-up pages).
+# They are never fetched, and the run-time egress guard would refuse them.
+_REFERENCE_LINK_HOSTS: dict[str, frozenset[str]] = {
+    "abusech": frozenset({"auth.abuse.ch"}),
+    "abuseipdb": frozenset({"www.abuseipdb.com"}),
+    "cloudflare-urlscanner": frozenset({"developers.cloudflare.com"}),
+    "cve-program": frozenset({"www.cve.org"}),
+    "github-advisories": frozenset({"github.com"}),
+    "mitre-attack": frozenset({"attack.mitre.org"}),
+}
 _SKILL_LIST_FIELDS = (
     "tags",
     "related_skills",
@@ -88,7 +100,8 @@ _SKILL_LIST_FIELDS = (
     "fallback_for_toolsets",
     "fallback_for_tools",
 )
-_SKILL_REQUIRED = ("name", "description", "version", "author", "license", "platforms")
+# platforms is optional: docs/skills/STANDARD.md says omit it to load everywhere.
+_SKILL_REQUIRED = ("name", "description", "version", "author", "license")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -255,6 +268,11 @@ def check_catalogue(root: Path) -> list[str]:
 
 
 def check_allowlist(root: Path) -> list[str]:
+    """Check the allowlist shape and that SOURCE.md, code and servers.yaml agree with it.
+
+    Drift between the allowlist and the connector inventory, and the
+    ``global_deny_cidrs`` floor, are checked by tools/ci/check_allowlist.py.
+    """
     path = root / "mcp" / "egress-allowlist.yaml"
     rel = _rel(root, path)
     data, error = _load_yaml(path)
@@ -264,11 +282,13 @@ def check_allowlist(root: Path) -> list[str]:
         return [f"{rel}: egress allowlist must be a mapping"]
 
     findings: list[str] = []
-    unexpected = sorted(set(data) - {"connectors", "version"})
+    unexpected = sorted(set(data) - {"connectors", "version", "global_deny_cidrs"})
     if unexpected:
         findings.append(f"{rel}: unexpected keys: {', '.join(unexpected)}")
     if "version" in data and not isinstance(data.get("version"), int):
         findings.append(f"{rel}: version must be an integer")
+    if "global_deny_cidrs" in data and not isinstance(data.get("global_deny_cidrs"), list):
+        findings.append(f"{rel}: global_deny_cidrs must be a list")
 
     connectors = data.get("connectors")
     if not isinstance(connectors, dict) or not connectors:
@@ -286,10 +306,17 @@ def check_allowlist(root: Path) -> list[str]:
         extra = sorted(set(spec) - {"hosts", "allow_ip_literals", "allow_http_loopback"})
         if extra:
             findings.append(f"{label}: unexpected keys: {', '.join(extra)}")
+        for flag in ("allow_ip_literals", "allow_http_loopback"):
+            if flag in spec and not isinstance(spec.get(flag), bool):
+                findings.append(f"{label}: {flag} must be a boolean")
         hosts = spec.get("hosts")
-        if not isinstance(hosts, list) or not hosts:
-            findings.append(f"{label}: hosts must be a non-empty list")
+        # An empty list is a connector whose host the operator supplies at run time.
+        if not isinstance(hosts, list):
+            findings.append(f"{label}: hosts must be a list")
             continue
+        loopback_ok = (
+            spec.get("allow_ip_literals") is True and spec.get("allow_http_loopback") is True
+        )
         normalised: set[str] = set()
         for host in hosts:
             if not isinstance(host, str):
@@ -298,12 +325,15 @@ def check_allowlist(root: Path) -> list[str]:
             cleaned = host.strip().rstrip(".").lower()
             if cleaned in normalised:
                 findings.append(f"{label}: duplicate host {cleaned}")
-            if not _HOST_NAME.fullmatch(cleaned):
+            if _is_loopback(cleaned):
+                if not loopback_ok:
+                    findings.append(
+                        f"{label}: loopback host {cleaned!r} needs allow_ip_literals "
+                        "and allow_http_loopback"
+                    )
+            elif not _HOST_NAME.fullmatch(cleaned):
                 findings.append(f"{label}: host {cleaned!r} is not a DNS name")
             normalised.add(cleaned)
-        for flag in ("allow_ip_literals", "allow_http_loopback"):
-            if flag in spec and not isinstance(spec.get(flag), bool):
-                findings.append(f"{label}: {flag} must be a boolean")
         listed[key] = normalised
 
     mcp = root / "mcp"
@@ -312,16 +342,28 @@ def check_allowlist(root: Path) -> list[str]:
         packages = sorted(
             child for child in mcp.iterdir() if child.is_dir() and (child / "SOURCE.md").is_file()
         )
-    package_names = {child.name for child in packages}
-    for key in sorted(set(listed) - package_names - _ALLOWLIST_WITHOUT_PACKAGE):
-        findings.append(f"{rel}: {key} is allowlisted but has no mcp/{key}/SOURCE.md")
 
+    runtime_hosts: set[str] = set()
     for package in packages:
         key = package.name
         source_rel = _rel(root, package / "SOURCE.md")
+        if _NO_UPSTREAM.search((package / "SOURCE.md").read_text(encoding="utf-8")):
+            # A shared interface package such as premium calls no upstream.
+            continue
         declared, declare_error = _egress_hosts(package / "SOURCE.md")
         if declare_error:
             findings.append(f"{source_rel}: {declare_error}")
+            continue
+        if declared is None:
+            # Prose such as "user supplied" or "none shipped": the host comes from
+            # the profile at run time, so no fixed host may be allowlisted.
+            runtime_hosts.add(key)
+            if listed.get(key):
+                findings.append(
+                    f"{source_rel}: Egress hosts are user supplied but the allowlist "
+                    f"fixes {_format_hosts(listed[key])}"
+                )
+            continue
         if key not in listed:
             findings.append(f"{source_rel}: connector {key} is missing from the egress allowlist")
             continue
@@ -333,17 +375,27 @@ def check_allowlist(root: Path) -> list[str]:
         src = package / "src"
         if not src.is_dir():
             continue
+        allowed = listed[key] | _REFERENCE_LINK_HOSTS.get(key, frozenset())
         for source_file in sorted(src.rglob("*.py")):
             used = _https_hosts(source_file.read_text(encoding="utf-8"))
-            missing = used - listed[key]
+            missing = used - allowed
             if missing:
                 findings.append(
                     f"{_rel(root, source_file)}: hosts not allowlisted for {key}: "
                     f"{_format_hosts(missing)}"
                 )
 
-    findings.extend(_check_servers(root, set(listed)))
+    findings.extend(_check_servers(root, listed, runtime_hosts))
     return findings
+
+
+def _is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 def _check_skill(root: Path, path: Path) -> list[str]:
@@ -462,7 +514,9 @@ def _check_feed_auth(label: str, auth: object) -> list[str]:
     return findings
 
 
-def _check_servers(root: Path, allowlisted: set[str]) -> list[str]:
+def _check_servers(
+    root: Path, listed: dict[str, set[str]], runtime_hosts: set[str] | None = None
+) -> list[str]:
     path = root / "mcp" / "servers.yaml"
     if not path.is_file():
         return []
@@ -475,16 +529,35 @@ def _check_servers(root: Path, allowlisted: set[str]) -> list[str]:
     servers = data.get("servers")
     if not isinstance(servers, dict):
         return [f"{rel}: servers must be a mapping"]
+    runtime_hosts = runtime_hosts or set()
+    every_host: set[str] = set().union(*listed.values()) if listed else set()
     findings: list[str] = []
     for server_name, spec in servers.items():
         if not isinstance(spec, dict):
             findings.append(f"{rel}: {server_name} must be a mapping")
             continue
+        url = spec.get("url")
+        if isinstance(url, str):
+            # A remote MCP server Hermes reaches directly. Its host must be one the
+            # allowlist already names.
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme != "https":
+                findings.append(f"{rel}: {server_name} url must use https")
+            elif host not in every_host:
+                findings.append(
+                    f"{rel}: {server_name} url host {host} is not in the egress allowlist"
+                )
+            continue
         connector = spec.get("connector")
-        if not isinstance(connector, str) or connector not in allowlisted:
-            findings.append(
-                f"{rel}: {server_name} connector {connector!r} is not in the egress allowlist"
-            )
+        if connector is None and ("command" in spec or spec.get("wrap") is True):
+            # A wrapped or external binary is allowlisted under its server key.
+            connector = server_name
+        if isinstance(connector, str) and (connector in listed or connector in runtime_hosts):
+            continue
+        findings.append(
+            f"{rel}: {server_name} connector {connector!r} is not in the egress allowlist"
+        )
     return findings
 
 
@@ -508,7 +581,8 @@ def _known_connectors(root: Path) -> set[str]:
     return found
 
 
-def _egress_hosts(path: Path) -> tuple[set[str], str | None]:
+def _egress_hosts(path: Path) -> tuple[set[str] | None, str | None]:
+    """Return the declared hosts, or ``None`` when the line is prose about a run-time host."""
     text = path.read_text(encoding="utf-8")
     matches = _EGRESS_LINE.findall(text)
     if not matches:
@@ -518,8 +592,11 @@ def _egress_hosts(path: Path) -> tuple[set[str], str | None]:
     hosts = set()
     for part in matches[0].split(","):
         cleaned = part.strip().rstrip(".").lower()
-        if cleaned:
-            hosts.add(cleaned)
+        if not cleaned:
+            continue
+        if not (_HOST_NAME.fullmatch(cleaned) or _is_loopback(cleaned)):
+            return None, None
+        hosts.add(cleaned)
     if not hosts:
         return set(), "Egress hosts line is empty"
     return hosts, None
