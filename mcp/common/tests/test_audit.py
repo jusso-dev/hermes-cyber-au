@@ -57,9 +57,10 @@ class TestChain:
         assert record["prev_hash"] == GENESIS
         assert record["seq"] == 1
         assert record["hash"] == chain_hash(GENESIS, body)
-        assert record["hash"] == hashlib.sha256(
-            (GENESIS + canonical_json(body)).encode("utf-8")
-        ).hexdigest()
+        assert (
+            record["hash"]
+            == hashlib.sha256((GENESIS + canonical_json(body)).encode("utf-8")).hexdigest()
+        )
         assert log.verify() == 1
 
     def test_events_chain_across_days(self, tmp_path: Path):
@@ -70,9 +71,7 @@ class TestChain:
         hooks.on_session_start("sess", model="local", platform="cli")
         hooks.post_tool_call("intel_search", {"q": "kev"}, '{"ok": true}', "task-1", 4)
         hooks.record_approval("intel_export_stix", {"id": "1"}, approved=True, task_id="task-1")
-        hooks.record_block(
-            "intel_add_observation", {"id": "1"}, task_id="task-1", reason="no"
-        )
+        hooks.record_block("intel_add_observation", {"id": "1"}, task_id="task-1", reason="no")
         hooks.record_export(
             "intel_export_stix",
             {"id": "1"},
@@ -480,7 +479,9 @@ class TestHooks:
         plugin_log = AuditLog()
         assert plugin_log.verify() == 3
 
+    @pytest.mark.no_cover
     def test_hook_overhead_under_5ms(self, tmp_path: Path):
+        # Measure runtime overhead, without coverage tracing each audit operation.
         log = _log(tmp_path)
         clock = _clock(datetime(2026, 10, 17, 9, 0, tzinfo=log.zone))
         log._clock = clock

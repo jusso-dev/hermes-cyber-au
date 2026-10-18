@@ -52,9 +52,7 @@ def _fixture(
     tmp_path: Path, *, dockerfile: bool = True, ci: bool = True, github_ci: bool = False
 ) -> Path:
     _write(tmp_path / "tools" / "hermes_pin.txt", "# Pinned Hermes release.\nv0.22.2\n")
-    _write(
-        tmp_path / "distribution.yaml", 'name: cyber-au\nhermes_requires: ">=0.22.2"\n'
-    )
+    _write(tmp_path / "distribution.yaml", 'name: cyber-au\nhermes_requires: ">=0.22.2"\n')
     if dockerfile:
         _write(
             tmp_path / "docker" / "Dockerfile",
@@ -63,12 +61,14 @@ def _fixture(
     if ci:
         _write(
             tmp_path / ".github" / "workflows" / "ci.yml",
-            "env:\n  HERMES_IMAGE: nousresearch/hermes-agent:v0.22.2   # bumped by deps-and-hermes-bump.yml\n",
+            "env:\n  HERMES_IMAGE: nousresearch/hermes-agent:v0.22.2"
+            "   # bumped by deps-and-hermes-bump.yml\n",
         )
     if github_ci:
         _write(
             tmp_path / ".github" / "workflows" / "ci.yml",
-            "env:\n  HERMES_IMAGE: nousresearch/hermes-agent:v0.22.2   # bumped by deps-and-hermes-bump.yml\n",
+            "env:\n  HERMES_IMAGE: nousresearch/hermes-agent:v0.22.2"
+            "   # bumped by deps-and-hermes-bump.yml\n",
         )
     return tmp_path
 
@@ -116,10 +116,7 @@ def test_set_updates_every_consumer_and_keeps_the_comment(tmp_path: Path):
     assert "FROM nousresearch/hermes-agent:${HERMES_VERSION}\n" in dockerfile
     for rel in (".github/workflows/ci.yml",):
         updated = (root / rel).read_text(encoding="utf-8")
-        assert (
-            "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml"
-            in updated
-        )
+        assert "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml" in updated
 
 
 def test_set_is_idempotent_for_the_same_tag(tmp_path: Path):
@@ -150,9 +147,7 @@ def test_set_accepts_the_real_distribution_and_ci_formats(tmp_path: Path):
     ci = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'hermes_requires: ">=9.9.9"\n' in distribution
     assert "name: cyber-au\n" in distribution
-    assert (
-        "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml" in ci
-    )
+    assert "nousresearch/hermes-agent:v9.9.9   # bumped by deps-and-hermes-bump.yml" in ci
     assert (ROOT / "distribution.yaml").read_text(encoding="utf-8") != distribution
 
 
@@ -162,22 +157,14 @@ def test_set_writes_nothing_when_a_consumer_is_missing(tmp_path: Path):
     with pytest.raises(pin.PinError, match="docker/Dockerfile"):
         pin.set_pin(root, "v9.9.9")
     assert (root / "distribution.yaml").read_text(encoding="utf-8") == before
-    assert (
-        (root / "tools" / "hermes_pin.txt")
-        .read_text(encoding="utf-8")
-        .endswith("v0.22.2\n")
-    )
+    assert (root / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").endswith("v0.22.2\n")
 
 
 def test_set_refuses_a_tree_with_no_ci_workflow(tmp_path: Path):
     root = _fixture(tmp_path, ci=False)
     with pytest.raises(pin.PinError, match="ci.yml"):
         pin.set_pin(root, "v9.9.9")
-    assert (
-        (root / "tools" / "hermes_pin.txt")
-        .read_text(encoding="utf-8")
-        .endswith("v0.22.2\n")
-    )
+    assert (root / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").endswith("v0.22.2\n")
 
 
 @pytest.mark.parametrize(
@@ -195,16 +182,10 @@ def test_set_refuses_unexpected_tags(tmp_path: Path, tag: str):
     root = _fixture(tmp_path)
     code = pin.main(["--root", str(root), "set", tag])
     assert code == 1
-    assert (
-        (root / "tools" / "hermes_pin.txt")
-        .read_text(encoding="utf-8")
-        .endswith("v0.22.2\n")
-    )
+    assert (root / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").endswith("v0.22.2\n")
 
 
-def test_rejected_token_is_not_echoed(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-):
+def test_rejected_token_is_not_echoed(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     root = _fixture(tmp_path)
     code = pin.main(["--root", str(root), "set", "ghp_supersecrettokenvalue"])
     assert code == 1
@@ -253,9 +234,7 @@ def test_actionlint_is_clean_when_called_workflows_are_present():
         dest.mkdir(parents=True)
         for name in ("deps-and-hermes-bump.yml", "ci.yml", "data-update-pr.yml"):
             source = ROOT / ".github" / "workflows" / name
-            (dest / name).write_text(
-                source.read_text(encoding="utf-8"), encoding="utf-8"
-            )
+            (dest / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
         proc = subprocess.run(
             [actionlint, str(dest / "deps-and-hermes-bump.yml")],
             cwd=work,
@@ -269,9 +248,7 @@ def test_actionlint_is_clean_when_called_workflows_are_present():
 
 
 def test_no_change_guard_ignores_the_pr_body_so_a_quiet_week_exits_cleanly():
-    text = (ROOT / ".github" / "workflows" / "data-update-pr.yml").read_text(
-        encoding="utf-8"
-    )
+    text = (ROOT / ".github" / "workflows" / "data-update-pr.yml").read_text(encoding="utf-8")
     # The no-change guard lives in tools/ci/data_update_pr.py, which leaves the
     # PR body out of the committable paths. tests/test_data_update_pr.py covers
     # that behaviour; here we check the workflow hands the script the body path.

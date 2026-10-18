@@ -65,8 +65,7 @@ def store_proposal(
 
 def note_proposal(indicator: str) -> str:
     return (
-        f"Proposal: store the analyst note for {indicator} at TLP:AMBER. "
-        "Nothing has been written."
+        f"Proposal: store the analyst note for {indicator} at TLP:AMBER. Nothing has been written."
     )
 
 
@@ -111,9 +110,7 @@ def document(
     if refusal:
         item["refusal"] = refusal
     if excerpts:
-        item["untrusted_excerpts"] = [
-            {"source": source, "text": text} for source, text in excerpts
-        ]
+        item["untrusted_excerpts"] = [{"source": source, "text": text} for source, text in excerpts]
     body = {
         "indicators": [item],
         "missing_sources": sorted(missing_sources),
@@ -178,11 +175,7 @@ def _proposal_problems(proposal: object) -> list[str]:
         problems.append("proposal must start with 'Proposal: '")
     if "Nothing has been written." not in proposal:
         problems.append("proposal must say nothing has been written")
-    if (
-        _IPV4_RE.search(proposal)
-        or _EMAIL_RE.search(proposal)
-        or _LIVE_URL_RE.search(proposal)
-    ):
+    if _IPV4_RE.search(proposal) or _EMAIL_RE.search(proposal) or _LIVE_URL_RE.search(proposal):
         problems.append("proposal is not defanged")
     return problems
 
@@ -229,9 +222,7 @@ def _indicator_problems(item: object) -> list[str]:
     problems.extend(_string_list("context_sources", item["context_sources"]))
     for label in ("first_seen", "last_seen"):
         value = item[label]
-        if value is not None and (
-            not isinstance(value, str) or not _WHEN_RE.fullmatch(value)
-        ):
+        if value is not None and (not isinstance(value, str) or not _WHEN_RE.fullmatch(value)):
             problems.append(f"{label} must be a date or null")
     if item["tlp"] not in _TLPS:
         problems.append("tlp is invalid")
@@ -265,9 +256,7 @@ def _points_problems(points: object) -> list[str]:
 
 
 def _string_list(label: str, value: object) -> list[str]:
-    if not isinstance(value, list) or any(
-        not isinstance(item, str) or not item for item in value
-    ):
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
         return [f"{label} must be a list of strings"]
     return []
 
@@ -289,9 +278,7 @@ def _display_problems(kind: str, indicator: str) -> list[str]:
             problems.append("url indicator is not defanged")
     if kind == "email" and _EMAIL_RE.search(indicator):
         problems.append("email indicator is not defanged")
-    if kind in _HASH_LENGTHS and not re.fullmatch(
-        rf"[0-9a-f]{{{_HASH_LENGTHS[kind]}}}", indicator
-    ):
+    if kind in _HASH_LENGTHS and not re.fullmatch(rf"[0-9a-f]{{{_HASH_LENGTHS[kind]}}}", indicator):
         problems.append("hash indicator must be lowercase hex")
     return problems
 

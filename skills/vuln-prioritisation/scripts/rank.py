@@ -25,9 +25,7 @@ CVE_FIND = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
 _INSTRUCTION = re.compile(
     r"(?i)(ignore (?:all |the |previous )*instructions|send_alert|apply_patch|\bmcp__)"
 )
-_NUMBER = (
-    r"\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fourteen|thirty"
-)
+_NUMBER = r"\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fourteen|thirty"
 _DURATION_RE = re.compile(
     rf"\b({_NUMBER})\s+(hour|hours|day|days|week|weeks|month|months)\b",
     re.IGNORECASE,
@@ -449,9 +447,7 @@ def _rank_one(
         rule_id = "not-enriched"
     sources = _sources(group, extra, context, today)
     names = _dedupe(
-        _csv_cell(defang_observable(str(item.get("asset"))))
-        for item in group
-        if item.get("asset")
+        _csv_cell(defang_observable(str(item.get("asset")))) for item in group if item.get("asset")
     )
     return {
         "rank": 0,
@@ -500,11 +496,7 @@ def _context(group: list[dict], extra: dict, asset_class: str) -> dict:
     cvss = nvd_cvss if nvd_cvss is not None else scanner_cvss
     au_count = len(au) if isinstance(au, list) else 0
     known = bool(
-        kev_listed
-        or au_count
-        or epss_score is not None
-        or nvd_found
-        or scanner_cvss is not None
+        kev_listed or au_count or epss_score is not None or nvd_found or scanner_cvss is not None
     )
     return {
         "kev_listed": kev_listed if isinstance(kev, dict) else None,
@@ -700,9 +692,7 @@ def _parse_csv(text: str) -> tuple[list[dict], list[str]]:
     warnings = []
     for number, raw in enumerate(reader, start=2):
         mapped = {
-            _header(key): (value or "").strip()
-            for key, value in raw.items()
-            if key is not None
+            _header(key): (value or "").strip() for key, value in raw.items() if key is not None
         }
         cell = _first(mapped, _CVE_HEADERS)
         cves = _unique_cves(cell)

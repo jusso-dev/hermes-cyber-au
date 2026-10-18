@@ -118,6 +118,13 @@ def distribution_root() -> Path:
 
 
 def profile_home(root: Path) -> Path:
+    try:
+        from hermes_constants import get_hermes_home
+    except ImportError:
+        pass
+    else:
+        # `hermes -p` selects a context-local home without changing HERMES_HOME.
+        return Path(get_hermes_home()).expanduser()
     home = os.environ.get("HERMES_HOME")
     if home:
         return Path(home).expanduser()
@@ -248,9 +255,7 @@ def check_plugin_tools(ctx: Context) -> Check:
             "Repair plugins/cyber-au/plugin.yaml.",
         )
     declared = [
-        item
-        for item in (manifest or {}).get("provides_tools") or []
-        if isinstance(item, str)
+        item for item in (manifest or {}).get("provides_tools") or [] if isinstance(item, str)
     ]
     registered, error = _registered_tools(plugin_dir)
     if error:
@@ -370,12 +375,18 @@ def check_connectors(ctx: Context) -> list[Check]:
     for name in names:
         if not isinstance(name, str):
             continue
-        base = dict(catalogue.get(name) or {})
+        shipped = catalogue.get(name)
+        base = dict(shipped) if isinstance(shipped, dict) else {}
+        # render_config writes command: cyberau-mcp onto every entry, so the
+        # shipped catalogue spec decides whether a server is external.
+        external = _is_external(base) if base else _is_external(rendered.get(name) or {})
         overlay = rendered.get(name) or {}
         if isinstance(overlay, dict):
             base.update(overlay)
         base["name"] = name
-        checks.append(_connector_check(ctx, name, base, from_config=bool(rendered)))
+        checks.append(
+            _connector_check(ctx, name, base, from_config=bool(rendered), external=external)
+        )
     return checks
 
 
@@ -598,9 +609,13 @@ def redact(text: str, environ: Mapping[str, str]) -> str:
     return cleaned
 
 
-def _connector_check(ctx: Context, name: str, spec: dict, *, from_config: bool) -> Check:
+def _connector_check(
+    ctx: Context, name: str, spec: dict, *, from_config: bool, external: bool = False
+) -> Check:
     check_id = f"connector.{name}"
     key = _connector_key(spec, name)
+    if external:
+        return _external_check(ctx, check_id, name, spec)
     if not _connector_installed(ctx.root, key):
         return _item(
             check_id,
@@ -641,18 +656,23 @@ def _probe(ctx: Context, target: str, *, enabled: bool) -> tuple[str, str]:
     return "ok", "offline probe passed; live probe passed"
 
 
+# Paths install/render_config.py writes into every server entry. They are not
+# secrets, so a literal value is expected; every other key must be a ${VAR}.
+_INSTALL_PATH_ENV = frozenset({"CYBERAU_DATA_DIR", "CYBERAU_EGRESS_ALLOWLIST"})
+
+
 def _env_findings(
     spec: dict, environ: Mapping[str, str], *, enabled: bool
 ) -> list[tuple[str, str]]:
-    required = {
-        item for item in (spec.get("required_env") or []) if isinstance(item, str)
-    }
+    required = {item for item in (spec.get("required_env") or []) if isinstance(item, str)}
     findings: list[tuple[str, str]] = []
     seen: set[str] = set()
     env_field = spec.get("env")
     if isinstance(env_field, dict):
         for key, value in env_field.items():
             if not isinstance(key, str):
+                continue
+            if key in _INSTALL_PATH_ENV:
                 continue
             if isinstance(value, str) and "${" not in value and value.strip():
                 findings.append(("fail", f"{key} is set to a literal value"))
@@ -671,6 +691,8 @@ def _env_findings(
                 continue
             if "${" not in item and "=" in item and item.split("=", 1)[1].strip():
                 key = item.split("=", 1)[0].strip()
+                if key in _INSTALL_PATH_ENV:
+                    continue
                 findings.append(("fail", f"{key} is set to a literal value"))
                 seen.add(key)
                 continue
@@ -709,9 +731,7 @@ def _connector_fix(
     if literals:
         return "Replace literal mcp server env values with ${VAR} placeholders."
     missing = [
-        detail.split(" ", 1)[0]
-        for status, detail in findings
-        if detail.endswith("is not set")
+        detail.split(" ", 1)[0] for status, detail in findings if detail.endswith("is not set")
     ]
     if missing:
         names = ", ".join(missing)
@@ -738,9 +758,7 @@ def _schema_check(ctx: Context, connection: sqlite3.Connection) -> Check:
     try:
         tables = {
             row[0]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'"
-            )
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
     except sqlite3.Error:
         return _item(
@@ -893,7 +911,48 @@ def _read_snapshot(check_id: str, directory: Path) -> tuple[str, date | None, st
         return _read_ism(directory)
     if check_id == "snapshot.kev":
         return _read_kev(directory)
+    if check_id == "snapshot.e8" and not (directory / "data" / "manifest.json").is_file():
+        return _read_essentials(directory)
+    if check_id == "snapshot.attack" and not (directory / "data" / "manifest.json").is_file():
+        return _read_attack(directory)
     return _read_dated_manifest(directory)
+
+
+def _read_essentials(directory: Path) -> tuple[str, date | None, str]:
+    """asd-essentials ships data/essentials-<YYYY-MM-DD>.json with retrieved_on."""
+    files = sorted((directory / "data").glob("essentials-*.json"))
+    if not files:
+        return "", None, "snapshot is missing"
+    try:
+        payload = json.loads(files[-1].read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return "", None, "snapshot could not be read"
+    stamp = str(payload.get("retrieved_on") or "") if isinstance(payload, dict) else ""
+    day = parse_day(stamp)
+    if day is None:
+        return "", None, "snapshot could not be read"
+    return stamp, day, ""
+
+
+def _read_attack(directory: Path) -> tuple[str, date | None, str]:
+    """mitre-attack ships the upstream data/index.json collection index."""
+    path = directory / "data" / "index.json"
+    if not path.is_file():
+        return "", None, "snapshot is missing"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return "", None, "snapshot could not be read"
+    collections = payload.get("collections") if isinstance(payload, dict) else None
+    for collection in collections if isinstance(collections, list) else []:
+        versions = collection.get("versions") if isinstance(collection, dict) else None
+        if isinstance(versions, list) and versions and isinstance(versions[0], dict):
+            latest = versions[0]
+            version = str(latest.get("version") or "")
+            day = parse_day(str(latest.get("modified") or ""))
+            if version or day is not None:
+                return version, day, ""
+    return "", None, "snapshot is missing"
 
 
 def _read_ism(directory: Path) -> tuple[str, date | None, str]:
@@ -1039,10 +1098,13 @@ def _check_egress(ctx: Context) -> Check:
         )
     missing = []
     for name, spec in _installed_servers(ctx):
+        if not _is_enabled(spec):
+            continue  # a disabled server makes no calls
         key = _connector_key(spec, name)
         entry = connectors.get(key)
-        hosts = entry.get("hosts") if isinstance(entry, dict) else None
-        if not hosts:
+        # An empty hosts list is deliberate: the operator supplies the host
+        # (MISP, OpenCTI, TAXII, Hindsight) and the connector allows only that.
+        if not isinstance(entry, dict) or not isinstance(entry.get("hosts"), list):
             missing.append(key)
     if missing:
         return _item(
@@ -1170,6 +1232,29 @@ def _server_catalogue(root: Path) -> tuple[dict, str]:
     if not isinstance(servers, dict):
         return {}, "invalid"
     return servers, ""
+
+
+def _is_external(spec: object) -> bool:
+    """A remote MCP URL, a vendored wrap or an operator-supplied command."""
+    if not isinstance(spec, dict):
+        return False
+    if spec.get("url") or spec.get("wrap") is True or spec.get("kind") == "wrap":
+        return True
+    command = spec.get("command")
+    return isinstance(command, str) and bool(command) and "cyberau-mcp" not in command
+
+
+def _external_check(ctx: Context, check_id: str, name: str, spec: dict) -> Check:
+    """External servers have no package to install or offline probe to run."""
+    enabled = _is_enabled(spec)
+    parts = ["enabled" if enabled else "disabled", "external server"]
+    statuses = ["ok" if enabled else "warn"]
+    findings = _env_findings(spec, ctx.environ, enabled=enabled)
+    for status, detail in findings:
+        statuses.append(status)
+        parts.append(detail)
+    status = _worst(statuses)
+    return _item(check_id, status, "; ".join(parts), _connector_fix(name, findings, "ok", enabled))
 
 
 def _connector_installed(root: Path, key: str) -> bool:
@@ -1430,9 +1515,7 @@ def _environ_home(root: Path, environ: Mapping[str, str]) -> Path:
     return Path(home).expanduser() if home else root
 
 
-def _server_env(
-    root: Path, home: Path, environ: Mapping[str, str], target: str
-) -> dict[str, str]:
+def _server_env(root: Path, home: Path, environ: Mapping[str, str], target: str) -> dict[str, str]:
     """Variables a connector declares, resolved from the profile environment."""
     catalogue, problem = _server_catalogue(root)
     if problem:

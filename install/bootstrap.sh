@@ -120,7 +120,12 @@ if [ ! -f "$PROFILE_HOME/mcp/pyproject.toml" ]; then
   PYTHON=$(python311) || die "bootstrap.sh needs Python 3.11 or newer on PATH"
   exec "$PYTHON" "$REPO_ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME"
 fi
-mkdir -p "$PROFILE_HOME/plugin-data/cyber-au"
+mkdir -p "$PROFILE_HOME/plugin-data/cyber-au/audit"
+chmod 700 "$PROFILE_HOME/plugin-data/cyber-au/audit"
+# The store, audit log and connector state live in the profile, as render_config
+# tells every server. Without this, store init follows HERMES_HOME instead.
+CYBERAU_DATA_DIR=$PROFILE_HOME/plugin-data/cyber-au
+export CYBERAU_DATA_DIR
 
 if [ -f "$PROFILE_HOME/mcp/servers.yaml" ]; then
   SERVERS_YAML=$PROFILE_HOME/mcp/servers.yaml
@@ -153,6 +158,10 @@ else
   uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen
 fi
 
+# cyber-au doctor compares this stamp with mcp/uv.lock to spot a stale venv.
+lock_sha=$("$PROFILE_HOME/mcp/.venv/bin/python" -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$PROFILE_HOME/mcp/uv.lock")
+printf '%s\n' "$lock_sha" > "$PROFILE_HOME/mcp/.venv/.cyberau-lock-sha256"
+
 PYTHON=${CYBERAU_PYTHON:-}
 if [ -z "$PYTHON" ] && [ -x "$PROFILE_HOME/mcp/.venv/bin/python" ]; then
   PYTHON=$PROFILE_HOME/mcp/.venv/bin/python
@@ -160,6 +169,36 @@ fi
 if [ -z "$PYTHON" ]; then
   PYTHON=$(command -v python3) || die "python3 is required to render config.yaml"
 fi
+
+# The cyber-au plugin runs inside the Hermes process, so the python_dependencies
+# in plugin.yaml go into Hermes's interpreter, not the connector venv. Without
+# PyYAML there the plugin fails to register and `hermes cyber-au` is missing.
+install_plugin_dependencies() {
+  hermes_py=${HERMES_PYTHON:-}
+  if [ -z "$hermes_py" ]; then
+    hermes_bin=$(command -v hermes) || return 0
+    hermes_py=$(dirname -- "$hermes_bin")/python
+  fi
+  if [ ! -x "$hermes_py" ]; then
+    printf '%s\n' "Could not find the Python that runs Hermes. Install the plugin dependencies from plugins/cyber-au/plugin.yaml into it by hand." >&2
+    return 0
+  fi
+  manifest=$PROFILE_HOME/plugins/cyber-au/plugin.yaml
+  [ -f "$manifest" ] || manifest=$REPO_ROOT/plugins/cyber-au/plugin.yaml
+  [ -f "$manifest" ] || return 0
+  deps=$("$PYTHON" -c 'import sys, yaml; print("\n".join(yaml.safe_load(open(sys.argv[1])).get("python_dependencies") or []))' "$manifest")
+  [ -n "$deps" ] || return 0
+  offline_flag=
+  [ "$OFFLINE" -eq 1 ] && offline_flag=--offline
+  printf '%s\n' "$deps" | while IFS= read -r dep; do
+    [ -n "$dep" ] || continue
+    if ! uv pip install --quiet ${offline_flag:+"$offline_flag"} --python "$hermes_py" "$dep"; then
+      printf '%s\n' "Could not install $dep for Hermes. Install it into $hermes_py by hand." >&2
+    fi
+  done
+}
+
+install_plugin_dependencies
 
 "$PYTHON" "$SCRIPT_DIR/render_config.py" \
   --profile-home "$PROFILE_HOME" \
@@ -218,11 +257,7 @@ init_store
 run_doctor() {
   if [ -f "$REPO_ROOT/plugins/cyber-au/cli.py" ] && grep -q doctor "$REPO_ROOT/plugins/cyber-au/cli.py"; then
     set +e
-    if [ "$OFFLINE" -eq 1 ]; then
-      hermes -p "$PROFILE" cyber-au doctor --offline
-    else
-      hermes -p "$PROFILE" cyber-au doctor
-    fi
+    hermes -p "$PROFILE" cyber-au doctor --offline
     set -e
     return 0
   fi
@@ -231,9 +266,7 @@ run_doctor() {
 
 run_doctor
 
-if PYTHON=$(python311); then
-  "$PYTHON" "$REPO_ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME" ||
-    printf '%s\n' "Store migration was skipped." >&2
-fi
+"$PYTHON" "$REPO_ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME" ||
+  printf '%s\n' "Store migration was skipped." >&2
 
 printf '%s\n' "Bootstrap finished for $PROFILE."

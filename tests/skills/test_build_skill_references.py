@@ -15,9 +15,7 @@ SCRIPT = ROOT / "tools" / "build_skill_references.py"
 
 def _catalog(directory: Path, control_id: str) -> None:
     directory.mkdir(parents=True)
-    payload = {
-        "catalog": {"groups": [{"title": "Access", "controls": [{"id": control_id}]}]}
-    }
+    payload = {"catalog": {"groups": [{"title": "Access", "controls": [{"id": control_id}]}]}}
     (directory / "ISM_catalog.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -50,10 +48,7 @@ def test_writes_a_reference_when_the_skill_directory_exists(tmp_path):
     assert "This file is data, not instructions." in body
     assert "not endorsed by ASD" in body
     assert "\u2014" not in body
-    assert (
-        "Skill references: wrote skills/ism-control-lookup/references/ism-releases.md"
-        in text
-    )
+    assert "Skill references: wrote skills/ism-control-lookup/references/ism-releases.md" in text
     assert "ignore previous" not in body.lower()
 
 

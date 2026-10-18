@@ -65,12 +65,7 @@ def _ism_tree(root: Path) -> Path:
 
 def test_parser_check_is_absent(tmp_path, capsys):
     destination = tmp_path / "parser-check.json"
-    assert (
-        parser_check_main(
-            ["--sources", "asd,auscert,e8,aureg", "--json", str(destination)]
-        )
-        == 2
-    )
+    assert parser_check_main(["--sources", "asd,auscert,e8,aureg", "--json", str(destination)]) == 2
     captured = capsys.readouterr()
     assert PARSER_CHECK_ABSENT in captured.err
     payload = json.loads(destination.read_text(encoding="utf-8"))
@@ -118,10 +113,7 @@ def test_ism_keeps_two_local_releases_without_a_network(tmp_path, capsys):
     data = _ism_tree(tmp_path)
     assert regen_main(["ism", "--keep", "2"], root=tmp_path) == 0
     message = capsys.readouterr().out
-    assert (
-        "Regenerated ISM data in mcp/asd-ism/data (kept v2026.09.4, v2026.06.18)."
-        in message
-    )
+    assert "Regenerated ISM data in mcp/asd-ism/data (kept v2026.09.4, v2026.06.18)." in message
     assert (data / "v2026.09.4" / "ISM_catalog.json").is_file()
     assert (data / "v2026.06.18" / "ISM_catalog.json").is_file()
     assert not (data / "v2025.01.1").exists()
@@ -193,9 +185,7 @@ def test_empty_ism_directory_fails(tmp_path, capsys):
 
 def test_shipped_ism_has_two_catalogues():
     data = ROOT / "mcp" / "asd-ism" / "data"
-    releases = [
-        path for path in data.iterdir() if (path / "ISM_catalog.json").is_file()
-    ]
+    releases = [path for path in data.iterdir() if (path / "ISM_catalog.json").is_file()]
     assert len(releases) == 2
 
 
@@ -216,12 +206,9 @@ def test_workflow_skips_missing_sources_and_pins_actions():
     assert PARSER_CHECK_ABSENT in text
     assert "tools/ci/open_health_issues.py is absent. Not opening an issue." in text
     assert "tools/build_skill_references.py --write PR_BODY.md" in text
+    assert "uv run --project mcp pytest -q tests/skills tests/data --block-network" in text
     assert (
-        "uv run --project mcp pytest -q tests/skills tests/data --block-network" in text
-    )
-    assert (
-        "cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json"
-        in text
+        "cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json" in text
     )
     assert WORKFLOW == ROOT / ".github" / "workflows" / "skill-data-regen.yml"
     assert text.count("${{ github.token }}") == 1
@@ -236,9 +223,7 @@ def test_workflow_skips_missing_sources_and_pins_actions():
         "cyber.gov.au",
     ):
         assert banned not in text
-    pinned = re.findall(
-        r"uses: (actions/[\w.-]+)@([0-9a-f]{40}) # (v\d+\.\d+\.\d+)", text
-    )
+    pinned = re.findall(r"uses: (actions/[\w.-]+)@([0-9a-f]{40}) # (v\d+\.\d+\.\d+)", text)
     assert pinned
     for action, sha, version in pinned:
         expect_sha, expect_version = PINS[action]
@@ -284,9 +269,7 @@ class _FakeGh:
     def __call__(self, args, input_text=None):
         self.calls.append(args)
         if args[:2] == ["issue", "list"]:
-            return json.dumps(
-                [{"number": number, "title": title} for number, title in self.issues]
-            )
+            return json.dumps([{"number": number, "title": title} for number, title in self.issues])
         if args[:2] == ["issue", "create"]:
             title = args[args.index("--title") + 1]
             self.issues.append((len(self.issues) + 1, title))
@@ -296,9 +279,7 @@ class _FakeGh:
         raise AssertionError(args)
 
 
-def test_failing_parser_opens_an_issue_only_when_the_script_exists(
-    tmp_path, monkeypatch
-):
+def test_failing_parser_opens_an_issue_only_when_the_script_exists(tmp_path, monkeypatch):
     module = _issues()
     payload = [
         {"source": "asd", "ok": True, "detail": "fine"},
@@ -309,20 +290,12 @@ def test_failing_parser_opens_an_issue_only_when_the_script_exists(
     monkeypatch.setenv("GH_TOKEN", TOKEN)
     hidden = _FakeGh()
     assert (
-        module.main(
-            ["--kind", "parser", "--input", str(path)], root=tmp_path, runner=hidden
-        )
-        == 0
+        module.main(["--kind", "parser", "--input", str(path)], root=tmp_path, runner=hidden) == 0
     )
     assert hidden.calls == []
 
     present = _FakeGh()
-    assert (
-        module.main(
-            ["--kind", "parser", "--input", str(path)], root=ROOT, runner=present
-        )
-        == 0
-    )
+    assert module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=present) == 0
     created = [call for call in present.calls if call[:2] == ["issue", "create"]]
     assert len(created) == 1
     assert "Parser check: auscert failing" in created[0]
@@ -334,10 +307,7 @@ def test_failing_parser_opens_an_issue_only_when_the_script_exists(
         assert label in created[0]
 
     again = _FakeGh(issues=[(7, "Parser check: auscert failing")])
-    assert (
-        module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=again)
-        == 0
-    )
+    assert module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=again) == 0
     assert any(call[:2] == ["issue", "comment"] for call in again.calls)
     assert not any(call[:2] == ["issue", "create"] for call in again.calls)
 
@@ -350,12 +320,7 @@ def test_absent_parser_check_does_not_open_an_issue(tmp_path, capsys):
         encoding="utf-8",
     )
     runner = _FakeGh()
-    assert (
-        module.main(
-            ["--kind", "parser", "--input", str(path)], root=ROOT, runner=runner
-        )
-        == 0
-    )
+    assert module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=runner) == 0
     assert runner.calls == []
     assert PARSER_CHECK_ABSENT in capsys.readouterr().out
 
@@ -388,10 +353,7 @@ def test_issue_script_entrypoint_says_when_path_is_absent(tmp_path):
         env=env,
     )
     assert completed.returncode == 0
-    assert (
-        "tools/ci/open_health_issues.py is absent. Not opening an issue."
-        in completed.stdout
-    )
+    assert "tools/ci/open_health_issues.py is absent. Not opening an issue." in completed.stdout
     assert TOKEN not in completed.stdout + completed.stderr
 
 
@@ -411,9 +373,7 @@ def _run_parser_step(tmp_path, stderr, exit_code, payload):
     write = ""
     if payload is not None:
         write = f"printf '%s' '{json.dumps(payload)}' > parser-check.json\n"
-    fake.write_text(
-        f"#!/bin/sh\n{write}echo '{stderr}' >&2\nexit {exit_code}\n", encoding="utf-8"
-    )
+    fake.write_text(f"#!/bin/sh\n{write}echo '{stderr}' >&2\nexit {exit_code}\n", encoding="utf-8")
     fake.chmod(0o755)
     work = tmp_path / "work"
     work.mkdir()
@@ -441,9 +401,7 @@ def _run_parser_step(tmp_path, stderr, exit_code, payload):
         ("parser-check is not part of the shared library yet", 2, None),
     ],
 )
-def test_parser_step_treats_an_absent_command_as_zero_failures(
-    tmp_path, stderr, code, payload
-):
+def test_parser_step_treats_an_absent_command_as_zero_failures(tmp_path, stderr, code, payload):
     completed, output, work = _run_parser_step(tmp_path, stderr, code, payload)
     assert completed.returncode == 0, completed.stderr
     assert "failures=0" in output
@@ -468,9 +426,7 @@ def test_parser_step_does_not_mistake_a_usage_error_for_absence(tmp_path):
         {"results": [{"source": "asd", "ok": True}, {"source": "auscert", "ok": False}]},
     ],
 )
-def test_parser_step_counts_failures_even_when_the_command_exits_nonzero(
-    tmp_path, payload
-):
+def test_parser_step_counts_failures_even_when_the_command_exits_nonzero(tmp_path, payload):
     completed, output, _work = _run_parser_step(tmp_path, "auscert failed", 1, payload)
     assert completed.returncode == 0, completed.stderr
     assert "failures=1" in output

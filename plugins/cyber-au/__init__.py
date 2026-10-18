@@ -10,8 +10,6 @@ import os
 import site
 from pathlib import Path
 
-from .cli import main
-
 __all__ = ["data_dir", "main", "org_exposure", "register"]
 
 
@@ -30,11 +28,42 @@ def data_dir() -> Path:
     return root / "plugin-data" / "cyber-au"
 
 
+def _profile_homes() -> list[Path]:
+    """Where the profile virtualenv may live.
+
+    The plugin normally sits at ``<profile>/plugins/cyber-au``. ``hermes plugins
+    doctor`` loads a copy from a scratch directory, so ``CYBERAU_HOME`` can name
+    the profile explicitly, the same variable ``cyberau-mcp`` reads.
+    """
+    homes = []
+    override = os.environ.get("CYBERAU_HOME", "").strip()
+    if override:
+        homes.append(Path(override).expanduser())
+    homes.append(Path(__file__).resolve().parents[2])
+    return homes
+
+
 def _connector_packages() -> None:
     """Connector libraries are installed in the profile virtualenv."""
-    profile = Path(__file__).resolve().parents[2]
-    for packages in sorted(profile.glob("mcp/.venv/lib/python*/site-packages")):
-        site.addsitedir(str(packages))
+    for profile in _profile_homes():
+        found = sorted(profile.glob("mcp/.venv/lib/python*/site-packages"))
+        for packages in found:
+            site.addsitedir(str(packages))
+        if found:
+            return
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the cyber-au command line.
+
+    Imported lazily: cli imports doctor, which needs PyYAML, and on a native
+    install PyYAML is only on the path once register() has added the profile
+    virtualenv.
+    """
+    _connector_packages()
+    from .cli import main as cli_main
+
+    return cli_main(argv)
 
 
 def org_exposure(args: dict | None = None, **_host) -> str:

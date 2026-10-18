@@ -133,9 +133,7 @@ def test_open_comment_and_do_not_duplicate(tmp_path: Path):
     assert "type changed: data.0.epss" in body
     assert "from number to string" in body
     assert SECRET not in body
-    assert all(
-        issue["title"] != "Connector health: nvd failing" for issue in github.issues
-    )
+    assert all(issue["title"] != "Connector health: nvd failing" for issue in github.issues)
 
     module.sync(report, github, close_recovered=True)
     assert [call[0] for call in github.calls] == ["create", "comment"]
@@ -250,10 +248,7 @@ def test_main_never_calls_gh(tmp_path: Path, monkeypatch):
     )
     assert github.calls[0][0] == "create"
     assert module.main(["--kind", "parser", "--input", str(path)], client=github) == 0
-    assert (
-        module.main(["--kind", "connector", "--input", str(tmp_path / "missing.json")])
-        == 2
-    )
+    assert module.main(["--kind", "connector", "--input", str(tmp_path / "missing.json")]) == 2
 
 
 def test_a_github_error_on_one_connector_does_not_skip_the_rest(tmp_path: Path, capsys):

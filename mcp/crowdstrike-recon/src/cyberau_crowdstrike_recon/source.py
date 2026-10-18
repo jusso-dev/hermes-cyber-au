@@ -318,8 +318,11 @@ def _records(
     except TimeoutError:
         if cached is not None:
             return _present(kind, cached), cached, "stale", ""
-        return [], [], "snapshot", (
-            "CrowdStrike request timed out and no cached result is available"
+        return (
+            [],
+            [],
+            "snapshot",
+            ("CrowdStrike request timed out and no cached result is available"),
         )
     if warning or raw is None:
         return [], [], "snapshot", warning or "CrowdStrike payload was not usable"
@@ -462,8 +465,7 @@ def _interpret(result) -> tuple[dict | None, str]:
         return None, _auth_message(code)
     if code == 429:
         return None, (
-            "CrowdStrike returned 429. The connector honoured Retry-After "
-            "and the limit still held."
+            "CrowdStrike returned 429. The connector honoured Retry-After and the limit still held."
         )
     if code >= 400:
         return None, _safe(message) or f"CrowdStrike status {code}"

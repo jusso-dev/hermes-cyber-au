@@ -137,9 +137,7 @@ def test_hashes_domains_email_and_idna():
 
 def test_lookalike_tokens_and_brand_file(tmp_path: Path):
     brands = normalise.load_brands()
-    assert ("commbank", "commbank.com.au") in [
-        (item.token, item.domain) for item in brands
-    ]
+    assert ("commbank", "commbank.com.au") in [(item.token, item.domain) for item in brands]
     assert normalise.lookalike_tokens("secure-login.commbank.example") == ("commbank",)
     assert normalise.lookalike_tokens("www.commbank.com.au") == ()
     assert normalise.lookalike_tokens("anzac.example") == ()
@@ -168,12 +166,8 @@ def test_fresh_window_boundaries():
 
 
 def test_score_matches_the_published_examples():
-    feodo = score.score_signals(
-        [score.Signal("feodo", "malicious", score.PRIMARY["feodo"])]
-    )
-    radar = score.score_signals(
-        [score.Signal("radar", "benign", score.radar_points(1000))]
-    )
+    feodo = score.score_signals([score.Signal("feodo", "malicious", score.PRIMARY["feodo"])])
+    radar = score.score_signals([score.Signal("radar", "benign", score.radar_points(1000))])
     lookalike = score.score_signals(
         [
             score.Signal("lookalike", "suspicious", score.LOOKALIKE_POINTS),
@@ -184,9 +178,7 @@ def test_score_matches_the_published_examples():
             ),
         ]
     )
-    one_pulse = score.score_signals(
-        [score.Signal("otx", "suspicious", score.otx_points(1))]
-    )
+    one_pulse = score.score_signals([score.Signal("otx", "suspicious", score.otx_points(1))])
     listed = score.score_signals(
         [
             score.Signal("feodo", "malicious", score.PRIMARY["feodo"]),
@@ -270,9 +262,7 @@ def test_score_edges():
     assert score.greynoise_signal("malicious", riot=True).classification == "malicious"
     assert score.greynoise_signal("unknown", noise=True).points == 10
     assert score.greynoise_signal("benign", noise=True).classification == "benign"
-    capped = score.score_signals(
-        [score.Signal(name, "malicious", 40) for name in score.PRIMARY]
-    )
+    capped = score.score_signals([score.Signal(name, "malicious", 40) for name in score.PRIMARY])
     assert capped.confidence == 100
     small = score.score_signals([score.Signal("custom", "malicious", 10)])
     assert (small.verdict, small.confidence) == ("suspicious", 10)

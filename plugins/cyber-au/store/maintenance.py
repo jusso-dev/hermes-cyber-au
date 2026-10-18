@@ -383,8 +383,7 @@ def _copy_public_rows(src: sqlite3.Connection, dest: sqlite3.Connection) -> None
     ]
     public = set(public_ids)
     clear_indicators = {
-        row["id"]: row
-        for row in src.execute("SELECT * FROM indicators WHERE tlp = 'CLEAR'")
+        row["id"]: row for row in src.execute("SELECT * FROM indicators WHERE tlp = 'CLEAR'")
     }
     observations: dict[str, list[sqlite3.Row]] = {}
     counters: dict[str, list[sqlite3.Row]] = {}
@@ -518,9 +517,7 @@ def _rollup(observations: list, counters: list) -> tuple[str, int, str, str]:
 def _rebuild_fts(conn: sqlite3.Connection) -> None:
     for row in conn.execute("SELECT id, type, value, value_norm, verdict FROM indicators"):
         extras = _observation_index_text(conn, row["id"])
-        body = _indicator_body(
-            row["value"], row["value_norm"], row["type"], row["verdict"], extras
-        )
+        body = _indicator_body(row["value"], row["value_norm"], row["type"], row["verdict"], extras)
         upsert_fts(conn, "indicator", row["id"], row["type"], body, replace=False)
     for row in conn.execute("SELECT id, title, summary FROM advisories"):
         summary = indexable_text(row["summary"] or "")

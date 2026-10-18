@@ -193,14 +193,10 @@ def check_query(query: str, schemas: dict[str, dict]) -> dict:
         )
     forbidden = _FORBIDDEN.search(stripped)
     if forbidden:
-        errors.append(
-            f"{forbidden.group(0)} is not a hunt. The query is not ready."
-        )
+        errors.append(f"{forbidden.group(0)} is not a hunt. The query is not ready.")
     if '"' in stripped or "'" in stripped:
         errors.append("unterminated string literal. The query is not ready.")
-    tables = [
-        name for name in schemas if re.search(rf"\b{re.escape(name)}\b", stripped)
-    ]
+    tables = [name for name in schemas if re.search(rf"\b{re.escape(name)}\b", stripped)]
     if not tables and not errors:
         errors.append("no bundled table name found. Put the table name in the query.")
     known = _known_columns(schemas, tables)
@@ -219,9 +215,7 @@ def check_query(query: str, schemas: dict[str, dict]) -> dict:
     return _result(not errors, tables, errors, schemas)
 
 
-def _result(
-    ready: bool, tables: list[str], errors: list[str], schemas: dict[str, dict]
-) -> dict:
+def _result(ready: bool, tables: list[str], errors: list[str], schemas: dict[str, dict]) -> dict:
     citations = []
     for name in tables:
         item = schemas[name]
@@ -271,9 +265,7 @@ def _columns_used(text: str) -> set[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Check KQL against bundled hunt schemas."
-    )
+    parser = argparse.ArgumentParser(description="Check KQL against bundled hunt schemas.")
     parser.add_argument("path", nargs="?", type=Path, help="File containing the query")
     parser.add_argument("--query", help="Query text. Overrides the file.")
     parser.add_argument("--schemas", type=Path, default=schema_dir())

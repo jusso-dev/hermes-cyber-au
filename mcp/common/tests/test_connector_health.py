@@ -223,7 +223,7 @@ def test_fetch_live_refuses_before_any_network_call():
 
 
 def test_workflow_pins_actions_and_does_not_embed_a_secret():
-    text = (ROOT / "ci" / "workflows" / "connector-health.yml").read_text(encoding="utf-8")
+    text = (ROOT / ".github" / "workflows" / "connector-health.yml").read_text(encoding="utf-8")
     uses = re.findall(r"uses:\s*(\S+)", text)
     assert uses
     for use in uses:

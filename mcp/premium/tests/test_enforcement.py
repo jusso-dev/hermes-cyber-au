@@ -75,12 +75,18 @@ def test_routine_share_and_approval_and_pages(tmp_path, monkeypatch, caplog):
     ledger = BudgetLedger(tmp_path / "ledger.sqlite")
     config = _enabled("upguard", {"calls_per_day": 4, "routine_share": 0.5})
     with caplog.at_level(logging.WARNING, logger="cyberau.premium"):
-        assert pre_tool_call(tool_name="upguard_probe", config=config, ledger=ledger, routine=True)[
-            "decision"
-        ] == "allow"
-        assert pre_tool_call(tool_name="upguard_probe", config=config, ledger=ledger, routine=True)[
-            "decision"
-        ] == "allow"
+        assert (
+            pre_tool_call(tool_name="upguard_probe", config=config, ledger=ledger, routine=True)[
+                "decision"
+            ]
+            == "allow"
+        )
+        assert (
+            pre_tool_call(tool_name="upguard_probe", config=config, ledger=ledger, routine=True)[
+                "decision"
+            ]
+            == "allow"
+        )
         blocked = pre_tool_call(
             tool_name="upguard_probe", config=config, ledger=ledger, routine=True
         )
@@ -131,9 +137,7 @@ def test_terms_relax_needs_contract_ref(tmp_path):
         spec,
         {
             "cyber_au": {
-                "premium": {
-                    "upguard": {"terms": {"stix_export": True, "contract_ref": "CN-100"}}
-                }
+                "premium": {"upguard": {"terms": {"stix_export": True, "contract_ref": "CN-100"}}}
             }
         },
         audit_path=audit,
@@ -309,8 +313,10 @@ def test_fixtures_are_synthetic():
 def _allowed_host(host: str) -> bool:
     if host in _ALLOWED:
         return True
-    return host.endswith(".example.com") or host.endswith(".example.com.au") or host.endswith(
-        ".example.au"
+    return (
+        host.endswith(".example.com")
+        or host.endswith(".example.com.au")
+        or host.endswith(".example.au")
     )
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 HARNESS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HARNESS_DIR))
 
-import harness
+import harness  # noqa: E402  (needs HARNESS_DIR on sys.path)
 
 ROOT = harness.ROOT
 SKILL = ROOT / "skills" / "ism-control-lookup"
@@ -31,9 +31,7 @@ def _release_module():
 
 def test_release_in_force_uses_published_dates():
     choose = _release_module().release_in_force
-    releases = json.loads(
-        (SKILL / "references" / "releases.json").read_text(encoding="utf-8")
-    )
+    releases = json.loads((SKILL / "references" / "releases.json").read_text(encoding="utf-8"))
     rows = releases["releases"]
     assert choose(rows, date(2026, 6, 17)) is None
     assert choose(rows, date(2026, 6, 18)) == "v2026.06.18"
@@ -41,10 +39,7 @@ def test_release_in_force_uses_published_dates():
     assert choose(rows, date(2026, 9, 2)) == "v2026.06.18"
     assert choose(rows, date(2026, 9, 3)) == "v2026.09.4"
     assert choose(rows, date(2026, 10, 17)) == "v2026.09.4"
-    assert (
-        choose([{"tag_name": "v1", "published_at": "not-a-date"}], date(2026, 1, 1))
-        is None
-    )
+    assert choose([{"tag_name": "v1", "published_at": "not-a-date"}], date(2026, 1, 1)) is None
     assert choose([{"tag_name": ""}], date(2026, 1, 1)) is None
     assert choose(["skip"], date(2026, 1, 1)) is None
 
@@ -64,9 +59,7 @@ def test_release_script_prints_the_tag_or_none(tmp_path: Path, capsys):
 
 
 def test_shipped_release_list_matches_the_connector_snapshot():
-    skill_list = json.loads(
-        (SKILL / "references" / "releases.json").read_text(encoding="utf-8")
-    )
+    skill_list = json.loads((SKILL / "references" / "releases.json").read_text(encoding="utf-8"))
     connector_list = json.loads(CONNECTOR_RELEASES.read_text(encoding="utf-8"))
     assert skill_list == connector_list
     note = (SKILL / "references" / "release-selection.md").read_text(encoding="utf-8")

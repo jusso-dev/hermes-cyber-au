@@ -87,9 +87,7 @@ def test_real_notes_parse_into_the_three_check_kinds():
         for check in fact.checks
     )
     assert any(
-        check.kind == "symbol"
-        and check.target == "ENV_TEMPLATE_FILENAME"
-        and check.bound is None
+        check.kind == "symbol" and check.target == "ENV_TEMPLATE_FILENAME" and check.bound is None
         for fact in facts
         for check in fact.checks
     )
@@ -191,9 +189,7 @@ def test_parent_citation_is_refused_without_reading_outside(
     outside.write_text("CANARY-OUTSIDE", encoding="utf-8")
     checkout = tmp_path / "hermes"
     checkout.mkdir()
-    facts = _facts(
-        tmp_path, "| Fact | Source |\n|---|---|\n| Escape. | `../secret.txt` |\n"
-    )
+    facts = _facts(tmp_path, "| Fact | Source |\n|---|---|\n| Escape. | `../secret.txt` |\n")
     report = tmp_path / "report.md"
     code = verify.main(
         ["--checkout", str(checkout), "--facts", str(facts), "--report", str(report)]

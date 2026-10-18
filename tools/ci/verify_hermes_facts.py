@@ -147,9 +147,7 @@ def _checks_from_paren(bound: str, paren: str) -> list[Check]:
         elif quoted:
             checks.append(Check("string", quoted.group(1), bound))
         else:
-            raise VerifyError(
-                f"Unrecognised citation {_shown(item)!r} on {_shown(bound)}"
-            )
+            raise VerifyError(f"Unrecognised citation {_shown(item)!r} on {_shown(bound)}")
     return checks
 
 
@@ -165,9 +163,7 @@ def checks_from_source(source: str) -> tuple[Check, ...]:
                 checks.extend(_checks_from_paren(token, paren))
         else:
             if paren:
-                raise VerifyError(
-                    f"Symbol {_shown(token)!r} cannot carry its own citation"
-                )
+                raise VerifyError(f"Symbol {_shown(token)!r} cannot carry its own citation")
             checks.append(Check("symbol", token))
     return tuple(checks)
 
@@ -361,17 +357,12 @@ def render_report(label: str, facts_path: Path, outcomes: list[Outcome]) -> str:
             location = f" at `{where}`"
         elif item.ok:
             location = f" in `{where}`"
-        elif (
-            where.startswith(("Missing", "Refusing"))
-            or where == "not found in any Python file"
-        ):
+        elif where.startswith(("Missing", "Refusing")) or where == "not found in any Python file":
             location = f" {where}"
         else:
             location = f" not in `{where}`"
         if item.ok:
-            lines.append(
-                f"- pass fact {item.fact.number} {label_text}: {subject}{location}"
-            )
+            lines.append(f"- pass fact {item.fact.number} {label_text}: {subject}{location}")
         else:
             lines.append(
                 f"- fail fact {item.fact.number} ({item.fact.summary}) "
@@ -382,16 +373,10 @@ def render_report(label: str, facts_path: Path, outcomes: list[Outcome]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Re-check Hermes structure notes against a tag."
-    )
+    parser = argparse.ArgumentParser(description="Re-check Hermes structure notes against a tag.")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument(
-        "--tag", help="Hermes release tag to clone, for example v0.22.2"
-    )
-    source.add_argument(
-        "--checkout", type=Path, help="Existing Hermes checkout, for tests"
-    )
+    source.add_argument("--tag", help="Hermes release tag to clone, for example v0.22.2")
+    source.add_argument("--checkout", type=Path, help="Existing Hermes checkout, for tests")
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--facts", type=Path, default=DEFAULT_FACTS)
     args = parser.parse_args(argv)

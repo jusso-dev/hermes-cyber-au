@@ -90,9 +90,7 @@ def _sync_one(row: dict, github, *, close_recovered: bool) -> None:
     open_issue = _preferred(matches, "open")
     if status == "fail":
         last = _known_date(row.get("last_good"))
-        last = (
-            last or _last_good(open_issue) or _last_good(_preferred(matches, "closed"))
-        )
+        last = last or _last_good(open_issue) or _last_good(_preferred(matches, "closed"))
         body = render_failure(row, last)
         if open_issue:
             github.comment(int(open_issue["number"]), body)
@@ -123,9 +121,7 @@ def render_failure(row: dict, last_good: str | None) -> str:
             elif item["change"] == "removed":
                 lines.append(f"- field removed: {where}")
             else:
-                lines.append(
-                    f"- type changed: {where} from {item['from']} to {item['to']}"
-                )
+                lines.append(f"- type changed: {where} from {item['from']} to {item['to']}")
     return "\n".join(lines) + "\n"
 
 
@@ -133,11 +129,7 @@ def render_recovered(row: dict) -> str:
     code = row.get("status_code")
     last = _known_date(row.get("last_good")) or "unknown"
     shown = code if isinstance(code, int) else "unknown"
-    return (
-        f"Connector `{row['key']}` has recovered.\n\n"
-        f"Status code: {shown}\n"
-        f"Last good: {last}\n"
-    )
+    return f"Connector `{row['key']}` has recovered.\n\nStatus code: {shown}\nLast good: {last}\n"
 
 
 def clean_diff(items: object) -> list[dict]:
@@ -149,9 +141,7 @@ def clean_diff(items: object) -> list[dict]:
             continue
         change = item.get("change")
         field = item.get("field")
-        if change not in {"added", "removed", "type_changed"} or not isinstance(
-            field, str
-        ):
+        if change not in {"added", "removed", "type_changed"} or not isinstance(field, str):
             continue
         if not _FIELD.fullmatch(field):
             continue
@@ -261,9 +251,7 @@ class GhCli:
 
     def close(self, number: int, body: str) -> None:
         self._run(["issue", "edit", str(number), "--body", body])
-        self._run(
-            ["issue", "close", str(number), "--reason", "completed", "--comment", body]
-        )
+        self._run(["issue", "close", str(number), "--reason", "completed", "--comment", body])
 
     def reopen(self, number: int, body: str) -> None:
         self._run(["issue", "reopen", str(number)])
@@ -271,9 +259,7 @@ class GhCli:
         self._run(["issue", "edit", str(number), "--body", body])
 
     def _run(self, args: list[str]) -> str:
-        proc = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, check=False
-        )
+        proc = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
         if proc.returncode != 0:
             message = proc.stderr.strip() or "gh failed"
             raise RuntimeError(message)
@@ -359,9 +345,7 @@ def _parser_failures(payload: object) -> list[dict]:
 
 
 def _existing_issue(runner, title: str) -> int | None:
-    raw = runner(
-        ["issue", "list", "--state", "open", "--limit", "100", "--json", "number,title"]
-    )
+    raw = runner(["issue", "list", "--state", "open", "--limit", "100", "--json", "number,title"])
     try:
         rows = json.loads(raw or "[]")
     except json.JSONDecodeError:
@@ -375,13 +359,9 @@ def _existing_issue(runner, title: str) -> int | None:
 def _body(row: dict, *, repeat: bool) -> str:
     source = str(row.get("source") or "unknown")
     detail = _redact(str(row.get("detail") or "The parser check failed."))
-    lead = (
-        f"Parser `{source}` failed again." if repeat else f"Parser `{source}` failed."
-    )
+    lead = f"Parser `{source}` failed again." if repeat else f"Parser `{source}` failed."
     return (
-        f"{lead}\n\n"
-        f"{detail}\n\n"
-        "Page content is untrusted data and is not included in this issue.\n"
+        f"{lead}\n\n{detail}\n\nPage content is untrusted data and is not included in this issue.\n"
     )
 
 

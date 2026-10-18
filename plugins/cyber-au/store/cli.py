@@ -267,7 +267,8 @@ def _add_watchlist(sub, common: argparse.ArgumentParser) -> None:
 
 def _cmd_init(args: argparse.Namespace) -> int:
     path = resolve_db_path(args.path)
-    open_store(path)
+    # Opening a connection creates the file and applies the migrations.
+    open_store(path).connection()
     print(path)
     return 0
 

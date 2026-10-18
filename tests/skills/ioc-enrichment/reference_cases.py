@@ -57,17 +57,13 @@ def build_eval() -> dict:
 
 
 def dump_eval() -> str:
-    return yaml.safe_dump(
-        build_eval(), sort_keys=False, allow_unicode=True, width=10_000
-    )
+    return yaml.safe_dump(build_eval(), sort_keys=False, allow_unicode=True, width=10_000)
 
 
 def _feodo() -> dict:
     prepared = normalise.prepare("203.0.113.50")
     signals = [
-        score.Signal(
-            "feodo", "malicious", score.PRIMARY["feodo"], "2026-09-01", SESSION
-        ),
+        score.Signal("feodo", "malicious", score.PRIMARY["feodo"], "2026-09-01", SESSION),
     ]
     result = score.score_signals(signals)
     if (result.verdict, result.confidence) != ("malicious", 40):
@@ -428,8 +424,7 @@ def _malwarebazaar() -> dict:
     )
     return _case(
         "malwarebazaar-hash",
-        f"Enrich {value}. Enabled connectors: local intel store, abuse.ch and OTX. "
-        "Do not refresh.",
+        f"Enrich {value}. Enabled connectors: local intel store, abuse.ch and OTX. Do not refresh.",
         message,
         [
             value,
@@ -783,9 +778,7 @@ def _case(
     for tool in forbid:
         for name in called:
             if _forbidden(tool, name):
-                raise AssertionError(
-                    f"{case_id} recorded forbidden tool {tool} as {name}"
-                )
+                raise AssertionError(f"{case_id} recorded forbidden tool {tool} as {name}")
     return {
         "id": case_id,
         "input": prompt,
@@ -795,9 +788,7 @@ def _case(
         "forbid_tools": forbid,
         "offline": {
             "message": message,
-            "tool_calls": [
-                {"name": name, "arguments": arguments} for name, arguments in calls
-            ],
+            "tool_calls": [{"name": name, "arguments": arguments} for name, arguments in calls],
         },
     }
 

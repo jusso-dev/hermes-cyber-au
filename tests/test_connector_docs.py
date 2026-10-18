@@ -193,16 +193,12 @@ class ConnectorDocsTest(unittest.TestCase):
         )
 
     def test_auth_cell_ignores_plain_capitals(self):
-        self.assertEqual(
-            self.docs.auth_cell("none. Served over TLS, JSON only."), "none"
-        )
+        self.assertEqual(self.docs.auth_cell("none. Served over TLS, JSON only."), "none")
         self.assertEqual(
             self.docs.auth_cell("none. Optional GITHUB_TOKEN for releases."),
             "`GITHUB_TOKEN` (optional)",
         )
 
     def test_prose_ends_with_a_full_stop(self):
-        self.assertEqual(
-            self.docs.prose("one download a day", "x"), "One download a day."
-        )
+        self.assertEqual(self.docs.prose("one download a day", "x"), "One download a day.")
         self.assertEqual(self.docs.prose("Already done.", "x"), "Already done.")

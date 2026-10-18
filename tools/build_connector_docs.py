@@ -210,11 +210,7 @@ class _Extractor(ast.NodeVisitor):
         for target in node.targets:
             if not isinstance(target, ast.Name):
                 continue
-            if (
-                target.id == "ATTRIBUTION"
-                and not self.stack
-                and self.attribution is None
-            ):
+            if target.id == "ATTRIBUTION" and not self.stack and self.attribution is None:
                 self.attribution = const_str(node.value)
             if target.id == "burst":
                 self.burst_assignments.append((self.function, ast.unparse(node.value)))
@@ -586,16 +582,12 @@ def render_tool(
 ) -> str:
     blocks = [f"### `{name}`", description or "No description is set on the tool."]
     if name in inputs:
-        blocks.append(
-            render_schema_block(f"{name}.input.json", inputs[name], "Input schema")
-        )
+        blocks.append(render_schema_block(f"{name}.input.json", inputs[name], "Input schema"))
     else:
         blocks.append("No input schema file is in `schema/`.")
     if name in responses:
         blocks.append(
-            render_schema_block(
-                f"{name}.response.json", responses[name], "Response schema"
-            )
+            render_schema_block(f"{name}.response.json", responses[name], "Response schema")
         )
     return "\n\n".join(blocks)
 
@@ -703,9 +695,7 @@ def render_cache(sites: list[TtlSite], default: int | None) -> str:
     return "\n\n".join(lines)
 
 
-def render_rates(
-    sites: list[RateSite], assignments: list[tuple[str, str]], stated: str
-) -> str:
+def render_rates(sites: list[RateSite], assignments: list[tuple[str, str]], stated: str) -> str:
     blocks = [prose(stated, "Not stated in `SOURCE.md`.")]
     kept = [site for site in sites if keep_rate(site)]
     if kept:
@@ -714,9 +704,7 @@ def render_rates(
             "|---|---|---|---|---|---|",
         ]
         for site in kept:
-            burst = (
-                "" if site.burst_node is None else f"`{ast.unparse(site.burst_node)}`"
-            )
+            burst = "" if site.burst_node is None else f"`{ast.unparse(site.burst_node)}`"
             window = f"`{site.window}`" if site.window else ""
             rows.append(
                 "| "
@@ -732,15 +720,12 @@ def render_rates(
                 )
                 + " |"
             )
-        blocks.append(
-            "Limiter arguments in the connector source:\n\n" + "\n".join(rows)
-        )
+        blocks.append("Limiter arguments in the connector source:\n\n" + "\n".join(rows))
     seen: set[tuple[str, str]] = set()
     notes: list[str] = []
     for function, expr in assignments:
         relevant = any(
-            site.function == function and re.search(r"\bburst\b", site.rate)
-            for site in kept
+            site.function == function and re.search(r"\bburst\b", site.rate) for site in kept
         )
         if relevant and (function, expr) not in seen:
             seen.add((function, expr))
@@ -760,7 +745,8 @@ def render_env(
     credentials = [item for item in uses.values() if item.kind == "credential"]
     if credentials:
         blocks.append(
-            "Credential values are read from the profile environment. Nothing on this page is a secret value."
+            "Credential values are read from the profile environment. "
+            "Nothing on this page is a secret value."
         )
     else:
         blocks.append("No credential variable is declared for this connector.")
@@ -777,9 +763,7 @@ def render_env(
         "| Variable | Kind | Server `env` | `required_env` | Read in connector |",
         "|---|---|---|---|---|",
     ]
-    for item in sorted(
-        uses.values(), key=lambda entry: (order.get(entry.kind, 9), entry.name)
-    ):
+    for item in sorted(uses.values(), key=lambda entry: (order.get(entry.kind, 9), entry.name)):
         rows.append(
             "| "
             + " | ".join(
@@ -849,8 +833,7 @@ def render_page(
         blocks.append(summary)
     blocks.append("\n".join(meta))
     blocks.append(
-        "## Authentication\n\n"
-        + prose(fields.get("auth", ""), "Not stated in `SOURCE.md`.")
+        "## Authentication\n\n" + prose(fields.get("auth", ""), "Not stated in `SOURCE.md`.")
     )
     blocks.append("## Environment variables\n\n" + env_section)
     blocks.append("## Rate limits\n\n" + rate_section)
@@ -1045,16 +1028,10 @@ def build(root: Path) -> dict[str, str]:
         )
     known = {item.key for item in connectors}
     unknown = sorted(
-        {
-            str(item.get("connector"))
-            for item in feeds
-            if item.get("connector") not in known
-        }
+        {str(item.get("connector")) for item in feeds if item.get("connector") not in known}
     )
     for name in unknown:
-        print(
-            f"catalogue feed ignored, no connector directory: {name}", file=sys.stderr
-        )
+        print(f"catalogue feed ignored, no connector directory: {name}", file=sys.stderr)
     block = render_readme_block(connectors)
     assert_house_style(block, "README connector table")
     readme_path = root / "README.md"
@@ -1099,9 +1076,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Render connector reference pages and the README table."
     )
-    parser.add_argument(
-        "--check", action="store_true", help="exit 1 if generated files differ"
-    )
+    parser.add_argument("--check", action="store_true", help="exit 1 if generated files differ")
     parser.add_argument("--root", type=Path, default=None, help="repository root")
     args = parser.parse_args(argv)
     root = (args.root or Path(__file__).resolve().parents[1]).resolve()

@@ -299,7 +299,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--channel", choices=("owner", "external"), default="owner")
     args = parser.parse_args(argv)
     try:
-        raw = sys.stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
+        raw = (
+            sys.stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
+        )
         pack = json.loads(raw)
         assets_path = Path(args.assets) if args.assets else default_assets_path()
         configured = assets_path.is_file()
@@ -376,7 +378,9 @@ def _pair(body: str) -> tuple[str, str]:
 
 
 def _asset(fields: dict[str, str]) -> Asset:
-    missing = [key for key in ("name", "vendor", "product", "exposure", "owner") if key not in fields]
+    missing = [
+        key for key in ("name", "vendor", "product", "exposure", "owner") if key not in fields
+    ]
     if missing:
         raise ValueError("asset is missing " + ", ".join(missing))
     exposure = fields["exposure"]
@@ -542,7 +546,9 @@ def _vulnerabilities(
             continue
         kev = records["kev"].get(cve)
         epss = records["epss"].get(cve)
-        kev_new = bool(kev and kev.get("date_added") and _in_window(str(kev["date_added"]), start, end))
+        kev_new = bool(
+            kev and kev.get("date_added") and _in_window(str(kev["date_added"]), start, end)
+        )
         alert_new = cve in alert_cves
         epss_new = _epss_tier_new(epss, start, end)
         if not (kev_new or alert_new or epss_new):
@@ -554,7 +560,9 @@ def _vulnerabilities(
         else:
             label = "EPSS"
         acted.add(cve)
-        act_rows.append((cve, _vuln_bullet(cve, label, rule, matched, kev, epss, records, detail, channel)))
+        act_rows.append(
+            (cve, _vuln_bullet(cve, label, rule, matched, kev, epss, records, detail, channel))
+        )
     act_rows.sort(key=lambda item: item[0])
     return [bullet for _cve, bullet in act_rows], _movers(records, acted, start, end)
 
@@ -638,9 +646,7 @@ def _movers(
 def _alert_bullets(alerts: list[dict], detail: str) -> list[Bullet]:
     bullets: list[Bullet] = []
     for alert in alerts:
-        text = (
-            f"ASD ACSC alert {alert['id']}, published {alert['published']}: {alert['title']}."
-        )
+        text = f"ASD ACSC alert {alert['id']}, published {alert['published']}: {alert['title']}."
         if detail == "full" and alert["summary"]:
             text = text[:-1] + ". " + alert["summary"]
         bullets.append(Bullet(alert["id"], text))
@@ -772,8 +778,7 @@ def _internet(
     for row in shown:
         name = _flatten(row.get("name"), limit if brief else FULL_TEXT)
         lines.append(
-            "Cloudflare Radar. Outage: "
-            f"{name}, AU, started {_display(str(row.get('started')))}."
+            f"Cloudflare Radar. Outage: {name}, AU, started {_display(str(row.get('started')))}."
         )
     if brief and len(outages) > BRIEF_OUTAGES:
         extra = len(outages) - BRIEF_OUTAGES

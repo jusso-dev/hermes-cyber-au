@@ -218,11 +218,7 @@ def open_pr() -> int:
     _git(["reset", "-q", "--", "."], repo)
     _git(["--literal-pathspecs", "add", "-A", "--", *committable], repo)
     staged = staged_paths(repo)
-    extra = [
-        path
-        for path in staged
-        if path not in committable or not is_allowed(path, pattern)
-    ]
+    extra = [path for path in staged if path not in committable or not is_allowed(path, pattern)]
     if extra:
         return _refuse_paths(extra)
     if not staged:
@@ -300,8 +296,7 @@ def reject_unexpected(
     bad = [
         path
         for path in paths
-        if not is_allowed(path, pattern)
-        or (repo is not None and not is_plain_file(repo, path))
+        if not is_allowed(path, pattern) or (repo is not None and not is_plain_file(repo, path))
     ]
     if not bad:
         return None
@@ -400,11 +395,7 @@ def _require_head(repo: Path, branch: str) -> None:
 
 def require_token() -> str:
     token = os.environ.get("GH_TOKEN", "")
-    if (
-        len(token) < 8
-        or token != token.strip()
-        or any(char in token for char in "\r\n\t ")
-    ):
+    if len(token) < 8 or token != token.strip() or any(char in token for char in "\r\n\t "):
         raise DataPrError("GH_TOKEN is not set.")
     return token
 

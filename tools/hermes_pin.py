@@ -74,9 +74,7 @@ def _inside(root: Path, rel: Path) -> Path:
     base = root.resolve()
     path = (base / rel).resolve()
     if not path.is_relative_to(base):
-        raise PinError(
-            f"Refusing to touch a path outside the repository: {rel.as_posix()}"
-        )
+        raise PinError(f"Refusing to touch a path outside the repository: {rel.as_posix()}")
     return path
 
 
@@ -90,9 +88,7 @@ def _read(root: Path, rel: Path) -> str:
 def _replace_exact(text: str, pattern: re.Pattern[str], repl, rel: Path) -> str:
     new, count = pattern.subn(repl, text)
     if count != 1:
-        raise PinError(
-            f"{rel.as_posix()} needs exactly one Hermes pin assignment, found {count}"
-        )
+        raise PinError(f"{rel.as_posix()} needs exactly one Hermes pin assignment, found {count}")
     return new
 
 
@@ -128,11 +124,10 @@ def _plan(root: Path, tag: str) -> list[tuple[Path, str]]:
     planned: list[tuple[Path, str]] = [(PIN_REL, _render_pin(root, tag))]
 
     def dist_repl(match: re.Match[str]) -> str:
-        return f"{match.group('prefix')}{match.group('q')}>={version}{match.group('q')}{match.group('trail')}"
+        quote = match.group("q")
+        return f"{match.group('prefix')}{quote}>={version}{quote}{match.group('trail')}"
 
-    planned.append(
-        (DIST_REL, _replace_exact(_read(root, DIST_REL), DIST_RE, dist_repl, DIST_REL))
-    )
+    planned.append((DIST_REL, _replace_exact(_read(root, DIST_REL), DIST_RE, dist_repl, DIST_REL)))
 
     def docker_repl(match: re.Match[str]) -> str:
         return f"{match.group('prefix')}{tag}{match.group('suffix') or ''}"
@@ -154,9 +149,7 @@ def _plan(root: Path, tag: str) -> list[tuple[Path, str]]:
         def ci_repl(match: re.Match[str], release: str = tag) -> str:
             return f"{match.group('prefix')}{release}{match.group('suffix') or ''}"
 
-        planned.append(
-            (rel, _replace_exact(path.read_text(encoding="utf-8"), CI_RE, ci_repl, rel))
-        )
+        planned.append((rel, _replace_exact(path.read_text(encoding="utf-8"), CI_RE, ci_repl, rel)))
     if not ci_found:
         looked = ", ".join(rel.as_posix() for rel in CI_RELS)
         raise PinError(f"Missing ci.yml. Looked for {looked}")
@@ -183,9 +176,7 @@ def set_pin(root: Path, tag: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Read and update the pinned Hermes release."
-    )
+    parser = argparse.ArgumentParser(description="Read and update the pinned Hermes release.")
     parser.add_argument("--root", type=Path, default=ROOT)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("get", help="Print the pinned release tag")

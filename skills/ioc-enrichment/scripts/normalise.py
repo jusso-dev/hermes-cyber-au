@@ -129,9 +129,7 @@ def load_brands(path: Path | None = None) -> tuple[Brand, ...]:
     """Load the heuristic bank-domain list. Domains in the file are defanged."""
     file = path or _brands_path()
     brands: list[Brand] = []
-    for number, line in enumerate(
-        file.read_text(encoding="utf-8").splitlines(), start=1
-    ):
+    for number, line in enumerate(file.read_text(encoding="utf-8").splitlines(), start=1):
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
@@ -140,9 +138,7 @@ def load_brands(path: Path | None = None) -> tuple[Brand, ...]:
             raise ValueError(f"{file}:{number}: expected a token and a domain")
         token = parts[0].lower()
         if not _TOKEN_RE.fullmatch(token):
-            raise ValueError(
-                f"{file}:{number}: token must be at least 3 letters or digits"
-            )
+            raise ValueError(f"{file}:{number}: token must be at least 3 letters or digits")
         prepared = prepare(parts[1])
         if prepared.kind != "domain":
             raise ValueError(f"{file}:{number}: {parts[1]} is not a domain")
@@ -152,18 +148,14 @@ def load_brands(path: Path | None = None) -> tuple[Brand, ...]:
     return tuple(brands)
 
 
-def lookalike_tokens(
-    domain: str, brands: Sequence[Brand] | None = None
-) -> tuple[str, ...]:
+def lookalike_tokens(domain: str, brands: Sequence[Brand] | None = None) -> tuple[str, ...]:
     """Brand tokens in a domain that is not one of the owned names or their subdomains."""
     prepared = prepare(domain)
     if prepared.kind != "domain":
         return ()
     chosen = tuple(brands) if brands is not None else load_brands()
     name = prepared.normalised
-    if any(
-        name == brand.domain or name.endswith("." + brand.domain) for brand in chosen
-    ):
+    if any(name == brand.domain or name.endswith("." + brand.domain) for brand in chosen):
         return ()
     parts: set[str] = set()
     for label in name.split("."):
@@ -221,9 +213,7 @@ def _looks_like_ip(text: str) -> bool:
     except ValueError:
         if re.fullmatch(r"[0-9.]+", candidate) and candidate.count(".") == 3:
             return True
-        return (
-            ":" in candidate and re.fullmatch(r"[0-9A-Fa-f:.%]+", candidate) is not None
-        )
+        return ":" in candidate and re.fullmatch(r"[0-9A-Fa-f:.%]+", candidate) is not None
     return True
 
 
@@ -236,9 +226,7 @@ def _from_ip(text: str) -> Prepared:
         return Prepared(text, text, kind, False, False, "invalid address")
     mapped = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else None
     if mapped is not None:
-        return Prepared(
-            text, ip.compressed, "ipv6", False, False, "IPv4-mapped address"
-        )
+        return Prepared(text, ip.compressed, "ipv6", False, False, "IPv4-mapped address")
     allowed, documentation, refusal = _policy(ip)
     normalised = str(ip) if ip.version == 4 else ip.compressed
     kind = "ipv4" if ip.version == 4 else "ipv6"
@@ -327,9 +315,7 @@ def _from_url(text: str) -> Prepared:
         refusal = _host_refusal(host_text)
         allowed = refusal is None
     scheme = parts.scheme.lower()
-    default_port = (scheme == "https" and port == 443) or (
-        scheme == "http" and port == 80
-    )
+    default_port = (scheme == "https" and port == 443) or (scheme == "http" and port == 80)
     netloc = host_text if port is None or default_port else f"{host_text}:{port}"
     path = _normalise_path(parts.path)
     normalised = urlunsplit((scheme, netloc, path, parts.query, ""))
@@ -368,9 +354,7 @@ def _host_refusal(host: str) -> str | None:
         return "non-standard IPv4 address"
     if "." not in host:
         return "single-label hostname"
-    if any(
-        host == suffix or host.endswith("." + suffix) for suffix in _INTERNAL_SUFFIXES
-    ):
+    if any(host == suffix or host.endswith("." + suffix) for suffix in _INTERNAL_SUFFIXES):
         return "internal hostname"
     return None
 

@@ -40,8 +40,7 @@ _COUNTRY = re.compile(r"[A-Za-z]{2}")
 _NET_FIELDS = ("cidr", "sblid", "rir")
 _ASN_FIELDS = ("asn", "rir")
 ATTRIBUTION = (
-    "Spamhaus DROP, DROPv6 and ASN-DROP. "
-    "Provided free of charge by Spamhaus. Attribute Spamhaus."
+    "Spamhaus DROP, DROPv6 and ASN-DROP. Provided free of charge by Spamhaus. Attribute Spamhaus."
 )
 _LIMITED = "A second DROP fetch inside an hour was refused by the limiter."
 _UNAVAILABLE = "DROP lists are unavailable"

@@ -123,10 +123,7 @@ def test_unknown_column_is_not_confirmed_and_not_ready():
         schemas,
     )
     assert result["ready"] is False
-    assert any(
-        "not confirmed" in item and "EncodedCommand" in item
-        for item in result["errors"]
-    )
+    assert any("not confirmed" in item and "EncodedCommand" in item for item in result["errors"])
 
 
 def test_unknown_table_and_management_commands_are_not_ready():
@@ -138,7 +135,8 @@ def test_unknown_table_and_management_commands_are_not_ready():
     assert created["ready"] is False
     assert any(".create" in item for item in created["errors"])
     external = check_kql.check_query(
-        'DeviceProcessEvents | where Timestamp > ago(1d) | join kind=inner externaldata(x:string)["https://example.com/a"] on x',
+        "DeviceProcessEvents | where Timestamp > ago(1d) | join kind=inner "
+        'externaldata(x:string)["https://example.com/a"] on x',
         schemas,
     )
     assert external["ready"] is False
@@ -225,10 +223,7 @@ def test_base64offset_is_a_graceful_unsupported_modifier():
     assert result["ok"] is False
     assert result["kql"] is None
     assert "base64offset" in result["unsupported"]
-    assert any(
-        "unsupported" in item and "No KQL was produced" in item
-        for item in result["errors"]
-    )
+    assert any("unsupported" in item and "No KQL was produced" in item for item in result["errors"])
     assert any("not ready" in item for item in result["errors"])
 
 
@@ -292,9 +287,7 @@ def test_eval_queries_match_the_checker_and_linter():
 
 def test_eval_file_forbids_create_and_run_tools():
     loaded = yaml.safe_load(EVALS.read_text(encoding="utf-8"))
-    refused = next(
-        case for case in loaded["cases"] if case["id"] == "refuse-create-or-run"
-    )
+    refused = next(case for case in loaded["cases"] if case["id"] == "refuse-create-or-run")
     assert "mcp__junction__sentinel_create_analytics_rule" in refused["forbid_tools"]
     assert "mcp__junction__sentinel_run_hunt" in refused["forbid_tools"]
     web = next(case for case in loaded["cases"] if case["id"] == "asd-web-shell")
@@ -302,9 +295,7 @@ def test_eval_file_forbids_create_and_run_tools():
     for name in ("mcp__attack__attack_technique", "mcp__sigma__sigma_search"):
         assert name in web["expect_tools"]
         assert name in [call["name"] for call in web["offline"]["tool_calls"]]
-    modifier = next(
-        case for case in loaded["cases"] if case["id"] == "unsupported-modifier"
-    )
+    modifier = next(case for case in loaded["cases"] if case["id"] == "unsupported-modifier")
     assert "mcp__sigma__sigma_convert" in modifier["forbid_tools"]
     assert modifier["offline"]["tool_calls"] == []
     assert "untrusted" in web["offline"]["message"]

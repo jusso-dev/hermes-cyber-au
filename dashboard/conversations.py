@@ -140,9 +140,7 @@ def _turns(conn: sqlite3.Connection, session_id: str) -> list[dict]:
     for name in ("content", "tool_name", "timestamp", "active"):
         if name in columns:
             wanted.append(name)
-    sql = (
-        f"SELECT {', '.join(wanted)} FROM messages WHERE session_id = ? ORDER BY id"
-    )
+    sql = f"SELECT {', '.join(wanted)} FROM messages WHERE session_id = ? ORDER BY id"
     try:
         rows = conn.execute(sql, (session_id,)).fetchall()
     except sqlite3.Error:
@@ -228,10 +226,16 @@ def list_sessions(profile: Path) -> tuple[list[dict], str | None]:
                     "profile": profile.name,
                     "speaker": speaker,
                     "title": title or session_id,
-                    "source": str(row[index["source"]]) if "source" in index and row[index["source"]] else "",
-                    "model": str(row[index["model"]]) if "model" in index and row[index["model"]] else "",
+                    "source": str(row[index["source"]])
+                    if "source" in index and row[index["source"]]
+                    else "",
+                    "model": str(row[index["model"]])
+                    if "model" in index and row[index["model"]]
+                    else "",
                     "when": _when(activity or started),
-                    "count": row[index["message_count"]] if "message_count" in index else len(turns),
+                    "count": row[index["message_count"]]
+                    if "message_count" in index
+                    else len(turns),
                     "turns": turns,
                 }
             )

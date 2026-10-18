@@ -6,7 +6,6 @@ import datetime
 import email.utils
 import math
 import random
-import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
@@ -326,11 +325,7 @@ def _from_cache(item, state: str, url: str) -> Response:
 
 
 def _drop_secret_headers(headers: dict) -> dict:
-    return {
-        key: value
-        for key, value in headers.items()
-        if key.lower() not in SECRET_HEADER_NAMES
-    }
+    return {key: value for key, value in headers.items() if key.lower() not in SECRET_HEADER_NAMES}
 
 
 def _read_capped(response: httpx.Response, max_bytes: int) -> bytes:

@@ -40,9 +40,7 @@ ENVELOPE = {
         "data": {},
     },
 }
-_PAGE = (
-    "<https://www.virustotal.com/api/v3/dtm/alerts?page=synthetic-page-2>; rel=\"next\""
-)
+_PAGE = '<https://www.virustotal.com/api/v3/dtm/alerts?page=synthetic-page-2>; rel="next"'
 
 
 def _resolve(_host: str):
@@ -396,9 +394,7 @@ def test_findings_are_stored_for_the_watchlist_only(live, monkeypatch):
 
 
 def test_tools_and_registration():
-    tools = {
-        tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())
-    }
+    tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     assert set(tools) == {"gti_dtm_alerts", "gti_dtm_monitors"}
     for name, tool in tools.items():
         assert tool.annotations.readOnlyHint is True

@@ -57,8 +57,7 @@ def test_eval_cases_and_the_notify_tool():
         assert NOTIFY in case.forbid_tools
         assert case.offline is not None
         assert all(
-            not harness.forbidden_tool_called(NOTIFY, call.name)
-            for call in case.offline.tool_calls
+            not harness.forbidden_tool_called(NOTIFY, call.name) for call in case.offline.tool_calls
         )
 
 
@@ -68,18 +67,9 @@ def test_period_window():
     today = date(2026, 10, 17)
     assert period.since_date(watermark) == date(2026, 10, 2)
     yesterday = date(2026, 10, 16)
-    assert (
-        period.proposed_watermark(today=today, fetch_ok=True, previous=watermark)
-        == yesterday
-    )
-    assert (
-        period.proposed_watermark(today=today, fetch_ok=False, previous=watermark)
-        is None
-    )
-    assert (
-        period.proposed_watermark(today=today, fetch_ok=True, previous=yesterday)
-        == yesterday
-    )
+    assert period.proposed_watermark(today=today, fetch_ok=True, previous=watermark) == yesterday
+    assert period.proposed_watermark(today=today, fetch_ok=False, previous=watermark) is None
+    assert period.proposed_watermark(today=today, fetch_ok=True, previous=yesterday) == yesterday
     assert period.proposed_watermark(today=today, fetch_ok=True, previous=today) is None
 
 
