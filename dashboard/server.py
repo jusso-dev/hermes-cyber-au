@@ -538,15 +538,15 @@ def render_index(profile: Path) -> bytes:
     parts.append(render_conversation_snapshots(profile))
 
     parts.append("<h2>Chat</h2>")
-    count = conversations.session_count(profile)
-    if count == 0:
+    count, unreadable_store = conversations.session_count(profile)
+    if count == 0 and not unreadable_store:
         parts.append(
             "<p>No chat has been opened yet. Run this inside the same Hermes installation "
             "and cyber-au profile shown above:</p>"
             f"<pre>{esc(CHAT_COMMAND)}</pre>"
             '<p class="muted">This read-only dashboard cannot start chats.</p>'
         )
-    else:
+    elif count > 0:
         parts.append(f"<p>{count} stored chat session snapshot(s) found.</p>")
 
     parts.append(

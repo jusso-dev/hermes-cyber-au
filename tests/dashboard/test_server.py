@@ -370,6 +370,29 @@ def test_no_session_store_says_so(profile: Path) -> None:
     assert "No conversations found in these profiles." in body
 
 
+def test_empty_session_store_says_no_chat(profile: Path) -> None:
+    import sqlite3
+
+    conn = sqlite3.connect(profile / "state.db")
+    conn.execute("CREATE TABLE sessions (id TEXT)")
+    conn.execute("CREATE TABLE messages (id INT, session_id TEXT, role TEXT, content TEXT)")
+    conn.commit()
+    conn.close()
+
+    _, body = _get(profile, "/")
+    assert "No chat has been opened yet" in body
+    assert "stored chat session snapshot(s) found." not in body
+
+
+def test_unreadable_session_store_does_not_claim_no_chat(profile: Path) -> None:
+    (profile / "state.db").write_bytes(b"not a SQLite database")
+
+    _, body = _get(profile, "/")
+    assert "The session store could not be read." in body
+    assert "No chat has been opened yet" not in body
+    assert "stored chat session snapshot(s) found." not in body
+
+
 def test_sessions_message(profile: Path) -> None:
     _, body = _get(profile, "/")
     assert "No chat has been opened yet" in body

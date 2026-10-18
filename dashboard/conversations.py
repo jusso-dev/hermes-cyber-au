@@ -174,7 +174,10 @@ def list_sessions(profile: Path) -> tuple[list[dict], str | None]:
             return [], "The session store could not be read."
         return [], None
     try:
-        columns = _columns(conn, "sessions")
+        try:
+            columns = _columns(conn, "sessions")
+        except sqlite3.Error:
+            return [], "The session store could not be read."
         if "id" not in columns:
             return [], None
         fields = ["id"]
@@ -244,9 +247,15 @@ def list_sessions(profile: Path) -> tuple[list[dict], str | None]:
         conn.close()
 
 
-def session_count(profile: Path) -> int:
-    """Number of visible session snapshots the dashboard can show."""
-    return sum(len(list_sessions(root)[0]) for root in profile_roots(profile))
+def session_count(profile: Path) -> tuple[int, bool]:
+    """Return visible session count and whether any session store was unreadable."""
+    count = 0
+    unreadable = False
+    for root in profile_roots(profile):
+        sessions, problem = list_sessions(root)
+        count += len(sessions)
+        unreadable = unreadable or problem is not None
+    return count, unreadable
 
 
 def find_session(profile: Path, session_id: str) -> dict | None:
