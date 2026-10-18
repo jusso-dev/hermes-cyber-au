@@ -70,8 +70,11 @@ def test_checkout_report_does_not_create_skill_directories(tmp_path):
     text = destination.read_text(encoding="utf-8")
     assert "using mcp/asd-ism/data" in text
     assert PARSER_CHECK_ABSENT in text
-    for source in ("e8", "aureg", "attack", "sigma"):
+    for source in ("e8", "aureg", "attack"):
         assert SKIP_MESSAGES[source] in text
+    # The checkout ships a local Sigma snapshot, so Sigma is regenerated, not skipped.
+    assert "Sigma: using mcp/sigma/data" in text
+    assert SKIP_MESSAGES["sigma"] not in text
     assert "\u2014" not in text
     assert sorted(path.name for path in (ROOT / "skills").iterdir()) == before
     assert not (ROOT / "mcp" / "asd-ism" / "data" / "regen.json").exists()
