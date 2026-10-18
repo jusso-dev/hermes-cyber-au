@@ -16,7 +16,7 @@ metadata:
 ## When to Use
 Use when the user asks what VirusTotal knows about a file hash, URL, domain or IP address.
 
-## Terms (say these before the first call in a session)
+### Terms (say these before the first call in a session)
 The VirusTotal Public API must not be used in commercial products or services, or in business workflows that do not contribute new files. This connector is off by default and uses the user's own token. If the work is commercial, stop and tell the user to use a Premium key or another source.
 
 If the `virustotal` server is not enabled, say so, point to `docs/connectors/virustotal.md`, and continue without it. Do not enable it yourself.
