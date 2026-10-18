@@ -8,7 +8,7 @@ written. Read tools continue, with a warning.
 
 from __future__ import annotations
 
-from cyberau_common.audit import AuditHooks, AuditLog, register_cli, register_hooks
+from cyberau_common.audit import AuditHooks, AuditLog, register_hooks
 
 _hooks = AuditHooks(AuditLog())
 
@@ -18,9 +18,7 @@ def pre_tool_call(tool_name, args=None, task_id="", **kwargs):
 
 
 def post_tool_call(tool_name, args=None, result=None, task_id="", duration_ms=0, **kwargs):
-    return _hooks.post_tool_call(
-        tool_name, args, result, task_id, duration_ms, **kwargs
-    )
+    return _hooks.post_tool_call(tool_name, args, result, task_id, duration_ms, **kwargs)
 
 
 def on_session_start(session_id, model="", platform="", **kwargs):
@@ -35,12 +33,13 @@ def on_session_end(
     platform="",
     **kwargs,
 ):
-    return _hooks.on_session_end(
-        session_id, completed, interrupted, model, platform, **kwargs
-    )
+    return _hooks.on_session_end(session_id, completed, interrupted, model, platform, **kwargs)
 
 
 def register(ctx):
-    """Register audit hooks and the ``cyber-au audit`` command."""
+    """Register the audit hooks.
+
+    ``cyber-au audit`` is a subcommand of the plugin's single ``cyber-au``
+    command (see ``cli.setup_parser``), so it is not registered here.
+    """
     register_hooks(ctx, _hooks)
-    register_cli(ctx)

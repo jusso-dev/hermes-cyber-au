@@ -499,6 +499,9 @@ def test_plugin_registers_update_command() -> None:
         def register_cli_command(self, **kwargs) -> None:
             self.kwargs = kwargs
 
+        def register_command(self, name, **kwargs) -> None:
+            self.slash = name
+
     ctx = Ctx()
     module.register(ctx)
     assert ctx.kwargs["name"] == "cyber-au"
