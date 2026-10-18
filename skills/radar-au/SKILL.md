@@ -2,6 +2,7 @@
 name: radar-au
 description: Use Cloudflare Radar for Australian internet and attack telemetry. Layer 7 attack summaries, AU outages, BGP hijacks and leaks, and domain rank for lookalike triage. Read-only, off by default, non-commercial data terms.
 version: 0.1.0
+author: Justin Middler
 license: Apache-2.0
 metadata:
   hermes:
@@ -20,7 +21,7 @@ required_environment_variables:
 
 Use for questions about what the wider internet looks like from Australia: attack trends against AU, AU outages and traffic anomalies, BGP hijacks and leaks involving an Australian ASN, and domain rank when triaging a lookalike domain. It is context for a briefing, not evidence about one organisation.
 
-## Terms (state these before the first Radar call in a session)
+### Terms (state these before the first Radar call in a session)
 
 - Cloudflare Radar data is CC BY-NC 4.0. It is for non-commercial use unless the user has an agreement with Cloudflare. If the work is commercial and the user has no agreement, stop and say so.
 - Attribute "Cloudflare Radar" in every briefing or answer that uses it, with the date range.
