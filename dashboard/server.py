@@ -381,8 +381,9 @@ def render_conversation_snapshots(profile: Path) -> str:
             parts.append(_session_card(session, preview=True))
     if not found:
         parts.append(
-            "<p>No conversation has been recorded yet. When a role chats, "
-            "a short snapshot appears here.</p>"
+            "<p>No conversations found in these profiles. When a role chats, "
+            "a short snapshot appears here. History from another Hermes installation "
+            "is stored separately.</p>"
         )
     return "\n".join(parts)
 
