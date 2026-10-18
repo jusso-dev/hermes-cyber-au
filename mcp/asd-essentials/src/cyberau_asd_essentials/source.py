@@ -57,9 +57,11 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 _TRANSPORT = None
 _SLEEP = __import__("time").sleep
 _PHASE = re.compile(r"^Priority phase (\d+)\s*:\s*(.+)$", re.IGNORECASE)
-_PRINCIPLE = re.compile(r"^([A-Z]{2,5}-\d+)\s*(?:[-–—]\s*)?(.+)$")
+# Escapes keep the source free of literal dashes and ticks for the style check.
+_PRINCIPLE = re.compile(r"^([A-Z]{2,5}-\d+)\s*(?:[-\u2013\u2014]\s*)?(.+)$")
 _PUBLISHED = re.compile(r"Published\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})")
-_TICKS = {"✔", "✓", "yes", "y"}
+_TICK_MARKS = ("\u2714", "\u2713")
+_TICKS = {*_TICK_MARKS, "yes", "y"}
 _SECTION_STRATEGY = {
     "application control": "application_control",
     "multi-factor authentication": "multi_factor_authentication",
@@ -1126,7 +1128,7 @@ def _domain_match(left: str, right: str) -> bool:
 
 
 def _ticked(value: str) -> bool:
-    return value.strip().lower() in _TICKS or "✔" in value or "✓" in value
+    return value.strip().lower() in _TICKS or any(mark in value for mark in _TICK_MARKS)
 
 
 def _strategy_key(value) -> str | None:

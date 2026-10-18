@@ -104,8 +104,8 @@ def test_rowspan_keeps_the_principle_on_the_following_action():
         <table>
         <tr><th>Principle</th><th>Action</th><th>MITRE ATT&CK</th><th>Boundary services</th></tr>
         <tr><td rowspan="2">PRO-13 - Identity management</td><td>First action.</td>
-        <td>Valid Accounts</td><td>✔</td></tr>
-        <tr><td>Use phishing-resistant MFA.</td><td>Brute Force</td><td>✔</td></tr>
+        <td>Valid Accounts</td><td>\u2714</td></tr>
+        <tr><td>Use phishing-resistant MFA.</td><td>Brute Force</td><td>\u2714</td></tr>
         </table>
         </div></body></html>
         """,

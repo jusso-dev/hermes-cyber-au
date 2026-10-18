@@ -83,5 +83,5 @@ def test_docs_name_the_hunt_operations_and_the_readme_links_them():
     assert "Junction is MIT and is not affiliated with Microsoft." in skill
     assert "[docs/connectors/junction.md](docs/connectors/junction.md)" in row
     assert "| off |" in row
-    assert "—" not in docs
-    assert "—" not in skill
+    assert "\u2014" not in docs
+    assert "\u2014" not in skill
