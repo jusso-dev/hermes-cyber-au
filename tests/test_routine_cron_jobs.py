@@ -134,7 +134,8 @@ EXPECTED = [
     {
         "id": "premium-exposure-watch",
         "name": "AU org exposure watch",
-        "schedule": "every 6h",
+        "schedule": _interval(360),
+        "schedule_display": "every 360m",
         "prompt": PREMIUM_PROMPT,
         "skills": ["au-org-exposure"],
         "deliver": "origin",

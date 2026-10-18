@@ -350,7 +350,8 @@ def test_routine_watchlist_domains_and_brands_are_shared(env):
 def test_shipped_job_arrives_paused_and_a_resume_survives_update():
     shipped = json.loads((ROOT / "cron" / "jobs.json").read_text(encoding="utf-8"))["jobs"]
     job = next(item for item in shipped if item["id"] == "premium-exposure-watch")
-    assert job["schedule"] == "every 6h"
+    assert job["schedule"] == {"kind": "interval", "minutes": 360, "display": "every 360m"}
+    assert job["schedule_display"] == "every 360m"
     assert job["skills"] == ["au-org-exposure"]
     assert job["deliver"] == "origin"
     assert "Australia/Sydney" in job["prompt"]

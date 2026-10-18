@@ -65,4 +65,4 @@ No other fields are accepted.
 - A filled-in watchlist loads. An empty file, a bad ABN checksum, or a duplicate domain is rejected before any vendor call.
 - With vendors mocked, the offline cases cover no findings, one infostealer finding, a leak site claim for a similar name on `exclude`, and a third party question that asks before anything is sent.
 - Two routine runs on the same fixture alert once. The second run is quiet.
-- `cron/jobs.json` contains `premium-exposure-watch` with schedule `every 6h` and skill `au-org-exposure`, and without runtime pause fields. New copies of that job arrive paused.
+- `cron/jobs.json` contains `premium-exposure-watch` with an interval schedule of 360 minutes (`every 360m`) and skill `au-org-exposure`, and without runtime pause fields. New copies of that job arrive paused.
