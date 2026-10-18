@@ -148,6 +148,15 @@ def test_oversized_arguments_cannot_hide_action_behind_truncation(guard):
     assert guard.pending_actions("s") == {}
 
 
+def test_approval_preview_shows_invisible_characters_as_json_escapes(guard):
+    _poison(guard, "s")
+    decision = _call(guard, "s", ("send_message", {"text": "before\u202eafter\u200b"}))
+    _code(decision)
+    assert r"before\u202eafter\u200b" in decision["message"]
+    assert "\u202e" not in decision["message"]
+    assert "\u200b" not in decision["message"]
+
+
 def test_approval_in_one_turn_does_not_cover_a_later_flagged_turn(guard):
     """Approve action A, then a poisoned feed result in a later turn, then action B."""
     _poison(guard, "s", turn="turn-1")

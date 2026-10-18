@@ -742,10 +742,11 @@ def _preview(args: object) -> str | None:
         from cyberau_common.audit import redact_value
 
         payload = json.loads(json.dumps(args or {}, default=str))
-        text = json.dumps(redact_value(payload), sort_keys=True, ensure_ascii=False)
+        # Escapes keep bidi and zero-width characters visible in the approval
+        # preview instead of silently removing part of the pending action.
+        text = json.dumps(redact_value(payload), sort_keys=True, ensure_ascii=True)
     except (ImportError, TypeError, ValueError):
         return None
-    text = _INVISIBLE.sub("", text)
     if len(text) > _ARGS_PREVIEW:
         return None
     return text
