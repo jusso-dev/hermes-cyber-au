@@ -7,6 +7,7 @@ import ipaddress
 import json
 import os
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -358,15 +359,17 @@ def test_shipped_job_arrives_paused_and_a_resume_survives_update():
     fresh = merge_shipped_jobs([], shipped, now="2026-10-17T09:00:00+11:00")
     assert fresh[0]["enabled"] is False
     assert fresh[0]["state"] == "paused"
+    # A local-only job: its id must not be one the distribution ships.
+    assert all(item["id"] != "desk-local-note" for item in shipped)
     existing = [
-        {"id": "cyberau-morning-brief", "enabled": True, "state": "scheduled", "prompt": "keep"},
+        {"id": "desk-local-note", "enabled": True, "state": "scheduled", "prompt": "keep"},
         {"id": "premium-exposure-watch", "enabled": True, "state": "scheduled", "prompt": "old"},
     ]
     # The exposure job is already known, so drop it from this local list and add it as new.
     only_other = [existing[0]]
     added = merge_shipped_jobs(only_other, shipped, now="2026-10-17T09:00:00+11:00")
     exposure = next(item for item in added if item["id"] == "premium-exposure-watch")
-    other = next(item for item in added if item["id"] == "cyberau-morning-brief")
+    other = next(item for item in added if item["id"] == "desk-local-note")
     assert exposure["state"] == "paused"
     assert exposure["enabled"] is False
     assert other["enabled"] is True
@@ -377,22 +380,41 @@ def test_shipped_job_arrives_paused_and_a_resume_survives_update():
     assert resumed[0]["prompt"] == job["prompt"]
 
 
-def test_plugin_registers_the_schema():
-    path = ROOT / "plugins" / "cyber-au" / "__init__.py"
-    spec = importlib.util.spec_from_file_location("cyber_au_plugin_under_test", path)
+def test_plugin_registers_the_schema(env):
+    # Load the plugin as a package, as Hermes does, under a name no other test uses.
+    name = "cyberau_plugin_org_exposure_test"
+    plugin_dir = ROOT / "plugins" / "cyber-au"
+    spec = importlib.util.spec_from_file_location(
+        name, plugin_dir / "__init__.py", submodule_search_locations=[str(plugin_dir)]
+    )
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
 
-    class Ctx:
-        def __init__(self):
-            self.kwargs = None
+        class Ctx:
+            """Records tools and ignores the plugin's other registrations."""
 
-        def register_tool(self, **kwargs):
-            self.kwargs = kwargs
+            def __init__(self):
+                self.tools = {}
 
-    ctx = Ctx()
-    module.register(ctx)
-    assert ctx.kwargs["name"] == "cyber_au_org_exposure"
+            def register_tool(self, name=None, **kwargs):
+                self.tools[name] = kwargs
+
+            def __getattr__(self, _attr):
+                return lambda *args, **kwargs: None
+
+        ctx = Ctx()
+        module.register(ctx)
+    finally:
+        for loaded in [key for key in sys.modules if key == name or key.startswith(name + ".")]:
+            del sys.modules[loaded]
+    registered = ctx.tools["cyber_au_org_exposure"]
+    assert registered["schema"] is SCHEMA
+    # Hermes calls a tool handler with the arguments as one dict plus host keywords.
+    payload = json.loads(registered["handler"]({"subject": "example.com.au"}, task_id="t"))
+    assert payload["untrusted"] is True
+    assert payload["data"]["calls"] == 0
     assert SCHEMA["parameters"]["additionalProperties"] is False
     assert SCHEMA["parameters"]["required"] == []
     assert set(SCHEMA["parameters"]["properties"]) == {"subject", "since", "kinds", "vendors"}

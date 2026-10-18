@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .cli import main
 
-__all__ = ["data_dir", "main", "register"]
+__all__ = ["data_dir", "main", "org_exposure", "register"]
 
 
 def data_dir() -> Path:
@@ -37,10 +37,17 @@ def _connector_packages() -> None:
         site.addsitedir(str(packages))
 
 
+def org_exposure(args: dict | None = None, **_host) -> str:
+    """Hermes passes tool arguments as one dict. The org exposure tool takes keywords."""
+    from cyberau_org_exposure.tool import handle
+
+    return handle(**(args or {}))
+
+
 def register(ctx) -> None:
     """Register tools, hooks, middleware, and commands."""
     _connector_packages()
-    from cyberau_org_exposure.tool import SCHEMA, handle
+    from cyberau_org_exposure.tool import SCHEMA
 
     from .cli import register as register_doctor
     from .hooks.audit import register as register_audit
@@ -56,6 +63,6 @@ def register(ctx) -> None:
         name="cyber_au_org_exposure",
         toolset="cyber-au",
         schema=SCHEMA,
-        handler=handle,
+        handler=org_exposure,
     )
     register_doctor(ctx)
