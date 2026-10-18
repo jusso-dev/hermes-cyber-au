@@ -544,7 +544,7 @@ def render_index(profile: Path) -> bytes:
             "<p>No chat has been opened yet. Run this inside the same Hermes installation "
             "and cyber-au profile shown above:</p>"
             f"<pre>{esc(CHAT_COMMAND)}</pre>"
-            "<p class=\"muted\">This read-only dashboard cannot start chats.</p>"
+            '<p class="muted">This read-only dashboard cannot start chats.</p>'
         )
     else:
         parts.append(f"<p>{count} stored chat session snapshot(s) found.</p>")
