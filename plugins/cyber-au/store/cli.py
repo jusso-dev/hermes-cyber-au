@@ -18,7 +18,14 @@ from .api import (
     upsert_vulnerability,
 )
 from .db import open_store, resolve_db_path
-from .maintenance import backup_store, restore_backup, snapshot_public, vacuum_store
+from .expiry import expire_by_age
+from .maintenance import (
+    apply_retention,
+    backup_store,
+    restore_backup,
+    snapshot_public,
+    vacuum_store,
+)
 from .stix import export_stix, import_stix_file
 from .tools import intel_add_observation, intel_get, intel_search
 from .watchlists import (
@@ -204,6 +211,13 @@ def build_parser() -> argparse.ArgumentParser:
     vacuum.set_defaults(func=_cmd_vacuum)
 
     _add_watchlist(sub, common)
+
+    compact = sub.add_parser(
+        "compact",
+        parents=[common],
+        help="Fold old observations into counters and drop expired feed rows",
+    )
+    compact.set_defaults(func=_cmd_compact)
     return parser
 
 
@@ -430,6 +444,13 @@ def _cmd_watchlist_hits(args: argparse.Namespace) -> int:
 
 def _cmd_watchlist_init(args: argparse.Namespace) -> int:
     _emit(init_watchlist(args.watchlist))
+    return 0
+
+
+def _cmd_compact(args: argparse.Namespace) -> int:
+    folded = apply_retention(args.path)
+    expired = expire_by_age(path=args.path)
+    _emit({"compacted_observations": folded, "expired": expired})
     return 0
 
 
