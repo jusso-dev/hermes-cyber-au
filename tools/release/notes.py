@@ -161,23 +161,26 @@ def _show(text: str) -> str:
     return text if text else "(blank line)"
 
 
-def _skill_map(root: Path) -> dict[str, dict[str, str]]:
+def _skill_map(root: Path) -> dict[str, dict[str, bytes]]:
     base = root / "skills"
-    found: dict[str, dict[str, str]] = {}
+    found: dict[str, dict[str, bytes]] = {}
     if not base.is_dir():
         return found
     for child in sorted(base.iterdir()):
         if child.name.startswith("."):
             continue
-        files: dict[str, str] = {}
+        files: dict[str, bytes] = {}
         paths = [child] if child.is_file() else sorted(p for p in child.rglob("*") if p.is_file())
         for path in paths:
-            if any(part.startswith(".") for part in path.relative_to(base).parts):
+            parts = path.relative_to(base).parts
+            # Bytecode caches are build output, not shipped skill files (package.py skips them too).
+            if any(part.startswith(".") or part == "__pycache__" for part in parts):
                 continue
             rel = path.relative_to(child if child.is_dir() else child.parent).as_posix()
             if child.is_file():
                 rel = child.name
-            files[rel] = path.read_text(encoding="utf-8")
+            # Compare bytes so a binary asset in a skill cannot break the notes.
+            files[rel] = path.read_bytes()
         found[child.name] = files
     return found
 
