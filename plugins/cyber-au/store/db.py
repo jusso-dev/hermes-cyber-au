@@ -14,6 +14,7 @@ from pathlib import Path
 _MIGRATIONS = (
     (Path(__file__).resolve().parent / "migrations" / "0001_init.sql", 1),
     (Path(__file__).resolve().parent / "migrations" / "0002_retention.sql", 2),
+    (Path(__file__).resolve().parent / "migrations" / "0003_watchlist_matches.sql", 3),
 )
 SCHEMA_VERSION = _MIGRATIONS[-1][1]
 _LOCK = threading.Lock()
@@ -30,6 +31,7 @@ TABLES = (
     "advisory_refs",
     "relationships",
     "routine_state",
+    "watchlist_matches",
     "fts",
 )
 

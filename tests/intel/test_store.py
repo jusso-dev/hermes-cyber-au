@@ -47,7 +47,7 @@ def test_schema_is_wal_and_versioned(store_path):
     assert str(mode).lower() == "wal"
     assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
     version = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
-    assert version == 2
+    assert version == 3
     assert conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0] == 1
     counts = table_counts(store_path)
     for name in (
