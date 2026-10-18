@@ -354,7 +354,7 @@ def test_failed_live_fetch_is_not_healthy_and_serves_the_snapshot(monkeypatch):
     assert {row["origin"] for row in served_again["data"]} == {"snapshot"}
 
 
-def test_fallback_drops_the_url_the_site_hangs_on(monkeypatch):
+def test_no_request_carries_the_url_the_site_hangs_on(monkeypatch):
     _live(monkeypatch)
     agents: list[str] = []
 
@@ -368,10 +368,8 @@ def test_fallback_drops_the_url_the_site_hangs_on(monkeypatch):
     source._TRANSPORT = httpx.MockTransport(hang_on_urls)
     listed = pspf_list_directions()
     assert listed["data"][0]["origin"] == "live"
-    fallback = [agent for agent in agents if "://" not in agent]
-    assert fallback
-    assert all(agent.startswith("hermes-cyber-au/") for agent in fallback)
-    assert all("HTTP/1.1 fallback" in agent for agent in fallback)
+    assert agents
+    assert all(agent.startswith("hermes-cyber-au/") and "://" not in agent for agent in agents)
 
 
 def test_a_hung_site_stays_inside_the_tool_timeout(monkeypatch):

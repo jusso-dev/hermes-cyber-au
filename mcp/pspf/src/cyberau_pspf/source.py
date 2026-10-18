@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urljoin
 
-from cyberau_common import USER_AGENT
+from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -70,9 +70,8 @@ _DIRECT = {
     "user-agent": USER_AGENT,
     "accept": "text/html,application/xhtml+xml, */*",
 }
-# The site hangs on any user agent that carries a URL, so the fallback names the project bare.
 _BROWSER = {
-    "user-agent": f"{USER_AGENT.split(' (', 1)[0]} (compatible; HTTP/1.1 fallback)",
+    "user-agent": f"{USER_AGENT} (compatible; HTTP/1.1 fallback)",
     "accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     "accept-language": "en-AU,en;q=0.9",
     "connection": "close",
