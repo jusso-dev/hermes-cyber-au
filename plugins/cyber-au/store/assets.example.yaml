@@ -1,0 +1,46 @@
+# Asset inventory template. Copy it to plugin-data/cyber-au/assets.yaml on your profile,
+# or build that file with `cyberau-mcp assets import <file.csv|sbom.json>`. Your copy
+# stays on your machine. It is never committed, shipped or sent to a connector.
+#
+# Every value below is a made-up example (RFC 2606 names, RFC 5737 addresses).
+#
+# Keep the flat shape: one `key: value` per line, two-space list items, no tabs and no
+# `#` inside a value. The daily briefing reads this file with a small reader.
+#
+# Required on every asset:
+#   name      a label you recognise (hostname, service or system)
+#   vendor    the vendor as the catalogue writes it (examplevendor, not a nickname)
+#   product   the product as the catalogue writes it
+#   exposure  internet or internal
+#   owner     the team to tell
+# Optional:
+#   version, cpe (CPE 2.3), purl (package URL), hostname, service,
+#   criticality (low, medium, high, critical), environment (it, ot, cloud), source
+assets:
+  - name: North gateway
+    vendor: examplevendor
+    product: edgegate
+    exposure: internet
+    owner: platform
+    version: 3.0.1
+    cpe: cpe:2.3:a:examplevendor:edgegate:3.0.1:*:*:*:*:*:*:*
+    hostname: gw1.example.com
+    criticality: critical
+    environment: it
+  - name: Plant historian
+    vendor: examplecontrols
+    product: historian server
+    exposure: internal
+    owner: operations
+    version: "7.2"
+    criticality: high
+    environment: ot
+  - name: "Billing API: examplelib 2.4.0"
+    vendor: examplelib
+    product: examplelib
+    exposure: internet
+    owner: payments
+    version: 2.4.0
+    purl: pkg:pypi/examplelib@2.4.0
+    service: Billing API
+    environment: cloud

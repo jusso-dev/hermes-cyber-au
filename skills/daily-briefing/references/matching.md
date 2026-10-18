@@ -46,3 +46,7 @@ A vulnerability is listed in Act today only when it matches at least one asset a
 - the EPSS score is at least 0.7 and the previous score was below 0.7 (or there was no previous score).
 
 That third test is the Tier 1 EPSS cut this briefing uses until `vuln-prioritisation` ships. A KEV row whose date ends before the window opens is not "new", even when the product matches. A KEV row inside the window that matches no asset is left out. ASD ACSC alerts are still listed on their own.
+
+## Building the inventory
+
+`cyberau-mcp assets import <file.csv|sbom.cdx.json>` writes `assets.yaml` in the flat shape this rule reads, with `name`, `vendor`, `product`, `exposure` and `owner` on every asset and `version`, `cpe`, `purl`, `criticality` and `environment` when known. An imported asset with a `cpe` matches under `nvd-cpe` above. `cyberau-mcp assets match` applies the same token rule and labels a name-only hit `vendor-product-fuzzy`.
