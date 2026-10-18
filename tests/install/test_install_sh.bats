@@ -342,7 +342,6 @@ EOF
   [ "$(cksum "$home/mcp/uv.lock")" = "$hash_lock" ]
   [ "$(cksum "$home/mcp/.venv/.cyberau-sync-stamp")" = "$hash_stamp" ]
   [ "$(grep -c "profile install" "$HERMES_FAKE_LOG")" -eq 1 ]
-  grep -q -- '--no-editable' "$UV_LOG"
   [[ "$output" == *"already installed"* ]]
 }
 

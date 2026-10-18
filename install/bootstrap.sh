@@ -150,9 +150,9 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 if [ "$OFFLINE" -eq 1 ]; then
-  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen --offline --no-editable
+  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen --offline
 else
-  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen --no-editable
+  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen
 fi
 
 # cyber-au doctor compares this stamp with mcp/uv.lock to spot a stale venv.
