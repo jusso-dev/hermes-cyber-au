@@ -6,7 +6,7 @@ Status tool for the shared premium interface. It does not call a vendor.
 
 - Key: `premium`
 - Server: `premium`
-- Default: not listed
+- Default: off: no entry in `mcp/servers.yaml`
 - Upstream: none. This package is the shared interface for paid feeds. It does not call a vendor.
 - Verified: 2026-10-17
 - Source: `mcp/premium/src/cyberau_premium/source.py`

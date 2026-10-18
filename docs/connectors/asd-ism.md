@@ -219,7 +219,7 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-The ism-oscal README states Creative Commons Attribution 4.0 International and © Commonwealth of Australia 2024, except the Coat of Arms, the ASD logo, and where otherwise stated. The cyber.gov.au copyright page says to attribute website material as © Commonwealth of Australia 2026. Record the release tag and SHA-256 with every answer. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
+The ism-oscal README states Creative Commons Attribution 4.0 International and © Commonwealth of Australia 2024, except the Coat of Arms, the ASD logo, and where otherwise stated. The cyber.gov.au copyright page says to attribute website material as © Commonwealth of Australia 2026. Record the release tag and SHA-256 with every answer. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../reference/data-sources.md).
 
 Attribution returned with each result:
 

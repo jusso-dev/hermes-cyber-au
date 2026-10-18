@@ -196,7 +196,7 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-FIRST publishes EPSS scores freely and requests attribution in a publication or product. Cite the model version and the score date. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
+FIRST publishes EPSS scores freely and requests attribution in a publication or product. Cite the model version and the score date. See [Data sources, licences and attribution](../reference/data-sources.md).
 
 Attribution returned with each result:
 

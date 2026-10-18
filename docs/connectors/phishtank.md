@@ -6,7 +6,7 @@ Read-only PhishTank verified-online phishing URL database.
 
 - Key: `phishtank`
 - Server: `phish`
-- Default: not listed
+- Default: off: no entry in `mcp/servers.yaml`
 - Upstream: https://phishtank.org/developer_info.php
 - Verified: 2026-10-17
 - Egress hosts: data.phishtank.com, cdn.phishtank.com

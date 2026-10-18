@@ -2,7 +2,7 @@
 
 Reference for `harness-sample` (version 0.1.0). Load it to prove the offline eval harness.
 
-Skill text: [skills/harness-sample/SKILL.md](../../skills/harness-sample/SKILL.md). Eval file: [tests/skills/harness-sample/evals.yaml](../../tests/skills/harness-sample/evals.yaml). Authoring rules: [STANDARD.md](STANDARD.md).
+Skill text: [skills/harness-sample/SKILL.md](https://github.com/jusso-dev/hermes-cyber-au/blob/main/skills/harness-sample/SKILL.md). Eval file: [tests/skills/harness-sample/evals.yaml](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tests/skills/harness-sample/evals.yaml). Authoring rules: [STANDARD.md](STANDARD.md).
 
 ## When to use
 
@@ -19,7 +19,7 @@ Each case has an `input` question. A live model run receives it. An offline run 
 | `cve_ids` | `kev-snapshot` | CVE ids argument to `kev_lookup` |
 | `CYBERAU_KEV_SNAPSHOT` | `kev-snapshot` | `fixtures/kev.json` beside the eval file, resolved inside this repository |
 
-The KEV fixture file is [tests/skills/harness-sample/fixtures/kev.json](../../tests/skills/harness-sample/fixtures/kev.json). Its `catalogVersion` is `harness-0`.
+The KEV fixture file is [tests/skills/harness-sample/fixtures/kev.json](https://github.com/jusso-dev/hermes-cyber-au/blob/main/tests/skills/harness-sample/fixtures/kev.json). Its `catalogVersion` is `harness-0`.
 
 ## Outputs
 

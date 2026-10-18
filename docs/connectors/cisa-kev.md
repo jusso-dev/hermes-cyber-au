@@ -162,7 +162,7 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-Creative Commons Zero 1.0. Cite CISA and the dateAdded field. Do not use the CISA logo or the DHS seal. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
+Creative Commons Zero 1.0. Cite CISA and the dateAdded field. Do not use the CISA logo or the DHS seal. See [Data sources, licences and attribution](../reference/data-sources.md).
 
 Attribution returned with each result:
 

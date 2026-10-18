@@ -1,6 +1,6 @@
 # Egress
 
-Connectors in this distribution may open connections only to hosts listed for them in [`mcp/egress-allowlist.yaml`](../../mcp/egress-allowlist.yaml). Anything else is refused and written to the `cyberau.egress` log. The refusal names the connector and the reason. It does not include the query string.
+Connectors in this distribution may open connections only to hosts listed for them in [`mcp/egress-allowlist.yaml`](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/egress-allowlist.yaml). Anything else is refused and written to the `cyberau.egress` log. The refusal names the connector and the reason. It does not include the query string.
 
 Hermes facts below were checked against NousResearch/hermes-agent at `43faacf` (v0.22.2). The iron-proxy commands were then run once on this machine. That run is recorded at the end of this page.
 

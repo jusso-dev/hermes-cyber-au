@@ -214,7 +214,7 @@ Additional properties are rejected.
 
 ## Terms and attribution
 
-Creative Commons Attribution 4.0 International, except the Coat of Arms, the ACSC logo, third-party content, and other excluded material. Attribute as © Commonwealth of Australia 2026. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../../docs/reference/data-sources.md).
+Creative Commons Attribution 4.0 International, except the Coat of Arms, the ACSC logo, third-party content, and other excluded material. Attribute as © Commonwealth of Australia 2026. This connector is not endorsed by ASD. See [Data sources, licences and attribution](../reference/data-sources.md).
 
 Attribution returned with each result:
 
