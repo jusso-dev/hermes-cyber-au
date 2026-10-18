@@ -350,6 +350,8 @@ def test_no_session_store_says_so(profile: Path) -> None:
 def test_sessions_message(profile: Path) -> None:
     _, body = _get(profile, "/")
     assert "No chat has been opened yet" in body
+    assert "same Hermes installation" in body
+    assert "This read-only dashboard cannot start chats." in body
     (profile / "sessions").mkdir()
     (profile / "sessions" / "s1.json").write_text("{}", encoding="utf-8")
     _, body = _get(profile, "/")
