@@ -34,7 +34,7 @@ ENVELOPE = {
 }
 _TOOL_NAME = re.compile(r"^[a-z][a-z0-9_]{2,40}$")
 _SECRET_HEADER = re.compile(
-    r"(?i)(authorization|auth-key|x-otx-api-key|x-api-key)\s*:\s*(?!\[REDACTED\]|\s*$)\S+"
+    r"(?i)(authorization|auth-key|x-otx-api-key|x-api-key)\s*:\s*(?!['\"]?\[REDACTED\]|\s*$)\S+"
 )
 
 
@@ -137,10 +137,18 @@ def check_connector(package: Path) -> None:
 
 
 def _wrap_entry(package: Path) -> tuple[str, dict] | None:
-    """The servers.yaml name and entry when this package wraps an upstream MCP server."""
+    """The servers.yaml name and entry when this package launches a vendored upstream MCP server.
+
+    An entry without its own ``command`` runs through ``cyberau-mcp serve``, so the
+    package serves the tools itself and gets the full connector contract.
+    """
     data = yaml.safe_load((ROOT / "mcp" / "servers.yaml").read_text(encoding="utf-8"))
     for server, entry in data["servers"].items():
-        if entry.get("connector") == package.name and entry.get("wrap") is True:
+        if (
+            entry.get("connector") == package.name
+            and entry.get("wrap") is True
+            and entry.get("command")
+        ):
             return server, entry
     return None
 
