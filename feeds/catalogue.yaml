@@ -1,0 +1,856 @@
+# Feed catalogue for hermes-cyber-au.
+#
+# One entry per upstream data source. Facts come from each connector's
+# mcp/<connector>/SOURCE.md and source code, mcp/servers.yaml and
+# mcp/egress-allowlist.yaml. Where a fact is not confirmed there, the entry
+# says so in licence or notes instead of guessing.
+#
+# This file is hand maintained and never written by a job. Run state
+# (last_run, last_ok, last_error, item_count) lives in feeds/status.json,
+# which `cyberau-mcp refresh --catalogue feeds/catalogue.yaml` writes beside
+# this file, keyed by the `refresh` value below.
+#
+# auth.env and auth.env_also hold environment variable NAMES only. Never put
+# a value here.
+#
+# poll is the ISO 8601 cache time to live or poll interval the connector uses
+# for its main call. PT0S means the source is called on demand with no local
+# cache.
+#
+# Checked: tests/test_feed_catalogue.py and tools/ci/validate_repo.py.
+version: 1
+
+excluded_servers:
+  stub: Test stub server. It has no upstream data source.
+  junction: >-
+    Microsoft 365 tool runner started from the operator's own JUNCTION_BIN.
+    It reads the operator's tenant, not a threat intel feed, and has no
+    connector package in this checkout.
+
+feeds:
+  # Keyless public sources
+
+  - id: cisa-kev
+    name: CISA Known Exploited Vulnerabilities
+    connector: cisa-kev
+    server: kev
+    url: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT6H
+    refresh: kev
+    refresh_supported: true
+    licence: CC0 1.0. Do not use the CISA logo or DHS seal.
+    region: global
+
+  - id: first-epss
+    name: FIRST EPSS
+    connector: first-epss
+    server: epss
+    url: https://api.first.org/data/v1/epss
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT12H
+    refresh: epss
+    refresh_supported: true
+    licence: Free to use, attribution requested (EPSS FAQ). No named licence.
+    region: global
+
+  - id: asd-acsc
+    name: ASD ACSC alerts, advisories, publications, threats and news
+    connector: asd-acsc
+    server: asd
+    url: https://www.cyber.gov.au/rss/alerts
+    urls:
+      - https://www.cyber.gov.au/rss/alerts
+      - https://www.cyber.gov.au/rss/advisories
+      - https://www.cyber.gov.au/rss/publications
+      - https://www.cyber.gov.au/rss/threats
+      - https://www.cyber.gov.au/rss/news
+    format: rss
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT15M
+    refresh: asd
+    refresh_supported: true
+    licence: CC BY 4.0 with exclusions (cyber.gov.au copyright page). Not endorsed by ASD.
+    region: AU
+    notes: Rate limit is one feed poll per 10 minutes. Item pages are cached for 7 days.
+
+  - id: asd-ism
+    name: Information Security Manual (ISM) OSCAL
+    connector: asd-ism
+    server: ism
+    url: https://api.github.com/repos/AustralianCyberSecurityCentre/ism-oscal/releases
+    urls:
+      - https://api.github.com/repos/AustralianCyberSecurityCentre/ism-oscal/releases
+      - https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal
+    format: oscal
+    auth: {type: bearer, env: GITHUB_TOKEN, optional: true}
+    keyed: false
+    enabled_by_default: true
+    poll: PT12H
+    licence: CC BY 4.0 (ism-oscal README), Commonwealth of Australia. Not endorsed by ASD.
+    region: AU
+    notes: The release list is cached for 12 hours, raw release files for 7 days. GITHUB_TOKEN only raises the GitHub API limit.
+
+  - id: asd-essentials
+    name: Essential Eight and ASD Essentials
+    connector: asd-essentials
+    server: e8
+    url: https://www.cyber.gov.au/publication/essentials-for-enterprise-it
+    urls:
+      - https://www.cyber.gov.au/publication/essentials-for-enterprise-it
+      - https://www.cyber.gov.au/publication/essentials-for-cloud
+      - https://www.cyber.gov.au/publication/essentials-for-ot
+      - https://www.cyber.gov.au/publication/transitioning-from-the-essential-eight
+      - https://www.asd.gov.au/news/2026-10-15-asd-essentials-evolving-our-approach-cyber-security-resilience
+      - https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: Not confirmed in SOURCE.md. Published by ASD. Record the ISM release tag and page SHA-256.
+    region: AU
+    notes: Tools answer from the shipped snapshot unless a live health check is asked for.
+
+  - id: asd-blueprint
+    name: ASD Blueprint for Secure Cloud
+    connector: asd-blueprint
+    server: blueprint
+    url: https://blueprint.asd.gov.au/
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P7D
+    licence: Not confirmed. Published by ASD. Not endorsed by ASD.
+    region: AU
+    notes: Search reads the shipped snapshot. A refresh is meant to run weekly.
+
+  - id: au-regulatory
+    name: AU regulatory guidance (OAIC NDB, ACSC reporting, CISC, Federal Register of Legislation)
+    connector: au-regulatory
+    server: aureg
+    url: https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches
+    urls:
+      - https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches
+      - https://www.oaic.gov.au/privacy/notifiable-data-breaches/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response/part-4-notifiable-data-breach-ndb-scheme
+      - https://www.cyber.gov.au/report-a-cyber-security-incident
+      - https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf
+      - https://www.legislation.gov.au/C2024A00098/latest/text
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P7D
+    licence: Commonwealth legislation and government guidance. No licence name recorded in SOURCE.md. Short quotes only, with source URL.
+    region: AU
+    notes: Fetches run from the regeneration path about once a week. The CISC guidance is a PDF. Tool calls answer from the shipped snapshot.
+
+  - id: auscert
+    name: AusCERT security bulletins
+    connector: auscert
+    server: auscert
+    url: https://portal.auscert.org.au/rss/bulletins/
+    format: rss
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT30M
+    refresh: auscert
+    refresh_supported: true
+    licence: Not confirmed. Return title, link, date and summary only. Do not mirror full bulletins.
+    region: AU
+
+  - id: irap
+    name: IRAP consumer guide and programme pages
+    connector: irap
+    server: irap
+    url: https://www.cyber.gov.au/irap
+    urls:
+      - https://www.cyber.gov.au/irap
+      - https://www.cyber.gov.au/business-government/protecting-devices-systems/assessment-evaluation-programs/irap/irap-consumer-guide
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P7D
+    licence: CC BY 4.0 except the Coat of Arms (July 2025 consumer guide). Not endorsed by ASD.
+    region: AU
+
+  - id: pspf
+    name: Protective Security Policy Framework
+    connector: pspf
+    server: pspf
+    url: https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026
+    urls:
+      - https://www.protectivesecurity.gov.au/publications-library/pspf-page-2026
+      - https://www.protectivesecurity.gov.au/protective-security-directions-under-pspf
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P7D
+    licence: Not confirmed. Quote short passages with attribution.
+    region: AU
+
+  - id: scamwatch
+    name: Scamwatch alerts
+    connector: scamwatch
+    server: scamwatch
+    url: https://www.scamwatch.gov.au/
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT6H
+    licence: Not confirmed. Quote short passages with attribution.
+    region: AU
+
+  - id: datagov-au
+    name: data.gov.au dataset search
+    connector: datagov-au
+    server: datagov
+    url: https://data.gov.au/data/api/3/action/package_search
+    urls:
+      - https://data.gov.au/data/api/3/action/package_search
+      - https://data.gov.au/data/api/3/action/package_show
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: Per dataset (license_id). Datasets with no licence are flagged.
+    region: AU
+
+  - id: ncsc-nz
+    name: NCSC New Zealand alerts
+    connector: ncsc-nz
+    server: ncscnz
+    url: https://www.ncsc.govt.nz/alerts/
+    format: html
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT1H
+    licence: Not confirmed. Quote short passages only.
+    region: global
+    notes: New Zealand source. The region enum has no NZ value. Alert pages are cached for 7 days.
+
+  - id: nvd
+    name: NIST National Vulnerability Database
+    connector: nvd
+    server: nvd
+    url: https://services.nvd.nist.gov/rest/json/cves/2.0
+    urls:
+      - https://services.nvd.nist.gov/rest/json/cves/2.0
+      - https://services.nvd.nist.gov/rest/json/cvehistory/2.0
+    format: json
+    auth: {type: header, header: apiKey, env: NVD_API_KEY, optional: true}
+    keyed: false
+    enabled_by_default: true
+    poll: PT1H
+    refresh: nvd
+    refresh_supported: false
+    licence: Public domain (17 USC). NVD API terms of use notice required.
+    region: global
+    notes: >-
+      Search is cached for 1 hour, CVE and history lookups for 1 day. The
+      connector works without a key, but servers.yaml lists NVD_API_KEY in
+      required_env, so render_config disables the server when it is unset.
+
+  - id: cve-program
+    name: CVE Program records
+    connector: cve-program
+    server: cve
+    url: https://cveawg.mitre.org/api/cve
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: CVE Terms of Use. Keep MITRE's copyright designation.
+    region: global
+
+  - id: osv
+    name: OSV vulnerability database
+    connector: osv
+    server: osv
+    url: https://api.osv.dev/v1
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT6H
+    licence: Per record. Each record's database_specific source and licence fields are kept.
+    region: global
+    notes: Queries are cached for 6 hours, records for 1 day.
+
+  - id: mitre-attack
+    name: MITRE ATT&CK STIX data
+    connector: mitre-attack
+    server: attack
+    url: https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/index.json
+    urls:
+      - https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/index.json
+      - https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/
+    format: stix
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT1H
+    refresh: attack
+    refresh_supported: false
+    licence: ATT&CK terms of use. Attribution to MITRE required. Not endorsed by MITRE.
+    region: global
+    notes: index.json is cached for 1 hour. A bundle is downloaded only when the index reports a new version.
+
+  - id: sigma
+    name: SigmaHQ detection rules
+    connector: sigma
+    server: sigma
+    url: https://api.github.com/repos/SigmaHQ/sigma/releases/latest
+    format: json
+    auth: {type: bearer, env: GITHUB_TOKEN, optional: true}
+    keyed: false
+    enabled_by_default: true
+    poll: PT12H
+    licence: Detection Rule License (DRL) 1.1. Keep the rule id and author.
+    region: global
+    notes: >-
+      The release document is cached for 12 hours and each rule package is
+      downloaded once per release tag from GitHub release asset hosts.
+      SOURCE.md lists release-assets.githubusercontent.com as an egress host
+      but mcp/egress-allowlist.yaml does not.
+
+  - id: crtsh
+    name: crt.sh certificate transparency search
+    connector: crtsh
+    server: crtsh
+    url: https://crt.sh/
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: Not confirmed. Public certificate transparency data from crt.sh.
+    region: global
+
+  - id: shodan-internetdb
+    name: Shodan InternetDB
+    connector: shodan-internetdb
+    server: internetdb
+    url: https://internetdb.shodan.io
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: Free for non-commercial use. Commercial use needs a Shodan enterprise licence.
+    region: global
+
+  - id: spamhaus-drop
+    name: Spamhaus DROP and ASN-DROP
+    connector: spamhaus-drop
+    server: drop
+    url: https://www.spamhaus.org/drop/drop_v4.json
+    urls:
+      - https://www.spamhaus.org/drop/drop_v4.json
+      - https://www.spamhaus.org/drop/drop_v6.json
+      - https://www.spamhaus.org/drop/asndrop.json
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: Provided free of charge. Formal licence text not confirmed. Attribute Spamhaus.
+    region: global
+
+  - id: openphish
+    name: OpenPhish community feed
+    connector: openphish
+    server: phish
+    url: https://openphish.com/feed.txt
+    urls:
+      - https://openphish.com/feed.txt
+      - https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt
+    format: text
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT1H
+    licence: Not confirmed. The community feed is a small sample.
+    region: global
+
+  - id: feodo-tracker
+    name: abuse.ch Feodo Tracker botnet C2 blocklist
+    connector: abusech
+    server: abusech
+    url: https://feodotracker.abuse.ch/downloads/ipblocklist.json
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: false
+    poll: PT1H
+    refresh: feodo
+    refresh_supported: true
+    licence: CC0 (Feodo Tracker statement). The abuse.ch terms also apply.
+    region: global
+    notes: >-
+      Served by the abusech server, which is off by default and needs
+      ABUSECH_AUTH_KEY for its other tools. cyberau-mcp refresh fetches
+      this blocklist without a key.
+
+  # Optional key or keyed sources
+
+  - id: abusech
+    name: abuse.ch URLhaus, ThreatFox and MalwareBazaar
+    connector: abusech
+    server: abusech
+    url: https://urlhaus-api.abuse.ch/v1/url/
+    urls:
+      - https://urlhaus-api.abuse.ch/v1/url/
+      - https://urlhaus-api.abuse.ch/v1/host/
+      - https://urlhaus-api.abuse.ch/v1/payload/
+      - https://urlhaus-api.abuse.ch/v1/urls/recent/limit/1/
+      - https://threatfox-api.abuse.ch/api/v1/
+      - https://mb-api.abuse.ch/api/v1/
+    format: json
+    auth: {type: header, header: Auth-Key, env: ABUSECH_AUTH_KEY}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    refresh: abusech
+    refresh_supported: false
+    licence: abuse.ch terms (4 November 2025). Free for not-for-profit use. Commercial use may need a Spamhaus subscription.
+    region: global
+    notes: Lookups are cached for 1 hour, recent lists for 15 minutes. Off by default for licence terms.
+
+  - id: abuseipdb
+    name: AbuseIPDB
+    connector: abuseipdb
+    server: abuseipdb
+    url: https://api.abuseipdb.com/api/v2/check
+    urls:
+      - https://api.abuseipdb.com/api/v2/check
+      - https://api.abuseipdb.com/api/v2/check-block
+    format: json
+    auth: {type: header, header: Key, env: ABUSEIPDB_API_KEY}
+    keyed: true
+    enabled_by_default: true
+    poll: PT6H
+    licence: Not confirmed. Attribute AbuseIPDB.
+    region: global
+
+  - id: otx
+    name: AlienVault OTX
+    connector: otx
+    server: otx
+    url: https://otx.alienvault.com/api/v1
+    format: json
+    auth: {type: header, header: X-OTX-API-KEY, env: OTX_API_KEY}
+    keyed: true
+    enabled_by_default: true
+    poll: PT1H
+    refresh: otx
+    refresh_supported: false
+    licence: OTX terms of service. Pulses are untrusted community content.
+    region: global
+    notes: Pulses are cached for 1 hour, indicators for 6 hours.
+
+  - id: greynoise
+    name: GreyNoise Community API
+    connector: greynoise
+    server: greynoise
+    url: https://api.greynoise.io/v3/community
+    format: json
+    auth: {type: header, header: key, env: GREYNOISE_API_KEY, optional: true}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: GreyNoise terms of service. Cite GreyNoise.
+    region: global
+
+  - id: ransomware-live
+    name: ransomware.live victim claims
+    connector: ransomware-live
+    server: ransomlive
+    url: https://api.ransomware.live/v2/recentvictims
+    urls:
+      - https://api.ransomware.live/v2/recentvictims
+      - https://api-pro.ransomware.live/victims/
+    format: json
+    auth: {type: header, header: X-API-KEY, env: RANSOMWARE_LIVE_API_KEY, optional: true}
+    keyed: false
+    enabled_by_default: false
+    poll: PT1H
+    licence: Not confirmed. Free community project. Check the site's terms before redistributing.
+    region: global
+    notes: The key selects the PRO API. Victim entries are claims from leak sites, not confirmed incidents.
+
+  - id: phishtank
+    name: PhishTank online-valid database
+    connector: phishtank
+    server: null
+    url: https://data.phishtank.com/data/online-valid.json
+    format: json
+    auth: {type: path, env: PHISHTANK_APP_KEY, optional: true}
+    keyed: false
+    enabled_by_default: false
+    poll: PT1H
+    licence: Not confirmed. Cite PhishTank.
+    region: global
+    notes: >-
+      The connector has a package and SOURCE.md but no entry in
+      mcp/servers.yaml, so it is not launched as a server. The optional key
+      is a path segment. PHISHTANK_APP_KEY is not in .env.template.
+
+  - id: hibp
+    name: Have I Been Pwned (official MCP server)
+    connector: hibp
+    server: hibp
+    url: https://haveibeenpwned.com/mcp
+    format: mcp
+    auth: {type: bearer, env: HIBP_API_KEY, optional: true}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    licence: Breach data CC BY 4.0, attribute Have I Been Pwned. Pwned Passwords has no attribution requirement.
+    region: global
+    notes: >-
+      Breach metadata and the Pwned Passwords range need no key. Account and
+      domain lookups need HIBP_API_KEY and a person's approval. Public tools
+      are cached for 1 day. HIBP_API_KEY is not in .env.template.
+
+  - id: github-advisories
+    name: GitHub Advisory Database (github-mcp-server)
+    connector: github-advisories
+    server: ghsa
+    url: https://api.github.com/advisories
+    format: mcp
+    auth: {type: passthrough, env: GITHUB_ADVISORY_TOKEN}
+    keyed: true
+    enabled_by_default: true
+    poll: PT0S
+    licence: CC BY 4.0. Attribute the GitHub Advisory Database.
+    region: global
+    notes: >-
+      The wrapped server receives the token as GITHUB_PERSONAL_ACCESS_TOKEN.
+      It answers with a sign-in link without one. GITHUB_ADVISORY_TOKEN is
+      not in .env.template.
+
+  - id: cloudflare-radar
+    name: Cloudflare Radar (Cloudflare MCP server, Radar tools)
+    connector: cloudflare-radar
+    server: cloudflare_radar
+    url: https://mcp.cloudflare.com/mcp?codemode=false
+    format: mcp
+    auth: {type: oauth, env: CLOUDFLARE_RADAR_API_TOKEN}
+    keyed: true
+    enabled_by_default: false
+    poll: PT0S
+    refresh: radar
+    refresh_supported: false
+    licence: CC BY-NC 4.0. Non-commercial use only unless you have an agreement with Cloudflare.
+    region: global
+    notes: OAuth 2.1 through the Hermes MCP client, or CLOUDFLARE_RADAR_API_TOKEN as a bearer token.
+
+  - id: cloudflare-urlscanner
+    name: Cloudflare URL Scanner
+    connector: cloudflare-urlscanner
+    server: cfscan
+    url: https://api.cloudflare.com/client/v4/accounts
+    format: json
+    auth: {type: bearer, env: CLOUDFLARE_URLSCAN_API_TOKEN, env_also: [CLOUDFLARE_ACCOUNT_ID]}
+    keyed: true
+    enabled_by_default: false
+    poll: P1D
+    licence: Not confirmed in SOURCE.md. Scans are always sent Unlisted. Submitting needs a person's approval.
+    region: global
+    notes: >-
+      Calls {url}/<account id>/urlscanner/v2/scan and /result. Submissions
+      are cached for 1 day, results for 1 year. CLOUDFLARE_URLSCAN_API_TOKEN
+      and CLOUDFLARE_ACCOUNT_ID are not in .env.template.
+
+  - id: virustotal
+    name: VirusTotal (official virustotal-mcp, VTAI)
+    connector: virustotal
+    server: virustotal
+    url: https://ai.virustotal.com/api/v3
+    format: mcp
+    auth: {type: passthrough, env: VTAI_TOKEN}
+    keyed: true
+    enabled_by_default: false
+    poll: P1D
+    licence: VirusTotal Public API must not be used commercially. Premium API is paid.
+    region: global
+    notes: >-
+      servers.yaml has no connector key for this wrapped server. Reports are
+      cached for 24 hours. VTAI_TOKEN is not in .env.template.
+
+  - id: threatsieve
+    name: ThreatSieve assessment API
+    connector: threatsieve
+    server: threatsieve
+    url: ${THREATSIEVE_URL}
+    format: json
+    auth: {type: bearer, env: THREATSIEVE_API_KEY, env_also: [THREATSIEVE_URL], optional: true}
+    keyed: false
+    enabled_by_default: true
+    poll: PT15M
+    licence: ThreatSieve's own licence.
+    region: global
+    notes: Calls POST /v1/assess. THREATSIEVE_URL defaults to http://127.0.0.1:8787 when unset.
+
+  - id: hindsight
+    name: Hindsight memory server (operator supplied)
+    connector: hindsight
+    server: hindsight
+    url: ${HINDSIGHT_BASE_URL}
+    format: json
+    auth: {type: bearer, env: HINDSIGHT_API_KEY, env_also: [HINDSIGHT_BASE_URL], optional: true}
+    keyed: false
+    enabled_by_default: false
+    poll: PT0S
+    licence: Operator's own server. Use only a server you operate or are allowed to use.
+    region: global
+    notes: No host is shipped. HINDSIGHT_BASE_URL must be https.
+
+  # Operator-run platforms
+
+  - id: misp
+    name: MISP instance (misp-mcp)
+    connector: misp
+    server: misp
+    url: ${MISP_URL}
+    format: json
+    auth: {type: header, header: Authorization, env: MISP_API_KEY, env_also: [MISP_URL]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT5M
+    licence: Per feed in your instance. MISP software is AGPL-3.0. Respect TLP and sharing groups.
+    region: global
+    notes: MISP_URL and MISP_API_KEY are not in .env.template.
+
+  - id: opencti
+    name: OpenCTI instance
+    connector: opencti
+    server: opencti
+    url: ${OPENCTI_URL}
+    format: json
+    auth: {type: bearer, env: OPENCTI_TOKEN, env_also: [OPENCTI_URL]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT0S
+    licence: Per source in your instance. OpenCTI Community Edition is Apache-2.0.
+    region: global
+    notes: GraphQL at <OPENCTI_URL>/graphql.
+
+  - id: taxii-ctis
+    name: TAXII 2.1 server (for example ASD CTIS)
+    connector: taxii-ctis
+    server: taxii
+    url: ${TAXII_API_ROOT}
+    format: stix
+    auth: {type: basic, env: TAXII_USERNAME, env_also: [TAXII_PASSWORD, TAXII_API_ROOT, TAXII_COLLECTION_ID]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: ASD Network Partner deed for CTIS content. TLP check before any copy or export.
+    region: AU
+    notes: Collection lists are cached for 1 day. No host is shipped in the egress allowlist.
+
+  # Commercial sources, bring your own licence
+
+  - id: hudson-rock
+    name: Hudson Rock Cavalier
+    connector: hudson-rock
+    server: hudsonrock
+    url: https://api.hudsonrock.com/json/v3/search-by-domain
+    urls:
+      - https://api.hudsonrock.com/json/v3/search-by-domain
+      - https://api.hudsonrock.com/json/v3/search-by-domain/overview
+    format: json
+    auth: {type: header, header: api-key, env: HUDSONROCK_API_KEY}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: Commercial licence. Session cache only. Store counts and metadata only.
+    region: global
+
+  - id: spycloud
+    name: SpyCloud Enterprise
+    connector: spycloud
+    server: spycloud
+    url: https://api.spycloud.io/enterprise-v2/breach/data/watchlist
+    urls:
+      - https://api.spycloud.io/enterprise-v2/breach/data/watchlist
+      - https://api.spycloud.io/enterprise-v2/breach/catalog/
+      - https://api.spycloud.io/enterprise-v2/watchlist/identifiers
+    format: json
+    auth: {type: header, header: X-API-KEY, env: SPYCLOUD_API_KEY}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: Commercial licence. Store metadata only. No STIX export.
+    region: global
+    notes: Records are cached for 1 hour, breach catalogue metadata for 1 day.
+
+  - id: upguard
+    name: UpGuard BreachSight
+    connector: upguard
+    server: upguard
+    url: https://cyber-risk.upguard.com/api/public
+    format: json
+    auth: {type: header, header: Authorization, env: UPGUARD_API_KEY}
+    keyed: true
+    enabled_by_default: false
+    poll: PT15M
+    licence: Commercial licence. Store metadata only. No STIX export.
+    region: global
+    notes: Session cache 15 minutes. Typosquat lists are cached for up to 12 hours.
+
+  - id: recorded-future
+    name: Recorded Future API
+    connector: recorded-future
+    server: recordedfuture
+    url: https://api.recordedfuture.com
+    format: json
+    auth: {type: header, header: X-RFToken, env: RECORDED_FUTURE_API_TOKEN, env_also: [RECORDED_FUTURE_ORG_ID]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: Commercial licence. Identity and alert metadata only. No STIX export.
+    region: global
+    notes: Playbook alerts are cached for 1 hour, identity results for 12 hours.
+
+  - id: recorded-future-mcp
+    name: Recorded Future official MCP server
+    connector: recorded-future
+    server: recordedfuture_mcp
+    url: https://mcp.recordedfuture.com/mcp
+    format: mcp
+    auth: {type: oauth, env: RECORDED_FUTURE_MCP_CLIENT_ID, env_also: [RECORDED_FUTURE_MCP_CLIENT_SECRET]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT0S
+    licence: Commercial licence. Needs a subscription with unlimited integrations.
+    region: global
+    notes: One MCP tool call counts as one API call against the shared daily limit.
+
+  - id: flashpoint
+    name: Flashpoint Ignite technical indicators
+    connector: flashpoint
+    server: flashpoint
+    url: https://api.flashpoint.io/technical-intelligence/v2/indicators
+    format: json
+    auth: {type: bearer, env: FLASHPOINT_API_TOKEN}
+    keyed: true
+    enabled_by_default: false
+    poll: PT15M
+    licence: Commercial licence. Redistribution forbidden.
+    region: global
+
+  - id: intel471
+    name: Intel 471 Titan
+    connector: intel471
+    server: intel471
+    url: https://api.intel471.com/v1
+    format: json
+    auth: {type: basic, env: INTEL471_EMAIL, env_also: [INTEL471_API_KEY]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT15M
+    licence: Commercial licence. Store metadata only. No STIX export.
+    region: global
+
+  - id: google-ti-dtm
+    name: Google Threat Intelligence Digital Threat Monitoring
+    connector: google-ti-dtm
+    server: gtidtm
+    url: https://www.virustotal.com/api/v3/dtm/alerts
+    urls:
+      - https://www.virustotal.com/api/v3/dtm/alerts
+      - https://www.virustotal.com/api/v3/dtm/monitors
+    format: json
+    auth: {type: header, header: x-apikey, env: GTI_API_KEY}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: Commercial licence. Redistribution forbidden.
+    region: global
+
+  - id: crowdstrike-recon
+    name: CrowdStrike Falcon Intelligence Recon
+    connector: crowdstrike-recon
+    server: csrecon
+    url: https://api.crowdstrike.com
+    format: json
+    auth: {type: oauth, env: FALCON_CLIENT_ID, env_also: [FALCON_CLIENT_SECRET, FALCON_BASE_URL]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: Commercial licence. Store metadata only. No STIX export.
+    region: global
+    notes: OAuth2 client credentials. FALCON_BASE_URL is optional.
+
+  - id: socradar
+    name: SOCRadar incidents
+    connector: socradar
+    server: socradar
+    url: https://platform.socradar.com/api/company/{company_id}/incidents/v4
+    format: json
+    auth: {type: header, header: Api-Key, env: SOCRADAR_API_KEY, env_also: [SOCRADAR_COMPANY_ID]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT6H
+    licence: Commercial licence. Store metadata only. No STIX export.
+    region: global
+
+  - id: darkowl
+    name: DarkOwl Vision search
+    connector: darkowl
+    server: darkowl
+    url: https://api.darkowl.com/api/v1/search
+    format: json
+    auth: {type: hmac, header: Authorization, env: DARKOWL_PUBLIC_KEY, env_also: [DARKOWL_PRIVATE_KEY]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: Commercial licence. Store counts and links only, no snippets.
+    region: global
+
+  - id: flare
+    name: Flare Firework API
+    connector: flare
+    server: flare
+    url: https://api.flare.io
+    format: json
+    auth: {type: header, header: Authorization, env: FLARE_API_KEY, env_also: [FLARE_TENANT_ID]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT5M
+    licence: Commercial licence. Store event metadata only. No STIX export.
+    region: global
+    notes: The key is exchanged for a 1 hour bearer token. Events are cached for 5 minutes, identifiers for 1 hour.
+
+  - id: flare-mcp
+    name: Flare official MCP server
+    connector: flare-mcp
+    server: flare_mcp
+    url: https://api.flare.io/mcp
+    format: mcp
+    auth: {type: header, header: Authorization, env: FLARE_API_KEY, env_also: [FLARE_TENANT_ID]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT0S
+    licence: Commercial licence (same terms as the flare connector).
+    region: global
+    notes: No connector package or egress entry named flare-mcp. The host is covered by the flare allowlist entry.

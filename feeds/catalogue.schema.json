@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "hermes-cyber-au feed catalogue",
+  "type": "object",
+  "required": ["version", "feeds"],
+  "properties": {
+    "version": {"type": "integer"},
+    "excluded_servers": {
+      "type": "object",
+      "description": "mcp/servers.yaml keys that are not data sources, with the reason.",
+      "additionalProperties": {"type": "string"}
+    },
+    "feeds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "connector",
+          "server",
+          "url",
+          "format",
+          "auth",
+          "keyed",
+          "enabled_by_default",
+          "poll",
+          "licence",
+          "region"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "connector": {"type": "string"},
+          "server": {
+            "type": ["string", "null"],
+            "description": "Key in mcp/servers.yaml, or null when the connector has no server entry."
+          },
+          "url": {
+            "type": "string",
+            "description": "Primary upstream URL, or a ${VAR} placeholder when the operator supplies the host."
+          },
+          "urls": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Every upstream URL the connector calls for this feed, including url."
+          },
+          "format": {
+            "enum": ["rss", "atom", "json", "csv", "stix", "oscal", "html", "text", "mcp"]
+          },
+          "auth": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "enum": ["none", "header", "bearer", "basic", "oauth", "hmac", "path", "passthrough"]
+              },
+              "env": {"type": "string", "description": "Environment variable name only, never a value."},
+              "env_also": {"type": "array", "items": {"type": "string"}},
+              "header": {"type": "string"},
+              "optional": {
+                "type": "boolean",
+                "description": "True when the connector still works without the credential."
+              }
+            }
+          },
+          "keyed": {
+            "type": "boolean",
+            "description": "True when the feed needs a credential to return data."
+          },
+          "enabled_by_default": {"type": "boolean"},
+          "poll": {"type": "string", "description": "ISO 8601 duration. PT0S means on demand with no local cache."},
+          "refresh": {
+            "type": "string",
+            "description": "Source key for cyberau-mcp refresh and the key in feeds/status.json."
+          },
+          "refresh_supported": {"type": "boolean"},
+          "licence": {"type": "string"},
+          "region": {"enum": ["AU", "global"]},
+          "tlp": {"enum": ["CLEAR", "GREEN", "AMBER", "AMBER+STRICT", "RED"]},
+          "notes": {"type": "string"},
+          "health": {
+            "type": "object",
+            "properties": {
+              "probe": {"type": "string"},
+              "expect_status": {"type": "integer"},
+              "max_age": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
