@@ -60,7 +60,11 @@ class ConnectorDocsTest(unittest.TestCase):
     def test_readme_lists_only_checkout_connectors(self):
         region = self.files["README.md"].split(START, 1)[1].split(END, 1)[0]
         links = re.findall(r"\]\(docs/connectors/([a-z0-9-]+)\.md\)", region)
-        self.assertEqual(sorted(links), sorted(CHECKOUT_KEYS))
+        checkout = sorted(
+            path.name for path in (ROOT / "mcp").iterdir() if (path / "SOURCE.md").is_file()
+        )
+        self.assertEqual(sorted(links), checkout)
+        self.assertLessEqual(set(CHECKOUT_KEYS), set(links))
         rows = [
             line
             for line in region.splitlines()
@@ -68,16 +72,11 @@ class ConnectorDocsTest(unittest.TestCase):
             and not line.startswith("| Connector")
             and not line.startswith("|---")
         ]
-        self.assertEqual(len(rows), len(CHECKOUT_KEYS))
-        for absent in (
-            "osv",
-            "abusech",
-            "auscert",
-            "recordedfuture",
-            "cloudflare_radar",
-            "virustotal",
-        ):
-            self.assertNotIn(absent, region)
+        self.assertEqual(len(rows), len(checkout))
+        # Directories without a SOURCE.md (shared libraries) get no row.
+        for absent in ("common", "org-exposure", "vendor"):
+            if absent not in checkout:
+                self.assertNotIn(f"docs/connectors/{absent}.md", region)
         self.assertNotIn("https://", region)
 
     def test_tools_schemas_and_attribution_come_from_checkout(self):

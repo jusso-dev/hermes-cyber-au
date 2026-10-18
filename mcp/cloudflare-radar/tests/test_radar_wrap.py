@@ -57,7 +57,7 @@ def test_entry_is_a_pinned_read_only_wrap(entry):
     assert entry["enabled_by_default"] is False
     assert entry["trust"] == "untrusted"
     assert "cloudflare-radar" not in {
-        item["connector"] for item in wrap.load_servers().values() if item.get("kind") != "wrap"
+        item.get("connector") for item in wrap.load_servers().values() if item.get("kind") != "wrap"
     }
 
 
