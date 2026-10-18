@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from cyberau_common.envelope import envelope
-from cyberau_common.secrets import install_log_redaction, record_tool_audit, redact_data
+from cyberau_common.envelope import envelope, harden_envelope, untrusted_text
+from cyberau_common.secrets import install_log_redaction, record_tool_audit
 
 _REGISTRY: dict[str, Callable[[], Connector]] = {}
 
@@ -93,12 +93,13 @@ def invoke_tool(connector: Connector, spec: ToolSpec, *args, **kwargs):
             connector.key,
             None,
             cache="snapshot",
-            warnings=(str(exc),),
+            # Exception text can carry upstream response text, so it is wrapped.
+            warnings=(untrusted_text(str(exc), connector.key, 500),),
             attribution=connector.attribution,
         )
     record_tool_audit(spec.name, args, kwargs, None)
     if isinstance(data, dict) and data.get("untrusted") is True and "source" in data:
-        return redact_data(data)
+        return harden_envelope(data)
     return envelope(
         connector.key,
         data,
