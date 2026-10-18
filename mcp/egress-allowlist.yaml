@@ -136,6 +136,8 @@ connectors:
     hosts:
       - www.virustotal.com
       - ai.virustotal.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   hibp:
     hosts:
     - haveibeenpwned.com
