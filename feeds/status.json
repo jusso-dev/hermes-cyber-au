@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-10-19T20:47:32Z",
+  "sources": {
+    "asd": {
+      "last_run": "2026-10-19T20:47:32Z",
+      "status": "ok",
+      "last_ok": "2026-10-19T20:47:32Z",
+      "item_count": 44,
+      "last_error": null
+    },
+    "auscert": {
+      "last_run": "2026-10-19T20:47:32Z",
+      "status": "ok",
+      "last_ok": "2026-10-19T20:47:32Z",
+      "item_count": 100,
+      "last_error": null
+    },
+    "epss": {
+      "last_run": "2026-10-19T20:47:32Z",
+      "status": "ok",
+      "last_ok": "2026-10-19T20:47:32Z",
+      "item_count": 1747,
+      "last_error": null
+    },
+    "feodo": {
+      "last_run": "2026-10-19T20:47:32Z",
+      "status": "ok",
+      "last_ok": "2026-10-19T20:47:32Z",
+      "item_count": 5,
+      "last_error": null
+    },
+    "kev": {
+      "last_run": "2026-10-19T20:47:32Z",
+      "status": "ok",
+      "last_ok": "2026-10-19T20:47:32Z",
+      "item_count": 1748,
+      "last_error": null
+    }
+  }
+}
