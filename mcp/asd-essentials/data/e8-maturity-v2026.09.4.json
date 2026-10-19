@@ -1,5 +1,5 @@
 {
-  "retrieved_on": "2026-10-17",
+  "retrieved_on": "2026-10-19",
   "ism_release": "v2026.09.4",
   "source_urls": [
     "https://raw.githubusercontent.com/AustralianCyberSecurityCentre/ism-oscal/v2026.09.4/ISM_E8_ML1-baseline-resolved-profile_catalog.json",
@@ -998,7 +998,7 @@
       "maturity_levels": [
         3
       ],
-      "strategy": "user_application_hardening"
+      "strategy": "restrict_admin_privileges"
     },
     {
       "control_id": "ism-1656",
@@ -1108,7 +1108,7 @@
       "maturity_levels": [
         3
       ],
-      "strategy": "user_application_hardening"
+      "strategy": "restrict_office_macros"
     },
     {
       "control_id": "ism-1508",
@@ -1339,6 +1339,86 @@
         3
       ],
       "strategy": "patch_operating_systems"
+    }
+  ],
+  "unassigned_controls": [
+    {
+      "control_id": "ism-0123",
+      "section": "Guidelines for cyber security incidents / Managing cyber security incidents / Reporting cyber security incidents",
+      "statement": "Cyber security incidents are reported to the chief information security officer, or one of their delegates, as soon as possible after they occur or are discovered.",
+      "updated": "Jun-23",
+      "maturity_levels": [
+        2,
+        3
+      ]
+    },
+    {
+      "control_id": "ism-0140",
+      "section": "Guidelines for cyber security incidents / Managing cyber security incidents / Reporting cyber security incidents to ASD",
+      "statement": "Cyber security incidents are reported to ASD as soon as possible after they occur or are discovered.",
+      "updated": "Sep-23",
+      "maturity_levels": [
+        2,
+        3
+      ]
+    },
+    {
+      "control_id": "ism-1819",
+      "section": "Guidelines for cyber security incidents / Responding to cyber security incidents / Enacting cyber security incident response plans",
+      "statement": "Following the identification of a cyber security incident, the cyber security incident response plan is enacted.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ]
+    },
+    {
+      "control_id": "ism-1815",
+      "section": "Guidelines for security assurance / Security monitoring / Centralised event logging facility",
+      "statement": "Event logs are protected from unauthorised modification and deletion.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ]
+    },
+    {
+      "control_id": "ism-1906",
+      "section": "Guidelines for security assurance / Security monitoring / Event log monitoring",
+      "statement": "Event logs from internet-facing servers are analysed in a timely manner to detect cyber security events.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        2,
+        3
+      ]
+    },
+    {
+      "control_id": "ism-1228",
+      "section": "Guidelines for security assurance / Security monitoring / Event log monitoring",
+      "statement": "Cyber security events are analysed in a timely manner to identify cyber security incidents.",
+      "updated": "Mar-22",
+      "maturity_levels": [
+        2,
+        3
+      ]
+    },
+    {
+      "control_id": "ism-1907",
+      "section": "Guidelines for security assurance / Security monitoring / Event log monitoring",
+      "statement": "Event logs from non-internet-facing servers are analysed in a timely manner to detect cyber security events.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ]
+    },
+    {
+      "control_id": "ism-0109",
+      "section": "Guidelines for security assurance / Security monitoring / Event log monitoring",
+      "statement": "Event logs from workstations are analysed in a timely manner to detect cyber security events.",
+      "updated": "Dec-23",
+      "maturity_levels": [
+        3
+      ]
     }
   ],
   "unassigned_control_ids": [
