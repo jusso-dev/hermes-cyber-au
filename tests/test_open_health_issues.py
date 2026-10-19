@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SECRET = "super-secret-value"
@@ -277,3 +280,34 @@ def test_a_github_error_on_one_connector_does_not_skip_the_rest(tmp_path: Path, 
     assert module.main(["--kind", "connector", "--input", str(path)], client=github) == 1
     assert [call[1] for call in github.calls] == ["Connector health: cisa-kev failing"]
     assert "first-epss: gh failed" in capsys.readouterr().err
+
+
+def test_create_adds_a_missing_label_and_keeps_existing_ones(monkeypatch):
+    calls = []
+
+    def fake_run(args, **_):
+        calls.append(args[1:])
+        if args[1:3] == ["label", "create"]:
+            if args[3] == "connector-health":
+                return subprocess.CompletedProcess(args, 0, "", "")
+            stderr = f'label with name "{args[3]}" already exists; use `--force` to update'
+            return subprocess.CompletedProcess(args, 1, "", stderr)
+        url = "https://github.com/o/r/issues/7\n"
+        return subprocess.CompletedProcess(args, 0, url, "")
+
+    issues = load()
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    number = issues.GhCli().create("t", "b", issues.LABELS)
+    assert number == 7
+    assert [call[2] for call in calls if call[:2] == ["label", "create"]] == issues.LABELS
+    assert all("--force" not in call for call in calls)
+
+
+def test_create_stops_when_a_label_cannot_be_created(monkeypatch):
+    def fake_run(args, **_):
+        return subprocess.CompletedProcess(args, 1, "", "HTTP 403: Resource not accessible")
+
+    issues = load()
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="403"):
+        issues.GhCli().create("t", "b", ["connector-health"])

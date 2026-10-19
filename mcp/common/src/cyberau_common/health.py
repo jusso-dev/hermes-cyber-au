@@ -15,7 +15,9 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from cyberau_common.secrets import redact
+import yaml
+
+from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, get_connector
 from cyberau_common.wrap import find_wrap, run_wrap_health
 
@@ -67,11 +69,16 @@ def collect_connector_health(
     stamp = today or datetime.now(UTC).date()
     saved = _read_state(state_path)
     fetch = fetcher or fetch_live
+    unconfigured = _unconfigured(checkout) if live else {}
     rows: list[dict] = []
     for key, package in _connectors(checkout):
         schemas = sorted((package / "schema").glob("*.response.json"))
         if not schemas:
             rows.append(_row(key, status="not_checked", detail="not checked"))
+            continue
+        if key in unconfigured:
+            detail = f"not configured: {unconfigured[key]} is not set"
+            rows.append(_row(key, status="not_checked", detail=detail))
             continue
         try:
             fetched = _response(key, live=live, fixtures=fixtures, fetcher=fetch)
@@ -138,6 +145,28 @@ def _connectors(root: Path) -> list[tuple[str, Path]]:
         if (path / "pyproject.toml").is_file():
             found.append((path.name, path))
     return found
+
+
+def _unconfigured(root: Path) -> dict[str, str]:
+    """Connectors whose every catalogue feed needs a credential that is not set.
+
+    Maps each such connector to its first missing variable name. An absent
+    licence is not a broken connector, so it is not probed and opens no issue.
+    """
+    try:
+        catalogue = yaml.safe_load((root / "feeds" / "catalogue.yaml").read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return {}
+    feeds = catalogue.get("feeds") if isinstance(catalogue, dict) else None
+    gaps: dict[str, list[str | None]] = {}
+    for feed in feeds if isinstance(feeds, list) else []:
+        if not isinstance(feed, dict) or not isinstance(feed.get("connector"), str):
+            continue
+        auth = feed.get("auth")
+        env = auth.get("env") if isinstance(auth, dict) else None
+        missing = feed.get("keyed") is True and isinstance(env, str) and lookup(env) is None
+        gaps.setdefault(feed["connector"], []).append(env if missing else None)
+    return {key: names[0] for key, names in gaps.items() if all(names)}
 
 
 def _response(
@@ -338,14 +367,17 @@ def _fetch_live_unchecked(key: str) -> dict:
     module_name = f"cyberau_{key.replace('-', '_')}.source"
     try:
         module = importlib.import_module(module_name)
-    except ModuleNotFoundError:
-        return {
-            "ok": False,
-            "status_code": None,
-            "error_class": "unknown_connector",
-            "body": None,
-            "detail": "unknown connector",
-        }
+    except ModuleNotFoundError as exc:
+        # Wrapped connectors have no source module. Their own health probe runs below.
+        if exc.name != module_name:
+            return {
+                "ok": False,
+                "status_code": None,
+                "error_class": "unknown_connector",
+                "body": None,
+                "detail": "unknown connector",
+            }
+        module = None
     loader = getattr(module, "health_response", None)
     if callable(loader):
         raw = loader()
