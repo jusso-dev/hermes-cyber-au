@@ -12,7 +12,7 @@ Every file in this directory is **DEMO DATA**. It is synthetic and made up for t
 | `edr-alert.json` | An EDR beacon alert from a fictional laptop | `cyber-au demo triage`, or the `incident-triage` skill |
 | `phishing-email.eml` | A payroll phishing email with failing SPF and DMARC | The `phishing-analysis` skill |
 | `iocs.txt` | Mixed indicators and two CVE ids | The `ioc-enrichment` and `vuln-prioritisation` skills |
-| `assets.csv` | A small fictional asset list | The `vuln-prioritisation` and `soci-reporting` skills |
+| `assets.csv` | A small fictional asset list | The `vuln-prioritisation`, `soci-reporting` and `pspf-risk-assessment` skills |
 | `incident-timeline.md` | The same fictional incident as a timeline | The `ndb-breach-notification` and `soci-reporting` skills |
 
 `cyber-au demo triage` only reads files marked as demo (`"demo": true`). It matches them against a synthetic demo intel set and labels every line of output as demo. It never reads or writes your real intel store. For a real alert, use the `incident-triage` skill in a chat, which uses live sources.

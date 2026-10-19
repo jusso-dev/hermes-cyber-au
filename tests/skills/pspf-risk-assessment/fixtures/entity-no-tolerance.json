@@ -1,0 +1,18 @@
+{
+  "as_of": "2026-10-19",
+  "documents": ["srmp"],
+  "scope": {
+    "entity": "Example Regulator (synthetic)",
+    "subject": "Example Regulator security plan risk component",
+    "kind": "entity"
+  },
+  "risks": [
+    {
+      "id": "R1",
+      "statement": "Foreign intelligence services cultivate staff to obtain sensitive regulatory information",
+      "likelihood": "possible",
+      "consequence": "severe",
+      "rated_by": "Chief Security Officer"
+    }
+  ]
+}

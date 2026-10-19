@@ -1,0 +1,92 @@
+{
+  "as_of": "2026-10-19",
+  "documents": ["tra", "srmp"],
+  "scope": {
+    "entity": "Example Agency (synthetic)",
+    "subject": "Payroll web application APP-DEMO-07",
+    "kind": "system",
+    "classification": "OFFICIAL: Sensitive",
+    "objectives": ["Pay staff accurately and on time", "Protect staff personal and bank details"],
+    "out_of_scope": ["Corporate desktop fleet"]
+  },
+  "tolerance": {"rating": "medium", "approved_by": "Secretary of Example Agency", "date": "2026-07-01"},
+  "threat_environment": {"national_terrorism_threat_level": "PROBABLE"},
+  "assets": [
+    {"id": "A1", "name": "Payroll records and staff bank details", "type": "information", "classification": "OFFICIAL: Sensitive", "critical": true, "owner": "Chief Financial Officer"},
+    {"id": "A2", "name": "APP-DEMO-07 payroll web application", "type": "system", "classification": "OFFICIAL: Sensitive", "critical": true, "owner": "Payroll application owner"}
+  ],
+  "threats": [
+    {
+      "id": "T1",
+      "name": "Financially motivated cybercriminals exploiting internet-facing applications",
+      "actor_type": "external",
+      "capability": "high",
+      "intent": "financial gain, including ransomware",
+      "attack_techniques": ["T1190"],
+      "evidence": [
+        {
+          "text": "CVE-2021-44228 is listed in the KEV fixture with known ransomware campaign use.",
+          "source": {"name": "CISA Known Exploited Vulnerabilities", "version": "skill-fixture-1", "retrieved": "2026-10-19"}
+        },
+        {
+          "text": "APP-DEMO-07 runs Apache Log4j 2.14.1 and is internet-facing.",
+          "source": {"name": "supplied asset list examples/assets.csv", "version": "none", "retrieved": "2026-10-19"}
+        }
+      ]
+    },
+    {
+      "id": "T2",
+      "name": "Trusted insider misusing payroll access",
+      "actor_type": "insider",
+      "capability": "medium",
+      "intent": "financial gain"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R1",
+      "statement": "Cybercriminals exploit the unpatched Log4j library in APP-DEMO-07 to run code, steal staff bank details and disrupt pay runs",
+      "assets": ["A1", "A2"],
+      "threats": ["T1"],
+      "vulnerability": "Apache Log4j 2.14.1 on an internet-facing host",
+      "controls": [
+        {
+          "text": "Patches for online services are applied within 48 hours when working exploits exist",
+          "ism": ["ism-1876"],
+          "effectiveness": "not in place for APP-DEMO-07",
+          "source": {"name": "asd-ism", "version": "v2026.09.4", "retrieved": "2026-10-19"}
+        }
+      ],
+      "likelihood": "likely",
+      "consequence": "major",
+      "rated_by": "proposed",
+      "rationale": "A known exploited vulnerability with ransomware use is present on an internet-facing host that holds critical personal information.",
+      "steward": "Chief Information Security Officer",
+      "treatment": {
+        "option": "reduce",
+        "actions": [
+          {"text": "Upgrade Log4j on APP-DEMO-07 to a fixed release", "owner": "Payroll application owner", "due": "2026-10-21", "ism": ["ism-1876"]},
+          {"text": "Hunt for exploitation of CVE-2021-44228 on APP-DEMO-07 since it was exposed", "owner": "Security operations lead", "due": "2026-10-24"}
+        ],
+        "residual_likelihood": "unlikely",
+        "residual_consequence": "major"
+      }
+    },
+    {
+      "id": "R2",
+      "statement": "A payroll officer changes bank details to divert pay",
+      "assets": ["A1"],
+      "threats": ["T2"],
+      "vulnerability": "No second approval for bank detail changes",
+      "likelihood": "possible",
+      "consequence": "moderate",
+      "rated_by": "proposed",
+      "rationale": "Supplied context says changes need one approver only."
+    }
+  ],
+  "plan": {
+    "goals": "Keep payroll available and staff data confidential",
+    "incident_management": "Example Agency cyber incident response plan v3"
+  },
+  "missing_sources": ["ASD ACSC advisories (mcp__asd__asd_search)", "ATT&CK (mcp__attack__attack_search)"]
+}

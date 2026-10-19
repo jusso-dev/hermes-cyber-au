@@ -58,5 +58,11 @@
     "prompt": "Using examples/incident-timeline.md and examples/assets.csv, does this incident trigger a SOCI Act report?",
     "keys": "none",
     "good_answer": "Notes that the SOCI asset SCADA-DEMO-03 shows no sign of access, explains which facts would open the 12 and 72 hour clocks in Sydney time, and does not submit anything."
+  },
+  {
+    "skill": "pspf-risk-assessment",
+    "prompt": "Do a PSPF threat and risk assessment of APP-DEMO-07 in examples/assets.csv and draft its security risk management plan. Our risk tolerance is medium.",
+    "keys": "none",
+    "good_answer": "Asks for the entity's risk matrix, who set the tolerance and the risk steward, and marks what is not supplied as missing. Looks up Log4j in KEV and the ISM patching control, rates the risk on the labelled default matrix as a proposal for the steward, lists treatments as Proposal: lines with owners and due dates, gives the PSPF review dates, and says it is not an IRAP assessment and was not sent."
   }
 ]

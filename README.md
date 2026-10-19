@@ -20,6 +20,7 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 - **Hunt with Sigma and KQL** for Microsoft Sentinel and Defender, with offline query checks.
 - **Walk through an OAIC Notifiable Data Breach assessment** and draft the statement. A person submits it.
 - **Decide SOCI Act reportability** and compute the 12 and 72 hour deadlines in Sydney time.
+- **Run PSPF threat and risk assessments and draft security risk management plans** (SRMPs) for an entity, a system, the internet-facing estate (Technology Security Risk Management Plan), a facility or a project. Threats come from the intel connectors with sources, ratings come from your risk matrix (or a labelled default), and the plan is checked against the PSPF Release 2026 security plan elements, risk tolerance, risk stewards and review dates. Acceptance and approval stay with the Accountable Authority or Authorising Officer.
 - **Write executive and board briefings** in plain Australian English.
 - **Run routines**: hourly feed ingest, a 07:30 Sydney briefing, a KEV watch against your assets, and a weekly executive summary. All arrive paused so you choose what runs.
 
@@ -28,7 +29,7 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 | Piece | Where | What it is |
 |---|---|---|
 | Profile distribution | `distribution.yaml`, `SOUL.md`, `config.yaml` | Installed with `hermes profile install`, updated with `hermes profile update` |
-| Skills | `skills/<name>/SKILL.md` | Triage, enrichment, essentials, ISM lookup, vulnerability priority, ACSC digest, phishing, hunting, NDB, SOCI, executive briefing, daily briefing, and AU org exposure |
+| Skills | `skills/<name>/SKILL.md` | Triage, enrichment, essentials, ISM lookup, vulnerability priority, ACSC digest, phishing, hunting, NDB, SOCI, PSPF risk assessment and SRMP, executive briefing, daily briefing, and AU org exposure |
 | Connectors | `mcp/<source>/` | Read-only stdio MCP servers on a shared HTTP client with an egress allowlist, caching and rate limiting |
 | Plugin | `plugins/cyber-au/` | Intel store tools, audit log hooks, untrusted-content guards, `cyber-au doctor`, update, and migrate |
 | Intel store | `plugin-data/cyber-au/intel.sqlite` | SQLite with canonical dedupe, retention, and STIX 2.1 export |
@@ -66,8 +67,9 @@ No keys needed. Run the chat from the root of your checkout so the `examples/` p
 - Which ISM controls cover multi-factor authentication for privileged users? Cite the ISM release.
 - What does Essential Eight Maturity Level 2 require for patching applications?
 - Using examples/incident-timeline.md, could this be an eligible data breach under the NDB scheme, and when does the 30 day assessment window end?
+- Do a PSPF threat and risk assessment of APP-DEMO-07 in examples/assets.csv and draft its security risk management plan. Our risk tolerance is medium.
 
-Ten prompts, the skill each one uses and what a good answer looks like are in [docs/getting-started/first-hour.md](docs/getting-started/first-hour.md).
+Eleven prompts, the skill each one uses and what a good answer looks like are in [docs/getting-started/first-hour.md](docs/getting-started/first-hour.md).
 
 ## Connectors
 

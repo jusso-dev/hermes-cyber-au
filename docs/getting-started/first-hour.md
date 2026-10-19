@@ -1,6 +1,6 @@
 # Your first hour
 
-Ten prompts that show what the cyber-au profile is good at. None of them needs a key. Each one names the skill it should load and what a good answer looks like.
+Eleven prompts that show what the cyber-au profile is good at. None of them needs a key. Each one names the skill it should load and what a good answer looks like.
 
 Start a chat with `hermes -p cyber-au chat` (or `cyber-au chat`) from the root of your checkout, so the `examples/` paths resolve. If you installed without a checkout, the same files are in `~/.hermes/profiles/cyber-au/examples/`. Use that path in the prompt instead.
 
@@ -28,6 +28,7 @@ It triages `examples/edr-alert.json` against a synthetic demo intel set and labe
 | 8 | `daily-briefing` | Write this morning's briefing from public sources only. | A short briefing in Sydney time from ASD's ACSC, AusCERT and new KEV entries, each item with a source line. Sources that could not be reached are listed as missing. |
 | 9 | `ndb-breach-notification` | Using examples/incident-timeline.md, could this be an eligible data breach under the NDB scheme, and when does the 30 day assessment window end? | Says personal information (bank details) may have been accessed, that serious harm has not been ruled out, works out the 30 calendar day assessment window from the awareness time in Sydney time, and says it is not legal advice and that a person decides and submits. |
 | 10 | `soci-reporting` | Using examples/incident-timeline.md and examples/assets.csv, does this incident trigger a SOCI Act report? | Notes that the SOCI asset SCADA-DEMO-03 shows no sign of access, explains which facts would open the 12 and 72 hour clocks in Sydney time, and does not submit anything. |
+| 11 | `pspf-risk-assessment` | Do a PSPF threat and risk assessment of APP-DEMO-07 in examples/assets.csv and draft its security risk management plan. Our risk tolerance is medium. | Asks for the entity's risk matrix, who set the tolerance and the risk steward, and marks what is not supplied as missing. Looks up Log4j in KEV and the ISM patching control, rates the risk on the labelled default matrix as a proposal for the steward, lists treatments as `Proposal:` lines with owners and due dates, gives the PSPF review dates, and says it is not an IRAP assessment and was not sent. |
 
 `hermes -p cyber-au cyber-au demo prompts` prints the same list.
 

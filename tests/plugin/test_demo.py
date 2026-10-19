@@ -262,7 +262,7 @@ def test_plugin_cli_has_demo_command():
 
 def test_prompts_name_real_skills_and_match_the_docs():
     prompts = demo.load_prompts()
-    assert len(prompts) == 10
+    assert len(prompts) == 11
     docs = FIRST_HOUR.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
     in_readme = 0
