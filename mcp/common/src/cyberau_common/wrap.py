@@ -253,11 +253,14 @@ async def _mcp_fetch(
     url: str, headers: dict[str, str], groups: list[dict], timeout: float
 ) -> tuple[list[str], dict]:
     """List upstream tools and make one cheap call per probe group over streamable HTTP."""
+    import httpx2
     from mcp import ClientSession
-    from mcp.client.streamable_http import streamablehttp_client
+    from mcp.client.streamable_http import streamable_http_client
+    from mcp.shared._httpx_utils import create_mcp_http_client
 
     payloads: dict = {}
-    async with streamablehttp_client(url, headers=headers, timeout=timeout) as (read, write, _):
+    client = create_mcp_http_client(headers=headers, timeout=httpx2.Timeout(timeout))
+    async with client, streamable_http_client(url, http_client=client) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             listed = await session.list_tools()

@@ -137,11 +137,11 @@ def test_convert_targets_and_unsupported_modifier():
 
 def test_schema_and_live_health(tmp_path, monkeypatch):
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["sigma_get"].annotations.readOnlyHint is True
-    assert tools["sigma_get"].annotations.openWorldHint is True
-    assert tools["sigma_get"].inputSchema["required"] == ["rule_id"]
-    assert "kusto" in json.dumps(tools["sigma_convert"].inputSchema)
-    assert "critical" in json.dumps(tools["sigma_search"].inputSchema)
+    assert tools["sigma_get"].annotations.read_only_hint is True
+    assert tools["sigma_get"].annotations.open_world_hint is True
+    assert tools["sigma_get"].input_schema["required"] == ["rule_id"]
+    assert "kusto" in json.dumps(tools["sigma_convert"].input_schema)
+    assert "critical" in json.dumps(tools["sigma_search"].input_schema)
     for name in ("sigma_search", "sigma_get", "sigma_convert"):
         jsonschema.Draft202012Validator.check_schema(
             json.loads((SCHEMA / f"{name}.input.json").read_text(encoding="utf-8"))

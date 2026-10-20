@@ -226,11 +226,11 @@ def schema_drift_message() -> str:
 def test_input_schemas_match_the_tools():
     listed = asyncio.run(build_server(source.connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
-    assert tools["ncscnz_list_alerts"].annotations.readOnlyHint is True
-    assert tools["ncscnz_get_alert"].annotations.openWorldHint is True
-    encoded = json.dumps(tools["ncscnz_list_alerts"].inputSchema)
+    assert tools["ncscnz_list_alerts"].annotations.read_only_hint is True
+    assert tools["ncscnz_get_alert"].annotations.open_world_hint is True
+    encoded = json.dumps(tools["ncscnz_list_alerts"].input_schema)
     assert "maximum" in encoded
-    assert tools["ncscnz_get_alert"].inputSchema["required"] == ["url"]
+    assert tools["ncscnz_get_alert"].input_schema["required"] == ["url"]
     list_schema = _schema("ncscnz_list_alerts.input.json")
     get_schema = _schema("ncscnz_get_alert.input.json")
     jsonschema.Draft202012Validator.check_schema(list_schema)

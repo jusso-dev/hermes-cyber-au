@@ -358,11 +358,11 @@ def test_live_health_and_tool_annotations():
     for name in ("upguard_identity_breaches", "upguard_data_leaks", "upguard_typosquats"):
         file_schema = json.loads((SCHEMA / f"{name}.input.json").read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator.check_schema(file_schema)
-        generated = tools[name].inputSchema
+        generated = tools[name].input_schema
         for prop in file_schema["properties"]:
             assert prop in generated["properties"]
-        assert tools[name].annotations.readOnlyHint is True
-        assert tools[name].annotations.openWorldHint is True
+        assert tools[name].annotations.read_only_hint is True
+        assert tools[name].annotations.open_world_hint is True
         assert len(f"mcp__upguard__{name}") <= 64
     assert "Commercial licence" in tools["upguard_typosquats"].description
 

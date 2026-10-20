@@ -78,14 +78,14 @@ def test_bad_payloads_warn():
 
 def test_advertised_schema_and_drift_probe():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    scores = tools["epss_scores"].inputSchema
+    scores = tools["epss_scores"].input_schema
     encoded = json.dumps(scores)
     assert scores["required"] == ["cve_ids"]
     assert "CVE-" in encoded
     assert "minItems" in encoded
-    history = tools["epss_history"].inputSchema
+    history = tools["epss_history"].input_schema
     assert history["required"] == ["cve_id"]
-    assert "maximum" in json.dumps(tools["epss_top"].inputSchema)
+    assert "maximum" in json.dumps(tools["epss_top"].input_schema)
     os.environ["CYBERAU_EPSS_SNAPSHOT"] = str(FIXTURES / "epss_drift.json")
     probe = connector().health(live=False, check_schema=True)
     assert probe.ok is False

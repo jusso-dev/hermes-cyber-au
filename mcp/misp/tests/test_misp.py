@@ -102,7 +102,7 @@ def test_schema_drift_probe_and_advertised_inputs():
     for name in READ_TOOLS:
         schema = json.loads((MCP / "misp" / "schema" / f"{name}.input.json").read_text())
         jsonschema.Draft202012Validator.check_schema(schema)
-        assert tools[name].annotations.readOnlyHint is True
+        assert tools[name].annotations.read_only_hint is True
     assert search_events(days=0)["warnings"]
     assert get_event("not an id")["warnings"]
     missing = get_event("missing")
