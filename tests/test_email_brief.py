@@ -184,7 +184,10 @@ def _profile(tmp_path: Path, hermes: str | None) -> tuple[Path, dict]:
     shutil.copy(ROOT / "skills/daily-briefing/references/email-prompt.txt", skill / "references")
     venv = profile / "mcp" / ".venv" / "bin"
     venv.mkdir(parents=True)
-    (venv / "python").symlink_to(sys.executable)
+    # A wrapper, not a symlink: a symlinked interpreter loses its virtualenv packages.
+    wrapper = venv / "python"
+    wrapper.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n', encoding="utf-8")
+    wrapper.chmod(0o755)
     cli = venv / "cyberau-mcp"
     cli.write_text("#!/bin/sh\nprintf '%s' '" + json.dumps(HITS) + "'\n", encoding="utf-8")
     cli.chmod(0o755)
