@@ -5,7 +5,7 @@
       "chapter": "enterprise-it",
       "url": "https://www.cyber.gov.au/publication/essentials-for-enterprise-it",
       "published": "",
-      "source_sha256": "23b62043626e61074c2d1e5ee1ec4682d6f433dd380dafd9a2004bfc3ee33102",
+      "source_sha256": "32d5aa42153b72960f88f895e933c33cd9d196a6ec1e69630f2f300e7ed2f9e0",
       "domains": [
         {
           "name": "Governance and culture",
@@ -895,7 +895,7 @@
       "chapter": "cloud",
       "url": "https://www.cyber.gov.au/publication/essentials-for-cloud",
       "published": "",
-      "source_sha256": "eaeef09fce916048540b94765e53b5a637ae895cbd83d50e77a272dcfd17f16d",
+      "source_sha256": "70442322000216fb478cfa2851a0091dadde56e1e3a44dc57f33249771ce0f50",
       "domains": [
         {
           "name": "Governance and culture",
@@ -2206,7 +2206,7 @@
       "chapter": "ot",
       "url": "https://www.cyber.gov.au/publication/essentials-for-ot",
       "published": "",
-      "source_sha256": "1e7a67440d632cd771923e7f7012bb6d8c10b39e254095947982a1a96f8708f8",
+      "source_sha256": "33284d7a0fd73028d4cdc02da4d771d24bc47b25f59f895e2999cf0e9755b0c7",
       "domains": [
         {
           "name": "Governance and culture",
@@ -3052,7 +3052,7 @@
   },
   "transition": {
     "url": "https://www.cyber.gov.au/publication/transitioning-from-the-essential-eight",
-    "source_sha256": "a52916d3eed8e3355d43a59f09155bc74c3f80a64d54445dde563785931d609a",
+    "source_sha256": "7d16f50dc10e62aaf465c9b895ce5b752501dad25607c0a33b8fd4488b4462dc",
     "strategies": {
       "application_control": {
         "label": "Application control",
@@ -3330,7 +3330,7 @@
     }
   },
   "launch_url": "https://www.asd.gov.au/news/2026-10-15-asd-essentials-evolving-our-approach-cyber-security-resilience",
-  "launch_sha256": "7b068ac3b46c74ad8a60a769479e6ff143f1da1946d824c2a13428b34f272fd0",
+  "launch_sha256": "68f80e99841065472b8614bb4f4c3a7b4434771d84efa1bdfa08b014637fc385",
   "launch_warning": "",
   "ot_url": "https://www.cyber.gov.au/publication/essentials-for-ot",
   "transition_url_confirmed": "https://www.cyber.gov.au/publication/transitioning-from-the-essential-eight"
