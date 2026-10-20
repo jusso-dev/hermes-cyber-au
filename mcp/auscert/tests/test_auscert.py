@@ -124,13 +124,13 @@ def test_bad_arguments_warn():
 
 def test_advertised_schema_matches_the_ticket():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    advertised = tools["auscert_bulletins"].inputSchema
+    advertised = tools["auscert_bulletins"].input_schema
     assert "required" not in advertised or advertised["required"] == []
     assert advertised["properties"]["limit"]["maximum"] == 100
     assert advertised["properties"]["limit"]["default"] == 20
     assert "pattern" in json.dumps(advertised["properties"]["since"])
-    assert tools["auscert_bulletins"].annotations.readOnlyHint is True
-    assert tools["auscert_bulletins"].annotations.openWorldHint is True
+    assert tools["auscert_bulletins"].annotations.read_only_hint is True
+    assert tools["auscert_bulletins"].annotations.open_world_hint is True
 
 
 def test_empty_feed(monkeypatch):

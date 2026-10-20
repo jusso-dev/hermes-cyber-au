@@ -142,13 +142,13 @@ def test_argument_warnings_and_advertised_schema():
     assert otx_pulses(modified_since="2026-13-01")["warnings"]
     listed = asyncio.run(build_server(connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
-    assert tools["otx_indicator"].annotations.readOnlyHint is True
-    assert tools["otx_indicator"].annotations.openWorldHint is True
+    assert tools["otx_indicator"].annotations.read_only_hint is True
+    assert tools["otx_indicator"].annotations.open_world_hint is True
     assert len("mcp__otx__otx_indicator") == 23
     assert len("mcp__otx__otx_pulses") == 20
-    encoded = json.dumps(tools["otx_indicator"].inputSchema)
+    encoded = json.dumps(tools["otx_indicator"].input_schema)
     assert "IPv6" in encoded
-    assert "maximum" in json.dumps(tools["otx_pulses"].inputSchema)
+    assert "maximum" in json.dumps(tools["otx_pulses"].input_schema)
     assert connector().health(live=False).detail == "offline ok"
 
 

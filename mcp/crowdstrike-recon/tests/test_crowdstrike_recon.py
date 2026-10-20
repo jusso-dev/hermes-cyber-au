@@ -478,8 +478,8 @@ def test_docs_fixtures_and_tool_contract():
         assert "hunter2" not in text
     listed = __import__("asyncio").run(build_server(connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
-    assert tools["cs_recon_notifications"].annotations.readOnlyHint is True
-    assert tools["cs_recon_notifications"].annotations.openWorldHint is True
+    assert tools["cs_recon_notifications"].annotations.read_only_hint is True
+    assert tools["cs_recon_notifications"].annotations.open_world_hint is True
     assert len("mcp__csrecon__cs_recon_notifications") == 36
     assert len("mcp__csrecon__cs_recon_rules") == 28
     missing = connector().health(live=False)

@@ -730,6 +730,10 @@ def _payload(result: object) -> dict:
         loaded = json.loads(text)
         if isinstance(loaded, dict):
             return loaded
+    # mcp 2 returns a CallToolResult whose content holds the text blocks.
+    content = getattr(result, "content", None)
+    if isinstance(content, list) and content:
+        return _payload(content)
     raise ValueError(f"cannot read tool result {type(result).__name__}")
 
 

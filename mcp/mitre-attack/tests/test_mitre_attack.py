@@ -196,8 +196,8 @@ def test_input_schemas_match_the_tools():
     for name, tool in tools.items():
         schema = json.loads((SCHEMA / f"{name}.input.json").read_text("utf-8"))
         jsonschema.Draft202012Validator.check_schema(schema)
-        assert tool.annotations.readOnlyHint is True and tool.annotations.openWorldHint is True
-        assert tool.inputSchema["required"] == schema["required"]
+        assert tool.annotations.read_only_hint is True and tool.annotations.open_world_hint is True
+        assert tool.input_schema["required"] == schema["required"]
         assert len(f"mcp__attack__{name}") <= 64
     technique = json.loads((SCHEMA / "attack_technique.input.json").read_text("utf-8"))
     validator = jsonschema.Draft202012Validator(technique)
@@ -205,10 +205,10 @@ def test_input_schemas_match_the_tools():
     assert not validator.is_valid({"technique_id": "1059"})
     assert not validator.is_valid({"technique_id": "T1059", "extra": 1})
     assert (
-        tools["attack_technique"].inputSchema["properties"]["technique_id"]["pattern"]
+        tools["attack_technique"].input_schema["properties"]["technique_id"]["pattern"]
         == (technique["properties"]["technique_id"]["pattern"])
     )
-    assert "ics" in json.dumps(tools["attack_search"].inputSchema)
+    assert "ics" in json.dumps(tools["attack_search"].input_schema)
 
 
 def test_live_fetch_stores_version_and_downloads_only_when_it_changes(monkeypatch, tmp_path):

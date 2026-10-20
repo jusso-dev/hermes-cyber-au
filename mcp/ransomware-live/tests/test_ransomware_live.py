@@ -153,13 +153,13 @@ def test_advertised_schema_and_terms():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     victims = tools["ransom_au_victims"]
     match = tools["ransom_watchlist_match"]
-    assert victims.annotations.readOnlyHint is True
-    assert victims.annotations.openWorldHint is True
-    assert match.annotations.readOnlyHint is True
-    encoded = json.dumps(victims.inputSchema)
+    assert victims.annotations.read_only_hint is True
+    assert victims.annotations.open_world_hint is True
+    assert match.annotations.read_only_hint is True
+    encoded = json.dumps(victims.input_schema)
     assert "since" in encoded
     assert "500" in encoded
-    assert "90" in json.dumps(match.inputSchema)
+    assert "90" in json.dumps(match.input_schema)
     docs = (ROOT / "docs/connectors/ransomware-live.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert DOCTOR_NOTE in docs

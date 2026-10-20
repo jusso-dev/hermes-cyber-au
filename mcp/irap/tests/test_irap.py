@@ -209,9 +209,9 @@ def test_bidi_text_is_wrapped(tmp_path, monkeypatch):
 
 def test_schema_and_live_health(tmp_path, monkeypatch):
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["irap_search_guidance"].inputSchema["required"] == ["query"]
-    assert "minLength" in json.dumps(tools["irap_search_guidance"].inputSchema)
-    assert tools["irap_consumer_checklist"].annotations.readOnlyHint is True
+    assert tools["irap_search_guidance"].input_schema["required"] == ["query"]
+    assert "minLength" in json.dumps(tools["irap_search_guidance"].input_schema)
+    assert tools["irap_consumer_checklist"].annotations.read_only_hint is True
     probe = connector().health(live=False, check_schema=True)
     assert probe.ok is True
     monkeypatch.setenv("CYBERAU_IRAP_SNAPSHOT", str(FIXTURES / "drift"))

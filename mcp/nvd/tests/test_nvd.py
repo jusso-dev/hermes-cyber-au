@@ -68,7 +68,7 @@ def test_search_filters_and_schema():
     assert nvd_search(limit=0)["warnings"]
     listed = asyncio.run(build_server(connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
-    encoded = json.dumps(tools["nvd_search"].inputSchema)
+    encoded = json.dumps(tools["nvd_search"].input_schema)
     assert "CRITICAL" in encoded
     assert "maximum" in encoded
     probe = connector().health(live=False, check_schema=True)

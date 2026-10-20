@@ -350,14 +350,14 @@ def test_fixtures_are_synthetic_and_have_no_secrets():
 
 def test_advertised_schema_is_read_only():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    encoded = json.dumps(tools["taxii_get_objects"].inputSchema)
+    encoded = json.dumps(tools["taxii_get_objects"].input_schema)
     assert "1000" in encoded
-    assert tools["taxii_lookup_indicator"].inputSchema["required"] == ["value"]
-    lookup = json.dumps(tools["taxii_lookup_indicator"].inputSchema)
+    assert tools["taxii_lookup_indicator"].input_schema["required"] == ["value"]
+    lookup = json.dumps(tools["taxii_lookup_indicator"].input_schema)
     assert "minLength" in lookup or "min_length" in lookup
     for tool in tools.values():
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.openWorldHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.open_world_hint is True
 
 
 def test_live_paging_discovery_auth_and_limits(tmp_path, monkeypatch):

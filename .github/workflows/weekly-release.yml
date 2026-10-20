@@ -53,7 +53,7 @@ jobs:
           sha256sum dist/* > dist/SHA256SUMS
       # Attest the tarball, SBOM, notes and checksums this job has written.
       - name: Attest release files
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         if: steps.changes.outputs.skip != 'true'
         with:
           subject-path: dist/*
@@ -78,7 +78,7 @@ jobs:
       # Attest the image only after the push returns its registry digest.
       - name: Attest image
         if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true && hashFiles('docker/Dockerfile') != ''
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.image.outputs.digest }}

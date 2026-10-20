@@ -73,8 +73,8 @@ def test_noise_riot_and_schemas(tmp_path, monkeypatch):
 
     listed = asyncio.run(build_server(connector()).list_tools())
     tool = {item.name: item for item in listed}["greynoise_ip"]
-    assert tool.annotations.readOnlyHint is True
-    assert tool.annotations.openWorldHint is True
+    assert tool.annotations.read_only_hint is True
+    assert tool.annotations.open_world_hint is True
     assert len("mcp__greynoise__greynoise_ip") == 28
     incoming = _schema("greynoise_ip.input.json")
     jsonschema.Draft202012Validator.check_schema(incoming)

@@ -281,9 +281,9 @@ def test_403_with_cache_is_not_an_empty_list(tmp_path, monkeypatch):
 
 def test_advertised_schema_and_live_health(tmp_path, monkeypatch):
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["scamwatch_list_alerts"].inputSchema["properties"]["limit"]["maximum"] == 50
-    url_schema = tools["scamwatch_get_alert"].inputSchema["properties"]["url"]
-    assert tools["scamwatch_get_alert"].inputSchema["required"] == ["url"]
+    assert tools["scamwatch_list_alerts"].input_schema["properties"]["limit"]["maximum"] == 50
+    url_schema = tools["scamwatch_get_alert"].input_schema["properties"]["url"]
+    assert tools["scamwatch_get_alert"].input_schema["required"] == ["url"]
     assert url_schema["pattern"] == r"^https://www\.scamwatch\.gov\.au/"
     _live(monkeypatch, tmp_path)
     body = (FIXTURES / "homepage_three_alerts.html").read_bytes()
