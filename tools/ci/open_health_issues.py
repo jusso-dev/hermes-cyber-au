@@ -239,6 +239,7 @@ class GhCli:
     def create(self, title: str, body: str, labels: list[str]) -> int:
         args = ["issue", "create", "--title", title, "--body", body]
         for label in labels:
+            self._ensure_label(label)
             args.extend(["--label", label])
         match = re.search(r"/issues/(\d+)$", self._run(args).strip())
         if not match:
@@ -257,6 +258,14 @@ class GhCli:
         self._run(["issue", "reopen", str(number)])
         self._run(["issue", "comment", str(number), "--body", body])
         self._run(["issue", "edit", str(number), "--body", body])
+
+    def _ensure_label(self, label: str) -> None:
+        """Create a missing label. An existing label keeps its colour and description."""
+        try:
+            self._run(["label", "create", label])
+        except RuntimeError as exc:
+            if "already exists" not in str(exc):
+                raise
 
     def _run(self, args: list[str]) -> str:
         proc = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
