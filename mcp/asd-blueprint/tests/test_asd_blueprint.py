@@ -180,11 +180,11 @@ def test_parser_skips_header_and_keeps_link_text():
 
 def test_advertised_schema_and_model_name():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    encoded = json.dumps(tools["blueprint_search"].inputSchema)
+    encoded = json.dumps(tools["blueprint_search"].input_schema)
     assert "minLength" in encoded
     model_name = "mcp__blueprint__blueprint_search"
     assert len(model_name) == 32
-    assert tools["blueprint_search"].annotations.readOnlyHint is True
+    assert tools["blueprint_search"].annotations.read_only_hint is True
 
 
 def test_offline_index_is_stale_and_fresh_index_is_a_hit(tmp_path, monkeypatch):

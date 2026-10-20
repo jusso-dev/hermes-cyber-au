@@ -397,8 +397,8 @@ def test_tools_and_registration():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     assert set(tools) == {"gti_dtm_alerts", "gti_dtm_monitors"}
     for name, tool in tools.items():
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.openWorldHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.open_world_hint is True
         schema = json.loads((ROOT / "mcp/google-ti-dtm/schema" / f"{name}.input.json").read_text())
         jsonschema.Draft202012Validator.check_schema(schema)
         length = len(f"mcp__gtidtm__{name}")

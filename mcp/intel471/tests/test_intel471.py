@@ -325,8 +325,8 @@ def test_tools_are_read_only_and_docs_are_linked():
     assert ".delete(" not in text
     assert 'markAsRead": "false"' in text
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["intel471_watcher_alerts"].annotations.readOnlyHint is True
-    assert tools["intel471_breach_alerts"].annotations.openWorldHint is True
+    assert tools["intel471_watcher_alerts"].annotations.read_only_hint is True
+    assert tools["intel471_breach_alerts"].annotations.open_world_hint is True
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "[docs/connectors/intel471.md](docs/connectors/intel471.md)" in readme
     docs = (ROOT / "docs" / "connectors" / "intel471.md").read_text(encoding="utf-8")

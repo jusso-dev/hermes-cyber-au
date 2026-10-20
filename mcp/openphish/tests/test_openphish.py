@@ -419,8 +419,8 @@ def test_invalid_url_does_not_fetch():
 def test_advertised_tool_is_read_only():
     tools = asyncio.run(build_server(connector()).list_tools())
     assert tools[0].name == "phish_check_url"
-    assert tools[0].annotations.readOnlyHint is True
-    assert tools[0].annotations.openWorldHint is True
+    assert tools[0].annotations.read_only_hint is True
+    assert tools[0].annotations.open_world_hint is True
     assert connector().server_name == "phish"
     assert len("mcp__phish__phish_check_url") == 27
 

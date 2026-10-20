@@ -121,8 +121,8 @@ def test_happy_path_and_schemas(tmp_path, monkeypatch):
     )
     jsonschema.validate({"query": "apt", "types": ["Malware"]}, input_schema)
     listed = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert listed["opencti_search_entities"].annotations.readOnlyHint is True
-    assert listed["opencti_search_entities"].annotations.openWorldHint is True
+    assert listed["opencti_search_entities"].annotations.read_only_hint is True
+    assert listed["opencti_search_entities"].annotations.open_world_hint is True
 
 
 def test_indicator_context_wraps_free_text(tmp_path, monkeypatch):

@@ -864,8 +864,8 @@ class TestServer:
         )
         server = build_server(connector)
         tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
-        assert tools["demo_read"].annotations.readOnlyHint is True
-        assert tools["demo_write"].annotations.readOnlyHint is False
+        assert tools["demo_read"].annotations.read_only_hint is True
+        assert tools["demo_write"].annotations.read_only_hint is False
 
     def test_stdio_lists_tools_quickly(self):
         from mcp import ClientSession
@@ -896,7 +896,7 @@ class TestServer:
         elapsed, listed = asyncio.run(run())
         assert elapsed < 1.5
         assert listed.tools[0].name == "stub_ping"
-        assert listed.tools[0].annotations.readOnlyHint is True
+        assert listed.tools[0].annotations.read_only_hint is True
 
     def test_wrapper_returns_errors_as_envelopes(self):
         def boom() -> dict:
