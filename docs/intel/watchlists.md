@@ -117,7 +117,7 @@ Terms use the brand and vendor token rule above, so they match whole words in or
 
 ### The microsoft-security pack
 
-Feeds: the MSRC Security Update Guide (cloud and security product entries only), the Microsoft Security blog, Azure updates (Security, Retirements and Compliance categories), the Microsoft 365 roadmap (security products only), and the Microsoft Sentinel, Defender XDR, Defender for Endpoint and Defender for Cloud blogs. Its watch, "Microsoft security changes", flags items about Sentinel, Defender, Entra, Azure, Intune, Purview, Conditional Access, Key Vault and Microsoft 365 from the last two days.
+Feeds: the MSRC Security Update Guide (cloud and security product entries only), the Microsoft Security blog, Azure updates (Security, Retirements and Compliance categories), the Microsoft 365 roadmap (security products only), and the Microsoft Sentinel, Defender XDR, Defender for Endpoint and Defender for Cloud blogs. Its watch, "Microsoft security changes", flags items about Sentinel, Defender, Entra, Azure, Intune, Purview, Conditional Access and Key Vault from the last two days.
 
 To write your own pack, copy that file, change the feeds and watch, and save it under a new name in `mcp/custom-feeds/packs/`. A pack's hosts must be in the `custom-feeds` entry of the egress allowlist. A feed in your own `watchlists.yaml` brings its host at run time instead.
 
