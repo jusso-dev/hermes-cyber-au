@@ -109,7 +109,7 @@ def test_tool_list_is_frozen_and_read_only():
     assert frozen == list(PUBLIC_TOOLS + GATED_TOOLS)
     listed = asyncio.run(build_server(connector()).list_tools())
     assert [tool.name for tool in listed] == frozen
-    assert all(tool.annotations.readOnlyHint for tool in listed)
+    assert all(tool.annotations.read_only_hint for tool in listed)
     servers = yaml.safe_load((PACKAGE.parent / "servers.yaml").read_text(encoding="utf-8"))
     wrap = servers["servers"]["hibp"]["wrap"]
     assert wrap["upstream"] == MCP_URL

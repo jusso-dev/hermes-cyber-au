@@ -116,10 +116,10 @@ def test_empty_malformed_and_unknown_query():
 
 def test_schema_drift_fails_health():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["pspf_search"].inputSchema["required"] == ["query"]
-    assert tools["pspf_search"].annotations.readOnlyHint is True
-    assert "minLength" in json.dumps(tools["pspf_search"].inputSchema)
-    assert tools["pspf_list_directions"].inputSchema["properties"] == {}
+    assert tools["pspf_search"].input_schema["required"] == ["query"]
+    assert tools["pspf_search"].annotations.read_only_hint is True
+    assert "minLength" in json.dumps(tools["pspf_search"].input_schema)
+    assert tools["pspf_list_directions"].input_schema["properties"] == {}
     assert connector().health(live=False, check_schema=True).ok is True
 
     os.environ["CYBERAU_PSPF_SNAPSHOT"] = str(FIXTURES / "drift.json")

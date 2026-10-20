@@ -153,11 +153,11 @@ def test_fallback_ladder_names_the_feed(tmp_path, monkeypatch):
 
 def test_schema_and_live_health(tmp_path, monkeypatch):
     listed = asyncio_tools()
-    encoded = json.dumps(listed["asd_list_items"].inputSchema)
+    encoded = json.dumps(listed["asd_list_items"].input_schema)
     assert "alerts" in encoded
     assert "maximum" in encoded
-    assert listed["asd_get_item"].inputSchema["required"] == ["url"]
-    assert listed["asd_search"].inputSchema["required"] == ["query"]
+    assert listed["asd_get_item"].input_schema["required"] == ["url"]
+    assert listed["asd_search"].input_schema["required"] == ["query"]
     probe = connector().health(live=False, check_schema=True)
     monkeypatch.setenv("CYBERAU_ASD_SNAPSHOT", str(FIXTURES / "drift"))
     failed = connector().health(live=False, check_schema=True)

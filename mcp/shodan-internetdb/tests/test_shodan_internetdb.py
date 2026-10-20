@@ -107,9 +107,9 @@ def test_tags_are_untrusted_text(tmp_path, monkeypatch):
 def test_advertised_schema_and_drift_probe(monkeypatch):
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     tool = tools["internetdb_ip"]
-    assert tool.inputSchema["required"] == ["ip"]
-    assert tool.annotations.readOnlyHint is True
-    assert tool.annotations.openWorldHint is True
+    assert tool.input_schema["required"] == ["ip"]
+    assert tool.annotations.read_only_hint is True
+    assert tool.annotations.open_world_hint is True
     assert len("mcp__internetdb__internetdb_ip") == 30
     assert connector().health(live=False, check_schema=True).ok is True
     monkeypatch.setenv("CYBERAU_INTERNETDB_SNAPSHOT", str(FIXTURES / "ip_drift.json"))

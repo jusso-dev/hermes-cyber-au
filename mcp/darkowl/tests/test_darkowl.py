@@ -466,8 +466,8 @@ def test_fresh_install_stays_off_and_update_keeps_enabled():
 def test_tool_annotations_and_schemas():
     listed = asyncio.run(build_server(connector()).list_tools())
     tool = {item.name: item for item in listed}["darkowl_search_watchlist"]
-    assert tool.annotations.readOnlyHint is True
-    assert tool.annotations.openWorldHint is True
+    assert tool.annotations.read_only_hint is True
+    assert tool.annotations.open_world_hint is True
     assert len(f"mcp__darkowl__{tool.name}") == 38
     schema = json.loads(
         (

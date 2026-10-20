@@ -683,18 +683,18 @@ def test_tools_match_the_stored_input_schemas():
     assert set(tools) == {"abusech_lookup", "threatfox_recent", "feodo_blocklist"}
     for name, tool in tools.items():
         stored = json.loads((PACKAGE / "schema" / f"{name}.input.json").read_text())
-        served = tool.inputSchema
+        served = tool.input_schema
         assert set(served["properties"]) == set(stored["properties"]), name
         assert set(served.get("required", [])) == set(stored["required"]), name
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.openWorldHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.open_world_hint is True
         assert len(f"mcp__abusech__{name}") <= 64
-    days = tools["threatfox_recent"].inputSchema["properties"]["days"]
+    days = tools["threatfox_recent"].input_schema["properties"]["days"]
     assert (days["minimum"], days["maximum"], days["default"]) == (1, 7, 1)
-    limit = tools["threatfox_recent"].inputSchema["properties"]["limit"]
+    limit = tools["threatfox_recent"].input_schema["properties"]["limit"]
     assert (limit["minimum"], limit["maximum"], limit["default"]) == (1, 1000, 100)
-    assert "enum" in json.dumps(tools["abusech_lookup"].inputSchema)
-    assert '"pattern": "^[A-Z]{2}$"' in json.dumps(tools["feodo_blocklist"].inputSchema)
+    assert "enum" in json.dumps(tools["abusech_lookup"].input_schema)
+    assert '"pattern": "^[A-Z]{2}$"' in json.dumps(tools["feodo_blocklist"].input_schema)
 
 
 def test_ships_off_by_default_with_the_terms_documented():

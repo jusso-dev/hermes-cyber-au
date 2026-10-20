@@ -288,8 +288,8 @@ def test_live_health_and_response_schemas(monkeypatch):
     jsonschema.validate(asn["data"][0], asn_schema)
     jsonschema.validate(status["data"][0], status_schema)
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["drop_check_ip"].annotations.readOnlyHint is True
-    assert tools["drop_check_ip"].annotations.openWorldHint is True
+    assert tools["drop_check_ip"].annotations.read_only_hint is True
+    assert tools["drop_check_ip"].annotations.open_world_hint is True
     assert set(tools) == {"drop_check_ip", "drop_check_asn", "drop_list_status"}
     _online(monkeypatch)
     _serve()

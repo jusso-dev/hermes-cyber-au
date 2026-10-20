@@ -64,8 +64,8 @@ def test_happy_path_normalises_and_stores(tmp_path, monkeypatch):
 
     listed = asyncio.run(build_server(connector()).list_tools())
     tool = {item.name: item for item in listed}["phishtank_check_url"]
-    assert tool.annotations.readOnlyHint is True
-    assert tool.annotations.openWorldHint is True
+    assert tool.annotations.read_only_hint is True
+    assert tool.annotations.open_world_hint is True
     advertised = json.loads((SCHEMA / "phishtank_check_url.input.json").read_text())
     assert advertised["properties"]["url"]["format"] == "uri"
     assert advertised["required"] == ["url"]

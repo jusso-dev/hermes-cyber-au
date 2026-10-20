@@ -246,9 +246,9 @@ def test_tool_schemas_match_the_ticket():
     import asyncio
 
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["e8_requirements"].inputSchema["required"] == ["strategy", "maturity_level"]
-    assert "patch_applications" in json.dumps(tools["e8_requirements"].inputSchema)
-    assert tools["essentials_chapter"].annotations.readOnlyHint is True
+    assert tools["e8_requirements"].input_schema["required"] == ["strategy", "maturity_level"]
+    assert "patch_applications" in json.dumps(tools["e8_requirements"].input_schema)
+    assert tools["essentials_chapter"].annotations.read_only_hint is True
     assert len("mcp__e8__essentials_transition") == 30
 
 

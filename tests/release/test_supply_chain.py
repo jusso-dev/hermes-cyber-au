@@ -214,7 +214,7 @@ def test_docs_recommend_install_ref_over_main():
 
 def test_release_workflow_attests_files_and_image():
     text = (ROOT / ".github" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
-    pinned = "actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2"
+    pinned = "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2"
     assert text.count(pinned) == 2
     assert "subject-path: dist/*" in text
     assert "subject-digest:" in text

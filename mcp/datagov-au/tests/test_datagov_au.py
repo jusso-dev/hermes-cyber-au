@@ -153,12 +153,12 @@ def test_notspecified_licence_is_flagged(tmp_path, monkeypatch):
 def test_advertised_schema_and_drift(monkeypatch):
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     search = tools["datagov_search"]
-    assert search.annotations.readOnlyHint is True
-    assert search.annotations.openWorldHint is True
-    encoded = json.dumps(search.inputSchema)
+    assert search.annotations.read_only_hint is True
+    assert search.annotations.open_world_hint is True
+    encoded = json.dumps(search.input_schema)
     assert "minLength" in encoded
     assert "maximum" in encoded
-    assert tools["datagov_get_package"].inputSchema["required"] == ["id"]
+    assert tools["datagov_get_package"].input_schema["required"] == ["id"]
     assert _schema("datagov_search.input.json")["required"] == ["query"]
     assert _schema("datagov_search.input.json")["properties"]["limit"]["maximum"] == 50
     probe = connector().health(live=False, check_schema=True)
