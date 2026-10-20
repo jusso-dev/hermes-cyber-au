@@ -62,7 +62,7 @@ connectors:
       - api.osv.dev
   cloudflare-radar:
     hosts:
-    - mcp.cloudflare.com
+    - api.cloudflare.com
     allow_ip_literals: false
     allow_http_loopback: false
   auscert:

@@ -197,6 +197,21 @@ class DailyBriefingTest(unittest.TestCase):
         self.assertNotIn("AusCERT, retrieved", text)
         self.assertNotRegex(text.lower(), r"\berrors?\b")
 
+    def test_radar_connector_outage_rows_render(self):
+        # get_radar_annotations_outages returns start, locations and cause.
+        pack = json.loads(json.dumps(self.pack))
+        pack["connectors"]["cloudflare-radar"]["envelope"]["data"] = {
+            "outages": [
+                {"start": "2026-10-19T12:00:00Z", "locations": ["NZ", "AU"], "cause": "CABLE_CUT"},
+                {"start": "2026-10-19T12:30:00Z", "locations": ["US"], "cause": "POWER_OUTAGE"},
+            ]
+        }
+        text = briefing.render(
+            pack, self.assets, datetime.fromisoformat(TUESDAY), "full", inventory_configured=True
+        )
+        self.assertIn("Cloudflare Radar. Outage: CABLE_CUT, AU", text)
+        self.assertNotIn("POWER_OUTAGE", text)
+
     def test_brief_stays_under_600_words_when_the_window_is_busy(self):
         title = " ".join(["synthetic"] * 30)
         alerts = [

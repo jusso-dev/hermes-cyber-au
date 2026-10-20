@@ -174,19 +174,18 @@ servers:
     required_env: []
   cloudflare_radar:
     connector: cloudflare-radar
-    kind: wrap
-    url: https://mcp.cloudflare.com/mcp?codemode=false
-    auth: oauth
-    token_env: CLOUDFLARE_RADAR_API_TOKEN
-    tools:
-      include:
-      - '*_radar_*'
+    args:
+    - serve
+    - cloudflare-radar
+    env:
+    - CLOUDFLARE_RADAR_API_TOKEN=${CLOUDFLARE_RADAR_API_TOKEN}
     trust: untrusted
     lazy: true
     timeout: 120
     enabled_by_default: false
     off_reason: licence terms
-    required_env: []
+    required_env:
+    - CLOUDFLARE_RADAR_API_TOKEN
     docs: docs/connectors/cloudflare-radar.md
   cfscan:
     connector: cloudflare-urlscanner

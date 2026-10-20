@@ -1,0 +1,55 @@
+{
+  "type": "object",
+  "required": [
+    "domain",
+    "rank",
+    "bucket"
+  ],
+  "properties": {
+    "domain": {
+      "type": "string"
+    },
+    "rank": {
+      "type": [
+        "number",
+        "integer",
+        "null"
+      ]
+    },
+    "bucket": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "window": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

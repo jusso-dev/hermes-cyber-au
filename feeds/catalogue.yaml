@@ -546,20 +546,20 @@ feeds:
       not in .env.template.
 
   - id: cloudflare-radar
-    name: Cloudflare Radar (Cloudflare MCP server, Radar tools)
+    name: Cloudflare Radar API
     connector: cloudflare-radar
     server: cloudflare_radar
-    url: https://mcp.cloudflare.com/mcp?codemode=false
-    format: mcp
-    auth: {type: oauth, env: CLOUDFLARE_RADAR_API_TOKEN}
+    url: https://api.cloudflare.com/client/v4/radar
+    format: json
+    auth: {type: bearer, env: CLOUDFLARE_RADAR_API_TOKEN}
     keyed: true
     enabled_by_default: false
-    poll: PT0S
+    poll: PT15M
     refresh: radar
     refresh_supported: false
     licence: CC BY-NC 4.0. Non-commercial use only unless you have an agreement with Cloudflare.
     region: global
-    notes: OAuth 2.1 through the Hermes MCP client, or CLOUDFLARE_RADAR_API_TOKEN as a bearer token.
+    notes: Custom API token with only Account > Radar > Read, sent as a bearer token. Six read-only tools.
 
   - id: cloudflare-urlscanner
     name: Cloudflare URL Scanner

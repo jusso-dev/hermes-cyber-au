@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -20,6 +20,7 @@ members = [
     "cyberau-au-regulatory",
     "cyberau-auscert",
     "cyberau-cisa-kev",
+    "cyberau-cloudflare-radar",
     "cyberau-cloudflare-urlscanner",
     "cyberau-common",
     "cyberau-crowdstrike-recon",
@@ -744,6 +745,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-cisa-kev"
 version = "0.1.0"
 source = { editable = "cisa-kev" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-cloudflare-radar"
+version = "0.1.0"
+source = { editable = "cloudflare-radar" }
 dependencies = [
     { name = "cyberau-common" },
 ]

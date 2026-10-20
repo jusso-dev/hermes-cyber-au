@@ -11,8 +11,8 @@ metadata:
 required_environment_variables:
   - name: CLOUDFLARE_RADAR_API_TOKEN
     prompt: Cloudflare API token with only Account > Radar > Read
-    help: Optional. Without it Hermes asks you to sign in with OAuth on first connect.
-    required_for: token based access
+    help: Custom Cloudflare API token with only Account > Radar > Read. The Radar tools need it.
+    required_for: all Radar tools
 ---
 
 # Radar AU
@@ -29,17 +29,18 @@ Use for questions about what the wider internet looks like from Australia: attac
 
 ## Quick Reference
 
-Tool names come from Cloudflare's unified MCP server and all match `*_radar_*`. Confirm the exact name with tool search before calling.
+The `cloudflare_radar` server has six read-only tools. `date_range` is one of `1d`, `2d`, `7d`, `14d`, `28d`, `12w`, `24w` or `52w`.
 
 | Question | Tool | Arguments |
 |---|---|---|
-| Layer 7 attacks on AU, and top attack types | `get_radar_attacks_layer7_summary` | `location: AU`, a `dateRange` such as `7d` |
-| Where attacks on AU come from | the layer 7 top locations tool, with `location: AU` as the target | `dateRange` |
-| AU outages and traffic anomalies | `get_radar_annotations_outages` | `location: AU`, `dateRange`, small `limit` |
-| BGP hijacks for an Australian ASN | `get_radar_bgp_hijacks_events` | `involvedAsn`, `per_page` |
-| BGP route leaks for an Australian ASN | `get_radar_bgp_leaks_events` | `involvedAsn`, `per_page` |
-| Rank of a lookalike or suspect domain | `get_radar_ranking_top` or the domain rank tool | `limit`, domain |
-| AU email authentication trends | the email security summary tools | `location: AU`, `dateRange` |
+| Layer 7 attacks on AU, by mitigation product or method | `get_radar_attacks_layer7_summary` | `dimension` (`mitigation_product`, `http_method`, `http_version`, `ip_version`, `managed_rules` or `bot_class`), `location: AU`, `date_range` |
+| AU outages and traffic anomalies | `get_radar_annotations_outages` | `location: AU`, `date_range`, small `limit` |
+| BGP hijacks for an Australian ASN | `get_radar_bgp_hijacks_events` | `involved_asn` or `involved_country: AU`, `limit` |
+| BGP route leaks for an Australian ASN | `get_radar_bgp_leaks_events` | `involved_asn` or `involved_country: AU`, `limit` |
+| Top domains in AU | `get_radar_ranking_top` | `location: AU`, `limit` |
+| Rank of a lookalike or suspect domain | `get_radar_ranking_domain` | `domain` |
+
+Attack source locations and email authentication trends are not available through these tools. Say so rather than guessing.
 
 ## Procedure
 
@@ -54,7 +55,7 @@ Tool names come from Cloudflare's unified MCP server and all match `*_radar_*`. 
 
 - An empty list can mean no events or a window that is too narrow. Say which you checked.
 - Radar attack percentages are shares of Cloudflare traffic, not counts of incidents in AU.
-- A 401 or 403 means the token or OAuth grant is wrong. Say so and name `CLOUDFLARE_RADAR_API_TOKEN`. Do not retry.
+- A 401 or 403 means the token is wrong or lacks Radar Read. Say so and name `CLOUDFLARE_RADAR_API_TOKEN`. Do not retry.
 
 ## Verification
 

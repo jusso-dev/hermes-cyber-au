@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "errors": [],
+  "result": {
+    "details_0": {
+      "rank": null,
+      "bucket": ">200000",
+      "categories": []
+    },
+    "meta": {
+      "dateRange": [
+        {
+          "startTime": "2026-10-19T00:00:00Z",
+          "endTime": "2026-10-19T00:00:00Z"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "required": [
+    "domains"
+  ],
+  "properties": {
+    "location": {
+      "type": "string"
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rank",
+          "domain"
+        ],
+        "properties": {
+          "rank": {
+            "type": [
+              "number",
+              "integer",
+              "null"
+            ]
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

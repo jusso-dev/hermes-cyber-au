@@ -285,15 +285,15 @@ Terms: CC BY 4.0. Attribute the GitHub Advisory Database.
 
 The wrapped server receives the token as GITHUB_PERSONAL_ACCESS_TOKEN. It answers with a sign-in link without one. GITHUB_ADVISORY_TOKEN is not in .env.template.
 
-## Cloudflare Radar (Cloudflare MCP server, Radar tools) (cloudflare-radar)
+## Cloudflare Radar API (cloudflare-radar)
 
 Connector: `cloudflare-radar`. Default: off.
 
-Source: https://mcp.cloudflare.com/mcp?codemode=false
+Source: https://api.cloudflare.com/client/v4/radar
 
 Terms: CC BY-NC 4.0. Non-commercial use only unless you have an agreement with Cloudflare.
 
-OAuth 2.1 through the Hermes MCP client, or CLOUDFLARE_RADAR_API_TOKEN as a bearer token.
+Custom API token with only Account > Radar > Read, sent as a bearer token. Six read-only tools.
 
 ## Cloudflare URL Scanner (cloudflare-urlscanner)
 

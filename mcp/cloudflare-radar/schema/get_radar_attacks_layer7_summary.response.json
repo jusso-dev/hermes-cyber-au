@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "required": [
+    "dimension",
+    "share_percent"
+  ],
+  "properties": {
+    "dimension": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "share_percent": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "window": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "last_updated": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

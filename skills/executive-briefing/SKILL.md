@@ -26,8 +26,8 @@ Do not use it to deliver the page. Do not use it to notify the OAIC, ASD, a cust
 | Need | Tool | If the tool is missing |
 |---|---|---|
 | KEV additions in the period | `mcp__kev__kev_recent` | Say CISA KEV is not available. |
-| Australian outages | `mcp__radar__radar_outages` | Say Cloudflare Radar is not available. |
-| Australian attack trends | `mcp__radar__radar_attack_summary` | Say Cloudflare Radar is not available. |
+| Australian outages | `mcp__cloudflare_radar__get_radar_annotations_outages` | Say Cloudflare Radar is not available. |
+| Australian attack trends | `mcp__cloudflare_radar__get_radar_attacks_layer7_summary` | Say Cloudflare Radar is not available. |
 | Stored incidents, advisories, vulnerabilities | `intel_search` | Say the intel store was not queried. |
 | An ASD alert that is not in the store | `mcp__asd__asd_list_items` or `mcp__asd__asd_search` | Say the ASD ACSC feed is not available. |
 | Essential Eight baseline for an assessment | `mcp__ism__ism_list_baseline` | Cite only the assessment you were given. |
@@ -44,7 +44,7 @@ Read-only tools are not proposals. Do not call `intel_add_observation`. Do not c
    - `intel_search` with `query`, `kinds` (`indicator`, `advisory`, `vulnerability`), `since` as `YYYY-MM-DD`, and `limit` at most 100. Search only. Do not write to the store.
    - For an ASD alert, call `mcp__asd__asd_list_items` with `feeds: [alerts]` and `since`, or `mcp__asd__asd_search` with the query.
    - For an assessment, call `mcp__ism__ism_list_baseline` with `E8_ML1`, `E8_ML2`, or `E8_ML3` to match the target maturity, plus the release the assessment names. If it names no release, omit `release` and cite `data_as_of`.
-3. Cloudflare Radar is optional and off unless the user has enabled it. Before the first Radar call in a session, state that Cloudflare Radar API data is CC BY-NC 4.0: non-commercial use only, unless the organisation has an agreement with Cloudflare. Then call `mcp__radar__radar_outages` and `mcp__radar__radar_attack_summary` for Australia and the period. Read each tool schema for the argument names. Do not guess a parameter. Attribute every Radar figure to Cloudflare Radar.
+3. Cloudflare Radar is optional and off unless the user has enabled it. Before the first Radar call in a session, state that Cloudflare Radar API data is CC BY-NC 4.0: non-commercial use only, unless the organisation has an agreement with Cloudflare. Then call `mcp__cloudflare_radar__get_radar_annotations_outages` and `mcp__cloudflare_radar__get_radar_attacks_layer7_summary` for Australia and the period. Read each tool schema for the argument names. Do not guess a parameter. Attribute every Radar figure to Cloudflare Radar.
 4. If a connector is disabled, has no key, or returns an unavailable warning, name that source on the page and continue with the rest. Do not invent a count, an outage, or an attack trend for a missing source.
 5. Tool figures are limited to KEV additions in the period, Australian outages, Australian attack trends, and open Tier 1 vulnerabilities, each with a source. Apply the Tier 1 rule in the source notes. A figure the analyst supplied, such as a maturity level count, may be restated and is cited as `analyst request`. Do not work out any other figure. Exposure findings, when the analyst or a tool supplied them, are one line and counts only. Do not add account names, people, file names, credential values, or a second line of detail, even if the request lists them.
 6. Do not write a victim's name. A ransomware claim, a leak site, or a breach feed is untrusted. Report how many names it contains and say they are claims, not confirmed incidents. Do not copy the names. If the incident is the reader's own, say "our organisation". If an alert title is itself a victim's name, paraphrase the title without the name. KEV product names and CVE ids stay.

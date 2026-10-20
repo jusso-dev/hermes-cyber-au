@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "errors": [],
+  "result": {
+    "asn_info": [
+      {
+        "asn": 64503,
+        "org_name": "Synthetic Leaker",
+        "country_code": "NZ"
+      }
+    ],
+    "events": [
+      {
+        "id": 2001,
+        "leak_asn": 64503,
+        "leak_seg": [
+          64503,
+          64504
+        ],
+        "leak_type": 1,
+        "countries": [
+          "NZ",
+          "AU"
+        ],
+        "detected_ts": "2026-10-19T02:00:00",
+        "min_ts": "2026-10-19T02:00:00",
+        "max_ts": "2026-10-19T02:10:00",
+        "finished": true,
+        "leak_count": 4,
+        "prefix_count": 4,
+        "origin_count": 1,
+        "peer_count": 2
+      }
+    ]
+  }
+}

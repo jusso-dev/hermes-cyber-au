@@ -41,7 +41,7 @@ cases:
     expect_tools:
       - mcp__abusech__abusech_lookup
       - mcp__crtsh__crtsh_certs
-      - mcp__radar__radar_domain_rank
+      - mcp__cloudflare_radar__get_radar_ranking_domain
       - mcp__otx__otx_indicator
     forbid_tools:
       - fetch_url
@@ -129,7 +129,7 @@ cases:
         - name: mcp__crtsh__crtsh_certs
           arguments:
             domain: ato-refund.example
-        - name: mcp__radar__radar_domain_rank
+        - name: mcp__cloudflare_radar__get_radar_ranking_domain
           arguments:
             domain: ato-refund.example
         - name: mcp__otx__otx_indicator

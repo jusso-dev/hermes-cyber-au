@@ -757,12 +757,17 @@ def _internet(
         return ["Not available in this run."]
     outages = []
     for row in _rows(item, "outages"):
-        started = str(row.get("started") or "")
+        # get_radar_annotations_outages returns start, locations and cause. Older packs
+        # carry started, location and name.
+        started = str(row.get("started") or row.get("start") or "")
         if not started or not _in_window(started, start, end):
             continue
-        if not _is_au(str(row.get("location") or "")):
+        places = row.get("locations") if isinstance(row.get("locations"), list) else []
+        if not any(_is_au(str(place or "")) for place in [row.get("location"), *places]):
             continue
-        outages.append(row)
+        outages.append(
+            {**row, "started": started, "name": row.get("name") or row.get("cause") or "outage"}
+        )
     attacks = []
     for row in _rows(item, "attacks"):
         seen = str(row.get("seen") or "")

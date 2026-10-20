@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "involved_asn": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295,
+      "description": "Only events involving this ASN"
+    },
+    "involved_country": {
+      "type": "string",
+      "description": "Only events involving this country, such as AU",
+      "minLength": 2,
+      "maxLength": 2
+    },
+    "date_range": {
+      "type": "string",
+      "enum": [
+        "7d",
+        "1d",
+        "2d",
+        "14d",
+        "28d",
+        "12w",
+        "24w",
+        "52w"
+      ],
+      "default": "7d",
+      "description": "Time window"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 10
+    }
+  },
+  "required": []
+}
