@@ -1,4 +1,4 @@
-"""FastMCP wiring. Read-only tools are the default."""
+"""MCP server wiring. Read-only tools are the default."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import inspect
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from cyberau_common.envelope import envelope, harden_envelope, untrusted_text
@@ -65,9 +65,9 @@ def get_connector(key: str) -> Connector:
     return _REGISTRY[key]()
 
 
-def build_server(connector: Connector) -> FastMCP:
+def build_server(connector: Connector) -> MCPServer:
     install_log_redaction()
-    mcp = FastMCP(connector.server_name)
+    mcp = MCPServer(connector.server_name)
     for spec in connector.tools:
         mcp.add_tool(
             _wrap(connector, spec),

@@ -71,8 +71,8 @@ def test_tools_are_read_only_and_names_fit():
     names = sorted(tool.name for tool in listed)
     assert names == sorted(fn.__name__ for fn, _text in source.TOOLS)
     for tool in listed:
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.destructiveHint is False
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.destructive_hint is False
         assert len(f"mcp__cloudflare_radar__{tool.name}") <= 64
         schema = json.loads((ROOT / "schema" / f"{tool.name}.input.json").read_text("utf-8"))
         jsonschema.Draft202012Validator.check_schema(schema)

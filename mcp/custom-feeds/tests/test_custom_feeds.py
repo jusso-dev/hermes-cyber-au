@@ -66,7 +66,7 @@ def test_tools_are_read_only():
     listed = asyncio.run(build_server(connector()).list_tools())
     assert sorted(tool.name for tool in listed) == ["custom_feed_items", "custom_feed_list"]
     for tool in listed:
-        assert tool.annotations.readOnlyHint is True
+        assert tool.annotations.read_only_hint is True
         schema = json.loads((ROOT / "schema" / f"{tool.name}.input.json").read_text("utf-8"))
         jsonschema.Draft202012Validator.check_schema(schema)
 

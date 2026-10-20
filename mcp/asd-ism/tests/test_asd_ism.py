@@ -76,9 +76,9 @@ def test_schema_and_live_health(tmp_path, monkeypatch):
     import asyncio
 
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["ism_get_control"].inputSchema["required"] == ["control_id"]
-    assert "ism-" in json.dumps(tools["ism_get_control"].inputSchema)
-    assert "E8_ML1" in json.dumps(tools["ism_search"].inputSchema)
+    assert tools["ism_get_control"].input_schema["required"] == ["control_id"]
+    assert "ism-" in json.dumps(tools["ism_get_control"].input_schema)
+    assert "E8_ML1" in json.dumps(tools["ism_search"].input_schema)
     probe = connector().health(live=False, check_schema=True)
     drift = tmp_path / "drift"
     (drift / "v2026.09.4").mkdir(parents=True)
