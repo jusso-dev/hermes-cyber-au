@@ -195,12 +195,12 @@ def test_reflect_is_not_a_tool_and_no_host_is_shipped():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     assert "hindsight_reflect" not in tools
     assert "reflect" not in tools
-    assert tools["hindsight_recall"].annotations.readOnlyHint is True
-    assert tools["hindsight_retain"].annotations.readOnlyHint is False
-    assert tools["handoff_list"].annotations.readOnlyHint is True
-    assert tools["handoff_post"].annotations.readOnlyHint is False
+    assert tools["hindsight_recall"].annotations.read_only_hint is True
+    assert tools["hindsight_retain"].annotations.read_only_hint is False
+    assert tools["handoff_list"].annotations.read_only_hint is True
+    assert tools["handoff_post"].annotations.read_only_hint is False
     for tool in tools.values():
-        assert tool.annotations.destructiveHint is False
+        assert tool.annotations.destructive_hint is False
 
     allow = (ROOT / "mcp" / "egress-allowlist.yaml").read_text(encoding="utf-8")
     assert "hindsight" not in allow

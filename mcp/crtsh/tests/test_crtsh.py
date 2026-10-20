@@ -87,11 +87,11 @@ def test_malformed_payload_warns(monkeypatch):
 def test_schema_probe_and_limits():
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     spec = tools["crtsh_certs"]
-    assert spec.annotations.readOnlyHint is True
-    assert spec.annotations.openWorldHint is True
-    assert spec.inputSchema["required"] == ["domain"]
-    assert spec.inputSchema["properties"]["include_subdomains"]["default"] is True
-    assert spec.inputSchema["properties"]["include_expired"]["default"] is False
+    assert spec.annotations.read_only_hint is True
+    assert spec.annotations.open_world_hint is True
+    assert spec.input_schema["required"] == ["domain"]
+    assert spec.input_schema["properties"]["include_subdomains"]["default"] is True
+    assert spec.input_schema["properties"]["include_expired"]["default"] is False
     schema_path = PACKAGE / "schema" / "crtsh_certs.response.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     for row in crtsh_certs("example.com")["data"]:

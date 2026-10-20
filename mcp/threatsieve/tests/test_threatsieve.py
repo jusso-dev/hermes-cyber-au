@@ -93,10 +93,10 @@ def test_empty_malformed_and_drift(monkeypatch, tmp_path):
 def test_advertised_schema_and_route_list(monkeypatch):
     listed = asyncio.run(build_server(connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
-    schema = tools["threatsieve_assess"].inputSchema
+    schema = tools["threatsieve_assess"].input_schema
     assert schema["required"] == ["indicator"]
-    assert tools["threatsieve_assess"].annotations.readOnlyHint is True
-    assert tools["threatsieve_assess"].annotations.openWorldHint is True
+    assert tools["threatsieve_assess"].annotations.read_only_hint is True
+    assert tools["threatsieve_assess"].annotations.open_world_hint is True
     stored = json.loads(
         (FIXTURES.parents[1] / "schema" / "threatsieve_assess.input.json").read_text()
     )

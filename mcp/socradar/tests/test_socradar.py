@@ -396,8 +396,8 @@ def test_fresh_install_stays_disabled():
 def test_tool_annotations_and_fixtures():
     listed = asyncio.run(build_server(connector()).list_tools())
     tool = next(item for item in listed if item.name == "socradar_incidents")
-    assert tool.annotations.readOnlyHint is True
-    assert tool.annotations.openWorldHint is True
+    assert tool.annotations.read_only_hint is True
+    assert tool.annotations.open_world_hint is True
     assert len(f"mcp__socradar__{tool.name}") == 33
     for path in FIXTURES.iterdir():
         text = path.read_text(encoding="utf-8")
