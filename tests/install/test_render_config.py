@@ -344,3 +344,56 @@ def test_a_commented_blank_key_is_still_unset(tmp_path: Path) -> None:
     assert _run(home, servers, config, env_file).returncode == 0
     loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
     assert loaded["mcp_servers"]["abusech"]["enabled"] is True
+
+
+def test_remote_wrap_uses_a_bearer_placeholder_once_its_token_is_set(tmp_path: Path) -> None:
+    home = tmp_path / "profile"
+    config = home / "config.yaml"
+    env_file = home / ".env"
+    proc = _run(home, SERVERS, config, env_file)
+    assert proc.returncode == 0, proc.stderr
+    radar = yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["cloudflare_radar"]
+    assert radar["url"] == "https://mcp.cloudflare.com/mcp?codemode=false"
+    assert radar["auth"] == "oauth"
+    assert "headers" not in radar and "command" not in radar
+    assert radar["tools"] == {"include": ["*_radar_*"]}
+    assert radar["enabled"] is False
+
+    # The person switches it on, then adds the token. Neither render turns it off.
+    text = config.read_text(encoding="utf-8")
+    on = text.replace('"*_radar_*"\n    enabled: false', '"*_radar_*"\n    enabled: true')
+    assert on != text
+    _write(config, on)
+    _write(env_file, f"CLOUDFLARE_RADAR_API_TOKEN={MARKER}\n")
+    proc = _run(home, SERVERS, config, env_file)
+    assert proc.returncode == 0, proc.stderr
+    text = config.read_text(encoding="utf-8")
+    radar = yaml.safe_load(text)["mcp_servers"]["cloudflare_radar"]
+    assert radar["headers"] == {"Authorization": "Bearer ${CLOUDFLARE_RADAR_API_TOKEN}"}
+    assert "auth" not in radar
+    assert radar["enabled"] is True
+    assert MARKER not in text
+
+
+def test_an_old_stdio_render_of_a_remote_wrap_is_replaced(tmp_path: Path) -> None:
+    home = tmp_path / "profile"
+    config = home / "config.yaml"
+    _write(
+        config,
+        """
+mcp_servers:
+  cloudflare_radar:
+    command: /old/cyberau-mcp
+    args: [serve, cloudflare-radar]
+    env:
+      CYBERAU_DATA_DIR: /old
+    enabled: true
+    x-cyber-au-managed: true
+""",
+    )
+    proc = _run(home, SERVERS, config, home / ".env")
+    assert proc.returncode == 0, proc.stderr
+    radar = yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["cloudflare_radar"]
+    assert not {"command", "args", "env"} & set(radar)
+    assert radar["url"].startswith("https://mcp.cloudflare.com/")
+    assert radar["enabled"] is True

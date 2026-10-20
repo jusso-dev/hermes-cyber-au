@@ -28,6 +28,9 @@ OWNED_RENDER_KEYS = (
     "command",
     "args",
     "env",
+    "url",
+    "headers",
+    "auth",
     "timeout",
     "lazy",
     "trust",
@@ -105,7 +108,8 @@ def _placeholder(raw: str, server: str) -> tuple[str, str]:
 def _enabled(spec: dict, previous: dict | None, present: set[str]) -> bool | None:
     default_on = spec.get("enabled_by_default", spec.get("default_enabled", True))
     if default_on is False:
-        return False
+        # Off by default, but a person who switched it on keeps that choice.
+        return bool(previous.get("enabled", False)) if previous is not None else False
     required = [str(item) for item in spec.get("required_env") or []]
     if required:
         return all(item in present for item in required)
@@ -119,6 +123,33 @@ def _server_entry(
 ) -> dict:
     if not isinstance(spec, dict):
         raise SystemExit(f"Server {name} in servers.yaml must be a mapping")
+    if isinstance(spec.get("url"), str):
+        entry = _remote_entry(name, spec, present)
+    else:
+        entry = _stdio_entry(name, spec, home)
+    if "timeout" in spec:
+        entry["timeout"] = spec["timeout"]
+    if "lazy" in spec:
+        entry["lazy"] = bool(spec["lazy"])
+    if "trust" in spec:
+        entry["trust"] = spec["trust"]
+    tools = spec.get("tools")
+    include = spec.get("tools.include")
+    if include is None and isinstance(tools, dict):
+        include = tools.get("include")
+    if include is not None:
+        entry["tools"] = {"include": list(include)}
+    enabled = _enabled(spec, previous if isinstance(previous, dict) else None, present)
+    if enabled is not None:
+        entry["enabled"] = enabled
+    if isinstance(previous, dict):
+        for key, value in previous.items():
+            if key not in entry and key not in OWNED_RENDER_KEYS:
+                entry[key] = value
+    return _ordered_entry(entry)
+
+
+def _stdio_entry(name: str, spec: dict, home: Path) -> dict:
     command = home / "mcp" / ".venv" / "bin" / "cyberau-mcp"
     args = spec.get("args")
     if not isinstance(args, list) or not args:
@@ -143,36 +174,34 @@ def _server_entry(
         else:
             raise SystemExit(f"Server {name} has an env entry that is not NAME=${{NAME}}")
         env[key] = value
-    entry: dict = {
+    return {
         "command": str(command),
         "args": [str(part) for part in args],
         "env": env,
         MANAGED_KEY: True,
     }
-    if "timeout" in spec:
-        entry["timeout"] = spec["timeout"]
-    if "lazy" in spec:
-        entry["lazy"] = bool(spec["lazy"])
-    if "trust" in spec:
-        entry["trust"] = spec["trust"]
-    tools = spec.get("tools")
-    include = spec.get("tools.include")
-    if include is None and isinstance(tools, dict):
-        include = tools.get("include")
-    if include is not None:
-        entry["tools"] = {"include": list(include)}
-    enabled = _enabled(spec, previous if isinstance(previous, dict) else None, present)
-    if enabled is not None:
-        entry["enabled"] = enabled
-    if isinstance(previous, dict):
-        for key, value in previous.items():
-            if key not in entry and key not in OWNED_RENDER_KEYS:
-                entry[key] = value
-    return _ordered_entry(entry)
+
+
+def _remote_entry(name: str, spec: dict, present: set[str]) -> dict:
+    """A remote MCP server Hermes connects to directly, such as a wrapped upstream.
+
+    With its token set in the profile .env the entry sends a bearer header holding
+    only a ${VAR} placeholder. Without it, Hermes signs in with OAuth on first connect.
+    """
+    entry: dict = {"url": spec["url"], MANAGED_KEY: True}
+    token_env = spec.get("token_env")
+    if isinstance(token_env, str) and token_env in present:
+        entry["headers"] = {"Authorization": f"Bearer ${{{token_env}}}"}
+    else:
+        entry["auth"] = str(spec.get("auth") or "oauth")
+    return entry
 
 
 def _ordered_entry(entry: dict) -> dict:
     preferred = (
+        "url",
+        "headers",
+        "auth",
         "command",
         "args",
         "env",
