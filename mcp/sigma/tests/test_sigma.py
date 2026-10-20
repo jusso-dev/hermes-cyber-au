@@ -424,3 +424,14 @@ def test_fixtures_have_no_secrets():
 
 def _response(name: str) -> dict:
     return json.loads((SCHEMA / f"{name}.response.json").read_text(encoding="utf-8"))
+
+
+def test_pysigma_caches_live_in_a_private_directory(tmp_path):
+    from sigma.data import mitre_attack, mitre_d3fend
+
+    source._backend("lucene")
+    for module, name in ((mitre_attack, "mitre_attack"), (mitre_d3fend, "mitre_d3fend")):
+        path = tmp_path / "pysigma-cache" / name
+        assert module._custom_cache_dir == path
+        assert path.stat().st_mode & 0o777 == 0o700
+    assert (tmp_path / "pysigma-cache").stat().st_mode & 0o777 == 0o700
