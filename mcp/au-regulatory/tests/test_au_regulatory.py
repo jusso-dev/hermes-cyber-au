@@ -150,7 +150,7 @@ def test_schema_drift_health_and_tools(monkeypatch):
             {"regime": "ndb", "trigger": "example", "aware_at": "example"},
         )
     )
-    text = called[0][0].text if isinstance(called, tuple) else called[0].text
+    text = called.content[0].text
     assert "not legal advice" in text
 
 
