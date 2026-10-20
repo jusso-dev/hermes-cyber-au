@@ -1,0 +1,11 @@
+# Morning briefing email settings. Copy to email.yaml in the profile data directory
+# ($CYBERAU_DATA_DIR, or plugin-data/cyber-au). That copy is yours and is never shipped.
+#
+# api_url takes a Resend-compatible POST: JSON with from, to, subject, html and text,
+# and an `Authorization: Bearer` key. Paperboy and Resend both accept it.
+api_url: https://api.resend.com/emails
+from: Hermes Cyber AU <briefing@example.com>
+to:
+  - security-team@example.com
+# The API key file, relative to this file. Keep it chmod 600.
+key_file: secrets/email-api-key
