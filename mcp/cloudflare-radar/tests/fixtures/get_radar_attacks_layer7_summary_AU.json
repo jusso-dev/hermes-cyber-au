@@ -1,0 +1,21 @@
+{
+  "success": true,
+  "errors": [],
+  "result": {
+    "summary_0": {
+      "WAF": "61.5",
+      "DDOS": "30.25",
+      "IP Reputation": "8.25"
+    },
+    "meta": {
+      "dateRange": [
+        {
+          "startTime": "2026-10-13T00:00:00Z",
+          "endTime": "2026-10-20T00:00:00Z"
+        }
+      ],
+      "normalization": "PERCENTAGE",
+      "lastUpdated": "2026-10-20T07:30:00Z"
+    }
+  }
+}

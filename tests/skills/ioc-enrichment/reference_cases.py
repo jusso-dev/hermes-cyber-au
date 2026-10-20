@@ -140,7 +140,7 @@ def _feodo() -> dict:
             "mcp__internetdb__internetdb_ip",
             "mcp__otx__otx_indicator",
         ],
-        [*ACTIONS, "mcp__crtsh__crtsh_certs", "mcp__radar__radar_domain_rank"],
+        [*ACTIONS, "mcp__crtsh__crtsh_certs", "mcp__cloudflare_radar__get_radar_ranking_domain"],
         [
             _search(value),
             ("mcp__abusech__feodo_blocklist", {}),
@@ -241,7 +241,7 @@ def _cloudflare() -> dict:
             "mcp__abusech__abusech_lookup",
             "mcp__internetdb__internetdb_ip",
             "mcp__otx__otx_indicator",
-            "mcp__radar__radar_domain_rank",
+            "mcp__cloudflare_radar__get_radar_ranking_domain",
         ],
         [*ACTIONS, "mcp__greynoise__greynoise_ip", "mcp__crtsh__crtsh_certs"],
         [
@@ -253,7 +253,7 @@ def _cloudflare() -> dict:
                 "mcp__otx__otx_indicator",
                 {"type": "IPv4", "value": value, "section": "general"},
             ),
-            ("mcp__radar__radar_domain_rank", {"domain": hostname.normalised}),
+            ("mcp__cloudflare_radar__get_radar_ranking_domain", {"domain": hostname.normalised}),
         ],
     )
 
@@ -347,7 +347,7 @@ def _lookalike() -> dict:
             "mcp__abusech__abusech_lookup",
             "mcp__otx__otx_indicator",
             "mcp__crtsh__crtsh_certs",
-            "mcp__radar__radar_domain_rank",
+            "mcp__cloudflare_radar__get_radar_ranking_domain",
         ],
         [
             *ACTIONS,
@@ -370,7 +370,7 @@ def _lookalike() -> dict:
                     "include_expired": False,
                 },
             ),
-            ("mcp__radar__radar_domain_rank", {"domain": value}),
+            ("mcp__cloudflare_radar__get_radar_ranking_domain", {"domain": value}),
         ],
     )
 
@@ -441,7 +441,7 @@ def _malwarebazaar() -> dict:
             "mcp__greynoise__greynoise_ip",
             "mcp__internetdb__internetdb_ip",
             "mcp__crtsh__crtsh_certs",
-            "mcp__radar__radar_domain_rank",
+            "mcp__cloudflare_radar__get_radar_ranking_domain",
         ],
         [
             _search(value),
@@ -500,7 +500,7 @@ def _private() -> dict:
             "mcp__internetdb__internetdb_ip",
             "mcp__otx__otx_indicator",
             "mcp__crtsh__crtsh_certs",
-            "mcp__radar__radar_domain_rank",
+            "mcp__cloudflare_radar__get_radar_ranking_domain",
         ],
         [_search(prepared.normalised)],
     )
@@ -582,7 +582,7 @@ def _injection() -> dict:
             "mcp__abusech__abusech_lookup",
             "mcp__greynoise__greynoise_ip",
             "mcp__internetdb__internetdb_ip",
-            "mcp__radar__radar_domain_rank",
+            "mcp__cloudflare_radar__get_radar_ranking_domain",
             "mcp__crtsh__crtsh_certs",
         ],
         [
@@ -647,7 +647,7 @@ def _fresh_store() -> dict:
             "mcp__internetdb__internetdb_ip",
             "mcp__otx__otx_indicator",
             "mcp__crtsh__crtsh_certs",
-            "mcp__radar__radar_domain_rank",
+            "mcp__cloudflare_radar__get_radar_ranking_domain",
         ],
         [_search(prepared.normalised)],
     )

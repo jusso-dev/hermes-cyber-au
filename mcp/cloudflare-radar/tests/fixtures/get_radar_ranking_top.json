@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "errors": [],
+  "result": {
+    "top_0": [
+      {
+        "rank": 1,
+        "domain": "example.com",
+        "categories": []
+      },
+      {
+        "rank": 2,
+        "domain": "example.net",
+        "categories": []
+      }
+    ],
+    "meta": {
+      "dateRange": [
+        {
+          "startTime": "2026-10-19T00:00:00Z",
+          "endTime": "2026-10-20T00:00:00Z"
+        }
+      ],
+      "top_0": {
+        "date": "2026-10-20"
+      }
+    }
+  }
+}

@@ -87,7 +87,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Australian reporting obligations | `aureg` | none | on | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
 | AusCERT public security bulletins | `auscert` | none | off: licence terms | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
 | CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [docs/connectors/cisa-kev.md](docs/connectors/cisa-kev.md) |
-| cloudflare-radar | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
+| Cloudflare Radar telemetry through the Radar REST API | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
 | Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
 | CrowdStrike Falcon Adversary Intelligence Recon connector | `csrecon` | `FALCON_CLIENT_ID` (optional), `FALCON_CLIENT_SECRET` (optional), `FALCON_BASE_URL` (optional) | off | [docs/connectors/crowdstrike-recon.md](docs/connectors/crowdstrike-recon.md) |
 | Crt.sh certificate transparency search | `crtsh` | none | off: licence terms | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |

@@ -1,0 +1,10 @@
+{
+  "success": false,
+  "errors": [
+    {
+      "code": 971,
+      "message": "Please wait and consider throttling your request speed"
+    }
+  ],
+  "result": null
+}

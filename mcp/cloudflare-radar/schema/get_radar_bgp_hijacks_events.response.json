@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "required": [
+    "date_range",
+    "events",
+    "asn_info"
+  ],
+  "properties": {
+    "date_range": {
+      "type": "string"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "hijacker_asn",
+          "prefixes"
+        ]
+      }
+    },
+    "asn_info": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "asn"
+        ],
+        "properties": {
+          "asn": {
+            "type": [
+              "number",
+              "integer",
+              "null"
+            ]
+          },
+          "org_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

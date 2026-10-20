@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "errors": [],
+  "result": {
+    "details_0": {
+      "rank": 1200,
+      "bucket": "2000",
+      "categories": [
+        {
+          "id": 1,
+          "name": "Search Engines",
+          "superCategoryId": 2
+        }
+      ]
+    },
+    "meta": {
+      "dateRange": [
+        {
+          "startTime": "2026-10-19T00:00:00Z",
+          "endTime": "2026-10-19T00:00:00Z"
+        }
+      ]
+    }
+  }
+}

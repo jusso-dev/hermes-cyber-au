@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "dimension": {
+      "type": "string",
+      "enum": [
+        "mitigation_product",
+        "http_method",
+        "http_version",
+        "ip_version",
+        "managed_rules",
+        "bot_class"
+      ],
+      "default": "mitigation_product",
+      "description": "What to break attack traffic down by"
+    },
+    "location": {
+      "type": "string",
+      "description": "Two-letter code of the targeted country, such as AU",
+      "minLength": 2,
+      "maxLength": 2
+    },
+    "date_range": {
+      "type": "string",
+      "enum": [
+        "7d",
+        "1d",
+        "2d",
+        "14d",
+        "28d",
+        "12w",
+        "24w",
+        "52w"
+      ],
+      "default": "7d",
+      "description": "Time window"
+    }
+  },
+  "required": []
+}

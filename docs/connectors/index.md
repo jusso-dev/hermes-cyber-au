@@ -15,7 +15,7 @@ Every connector with a `SOURCE.md` in this checkout. Planned sources without a c
 | Australian reporting obligations | `aureg` | none | on | [au-regulatory](au-regulatory.md) |
 | AusCERT public security bulletins | `auscert` | none | off: licence terms | [auscert](auscert.md) |
 | CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [cisa-kev](cisa-kev.md) |
-| cloudflare-radar | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [cloudflare-radar](cloudflare-radar.md) |
+| Cloudflare Radar telemetry through the Radar REST API | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [cloudflare-radar](cloudflare-radar.md) |
 | Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [cloudflare-urlscanner](cloudflare-urlscanner.md) |
 | CrowdStrike Falcon Adversary Intelligence Recon connector | `csrecon` | `FALCON_CLIENT_ID` (optional), `FALCON_CLIENT_SECRET` (optional), `FALCON_BASE_URL` (optional) | off | [crowdstrike-recon](crowdstrike-recon.md) |
 | Crt.sh certificate transparency search | `crtsh` | none | off: licence terms | [crtsh](crtsh.md) |

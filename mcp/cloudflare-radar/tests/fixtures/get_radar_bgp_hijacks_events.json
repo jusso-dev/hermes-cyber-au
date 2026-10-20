@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "errors": [],
+  "result": {
+    "asn_info": [
+      {
+        "asn": 64501,
+        "org_name": "Synthetic Transit Pty Ltd",
+        "country_code": "AU"
+      }
+    ],
+    "events": [
+      {
+        "id": 1001,
+        "hijacker_asn": 64501,
+        "hijacker_country": "AU",
+        "victim_asns": [
+          64502
+        ],
+        "prefixes": [
+          "192.0.2.0/24"
+        ],
+        "min_hijack_ts": "2026-10-19T01:00:00",
+        "max_hijack_ts": "2026-10-19T01:05:00",
+        "duration": 300,
+        "confidence_score": 9,
+        "is_stale": false,
+        "secret_field": "dropped"
+      }
+    ],
+    "total_monitors": 279
+  }
+}

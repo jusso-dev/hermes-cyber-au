@@ -213,50 +213,35 @@ CONNECTORS = [
         fixtures=["query_pypi_jinja2.json", "vuln_GHSA.json", "batch.json"],
     ),
     dict(
-        key="cloudflare-radar", server="cloudflare_radar", name="Cloudflare Radar via Cloudflare's unified MCP server",
+        key="cloudflare-radar", server="cloudflare_radar", name="Cloudflare Radar API",
         group="Internet and attack telemetry", milestone=M_V01, priority="p1",
         docs="https://developers.cloudflare.com/radar/",
         endpoints=[
-            ("MCP", "https://mcp.cloudflare.com/mcp?codemode=false", "Cloudflare's unified remote MCP server (github.com/cloudflare/mcp). With `codemode=false` each API endpoint is its own tool; Radar endpoints match `*_radar_*`"),
-            ("GET", "https://api.cloudflare.com/client/v4/radar/annotations/outages", "Underlying Radar API: outages, filter `location=AU`"),
-            ("GET", "https://api.cloudflare.com/client/v4/radar/attacks/layer7/summary", "Underlying Radar API: application layer attack summaries"),
-            ("GET", "https://api.cloudflare.com/client/v4/radar/bgp/hijacks/events , /radar/bgp/leaks/events", "Underlying Radar API: BGP events"),
-            ("GET", "https://api.cloudflare.com/client/v4/radar/ranking/top", "Underlying Radar API: domain rankings"),
+            ("GET", "https://api.cloudflare.com/client/v4/radar/annotations/outages", "Outages and traffic anomalies, filter `location`, `asn`, `dateRange`, `limit`"),
+            ("GET", "https://api.cloudflare.com/client/v4/radar/attacks/layer7/summary/{dimension}", "Share of layer 7 attack traffic by one dimension, filter `location`, `dateRange`"),
+            ("GET", "https://api.cloudflare.com/client/v4/radar/bgp/hijacks/events , /radar/bgp/leaks/events", "BGP hijack and route leak events, filter `involvedAsn`, `involvedCountry`, `dateRange`, `per_page`"),
+            ("GET", "https://api.cloudflare.com/client/v4/radar/ranking/top , /radar/ranking/domain/{domain}", "Domain popularity ranking"),
         ],
-        auth="OAuth 2.1 through Hermes's MCP client (scope the grant to Radar read), or a custom API token with Account > Radar > Read sent as a bearer header.",
-        env=[("CLOUDFLARE_RADAR_API_TOKEN", False, "Optional. Custom API token with only Account > Radar > Read. Without it, Hermes uses OAuth on first connect.")],
-        rate="Cloudflare client API: 1,200 requests per 5 minutes per token; going over blocks calls for 5 minutes. Read `retry-after`.",
-        cache="No local cache in the wrapped server. The `radar-au` skill keeps its own call budget and the briefing routine stores summaries in the intel store.",
+        auth="Custom API token with only Account > Radar > Read, sent as `Authorization: Bearer`.",
+        env=[("CLOUDFLARE_RADAR_API_TOKEN", True, "Custom API token with only Account > Radar > Read.")],
+        rate="Cloudflare client API: 1,200 requests per 5 minutes per token; going over blocks calls for 5 minutes. The connector allows 2 requests a second and reports `retry-after` on 429.",
+        cache="Shared HTTP cache, 15 minute TTL. Offline mode and failed fetches serve a cached copy marked stale; nothing is shipped.",
         terms="Cloudflare Radar API data is CC BY-NC 4.0: non-commercial use only unless you have an agreement with Cloudflare. Attribute Cloudflare Radar in every briefing that uses it.",
-        default_off="Radar data is CC BY-NC 4.0 (see Terms). The server ships with `enabled: false` and users bring their own Cloudflare token or OAuth grant.",
-        hosts=["mcp.cloudflare.com"],
-        notes="Retargeted from a first-party Radar connector to a wrap of Cloudflare's unified MCP server. Cloudflare's older dedicated Radar MCP server (`cloudflare/mcp-server-cloudflare`, `apps/radar`) is marked deprecated in its README in favour of the unified server, so nothing here builds on it. Hermes ships a catalog entry for the unified server (" + hsrc('optional-mcps/cloudflare/manifest.yaml') + "), but that entry excludes `*_radar_*` by default and exposes about 1,900 account tools, so this distribution adds its own narrow server entry instead: Radar tools only, read only. `tools.include` accepts fnmatch globs (" + hsrc('website/docs/reference/mcp-config-reference.md') + "), and include wins over exclude.",
-        verified="`https://mcp.cloudflare.com/mcp` answered 401 without auth on 16 October 2026 (exists). Hermes manifest read at the pinned commit. Radar REST endpoint returned the expected missing-auth error. Deprecation of the dedicated Radar server per its README, checked by a second inventory on the same date.",
-        config="""```yaml
-mcp_servers:
-  cloudflare_radar:
-    url: "https://mcp.cloudflare.com/mcp?codemode=false"
-    # Either OAuth (default) ...
-    auth: oauth
-    # ... or, when CLOUDFLARE_RADAR_API_TOKEN is set, bootstrap renders this instead of `auth`:
-    # headers:
-    #   Authorization: "Bearer ${CLOUDFLARE_RADAR_API_TOKEN}"
-    tools:
-      include: ["*_radar_*"]
-    enabled: false        # non-commercial data terms; the user switches it on
-    lazy: true
-    timeout: 120
-    trust: untrusted
-```
-Field names from """ + hsrc('website/docs/reference/mcp-config-reference.md') + """ (`url`, `headers`, `auth: oauth`, `enabled`, `tools.include`). Confirm at build time that the unified server accepts a bearer API token as well as OAuth; if it does not, drop the token path and keep OAuth only.""",
-        files=["mcp/servers.yaml (entry `cloudflare_radar`, wrap, no local code)", "skills/radar-au/SKILL.md (AU-focused question patterns, call budget, attribution)", "mcp/cloudflare-radar/tests/test_radar_wrap.py (config render and tool filter tests)", "mcp/cloudflare-radar/SOURCE.md", "docs/connectors/cloudflare-radar.md (generated)"],
+        default_off="Radar data is CC BY-NC 4.0 (see Terms). The server ships with `enabled: false` and users bring their own Cloudflare token.",
+        hosts=["api.cloudflare.com"],
+        notes="A local connector over the Radar REST API. It first wrapped Cloudflare's unified MCP server, but with `?codemode=false` that server answers `tools/list` with one 3.6 MB event (3,763 tools) and the MCP client in Hermes 0.22.2 refuses events over 1 MiB. Code mode instead exposes a general `execute` tool that the injection guard treats as a write. Six read-only tools keep the `get_radar_*` names the skills use.",
+        verified="All six endpoints answered 200 with a Radar Read token on 20 October 2026. `/attacks/layer7/summary` without a dimension answers 400 (no route), so the tool always names a dimension. An unknown domain answers 200 with `rank: null`.",
+        files=["mcp/cloudflare-radar/src/cyberau_cloudflare_radar/source.py", "mcp/cloudflare-radar/tests/test_cloudflare_radar.py", "skills/radar-au/SKILL.md (AU-focused question patterns, call budget, attribution)", "mcp/cloudflare-radar/SOURCE.md", "docs/connectors/cloudflare-radar.md (generated)"],
         tools=[
-            ("(wrapped tools)", "Tools come from the unified server and match `*_radar_*` (about 275 endpoint tools per the Hermes manifest comment). Pin the expected list in `mcp/cloudflare-radar/expected_tools.txt` at build time, and let `connector-health.yml` open a drift issue when it changes. The `radar-au` skill maps questions to them: AU layer 7 attack summary and top attack types, top source locations for attacks on AU, AU outages and traffic anomalies, BGP hijacks and leaks for an Australian ASN, domain rank for lookalike triage, and AU email authentication trends.", None),
+            ("get_radar_annotations_outages", "Outages and traffic anomalies, optionally for one country or ASN.", None),
+            ("get_radar_attacks_layer7_summary", "Share of layer 7 attack traffic by one dimension, worldwide or targeting one country.", None),
+            ("get_radar_bgp_hijacks_events", "Recent BGP origin hijack events, optionally involving one ASN or country.", None),
+            ("get_radar_bgp_leaks_events", "Recent BGP route leak events, optionally involving one ASN or country.", None),
+            ("get_radar_ranking_top", "Top domains by popularity, worldwide or for one country.", None),
+            ("get_radar_ranking_domain", "Popularity rank, rank bucket and categories for one domain.", None),
         ],
-        fixtures=["tools_list_radar.json (recorded tools/list, Radar subset)", "outages_AU.json", "l7_summary_AU.json", "bgp_hijacks.json", "radar_429_with_retry_after.json", "unauthorised_401.json"],
-        wrap=True,
-        extra_tests=["Render test: with no token, the entry uses `auth: oauth`; with `CLOUDFLARE_RADAR_API_TOKEN` set, it uses the bearer header and no `auth` key; `tools.include` is exactly `[\"*_radar_*\"]` in both.", "Filter test against the recorded `tools/list`: no tool outside `*_radar_*` registers, and every registered tool maps to a GET Radar endpoint."],
-        extra_criteria=["No Cloudflare tool that can change an account is registered.", "Nothing depends on the deprecated dedicated Radar MCP server."],
+        fixtures=["get_radar_annotations_outages_AU.json", "get_radar_attacks_layer7_summary_AU.json", "get_radar_bgp_hijacks_events.json", "get_radar_bgp_leaks_events.json", "get_radar_ranking_top.json", "get_radar_ranking_domain_ranked.json", "radar_401.json", "radar_429.json"],
+        extra_criteria=["Every tool is a GET to the Radar API. No tool can change a Cloudflare account."],
     ),
     dict(
         key="auscert", server="auscert", name="AusCERT public security bulletins",

@@ -346,54 +346,92 @@ def test_a_commented_blank_key_is_still_unset(tmp_path: Path) -> None:
     assert loaded["mcp_servers"]["abusech"]["enabled"] is True
 
 
-def test_remote_wrap_uses_a_bearer_placeholder_once_its_token_is_set(tmp_path: Path) -> None:
+REMOTE_SERVERS = """
+servers:
+  remote_demo:
+    connector: remote-demo
+    url: https://mcp.example.com/mcp
+    auth: oauth
+    token_env: REMOTE_DEMO_TOKEN
+    tools:
+      include:
+      - demo_*
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: false
+    required_env: []
+"""
+
+
+def test_remote_server_uses_a_bearer_placeholder_once_its_token_is_set(tmp_path: Path) -> None:
     home = tmp_path / "profile"
+    servers = tmp_path / "servers.yaml"
     config = home / "config.yaml"
     env_file = home / ".env"
-    proc = _run(home, SERVERS, config, env_file)
+    _write(servers, REMOTE_SERVERS)
+    proc = _run(home, servers, config, env_file)
     assert proc.returncode == 0, proc.stderr
-    radar = yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["cloudflare_radar"]
-    assert radar["url"] == "https://mcp.cloudflare.com/mcp?codemode=false"
-    assert radar["auth"] == "oauth"
-    assert "headers" not in radar and "command" not in radar
-    assert radar["tools"] == {"include": ["*_radar_*"]}
-    assert radar["enabled"] is False
+    remote = yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["remote_demo"]
+    assert remote["url"] == "https://mcp.example.com/mcp"
+    assert remote["auth"] == "oauth"
+    assert "headers" not in remote and "command" not in remote
+    assert remote["tools"] == {"include": ["demo_*"]}
+    assert remote["enabled"] is False
 
     # The person switches it on, then adds the token. Neither render turns it off.
     text = config.read_text(encoding="utf-8")
-    on = text.replace('"*_radar_*"\n    enabled: false', '"*_radar_*"\n    enabled: true')
+    on = text.replace("enabled: false", "enabled: true")
     assert on != text
     _write(config, on)
-    _write(env_file, f"CLOUDFLARE_RADAR_API_TOKEN={MARKER}\n")
-    proc = _run(home, SERVERS, config, env_file)
+    _write(env_file, f"REMOTE_DEMO_TOKEN={MARKER}\n")
+    proc = _run(home, servers, config, env_file)
     assert proc.returncode == 0, proc.stderr
     text = config.read_text(encoding="utf-8")
-    radar = yaml.safe_load(text)["mcp_servers"]["cloudflare_radar"]
-    assert radar["headers"] == {"Authorization": "Bearer ${CLOUDFLARE_RADAR_API_TOKEN}"}
-    assert "auth" not in radar
-    assert radar["enabled"] is True
+    remote = yaml.safe_load(text)["mcp_servers"]["remote_demo"]
+    assert remote["headers"] == {"Authorization": "Bearer ${REMOTE_DEMO_TOKEN}"}
+    assert "auth" not in remote
+    assert remote["enabled"] is True
     assert MARKER not in text
 
 
-def test_an_old_stdio_render_of_a_remote_wrap_is_replaced(tmp_path: Path) -> None:
+def test_an_old_stdio_render_of_a_remote_server_is_replaced(tmp_path: Path) -> None:
     home = tmp_path / "profile"
+    servers = tmp_path / "servers.yaml"
     config = home / "config.yaml"
+    _write(servers, REMOTE_SERVERS)
     _write(
         config,
         """
 mcp_servers:
-  cloudflare_radar:
+  remote_demo:
     command: /old/cyberau-mcp
-    args: [serve, cloudflare-radar]
+    args: [serve, remote-demo]
     env:
       CYBERAU_DATA_DIR: /old
     enabled: true
     x-cyber-au-managed: true
 """,
     )
-    proc = _run(home, SERVERS, config, home / ".env")
+    proc = _run(home, servers, config, home / ".env")
     assert proc.returncode == 0, proc.stderr
-    radar = yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["cloudflare_radar"]
-    assert not {"command", "args", "env"} & set(radar)
-    assert radar["url"].startswith("https://mcp.cloudflare.com/")
-    assert radar["enabled"] is True
+    remote = yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["remote_demo"]
+    assert not {"command", "args", "env"} & set(remote)
+    assert remote["url"] == "https://mcp.example.com/mcp"
+    assert remote["enabled"] is True
+
+
+def test_radar_renders_as_a_local_server_that_needs_its_token(tmp_path: Path) -> None:
+    home = tmp_path / "profile"
+    config = home / "config.yaml"
+    env_file = home / ".env"
+    _write(env_file, f"CLOUDFLARE_RADAR_API_TOKEN={MARKER}\n")
+    proc = _run(home, SERVERS, config, env_file)
+    assert proc.returncode == 0, proc.stderr
+    text = config.read_text(encoding="utf-8")
+    radar = yaml.safe_load(text)["mcp_servers"]["cloudflare_radar"]
+    assert radar["args"] == ["serve", "cloudflare-radar"]
+    assert radar["env"]["CLOUDFLARE_RADAR_API_TOKEN"] == "${CLOUDFLARE_RADAR_API_TOKEN}"
+    assert "url" not in radar
+    assert radar["enabled"] is False
+    assert MARKER not in text

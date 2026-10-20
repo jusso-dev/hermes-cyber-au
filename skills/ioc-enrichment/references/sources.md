@@ -86,7 +86,7 @@ Non-commercial use only unless the operator has an agreement with Cloudflare.
 The server ships off until the operator enables it.
 `${CLOUDFLARE_RADAR_API_TOKEN}` is optional. Without it, the operator uses OAuth.
 Stay under 1200 requests per 5 minutes.
-Call `mcp__radar__radar_domain_rank` with the normalised domain.
+Call `mcp__cloudflare_radar__get_radar_ranking_domain` with the normalised domain.
 If that tool is not registered, record missing source `radar`.
 Do not call a Cloudflare tool that can change an account.
 

@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "domain": {
+      "type": "string",
+      "description": "Hostname, such as example.com",
+      "minLength": 3,
+      "maxLength": 253
+    }
+  },
+  "required": [
+    "domain"
+  ]
+}
