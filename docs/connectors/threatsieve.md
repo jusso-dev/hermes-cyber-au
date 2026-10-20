@@ -14,7 +14,7 @@ Read-only assessments from a ThreatSieve instance the operator already runs.
 
 ## Authentication
 
-Optional `THREATSIEVE_API_KEY` sent as `Authorization: Bearer`. Never logged.
+`THREATSIEVE_API_KEY`, a ThreatSieve scoped API key, sent as `Authorization: Bearer`. The connector makes no call without it. Never logged.
 
 ## Environment variables
 

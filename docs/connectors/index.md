@@ -55,6 +55,6 @@ Every connector with a `SOURCE.md` in this checkout. Planned sources without a c
 | Spamhaus DROP, DROPv6 and ASN-DROP lists | `drop` | none | off: licence terms | [spamhaus-drop](spamhaus-drop.md) |
 | SpyCloud Enterprise Protection connector | `spycloud` | `SPYCLOUD_API_KEY` | off | [spycloud](spycloud.md) |
 | TAXII 2.1 client for a user-supplied API root | `taxii` | `TAXII_USERNAME`, `TAXII_PASSWORD` | off | [taxii-ctis](taxii-ctis.md) |
-| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` (optional) | off: requires local setup | [threatsieve](threatsieve.md) |
+| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` | off: requires local setup | [threatsieve](threatsieve.md) |
 | UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [upguard](upguard.md) |
 | virustotal | `virustotal` | `VTAI_TOKEN` | off: licence terms | [virustotal](virustotal.md) |

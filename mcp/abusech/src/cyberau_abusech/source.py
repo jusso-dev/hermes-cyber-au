@@ -458,11 +458,11 @@ def _live_probe(key: str) -> Probe:
             status = _query_status(outcome.payload)
             if status not in {"ok", *_NO_RESULT, None}:
                 problems.append(f"{call.platform}: answered query_status {_short(status)}")
-    if unkeyed:
-        problems.append(f"{ENV_KEY} is not set, so {', '.join(unkeyed)} were not probed")
+    skipped = f"{ENV_KEY} is not set, so {', '.join(unkeyed)} were not probed" if unkeyed else ""
     if problems:
-        return Probe(key, False, "; ".join(problems))
-    return Probe(key, True, "live ok")
+        return Probe(key, False, "; ".join([*problems, *([skipped] if skipped else [])]))
+    # A missing licence key is not a broken connector: the keyless feeds answered.
+    return Probe(key, True, f"live ok; {skipped}" if skipped else "live ok")
 
 
 def _read(call: _Call, outcome: _Outcome, parse) -> tuple[str, list[dict], str]:

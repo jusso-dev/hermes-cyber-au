@@ -1,7 +1,7 @@
 # threatsieve
 
 - Upstream: https://github.com/jusso-dev/ThreatSieve/blob/HEAD/docs/api.md
-- Auth: optional `THREATSIEVE_API_KEY` sent as `Authorization: Bearer`. Never logged.
+- Auth: `THREATSIEVE_API_KEY`, a ThreatSieve scoped API key, sent as `Authorization: Bearer`. The connector makes no call without it. Never logged.
 - Rate limit: 4 requests a second, under the 5 per second deployment default.
 - Terms: ThreatSieve's own licence.
 - Verified: 2026-10-17
