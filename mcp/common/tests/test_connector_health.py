@@ -94,7 +94,10 @@ def test_checkout_without_a_response_schema_is_not_checked(tmp_path: Path):
     with_schema = {
         key for key in by_key if any((ROOT / "mcp" / key / "schema").glob("*.response.json"))
     }
-    assert set(called) == with_schema - {"first-epss"}
+    unconfigured = {
+        key for key, row in by_key.items() if row["detail"].startswith("not configured: ")
+    }
+    assert set(called) == with_schema - {"first-epss"} - unconfigured
     assert by_key["first-epss"]["status"] == "ok"
     assert by_key["first-epss"]["detail"] == "schema ok"
     assert by_key["first-epss"]["keyed"] is False
@@ -261,3 +264,47 @@ def test_detail_is_redacted_before_it_reaches_the_report(tmp_path: Path):
         ROOT, live=True, check_schema=True, fetcher=fetcher, today=date(2026, 10, 17)
     )
     assert "hunter2" not in json.dumps(report)
+
+
+def test_connector_without_its_required_key_is_not_configured(tmp_path: Path, monkeypatch):
+    root = _mini_checkout(tmp_path)
+    for key in ("spycloud", "abusech"):
+        (root / "mcp" / key / "schema").mkdir(parents=True)
+        (root / "mcp" / key / "pyproject.toml").write_text("", encoding="utf-8")
+        (root / "mcp" / key / "schema" / "x.response.json").write_text("{}", encoding="utf-8")
+    (root / "feeds").mkdir()
+    (root / "feeds" / "catalogue.yaml").write_text(
+        "feeds:\n"
+        "  - {connector: spycloud, keyed: true, auth: {env: SPYCLOUD_API_KEY}}\n"
+        "  - {connector: abusech, keyed: false}\n"
+        "  - {connector: abusech, keyed: true, auth: {env: ABUSECH_AUTH_KEY}}\n"
+        "  - {connector: first-epss, keyed: true, auth: {env: EPSS_DEMO_KEY}}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("SPYCLOUD_API_KEY", raising=False)
+    monkeypatch.delenv("ABUSECH_AUTH_KEY", raising=False)
+    monkeypatch.setenv("EPSS_DEMO_KEY", "set")
+    called = []
+
+    def fetcher(key: str) -> dict:
+        called.append(key)
+        return {"ok": True, "status_code": 200, "error_class": None, "body": None}
+
+    report = collect_connector_health(
+        root, live=True, check_schema=True, fetcher=fetcher, today=date(2026, 10, 17)
+    )
+    by_key = {row["key"]: row for row in report["connectors"]}
+    assert by_key["spycloud"]["status"] == "not_checked"
+    assert by_key["spycloud"]["detail"] == "not configured: SPYCLOUD_API_KEY is not set"
+    # A keyless feed still gets probed, and a set key is probed as usual.
+    assert sorted(called) == ["abusech", "first-epss"]
+
+
+def test_wrapped_connector_without_a_source_module_runs_its_own_probe(monkeypatch):
+    import cyberau_common.health as health
+
+    monkeypatch.setattr(health, "run_health", lambda key, **_: health.Probe(key, True, "live ok"))
+    row = health._fetch_live_unchecked("github-advisories")
+    assert row["ok"] is True
+    assert row["error_class"] is None
+    assert health._fetch_live_unchecked("no-such-connector")["error_class"] == "unknown_connector"
