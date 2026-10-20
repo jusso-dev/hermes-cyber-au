@@ -1,0 +1,14 @@
+{
+  "data_dir": "mcp/asd-essentials/data",
+  "files": [
+    {
+      "path": "mcp/asd-essentials/data/e8-maturity-v2026.09.4.json",
+      "sha256": "039859970cccc26604ab880cbcea3149dbc9faf75df16850fe622c8c6b022a60"
+    },
+    {
+      "path": "mcp/asd-essentials/data/essentials-2026-10-20.json",
+      "sha256": "9c57520d6b15bade69e79156680f1944ca6ac525b007a91a4c0719f2992d25d0"
+    }
+  ],
+  "source": "e8"
+}
