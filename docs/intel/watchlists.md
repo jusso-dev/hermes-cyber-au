@@ -81,6 +81,50 @@ Vendors are merged with a built-in alias table. A watched name that is a known v
 
 Your own `aliases` are added to the built-in ones.
 
+## Watches
+
+A watch is a named daily rule over what the intel store collected: recent advisories and feed items whose text has the terms you care about. It works like a Sentinel analytics rule over a watchlist. Watches live in the same `watchlists.yaml`, under three optional keys.
+
+```yaml
+packs:
+  - microsoft-security        # shipped feeds plus a ready-made watch
+feeds:
+  - id: vendor-blog
+    label: Vendor security blog
+    url: https://vendor.example/feed.xml
+watches:
+  - name: vendor-changes
+    title: Vendor security changes
+    sources: [vendor-blog]
+    any: [security, vulnerability]
+    exclude: [webinar]
+    lookback_days: 3
+```
+
+| Key | Entries |
+|---|---|
+| `packs` | Names of shipped packs in `mcp/custom-feeds/packs/`. A pack brings its own feeds and watches. |
+| `feeds` | RSS 2.0 or Atom feeds: `id`, `url` (https, a DNS host name, no port), optional `label`, `categories` (keep only items in one of these feed categories), `include` (keep only items with one of these terms) and `max_age_days` (default 14). |
+| `watches` | `name`, `title`, `sources` (feed ids, or the store sources `asd-acsc` and `auscert`; empty means every source), `any`, `all`, `exclude` and `lookback_days` (default 3, at most 30). A watch needs `any` or `all`. |
+
+Terms use the brand and vendor token rule above, so they match whole words in order, ignoring case and punctuation. An item matches when it has every `all` term, at least one `any` term and no `exclude` term, and it was published inside the lookback window.
+
+### How a watch runs
+
+1. `cyberau-ingest-custom` (every six hours) runs `cyberau-mcp refresh --sources custom --store`. Every configured feed is fetched through the `custom-feeds` connector and its items are stored as advisories with source `feed-<id>`. One failing feed is reported and skipped; the run fails only when every feed fails.
+2. The nightly watchlist run evaluates every watch and keeps its matches under the list `watches`, with the watch title as the value.
+3. The daily briefing lists new watch matches under "Watchlist hits", grouped by watch, with the item, its feed, its date and an https link. An external channel shows only a count per watch.
+
+### The microsoft-security pack
+
+Feeds: the MSRC Security Update Guide (cloud and security product entries only), the Microsoft Security blog, Azure updates (Security, Retirements and Compliance categories), the Microsoft 365 roadmap (security products only), and the Microsoft Sentinel, Defender XDR, Defender for Endpoint and Defender for Cloud blogs. Its watch, "Microsoft security changes", flags items about Sentinel, Defender, Entra, Azure, Intune, Purview, Conditional Access and Key Vault from the last two days.
+
+To write your own pack, copy that file, change the feeds and watch, and save it under a new name in `mcp/custom-feeds/packs/`. A pack's hosts must be in the `custom-feeds` entry of the egress allowlist. A feed in your own `watchlists.yaml` brings its host at run time instead.
+
+### Egress and safety
+
+The `custom-feeds` connector allows the allowlisted hosts plus the host of each feed you configure. Every connection still goes through the private address floor in the egress policy. A feed that declares a DTD is refused. Titles, summaries and categories are stripped of markup and kept as untrusted text, and only https links are kept.
+
 ## Stored matches
 
 Matches are kept in the `watchlist_matches` table of the intel store (migration `0003_watchlist_matches.sql`). Each row records the list, the match kind, the watchlist entry, what it points at (`indicator`, `advisory` or `crtsh`), the store value that matched, a short detail, and when it was first and last matched.

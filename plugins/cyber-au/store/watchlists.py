@@ -1,5 +1,9 @@
 """Watchlists: match the user's own domains, brands, ranges, ASNs and vendors.
 
+The same file can also turn on watches: named, Sentinel-style rules over recent advisories
+and custom feed items (see ``cyberau_custom_feeds.config``). Each watch keeps its matches in
+``watchlist_matches`` under the ``watches`` list, so they reach the daily briefing.
+
 The watchlist lives at ``plugin-data/cyber-au/watchlists.yaml`` on the profile and is never
 shipped. Each run recomputes ``watchlist_matches`` from what is in the store now: current
 matches are kept (with their first match time) and every other row is deleted, so a match
@@ -32,6 +36,7 @@ FILE_NAME = "watchlists.yaml"
 ROUTINE = "watchlist"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "watchlists.example.yaml"
 LISTS = ("domains", "brands", "ip_ranges", "asns", "vendors")
+WATCH_LIST = "watches"
 STORE_REFS = ("indicator", "advisory")
 CRTSH_REF = "crtsh"
 # A crt.sh match is replaced only by a successful query for its domain. When queries keep
@@ -138,9 +143,13 @@ class Watchlist:
     asns: tuple[int, ...] = ()
     vendors: tuple[Vendor, ...] = ()
     warnings: tuple[str, ...] = ()
+    # Watch rules from cyberau_custom_feeds.config.Watch.
+    watches: tuple = ()
 
     def counts(self) -> dict[str, int]:
-        return {name: len(getattr(self, name)) for name in LISTS}
+        found = {name: len(getattr(self, name)) for name in LISTS}
+        found[WATCH_LIST] = len(self.watches)
+        return found
 
     def empty(self) -> bool:
         return not any(self.counts().values())
@@ -230,6 +239,7 @@ def load_watchlist(path: str | Path) -> Watchlist:
     ranges = _parse_list(data, "ip_ranges", _parse_range, warnings)
     asns = _parse_list(data, "asns", _parse_asn, warnings)
     vendors = _parse_list(data, "vendors", _parse_vendor, warnings)
+    watches = _load_watches(path, data, warnings)
     return Watchlist(
         domains=tuple(_unique(domains)),
         brands=tuple(_unique(brands)),
@@ -237,7 +247,25 @@ def load_watchlist(path: str | Path) -> Watchlist:
         asns=tuple(_unique(asns)),
         vendors=tuple(_merge_vendors(vendors)),
         warnings=tuple(warnings),
+        watches=watches,
     )
+
+
+def _load_watches(path: str | Path, data: dict, warnings: list[str]) -> tuple:
+    if not any(data.get(key) for key in ("watches", "packs")):
+        return ()
+    try:
+        from cyberau_custom_feeds.config import ConfigError, load_config
+    except ImportError:
+        warnings.append("watches need the custom-feeds connector, which is not installed")
+        return ()
+    try:
+        config = load_config(path)
+    except ConfigError as exc:
+        warnings.append(f"watches were skipped: {exc}")
+        return ()
+    warnings.extend(config.warnings)
+    return config.watches
 
 
 def _parse_list(data: dict, name: str, parse, warnings: list[str]) -> list:
@@ -631,10 +659,79 @@ def compute_matches(conn, watch: Watchlist) -> list[Match]:
             summary = indexable_text(row["summary"] or "")
             text = " ".join((row["title"] or "", summary, body["body"] if body else ""))
             matches.extend(match_text(watch, row["id"], row["title"] or "", text))
+    if watch.watches:
+        matches.extend(match_watches(conn, watch.watches))
     unique: dict[tuple[str, str, str, str], Match] = {}
     for item in matches:
         unique.setdefault(item.key, item)
     return list(unique.values())
+
+
+def match_watches(conn, watches: Iterable, *, now: str | None = None) -> list[Match]:
+    """Advisories and feed items from each watch's sources, inside its lookback window,
+    whose text has every ``all`` term, at least one ``any`` term and no ``exclude`` term.
+    Terms use the same token rule as brands and vendors."""
+    from datetime import datetime, timedelta
+
+    moment = datetime.fromisoformat((now or utc_now()).replace("Z", "+00:00"))
+    found: list[Match] = []
+    rows = conn.execute(
+        "SELECT id, source_id, title, summary, published_at, first_seen FROM advisories"
+    ).fetchall()
+    texts: dict[str, tuple[str, ...]] = {}
+    for rule in watches:
+        cutoff = (moment - timedelta(days=rule.lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        sources = {
+            source if source.startswith("feed-") or source in _STORE_SOURCES else f"feed-{source}"
+            for source in rule.sources
+        }
+        wanted_any = [tokens(term) for term in rule.any]
+        wanted_all = [tokens(term) for term in rule.all]
+        unwanted = [tokens(term) for term in rule.exclude]
+        for row in rows:
+            if sources and row["source_id"] not in sources:
+                continue
+            when = row["published_at"] or row["first_seen"] or ""
+            if when < cutoff:
+                continue
+            haystack = texts.get(row["id"])
+            if haystack is None:
+                body = conn.execute(
+                    "SELECT body FROM fts WHERE rowid = ?", (fts_rowid("advisory", row["id"]),)
+                ).fetchone()
+                summary = indexable_text(row["summary"] or "")
+                haystack = tokens(
+                    " ".join((row["title"] or "", summary, body["body"] if body else ""))
+                )
+                texts[row["id"]] = haystack
+            if any(phrase_in(term, haystack) for term in unwanted):
+                continue
+            if not all(phrase_in(term, haystack) for term in wanted_all):
+                continue
+            hit = next(
+                (name for name, term in zip(rule.any, wanted_any) if phrase_in(term, haystack)),
+                None,
+            )
+            if wanted_any and hit is None:
+                continue
+            detail = f"term {hit}" if hit else "all terms"
+            found.append(
+                Match(
+                    WATCH_LIST,
+                    "watch",
+                    # The title, so the briefing can head each watch without reading config.
+                    rule.title,
+                    "advisory",
+                    row["id"],
+                    (row["title"] or "")[:200],
+                    detail,
+                )
+            )
+    return found
+
+
+# Intel store source ids a watch may name directly. Anything else is a custom feed id.
+_STORE_SOURCES = frozenset({"asd-acsc", "auscert"})
 
 
 # crt.sh lookalike discovery.
@@ -899,7 +996,7 @@ def list_matches(
 
     chosen = [name for name in lists if name]
     for name in chosen:
-        if name not in LISTS:
+        if name not in (*LISTS, WATCH_LIST):
             raise ValueError(f"unknown watchlist list: {name}")
     clauses = [f"({_LIVE})"]
     params: list = []
@@ -922,24 +1019,51 @@ def list_matches(
     return [dict(row) for row in rows]
 
 
+def _watch_details(store: str | Path | None, refs: list[str]) -> dict[str, dict]:
+    """Link, source and date of each advisory a watch matched."""
+    if not refs:
+        return {}
+    conn = open_store(resolve_db_path(store)).connection()
+    found: dict[str, dict] = {}
+    for start in range(0, len(refs), 500):
+        chunk = refs[start : start + 500]
+        rows = conn.execute(
+            "SELECT id, source_id, url, published_at FROM advisories"
+            f" WHERE id IN ({','.join('?' for _ in chunk)})",
+            chunk,
+        )
+        for row in rows:
+            found[row["id"]] = {
+                "source": row["source_id"],
+                "url": row["url"],
+                "published": row["published_at"],
+            }
+    return found
+
+
 def hits(*, store: str | Path | None = None, since: str) -> dict:
     """Matches since ``since`` in the daily-briefing intel-store ``hits`` shape."""
     rows = list_matches(store=store, since=since)
+    details = _watch_details(store, [row["ref"] for row in rows if row["list"] == WATCH_LIST])
     out = []
     for row in rows:
         digest = hashlib.sha256(
             "\0".join((row["list"], row["value"], row["ref_kind"], row["ref"])).encode()
         ).hexdigest()[:12]
         kind = row["kind"] if row["ref_kind"] != "advisory" else f"advisory {row['kind']}"
-        out.append(
-            {
-                "id": f"watch-{digest}",
-                "kind": kind,
-                "value": row["matched"],
-                "seen": row["first_matched"],
-                "asset": row["value"],
-            }
-        )
+        hit = {
+            "id": f"watch-{digest}",
+            "kind": kind,
+            "value": row["matched"],
+            "seen": row["first_matched"],
+            "asset": row["value"],
+        }
+        if row["list"] == WATCH_LIST:
+            # A watch hit is not about an owned asset. It names its watch and the item.
+            hit.pop("asset")
+            hit["watch"] = row["value"]
+            hit.update(details.get(row["ref"], {}))
+        out.append(hit)
     out.sort(key=lambda item: (item["seen"], item["id"]))
     return {
         "source": "intel-store",

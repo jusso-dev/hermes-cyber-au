@@ -285,6 +285,16 @@ Terms: CC BY 4.0. Attribute the GitHub Advisory Database.
 
 The wrapped server receives the token as GITHUB_PERSONAL_ACCESS_TOKEN. It answers with a sign-in link without one. GITHUB_ADVISORY_TOKEN is not in .env.template.
 
+## Custom RSS and Atom feeds (watch packs) (custom-feeds)
+
+Connector: `custom-feeds`. Default: on.
+
+Source: https://api.msrc.microsoft.com/update-guide/rss
+
+Terms: Each feed's publisher terms. The shipped microsoft-security pack is Microsoft content under the Microsoft Terms of Use.
+
+Generic reader for the feeds turned on in watchlists.yaml. Nothing is fetched until a pack or feed is listed there. URLs are the shipped microsoft-security pack.
+
 ## Cloudflare Radar API (cloudflare-radar)
 
 Connector: `cloudflare-radar`. Default: off.

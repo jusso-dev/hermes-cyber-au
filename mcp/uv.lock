@@ -25,6 +25,7 @@ members = [
     "cyberau-common",
     "cyberau-crowdstrike-recon",
     "cyberau-crtsh",
+    "cyberau-custom-feeds",
     "cyberau-cve-program",
     "cyberau-darkowl",
     "cyberau-datagov-au",
@@ -824,6 +825,17 @@ requires-dist = [
 name = "cyberau-crtsh"
 version = "0.1.0"
 source = { editable = "crtsh" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-custom-feeds"
+version = "0.1.0"
+source = { editable = "custom-feeds" }
 dependencies = [
     { name = "cyberau-common" },
 ]

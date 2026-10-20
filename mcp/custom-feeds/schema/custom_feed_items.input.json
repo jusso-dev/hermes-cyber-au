@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "feed": {
+      "type": "string",
+      "description": "Feed id from custom_feed_list",
+      "minLength": 1,
+      "maxLength": 41
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 20
+    }
+  },
+  "required": [
+    "feed"
+  ]
+}

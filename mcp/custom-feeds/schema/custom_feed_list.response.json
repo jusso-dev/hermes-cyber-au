@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "required": [
+    "packs_enabled",
+    "packs_available",
+    "feeds",
+    "watches"
+  ],
+  "properties": {
+    "packs_enabled": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "packs_available": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "feeds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "url"
+        ]
+      }
+    },
+    "watches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "title"
+        ]
+      }
+    }
+  }
+}

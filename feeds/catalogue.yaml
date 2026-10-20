@@ -545,6 +545,28 @@ feeds:
       It answers with a sign-in link without one. GITHUB_ADVISORY_TOKEN is
       not in .env.template.
 
+  - id: custom-feeds
+    name: Custom RSS and Atom feeds (watch packs)
+    connector: custom-feeds
+    server: custom_feeds
+    url: https://api.msrc.microsoft.com/update-guide/rss
+    urls:
+      - https://api.msrc.microsoft.com/update-guide/rss
+      - https://www.microsoft.com/en-us/security/blog/feed/
+      - https://www.microsoft.com/releasecommunications/api/v2/azure/rss
+      - https://www.microsoft.com/releasecommunications/api/v1/m365/rss
+      - https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=MicrosoftSentinelBlog
+    format: rss
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT1H
+    refresh: custom
+    refresh_supported: true
+    licence: Each feed's publisher terms. The shipped microsoft-security pack is Microsoft content under the Microsoft Terms of Use.
+    region: global
+    notes: Generic reader for the feeds turned on in watchlists.yaml. Nothing is fetched until a pack or feed is listed there. URLs are the shipped microsoft-security pack.
+
   - id: cloudflare-radar
     name: Cloudflare Radar API
     connector: cloudflare-radar

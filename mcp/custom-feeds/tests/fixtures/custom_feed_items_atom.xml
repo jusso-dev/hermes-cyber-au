@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Synthetic vendor blog</title>
+  <entry>
+    <id>tag:vendor.example,2026:post-7</id>
+    <title type="html">New &lt;em&gt;Entra&lt;/em&gt; Conditional Access controls</title>
+    <link rel="alternate" href="https://vendor.example/posts/7"/>
+    <published>2026-10-19T03:00:00Z</published>
+    <category term="Identity"/>
+    <summary>Conditional Access gains session controls.</summary>
+  </entry>
+  <entry>
+    <id>tag:vendor.example,2026:post-8</id>
+    <title>Unsafe link</title>
+    <link rel="alternate" href="javascript:alert(1)"/>
+    <updated>2026-10-18T03:00:00Z</updated>
+  </entry>
+</feed>

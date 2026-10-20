@@ -709,9 +709,13 @@ def _watchlist(
     by_name = {asset.name.casefold(): asset for asset in assets}
     public: list[Bullet] = []
     owned: list[tuple[dict, Asset]] = []
+    watched: dict[str, list[dict]] = {}
     for row in _rows(connectors["intel-store"], "hits"):
         seen = str(row.get("seen") or "")
         if not seen or not _in_window(seen, start, end):
+            continue
+        if row.get("watch"):
+            watched.setdefault(_flatten(row.get("watch"), limit), []).append(row)
             continue
         claimed = _flatten(row.get("asset"), None)
         asset = by_name.get(claimed.casefold()) if claimed else None
@@ -724,6 +728,7 @@ def _watchlist(
         text = f"{ident}, {kind} {value}, seen {_display(seen)}."
         public.append(Bullet(ident, text))
     public.sort(key=lambda bullet: bullet.text)
+    public = _watch_bullets(watched, channel, limit) + public
     if not owned:
         return public
     if channel == "owner":
@@ -796,6 +801,28 @@ def _internet(
     if brief and len(attacks) > 1:
         lines.append(f"{len(attacks) - 1} more attack summaries are in the full briefing.")
     return lines
+
+
+def _watch_bullets(watched: dict[str, list[dict]], channel: str, limit: int | None) -> list[Bullet]:
+    """Watch hits, grouped by watch. The owner channel lists items; external only counts."""
+    bullets: list[Bullet] = []
+    for title in sorted(watched):
+        rows = sorted(watched[title], key=lambda row: str(row.get("published") or ""), reverse=True)
+        if channel != "owner":
+            noun = "item" if len(rows) == 1 else "items"
+            bullets.append(Bullet(f"watch-{title}", f"{title}: {len(rows)} new {noun}."))
+            continue
+        for row in rows:
+            ident = _flatten(row.get("id"), limit)
+            item = _flatten(row.get("value"), limit)
+            source = _flatten(row.get("source"), limit)
+            published = str(row.get("published") or row.get("seen") or "")
+            text = f"{title}: {item} ({source}, {_display(published)})."
+            url = str(row.get("url") or "")
+            if url.startswith("https://") and not any(ch.isspace() for ch in url):
+                text += f" {url}"
+            bullets.append(Bullet(ident, text))
+    return bullets
 
 
 def _is_au(location: str) -> bool:

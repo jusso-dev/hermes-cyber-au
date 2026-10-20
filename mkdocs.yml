@@ -50,6 +50,7 @@ nav:
       - cloudflare-urlscanner: connectors/cloudflare-urlscanner.md
       - crowdstrike-recon: connectors/crowdstrike-recon.md
       - crtsh: connectors/crtsh.md
+      - custom-feeds: connectors/custom-feeds.md
       - cve-program: connectors/cve-program.md
       - darkowl: connectors/darkowl.md
       - datagov-au: connectors/datagov-au.md

@@ -1,0 +1,11 @@
+packs:
+  - microsoft-security
+feeds:
+  - id: vendor-blog
+    label: Vendor security blog
+    url: https://vendor.example/feed.xml
+watches:
+  - name: vendor-changes
+    title: Vendor security changes
+    sources: [vendor-blog]
+    any: [Conditional Access]

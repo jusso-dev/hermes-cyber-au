@@ -1,0 +1,60 @@
+# Microsoft security changes: Sentinel, Defender, Entra, Intune, Purview and Azure.
+# Turn it on with `packs: [microsoft-security]` in your watchlists.yaml.
+#
+# Every URL here was checked live on 20 October 2026. The feeds are public and keyless.
+# Content is Microsoft's, under the Microsoft Terms of Use. Items are untrusted text.
+
+feeds:
+  - id: msrc-update-guide
+    label: MSRC Security Update Guide
+    url: https://api.msrc.microsoft.com/update-guide/rss
+    # About 5,000 CVE entries. Keep only cloud and security product entries.
+    include: [Azure, Defender, Sentinel, Entra, Intune, Purview, Microsoft 365, Exchange Online, SharePoint Online, Teams]
+    max_age_days: 7
+  - id: ms-security-blog
+    label: Microsoft Security blog
+    url: https://www.microsoft.com/en-us/security/blog/feed/
+  - id: azure-updates
+    label: Azure updates
+    url: https://www.microsoft.com/releasecommunications/api/v2/azure/rss
+    categories: [Security, Retirements, Compliance]
+  - id: m365-roadmap
+    label: Microsoft 365 roadmap
+    url: https://www.microsoft.com/releasecommunications/api/v1/m365/rss
+    include: [Defender, Sentinel, Entra, Intune, Purview, Conditional Access, Microsoft Security]
+    max_age_days: 7
+  - id: ms-sentinel-blog
+    label: Microsoft Sentinel blog
+    url: https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=MicrosoftSentinelBlog
+  - id: ms-defender-xdr-blog
+    label: Microsoft Defender XDR blog
+    url: https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=MicrosoftThreatProtectionBlog
+  - id: ms-defender-endpoint-blog
+    label: Microsoft Defender for Endpoint blog
+    url: https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=MicrosoftDefenderATPBlog
+  - id: ms-defender-cloud-blog
+    label: Microsoft Defender for Cloud blog
+    url: https://techcommunity.microsoft.com/t5/s/gxcuf89792/rss/board?board.id=MicrosoftDefenderCloudBlog
+
+watches:
+  - name: microsoft-security
+    title: Microsoft security changes
+    sources:
+      - msrc-update-guide
+      - ms-security-blog
+      - azure-updates
+      - m365-roadmap
+      - ms-sentinel-blog
+      - ms-defender-xdr-blog
+      - ms-defender-endpoint-blog
+      - ms-defender-cloud-blog
+    any:
+      - Sentinel
+      - Defender
+      - Entra
+      - Azure
+      - Intune
+      - Purview
+      - Conditional Access
+      - Key Vault
+    lookback_days: 2

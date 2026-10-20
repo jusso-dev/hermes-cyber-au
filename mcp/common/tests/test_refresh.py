@@ -278,3 +278,60 @@ def test_epss_alone_scores_the_stored_kev_list(feeds, store_path, monkeypatch, c
     feeds["epss_calls"].clear()
     assert main(["refresh", "--sources", "epss", "--store"]) == 0
     assert feeds["epss_calls"] == [{"cve": "CVE-2026-0001,CVE-2026-0002"}]
+
+
+def test_custom_feeds_load_items_and_one_failure_does_not_fail_the_rest(
+    store_path, tmp_path, monkeypatch, capsys
+):
+    from cyberau_custom_feeds import source
+
+    data = store_path.parent
+    data.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    (data / "watchlists.yaml").write_text(
+        "feeds:\n"
+        "  - id: good\n    url: https://good.example/rss\n"
+        "  - id: broken\n    url: https://broken.example/rss\n",
+        encoding="utf-8",
+    )
+    item = {
+        "id": "0123456789abcdef",
+        "title": "Defender for Cloud adds scanning",
+        "url": "https://good.example/a",
+        "guid": "a",
+        "published": "2026-10-19T08:00:00Z",
+        "categories": ["Security"],
+        "summary": "Agentless.",
+    }
+
+    def fetch_items(feed, **_kwargs):
+        if feed.id == "broken":
+            return [], "snapshot", "Broken feed is unavailable"
+        return [item], "miss", ""
+
+    monkeypatch.setattr(source, "fetch_items", fetch_items)
+    code = main(["refresh", "--sources", "custom", "--store"])
+    out = capsys.readouterr().out.splitlines()
+    assert code == 0, out
+    assert any("custom ok 1 items, stored 1" in line for line in out), out
+
+    from store.db import open_store
+
+    row = (
+        open_store(store_path)
+        .connection()
+        .execute("SELECT id, source_id, summary FROM advisories")
+        .fetchone()
+    )
+    assert row["id"] == "feed-good:0123456789abcdef"
+    assert row["source_id"] == "feed-good"
+    assert "Categories: Security" in row["summary"]
+
+    monkeypatch.setattr(source, "fetch_items", lambda feed, **_k: ([], "snapshot", "down"))
+    assert main(["refresh", "--sources", "custom"]) == 1
+
+
+def test_custom_feeds_without_config_do_nothing(store_path, monkeypatch, capsys):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(store_path.parent))
+    assert main(["refresh", "--sources", "custom"]) == 0
+    assert "custom ok 0 items" in capsys.readouterr().out
