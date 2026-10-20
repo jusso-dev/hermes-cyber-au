@@ -208,12 +208,12 @@ def test_withdrawn_is_kept_and_absent_values_are_not_invented():
 def test_advertised_schema_and_drift_probe(monkeypatch):
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
     assert set(tools) == {"osv_query", "osv_get", "osv_batch"}
-    assert tools["osv_query"].inputSchema["required"] == ["ecosystem", "package"]
-    assert tools["osv_get"].inputSchema["required"] == ["id"]
-    assert "maxItems" in json.dumps(tools["osv_batch"].inputSchema)
+    assert tools["osv_query"].input_schema["required"] == ["ecosystem", "package"]
+    assert tools["osv_get"].input_schema["required"] == ["id"]
+    assert "maxItems" in json.dumps(tools["osv_batch"].input_schema)
     for tool in tools.values():
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.openWorldHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.open_world_hint is True
     assert connector().health(live=False, check_schema=True).ok is True
     monkeypatch.setenv("CYBERAU_OSV_SNAPSHOT", str(FIXTURES / "vuln_drift.json"))
     probe = connector().health(live=False, check_schema=True)

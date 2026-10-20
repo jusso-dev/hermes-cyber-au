@@ -253,9 +253,9 @@ def test_tools_are_read_only():
         "flare_quota_status",
     }
     for tool in tools.values():
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.openWorldHint is True
-    props = tools["flare_domain_credentials"].inputSchema["properties"]
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.open_world_hint is True
+    props = tools["flare_domain_credentials"].input_schema["properties"]
     assert set(props) == {"domain", "since"}
 
 

@@ -142,8 +142,8 @@ def test_schema_drift_health_and_tools(monkeypatch):
     assert main(["health", "au-regulatory", "--schema-drift"]) == 1
 
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["aureg_obligation"].annotations.readOnlyHint is True
-    assert tools["aureg_deadline"].inputSchema["required"] == ["regime", "trigger", "aware_at"]
+    assert tools["aureg_obligation"].annotations.read_only_hint is True
+    assert tools["aureg_deadline"].input_schema["required"] == ["regime", "trigger", "aware_at"]
     called = asyncio.run(
         build_server(connector()).call_tool(
             "aureg_deadline",

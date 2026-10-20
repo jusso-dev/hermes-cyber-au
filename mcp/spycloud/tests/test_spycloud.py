@@ -539,8 +539,8 @@ def test_tools_are_read_only_and_fixtures_are_clean():
     assert len("mcp__spycloud__spycloud_watchlist_exposure") == 42
     assert len("mcp__spycloud__spycloud_breach_info") == 35
     for name, tool in tools.items():
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.openWorldHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.open_world_hint is True
         schema_path = ROOT / "mcp" / "spycloud" / "schema" / f"{name}.input.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(schema)

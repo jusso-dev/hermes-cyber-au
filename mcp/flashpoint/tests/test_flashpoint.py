@@ -345,11 +345,11 @@ def test_tool_annotations_are_read_only():
     listed = asyncio.run(build_server(connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
     assert set(tools) == {"flashpoint_indicator"}
-    encoded = json.dumps(tools["flashpoint_indicator"].inputSchema)
+    encoded = json.dumps(tools["flashpoint_indicator"].input_schema)
     assert "minLength" in encoded
     annotations = tools["flashpoint_indicator"].annotations
-    assert annotations.readOnlyHint is True
-    assert annotations.openWorldHint is True
+    assert annotations.read_only_hint is True
+    assert annotations.open_world_hint is True
 
 
 def test_snapshot_is_never_served_as_live_without_a_warning(tmp_path, monkeypatch):

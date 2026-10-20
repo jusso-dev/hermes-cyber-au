@@ -310,9 +310,9 @@ def test_live_health_and_advertised_tools(monkeypatch):
     assert "CLOUDFLARE_URLSCAN_API_TOKEN" in offline_probe.detail
 
     tools = {tool.name: tool for tool in asyncio.run(build_server(connector()).list_tools())}
-    assert tools["urlscan_submit_unlisted"].annotations.readOnlyHint is True
-    assert tools["urlscan_get_result"].annotations.readOnlyHint is True
-    assert tools["urlscan_submit_unlisted"].annotations.openWorldHint is True
+    assert tools["urlscan_submit_unlisted"].annotations.read_only_hint is True
+    assert tools["urlscan_get_result"].annotations.read_only_hint is True
+    assert tools["urlscan_submit_unlisted"].annotations.open_world_hint is True
     submit_schema = json.loads(
         (FIXTURES.parents[1] / "schema" / "urlscan_submit_unlisted.input.json").read_text()
     )

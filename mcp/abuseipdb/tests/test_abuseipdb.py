@@ -284,12 +284,12 @@ def test_advertised_schema_and_cassettes(vcr_config):
     tools = {tool.name: tool for tool in listed}
     check = tools["abuseipdb_check_ip"]
     block = tools["abuseipdb_check_block"]
-    assert check.annotations.readOnlyHint is True
-    assert check.annotations.openWorldHint is True
-    encoded = json.dumps(check.inputSchema)
+    assert check.annotations.read_only_hint is True
+    assert check.annotations.open_world_hint is True
+    encoded = json.dumps(check.input_schema)
     assert "IPv4 or IPv6 address" in encoded
     assert "maximum" in encoded
-    assert block.inputSchema["required"] == ["network"]
+    assert block.input_schema["required"] == ["network"]
     assert len("mcp__abuseipdb__abuseipdb_check_ip") == 34
     assert len("mcp__abuseipdb__abuseipdb_check_block") == 37
     assert "key" in vcr_config["filter_headers"]
