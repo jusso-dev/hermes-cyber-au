@@ -60,6 +60,13 @@ connectors:
   osv:
     hosts:
       - api.osv.dev
+  custom-feeds:
+    hosts:
+    - api.msrc.microsoft.com
+    - techcommunity.microsoft.com
+    - www.microsoft.com
+    allow_ip_literals: false
+    allow_http_loopback: false
   cloudflare-radar:
     hosts:
     - api.cloudflare.com

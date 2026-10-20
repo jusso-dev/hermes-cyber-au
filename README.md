@@ -91,6 +91,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |
 | CrowdStrike Falcon Adversary Intelligence Recon connector | `csrecon` | `FALCON_CLIENT_ID` (optional), `FALCON_CLIENT_SECRET` (optional), `FALCON_BASE_URL` (optional) | off | [docs/connectors/crowdstrike-recon.md](docs/connectors/crowdstrike-recon.md) |
 | Crt.sh certificate transparency search | `crtsh` | none | off: licence terms | [docs/connectors/crtsh.md](docs/connectors/crtsh.md) |
+| Read RSS and Atom feeds the user turned on in watchlists.yaml, read only | `custom_feeds` | none | on | [docs/connectors/custom-feeds.md](docs/connectors/custom-feeds.md) |
 | CVE Program records from the CVE Services API | `cve` | none | on | [docs/connectors/cve-program.md](docs/connectors/cve-program.md) |
 | DarkOwl Vision search | `darkowl` | none | off | [docs/connectors/darkowl.md](docs/connectors/darkowl.md) |
 | Data.gov.au CKAN catalogue | `datagov` | none | on | [docs/connectors/datagov-au.md](docs/connectors/datagov-au.md) |

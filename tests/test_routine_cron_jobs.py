@@ -125,7 +125,7 @@ def _script_job(job_id: str, name: str, feed: str, schedule: dict) -> dict:
     }
 
 
-FEEDS = ("asd", "auscert", "feodo", "kev", "epss")
+FEEDS = ("asd", "auscert", "feodo", "kev", "epss", "custom")
 SCRIPTS = (
     "cyberau_ingest.sh",
     *(f"cyberau_ingest_{feed}.sh" for feed in FEEDS),
@@ -151,6 +151,9 @@ EXPECTED = [
     _script_job("cyberau-ingest-feodo", "Ingest Feodo Tracker C2 list", "feodo", _interval(60)),
     _script_job("cyberau-ingest-kev", "Ingest CISA KEV", "kev", _interval(360)),
     _script_job("cyberau-ingest-epss", "Ingest EPSS for KEV CVEs", "epss", _interval(720)),
+    _script_job(
+        "cyberau-ingest-custom", "Ingest custom feeds for watches", "custom", _interval(360)
+    ),
     {
         "id": "cyberau-morning-brief",
         "name": "Morning cyber briefing (AU)",

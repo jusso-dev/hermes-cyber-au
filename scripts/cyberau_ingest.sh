@@ -7,7 +7,8 @@
 # is delivered verbatim, so a credential printed by a fault would leave the
 # machine. Keyed sources stay on agent jobs, where each MCP server receives
 # its keys from mcp_servers.*.env. This script refreshes keyless sources only
-# (asd, kev, epss, auscert, and the public Feodo list).
+# (asd, kev, epss, auscert, the public Feodo list, and the public custom feeds
+# turned on in watchlists.yaml).
 set -euo pipefail
 unset CDPATH
 

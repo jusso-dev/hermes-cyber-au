@@ -172,6 +172,18 @@ servers:
     enabled_by_default: false
     off_reason: licence terms
     required_env: []
+  custom_feeds:
+    connector: custom-feeds
+    args:
+    - serve
+    - custom-feeds
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
+    docs: docs/intel/watchlists.md
   cloudflare_radar:
     connector: cloudflare-radar
     args:

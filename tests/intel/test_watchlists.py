@@ -453,3 +453,76 @@ def test_crtsh_missing_connector_is_a_warning(store_path, monkeypatch, capsys):
     assert code == 0
     assert payload["crtsh"]["skipped"] == "crt.sh connector is not installed"
     assert payload["status"] == "ok"
+
+
+# Watches over feed items and advisories.
+
+WATCHES = """\
+feeds:
+  - id: azure-updates
+    url: https://updates.example/rss
+watches:
+  - name: ms-changes
+    title: Microsoft security changes
+    sources: [azure-updates]
+    any: [Defender, Sentinel]
+    exclude: [webinar]
+    lookback_days: 2
+  - name: entra-ca
+    title: Entra Conditional Access
+    all: [Entra, Conditional Access]
+"""
+
+
+def _feed_item(ident: str, title: str, published: str, source: str = "feed-azure-updates"):
+    upsert_advisory(
+        f"{source}:{ident}",
+        source=source,
+        title=title,
+        url=f"https://updates.example/{ident}",
+        published_at=published,
+        summary=None,
+        content_sha256=None,
+    )
+
+
+def test_watches_match_sources_terms_and_window(store_path):
+    _write(store_path, WATCHES)
+    _feed_item("a", "Defender for Cloud adds agentless scanning", "2026-10-19T08:00:00Z")
+    _feed_item("b", "Sentinel webinar next week", "2026-10-19T08:00:00Z")
+    _feed_item("c", "Defender retired feature", "2026-10-10T08:00:00Z")
+    _feed_item("d", "Defender in another feed", "2026-10-19T08:00:00Z", source="feed-other")
+    _feed_item("e", "Larger VM sizes", "2026-10-19T08:00:00Z")
+    _feed_item("f", "Entra Conditional Access session controls", "2026-10-19T08:00:00Z", "auscert")
+    summary = run_watchlist(store=store_path, now="2026-10-20T04:00:00Z")
+    assert summary["entries"]["watches"] == 2
+    assert summary["by_kind"] == {"watch": 2}
+    rows = list_matches(store=store_path, lists=["watches"])
+    assert {(row["value"], row["ref"]) for row in rows} == {
+        ("Microsoft security changes", "feed-azure-updates:a"),
+        ("Entra Conditional Access", "auscert:f"),
+    }
+    payload = hits(store=store_path, since="2026-10-20T00:00:00Z")
+    by_ref = {row["value"]: row for row in payload["data"]["hits"]}
+    row = by_ref["Defender for Cloud adds agentless scanning"]
+    assert row["watch"] == "Microsoft security changes"
+    assert row["url"] == "https://updates.example/a"
+    assert row["source"] == "feed-azure-updates"
+    assert row["published"] == "2026-10-19T08:00:00Z"
+    assert "asset" not in row
+
+
+def test_packs_without_the_connector_warn(store_path, monkeypatch):
+    import builtins
+
+    real = builtins.__import__
+
+    def blocked(name, *args, **kwargs):
+        if name.startswith("cyberau_custom_feeds"):
+            raise ImportError(name)
+        return real(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked)
+    _write(store_path, "packs: [microsoft-security]\n")
+    summary = run_watchlist(store=store_path, now="2026-10-20T04:00:00Z")
+    assert any("custom-feeds connector" in item for item in summary["warnings"])

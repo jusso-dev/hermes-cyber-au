@@ -212,6 +212,34 @@ class DailyBriefingTest(unittest.TestCase):
         self.assertIn("Cloudflare Radar. Outage: CABLE_CUT, AU", text)
         self.assertNotIn("POWER_OUTAGE", text)
 
+    def test_watch_hits_are_grouped_by_watch(self):
+        pack = json.loads(json.dumps(self.pack))
+        hits = pack["connectors"]["intel-store"]["envelope"]["data"]["hits"]
+        hits.append(
+            {
+                "id": "watch-0123456789ab",
+                "kind": "advisory watch",
+                "value": "Defender for Cloud adds agentless scanning",
+                "seen": "2026-10-19T18:00:00Z",
+                "watch": "Microsoft security changes",
+                "source": "feed-azure-updates",
+                "url": "https://updates.example/a",
+                "published": "2026-10-19T08:00:00Z",
+            }
+        )
+        moment = datetime.fromisoformat(TUESDAY)
+        owner = briefing.render(pack, self.assets, moment, "full", inventory_configured=True)
+        self.assertIn(
+            "Microsoft security changes: Defender for Cloud adds agentless scanning "
+            "(feed-azure-updates, 2026-10-19T19:00:00+11:00). https://updates.example/a",
+            owner,
+        )
+        external = briefing.render(
+            pack, self.assets, moment, "full", "external", inventory_configured=True
+        )
+        self.assertIn("Microsoft security changes: 1 new item.", external)
+        self.assertNotIn("updates.example", external)
+
     def test_brief_stays_under_600_words_when_the_window_is_busy(self):
         title = " ".join(["synthetic"] * 30)
         alerts = [

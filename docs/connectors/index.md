@@ -19,6 +19,7 @@ Every connector with a `SOURCE.md` in this checkout. Planned sources without a c
 | Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [cloudflare-urlscanner](cloudflare-urlscanner.md) |
 | CrowdStrike Falcon Adversary Intelligence Recon connector | `csrecon` | `FALCON_CLIENT_ID` (optional), `FALCON_CLIENT_SECRET` (optional), `FALCON_BASE_URL` (optional) | off | [crowdstrike-recon](crowdstrike-recon.md) |
 | Crt.sh certificate transparency search | `crtsh` | none | off: licence terms | [crtsh](crtsh.md) |
+| Read RSS and Atom feeds the user turned on in watchlists.yaml, read only | `custom_feeds` | none | on | [custom-feeds](custom-feeds.md) |
 | CVE Program records from the CVE Services API | `cve` | none | on | [cve-program](cve-program.md) |
 | DarkOwl Vision search | `darkowl` | none | off | [darkowl](darkowl.md) |
 | Data.gov.au CKAN catalogue | `datagov` | none | on | [datagov-au](datagov-au.md) |

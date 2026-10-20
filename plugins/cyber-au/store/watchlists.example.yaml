@@ -39,3 +39,27 @@ vendors:
   - name: Example Vendor
     aliases:
       - ExampleOS
+
+# Watches: daily rules over feed items and advisories, like a Sentinel analytics rule over
+# a watchlist. New matches appear under "Watchlist hits" in the daily briefing, grouped by
+# watch. Uncomment to use. See docs/intel/watchlists.md.
+#
+# Shipped packs bring feeds and a ready-made watch. microsoft-security covers security
+# changes to Sentinel, Defender, Entra, Intune, Purview and Azure.
+# packs:
+#   - microsoft-security
+#
+# Your own RSS or Atom feeds. https only.
+# feeds:
+#   - id: vendor-blog
+#     label: Vendor security blog
+#     url: https://vendor.example/feed.xml
+#
+# Your own watches. sources are feed ids, or asd-acsc and auscert. Terms match whole words.
+# watches:
+#   - name: vendor-changes
+#     title: Vendor security changes
+#     sources: [vendor-blog]
+#     any: [security, vulnerability]
+#     exclude: [webinar]
+#     lookback_days: 3

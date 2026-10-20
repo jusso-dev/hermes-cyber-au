@@ -26,7 +26,7 @@ from pathlib import Path
 
 from cyberau_common.secrets import redact
 
-SUPPORTED = ("asd", "kev", "epss", "auscert", "feodo")
+SUPPORTED = ("asd", "kev", "epss", "auscert", "feodo", "custom")
 _LIVE = {"miss", "hit", "direct", "http11"}
 _EPSS_BATCH = 100
 
@@ -275,6 +275,55 @@ def _auscert(result: Result, run: _Run) -> None:
         )
 
 
+# Custom feeds: the RSS and Atom feeds turned on in watchlists.yaml
+
+
+def _custom(result: Result, run: _Run) -> None:
+    from cyberau_custom_feeds import source
+    from cyberau_custom_feeds.config import load_config
+
+    config = load_config()
+    if not config.feeds:
+        result.detail = "no custom feeds configured"
+        return
+    problems = []
+    stored = 0
+    for feed in config.feeds:
+        items, _cache, warning = source.fetch_items(feed)
+        if warning:
+            problems.append(warning)
+            continue
+        rows = [
+            {
+                "id": f"{feed.source_id}:{item['id']}",
+                "title": item["title"],
+                "url": item["url"] or item["guid"],
+                "published_at": item["published"] or None,
+                "summary": _feed_summary(item),
+                "feed": feed.id,
+            }
+            for item in items
+        ]
+        result.rows.extend(rows)
+        if run.store and rows:
+            stored += _store_advisories(feed.source_id, rows)
+    result.items = len(result.rows)
+    if run.store:
+        result.stored = stored
+    if problems and len(problems) == len(config.feeds):
+        result.fail("; ".join(problems))
+    elif problems:
+        # One flaky blog must not fail the rest. The run names what it skipped.
+        result.detail = "skipped: " + "; ".join(problems)
+
+
+def _feed_summary(item: dict) -> str | None:
+    parts = [item["summary"]] if item["summary"] else []
+    if item["categories"]:
+        parts.append("Categories: " + ", ".join(item["categories"][:10]))
+    return " ".join(parts) or None
+
+
 # Feodo Tracker, the keyless part of abuse.ch
 
 
@@ -329,6 +378,7 @@ _ADAPTERS: dict[str, Callable[[Result, _Run], None]] = {
     "epss": _epss,
     "auscert": _auscert,
     "feodo": _feodo,
+    "custom": _custom,
 }
 
 
