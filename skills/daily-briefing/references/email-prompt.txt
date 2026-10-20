@@ -1,0 +1,22 @@
+Write this morning's Australian cyber briefing for DATE_LABEL from public sources only, in Sydney time, covering the 24 hours to 07:30 today (72 hours on a Monday). Use the daily-briefing procedure: new CISA KEV entries, ASD's ACSC, AusCERT, and anything else your connectors return. Say plainly when a source could not be reached. Do not send it anywhere.
+
+ASD's ACSC is required. Call mcp__asd__asd_feed_status once, then call mcp__asd__asd_list_items exactly ONCE with feeds ["alerts","advisories","threats","publications","news"], since set to 7 days before today and limit 100. Do not call asd_list_items again: it is rate limited and shared with the ingest job. Items served "from the last stored poll" are current when asd_feed_status shows that feed's last_success within the last 2 hours; only call a feed stale when its last_success is older than that. Put every ACSC item published in the window in "acsc", whatever its topic, including news and publications. Put ACSC items from the previous 7 days that fall before the window in "acsc_recent" (same shape). If a feed returned nothing in the window, say so in "acsc_note".
+
+Return ONLY one JSON object, no prose before or after, with exactly these keys:
+{
+  "window": "one line: window covered, 'Public sources only', retrieval time AEDT",
+  "headline": "1 to 2 sentences, with [n] source refs",
+  "act_today": {
+    "intro": "Proposal: ... (one sentence) or empty",
+    "items": [{"title": "product or issue", "ids": ["CVE-..."], "tag": "short tag e.g. KEV due 21 Oct", "summary": "one sentence with [n]"}],
+    "notes": ["short paragraphs, e.g. vendor action, what was not checked"]
+  },
+  "acsc": [{"feed": "alerts|advisories|threats|publications|news", "title": "item title", "published": "YYYY-MM-DD", "url": "https://www.cyber.gov.au/...", "summary": "one plain sentence on what it is and who should read it"}],
+  "acsc_recent": [{"feed": "...", "title": "...", "published": "YYYY-MM-DD", "url": "https://www.cyber.gov.au/...", "summary": "..."}],
+  "acsc_note": "one line: feed freshness, and which feeds had nothing new",
+  "this_week": ["short paragraphs, start proposals with 'Proposal:'"],
+  "worth_knowing": ["optional short paragraphs"],
+  "coverage": [{"name": "source name", "status": "checked|stale|partial|unavailable|not checked", "detail": "short detail"}],
+  "sources": [{"n": 1, "text": "source name, version, retrieved date time", "links": [{"label": "short label", "url": "https://..."}]}]
+}
+Use Australian English. No em dashes. Only cite facts a tool returned.
