@@ -598,13 +598,20 @@ def test_live_health_probes_each_group_and_ignores_cache():
     assert "threatfox" in down.detail
 
 
-def test_live_health_without_a_key_fails_clearly(monkeypatch):
+def test_live_health_without_a_key_checks_feodo_and_names_what_it_skipped(monkeypatch):
     monkeypatch.delenv(ENV_KEY)
-    serve(all_routes())
+    routes = all_routes()
+    serve(routes)
     probe = connector().health(live=True)
-    assert probe.ok is False
+    # A missing licence key is not a broken connector, so the keyless feed decides.
+    assert probe.ok is True
+    assert probe.detail.startswith("live ok; ")
     assert ENV_KEY in probe.detail
     assert "feodo" not in probe.detail
+    serve({**routes, FEODO: (503, b"down")})
+    down = connector().health(live=True)
+    assert down.ok is False
+    assert "feodo" in down.detail and ENV_KEY in down.detail
 
 
 def test_no_secret_reaches_results_logs_cache_or_store(tmp_path, caplog):

@@ -127,7 +127,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Spamhaus DROP, DROPv6 and ASN-DROP lists | `drop` | none | off: licence terms | [docs/connectors/spamhaus-drop.md](docs/connectors/spamhaus-drop.md) |
 | SpyCloud Enterprise Protection connector | `spycloud` | `SPYCLOUD_API_KEY` | off | [docs/connectors/spycloud.md](docs/connectors/spycloud.md) |
 | TAXII 2.1 client for a user-supplied API root | `taxii` | `TAXII_USERNAME`, `TAXII_PASSWORD` | off | [docs/connectors/taxii-ctis.md](docs/connectors/taxii-ctis.md) |
-| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` (optional) | off: requires local setup | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
+| Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` | off: requires local setup | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
 | UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [docs/connectors/upguard.md](docs/connectors/upguard.md) |
 | virustotal | `virustotal` | `VTAI_TOKEN` | off: licence terms | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
 <!-- connectors:end -->

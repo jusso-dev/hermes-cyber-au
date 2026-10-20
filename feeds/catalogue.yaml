@@ -622,8 +622,8 @@ feeds:
     server: threatsieve
     url: ${THREATSIEVE_URL}
     format: json
-    auth: {type: bearer, env: THREATSIEVE_API_KEY, env_also: [THREATSIEVE_URL], optional: true}
-    keyed: false
+    auth: {type: bearer, env: THREATSIEVE_API_KEY, env_also: [THREATSIEVE_URL]}
+    keyed: true
     enabled_by_default: false
     poll: PT15M
     licence: ThreatSieve's own licence.
