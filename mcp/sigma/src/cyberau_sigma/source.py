@@ -650,7 +650,26 @@ def _backend(target: str):
         return SplunkBackend()
     from sigma.backends.elasticsearch import LuceneBackend
 
+    _private_pysigma_cache()
     return LuceneBackend()
+
+
+def _private_pysigma_cache() -> None:
+    """Keep pysigma's ATT&CK and D3FEND caches in a directory only this user can write.
+
+    pysigma stores them with diskcache, which unpickles what it reads
+    (GHSA-w8v5-vhqr-4h9v, no fixed release). Its default is ~/.cache/pysigma. A
+    private directory under the connector data dir means no other user or process can
+    plant an entry for it to load.
+    """
+    from sigma.data import mitre_attack, mitre_d3fend
+
+    for module in (mitre_attack, mitre_d3fend):
+        path = _data_dir() / "pysigma-cache" / module.__name__.rsplit(".", 1)[-1]
+        path.mkdir(parents=True, exist_ok=True)
+        for folder in (path.parent, path):
+            os.chmod(folder, 0o700)
+        module.set_cache_dir(str(path))
 
 
 def _meta(text: str) -> dict:
