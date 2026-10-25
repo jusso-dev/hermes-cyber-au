@@ -7,7 +7,7 @@ dependencies = ["cyberau-common", "cyberau-premium", "cyberau-crowdstrike-recon"
 
 [project.optional-dependencies]
 # Optional DuckDB export: uv sync --project mcp --extra analytics
-analytics = ["duckdb>=1.1,<2"]
+analytics = ["duckdb>=1.1,<3"]
 
 [tool.uv.workspace]
 members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "asd-essentials", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert", "cloudflare-radar", "cloudflare-urlscanner", "custom-feeds", "crtsh", "github-advisories", "greynoise", "hibp", "irap", "misp", "mitre-attack", "ncsc-nz", "opencti", "openphish", "osv", "phishtank", "pspf", "ransomware-live", "scamwatch", "shodan-internetdb", "sigma", "spamhaus-drop", "taxii-ctis", "threatsieve", "hindsight", "premium", "crowdstrike-recon", "darkowl", "flare", "flashpoint", "google-ti-dtm", "hudson-rock", "intel471", "recorded-future", "socradar", "spycloud", "upguard", "cve-program"]
