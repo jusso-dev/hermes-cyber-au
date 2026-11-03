@@ -33,10 +33,13 @@ def _isolated(tmp_path, monkeypatch):
     monkeypatch.delenv("CYBERAU_WATCH_PACKS_DIR", raising=False)
     source._SLEEP = lambda _seconds: None
     source._LIMIT_SLEEP = lambda _seconds: None
+    # The fixtures carry fixed dates, so the age filter must not read the wall clock.
+    source._NOW = lambda _tz: NOW
     yield
     source._TRANSPORT = None
     source._SLEEP = time.sleep
     source._LIMIT_SLEEP = time.sleep
+    source._NOW = datetime.now
 
 
 def _config(tmp_path: Path, text: str) -> Path:

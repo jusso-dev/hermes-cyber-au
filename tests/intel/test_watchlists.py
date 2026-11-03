@@ -12,6 +12,7 @@ import httpx
 import pytest
 from cyberau_common import egress
 from store.api import upsert_advisory, upsert_indicator
+from store.canonical import utc_now
 from store.cli import main
 from store.db import open_store
 from store.watchlists import (
@@ -510,6 +511,17 @@ def test_watches_match_sources_terms_and_window(store_path):
     assert row["source"] == "feed-azure-updates"
     assert row["published"] == "2026-10-19T08:00:00Z"
     assert "asset" not in row
+
+
+def test_watch_window_follows_the_run_not_the_clock(store_path):
+    _write(store_path, WATCHES)
+    _feed_item("old", "Defender adds agentless scanning", "2001-01-09T00:00:00Z")
+    _feed_item("today", "Sentinel adds a connector", utc_now())
+    # A window anchored on the wall clock would keep only the item published today.
+    summary = run_watchlist(store=store_path, now="2001-01-10T00:00:00Z")
+    assert summary["by_kind"] == {"watch": 2}
+    summary = run_watchlist(store=store_path, now="2099-01-10T00:00:00Z")
+    assert summary["matches"] == 0
 
 
 def test_packs_without_the_connector_warn(store_path, monkeypatch):

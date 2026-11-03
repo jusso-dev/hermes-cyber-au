@@ -3,6 +3,7 @@ import ipaddress
 import json
 import os
 import time
+from datetime import date
 from pathlib import Path
 
 import cyberau_asd_blueprint.source as source
@@ -507,6 +508,8 @@ def test_failed_or_cached_refresh_keeps_previous_index(tmp_path, monkeypatch):
     monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("CYBERAU_BLUEPRINT_SNAPSHOT", raising=False)
+    # The fallback is the shipped snapshot, which ages out 180 days after it was taken.
+    monkeypatch.setattr(source, "_TODAY", lambda: date(2026, 10, 18))
     source._RESOLVER = _public
     source._CLOCK, source._SLEEP, _stamps, _slept = _paced_clock()
     cache = HttpCache(tmp_path / "http_cache.sqlite")

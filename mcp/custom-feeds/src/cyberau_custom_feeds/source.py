@@ -39,6 +39,7 @@ _TRANSPORT = None
 _SLEEP = time.sleep
 _LIMIT_SLEEP = time.sleep
 _CLOCK = time.monotonic
+_NOW = datetime.now
 _RETRIES = 1
 _TAG = re.compile(r"<[^>]+>")
 _SPACE = re.compile(r"\s+")
@@ -132,7 +133,7 @@ def parse_feed(text: str) -> tuple[list[dict], str | None]:
 
 def filter_items(feed: Feed, items: list[dict], *, now: datetime | None = None) -> list[dict]:
     """Apply the feed's category, term and age filters, then cap the count."""
-    cutoff = (now or datetime.now(UTC)) - timedelta(days=feed.max_age_days)
+    cutoff = (now or _NOW(UTC)) - timedelta(days=feed.max_age_days)
     wanted = {name.casefold() for name in feed.categories}
     kept = []
     for item in items:
