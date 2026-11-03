@@ -28,7 +28,7 @@ from pathlib import Path
 
 import idna
 
-from .canonical import utc_now
+from .canonical import canonical_timestamp, utc_now
 from .db import fts_rowid, open_store, resolve_db_path
 from .text import indexable_text, unwrap_untrusted
 
@@ -632,8 +632,9 @@ def match_text(watch: Watchlist, advisory_id: str, title: str, text: str) -> lis
     return found
 
 
-def compute_matches(conn, watch: Watchlist) -> list[Match]:
-    """Every current match against the rows in the store now."""
+def compute_matches(conn, watch: Watchlist, *, now: str | None = None) -> list[Match]:
+    """Every current match against the rows in the store now. ``now`` anchors each
+    watch's lookback window."""
     matches: list[Match] = []
     types: list[str] = []
     if watch.ip_ranges:
@@ -660,7 +661,7 @@ def compute_matches(conn, watch: Watchlist) -> list[Match]:
             text = " ".join((row["title"] or "", summary, body["body"] if body else ""))
             matches.extend(match_text(watch, row["id"], row["title"] or "", text))
     if watch.watches:
-        matches.extend(match_watches(conn, watch.watches))
+        matches.extend(match_watches(conn, watch.watches, now=now))
     unique: dict[tuple[str, str, str, str], Match] = {}
     for item in matches:
         unique.setdefault(item.key, item)
@@ -834,7 +835,7 @@ def run_watchlist(
 ) -> dict:
     """Recompute watchlist matches. Returns a JSON-ready summary without watched values."""
     file = watchlist_path(watchlist)
-    run_at = now or utc_now()
+    run_at = canonical_timestamp(now) if now else utc_now()
     summary: dict = {
         "status": "ok",
         "routine": ROUTINE,
@@ -880,7 +881,7 @@ def run_watchlist(
 
     handle = open_store(store_file)
     with handle.transaction() as conn:
-        current = compute_matches(conn, watch)
+        current = compute_matches(conn, watch, now=run_at)
         current.extend(found_crtsh.matches)
         new, removed = _store_matches(conn, watch, current, found_crtsh, run_at)
         _touch_routine(conn, run_at)
