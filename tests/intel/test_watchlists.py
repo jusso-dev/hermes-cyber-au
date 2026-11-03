@@ -524,6 +524,15 @@ def test_watch_window_follows_the_run_not_the_clock(store_path):
     assert summary["matches"] == 0
 
 
+def test_watch_window_reads_an_offset_now_as_utc(store_path):
+    _write(store_path, WATCHES)
+    _feed_item("edge", "Defender adds agentless scanning", "2001-01-08T00:30:00Z")
+    # 10:00+10:00 is 00:00Z, so the 2-day window opens at 2001-01-08T00:00:00Z.
+    summary = run_watchlist(store=store_path, now="2001-01-10T10:00:00+10:00")
+    assert summary["by_kind"] == {"watch": 1}
+    assert list_matches(store=store_path)[0]["last_matched"] == "2001-01-10T00:00:00Z"
+
+
 def test_packs_without_the_connector_warn(store_path, monkeypatch):
     import builtins
 

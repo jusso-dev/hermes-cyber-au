@@ -28,7 +28,7 @@ from pathlib import Path
 
 import idna
 
-from .canonical import utc_now
+from .canonical import canonical_timestamp, utc_now
 from .db import fts_rowid, open_store, resolve_db_path
 from .text import indexable_text, unwrap_untrusted
 
@@ -835,7 +835,7 @@ def run_watchlist(
 ) -> dict:
     """Recompute watchlist matches. Returns a JSON-ready summary without watched values."""
     file = watchlist_path(watchlist)
-    run_at = now or utc_now()
+    run_at = canonical_timestamp(now) if now else utc_now()
     summary: dict = {
         "status": "ok",
         "routine": ROUTINE,
