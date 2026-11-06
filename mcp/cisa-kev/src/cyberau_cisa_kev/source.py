@@ -8,11 +8,8 @@ from datetime import date
 from pathlib import Path
 
 from cyberau_common import USER_AGENT, runtime
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.server import Connector, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
 
@@ -102,14 +99,10 @@ def _load_catalog() -> tuple[dict | None, str, tuple[str, ...]]:
     snapshot = os.environ.get("CYBERAU_KEV_SNAPSHOT")
     if snapshot:
         return json.loads(Path(snapshot).read_text(encoding="utf-8")), "snapshot", (SNAPSHOT_NOTE,)
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-kev"))
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_repo_allowlist())))
-    client = HttpClient(
+    offline = runtime.offline()
+    client = runtime.http_client(
         "cisa-kev",
-        policy=EgressPolicy(allowlist, "cisa-kev"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
+        directory=runtime.data_dir("kev"),
         user_agent=USER_AGENT,
         rate=1 / (6 * 3600),
         burst=1,
@@ -174,10 +167,6 @@ def _envelope(
 
 def _today() -> date:
     return runtime.today()
-
-
-def _repo_allowlist() -> Path:
-    return runtime.allowlist_path()
 
 
 register_connector("cisa-kev", connector)

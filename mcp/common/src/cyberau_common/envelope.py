@@ -10,6 +10,9 @@ from urllib.parse import urlsplit
 
 from cyberau_common.secrets import redact_data
 
+# The UTC timestamp format every envelope and connector writes. runtime.iso uses it.
+TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _INVISIBLE = re.compile("[­؜᠋-᠏​-‏‪-‮⁠-⁩﻿\U000e0000-\U000e007f]")
 _WS = re.compile(r"\s+")
@@ -240,7 +243,7 @@ def envelope(
     """Build the JSON object every connector tool returns."""
     if cache not in {"hit", "miss", "stale", "snapshot"}:
         raise ValueError(f"unknown cache state: {cache}")
-    when = retrieved_at or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    when = retrieved_at or datetime.now(UTC).strftime(TIMESTAMP_FORMAT)
     return harden_envelope(
         {
             "source": source,

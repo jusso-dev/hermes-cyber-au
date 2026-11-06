@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import yaml
 from cyberau_common import USER_AGENT, runtime
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
@@ -324,13 +324,10 @@ def _fetch_one(
     headers = _auth_headers()
     if headers is None:
         return None, "snapshot", _MISSING_KEY, {}, 0
-    policy_kwargs = {}
-    if _RESOLVER is not None:
-        policy_kwargs["resolver"] = _RESOLVER
     client = runtime.http_client(
         "google-ti-dtm",
-        directory=_root(),
-        policy=EgressPolicy(runtime.allowlist_path(), "google-ti-dtm", **policy_kwargs),
+        directory=runtime.data_dir("gtidtm"),
+        resolver=_RESOLVER,
         cache=cache,
         user_agent=USER_AGENT,
         rate=_RATE,
@@ -674,17 +671,17 @@ def _envelope(
 def _remember(findings: list[ExposureFinding], watchlist: Watchlist) -> None:
     if not findings:
         return
-    store = ExposureStore(_root() / "intel.sqlite")
+    store = ExposureStore(runtime.data_dir("gtidtm") / "intel.sqlite")
     terms = _spec().terms
     for finding in findings:
         store.write(finding, terms=terms, watchlist=watchlist)
 
 
 def _load_watchlist() -> Watchlist | None:
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if not raw:
+    data = runtime.configured_data_dir()
+    if data is None:
         return None
-    path = Path(raw) / "watchlists" / "org-exposure.yaml"
+    path = data / "watchlists" / "org-exposure.yaml"
     if not path.is_file():
         return None
     loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -724,15 +721,8 @@ def _scope() -> str:
 
 
 def _session_cache():
-    root = _root()
+    root = runtime.data_dir("gtidtm")
     return cache_once(_CACHES, f"{root}|{_scope()}", root / "http_cache.sqlite", _spec().terms)
-
-
-def _root() -> Path:
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw)
-    return Path("/tmp") / "cyberau-gtidtm"
 
 
 def _snapshot_env(kind: str) -> str:

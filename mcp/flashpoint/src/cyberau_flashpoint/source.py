@@ -253,7 +253,7 @@ def _records(payload: dict) -> list | None:
 def _persist(rows: list[dict]) -> None:
     if not rows:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("flashpoint")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "flashpoint-indicators.jsonl"
     with path.open("a", encoding="utf-8") as handle:
@@ -267,7 +267,7 @@ def _persist(rows: list[dict]) -> None:
 
 
 def _cache():
-    directory = _data_dir()
+    directory = runtime.data_dir("flashpoint")
     return cache_once(
         _CACHES, str(directory), directory / "http_cache.sqlite", get_vendor("flashpoint").terms
     )
@@ -279,7 +279,7 @@ def _client(cache) -> HttpClient:
         kwargs["resolver"] = _RESOLVER
     return runtime.http_client(
         "flashpoint",
-        directory=_data_dir(),
+        directory=runtime.data_dir("flashpoint"),
         policy=EgressPolicy(runtime.allowlist_path(), "flashpoint", **kwargs),
         cache=cache,
         user_agent=USER_AGENT,
@@ -345,10 +345,6 @@ def _envelope(
         warnings=warnings,
         attribution=get_vendor("flashpoint").terms.attribution,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("flashpoint")
 
 
 register_connector("flashpoint", connector)

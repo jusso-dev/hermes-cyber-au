@@ -30,7 +30,7 @@ Server manifest `required_env`: `MISP_URL`, `MISP_API_KEY`.
 |---|---|---|---|---|
 | `MISP_API_KEY` | credential | yes | yes | `lookup` |
 | `MISP_URL` | credential | yes | yes | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.configured_data_dir, runtime.data_dir` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
 | `CYBERAU_MISP_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |

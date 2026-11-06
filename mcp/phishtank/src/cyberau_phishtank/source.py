@@ -146,7 +146,7 @@ def _feed(*, force_live: bool) -> tuple[list | None, str, str]:
     offline = runtime.offline() and not force_live
     if pinned:
         return _snapshot()
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("phishtank")
     http_cache = HttpCache(data_dir / "http_cache.sqlite")
     target = _request_target()
     cached = None
@@ -332,7 +332,7 @@ def _limiter() -> RateLimiter:
         kwargs["clock"] = _CLOCK
     if _SLEEP is not None:
         kwargs["sleeper"] = _SLEEP
-    return RateLimiter(_data_dir() / "rate_limit.sqlite", **kwargs)
+    return RateLimiter(runtime.data_dir("phishtank") / "rate_limit.sqlite", **kwargs)
 
 
 def _from_body(body: bytes, cache: str) -> tuple[list | None, str, str]:
@@ -524,7 +524,7 @@ def _persist(rows: list, digest: str) -> None:
             now,
         )
     if chosen:
-        with sqlite3.connect(_data_dir() / "phishtank.sqlite") as conn:
+        with sqlite3.connect(runtime.data_dir("phishtank") / "phishtank.sqlite") as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS phish (
@@ -585,7 +585,7 @@ def _cached_text() -> str | None:
     if target is None:
         return None
     url, scope = target
-    http_cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    http_cache = HttpCache(runtime.data_dir("phishtank") / "http_cache.sqlite")
     cached = http_cache.get(http_cache.key("GET", url, None, b"", scope))
     if cached is None:
         return None
@@ -618,10 +618,6 @@ def _clean_text(message: str) -> str:
     if secret:
         text = text.replace(secret, "[REDACTED]")
     return _URL_QUERY.sub(r"\1?[REDACTED]", text)
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("phishtank")
 
 
 register_connector("phishtank", connector)

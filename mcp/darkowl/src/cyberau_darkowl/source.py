@@ -482,7 +482,7 @@ def _query_text(term: str) -> str:
 def _from_zulu(since: str) -> str:
     day = date.fromisoformat(since)
     start = datetime.combine(day, time.min, tzinfo=_SYDNEY)
-    return start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(start)
 
 
 def _validate_terms(terms: list[str] | None, since: str | None) -> tuple[list[str], list[str]]:

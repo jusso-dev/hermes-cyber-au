@@ -348,7 +348,7 @@ def _try_http11(warning: str) -> bool:
 
 
 def _http(url: str, headers: dict, *, skip_cache: bool) -> dict:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("irap")
     client = runtime.http_client(
         "irap",
         directory=data_dir,
@@ -650,7 +650,9 @@ def _response_schema(name: str) -> dict:
 
 
 def _limit() -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", clock=_clock, sleeper=_sleep).acquire(
+    RateLimiter(
+        runtime.data_dir("irap") / "rate_limit.sqlite", clock=_clock, sleeper=_sleep
+    ).acquire(
         "irap:page",
         rate=1 / 6,
         burst=1,
@@ -722,13 +724,9 @@ def _sleep(seconds: float) -> None:
     _NOW += seconds
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("irap")
-
-
 @contextmanager
 def _db():
-    conn = sqlite3.connect(_data_dir() / "irap_guidance.sqlite")
+    conn = sqlite3.connect(runtime.data_dir("irap") / "irap_guidance.sqlite")
     conn.row_factory = sqlite3.Row
     conn.execute(
         """

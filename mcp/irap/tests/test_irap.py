@@ -321,7 +321,7 @@ def test_retry_after_redirect_and_timeout(tmp_path, monkeypatch):
     assert "timed out" in " ".join(stale["warnings"])
 
 
-def test_http11_fallback_and_spacing(monkeypatch):
+def test_http11_fallback_and_spacing(monkeypatch, tmp_path):
     monkeypatch.delenv("CYBERAU_OFFLINE")
     monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
     overview = (FIXTURES / "irap_overview.html").read_bytes()
@@ -340,12 +340,12 @@ def test_http11_fallback_and_spacing(monkeypatch):
     found = irap_search_guidance("three quotes")
     assert found["data"]["coverage"] == "quoted"
     assert source._NOW >= 5
-    db = sqlite3.connect(Path(source._data_dir()) / "irap_guidance.sqlite")
+    db = sqlite3.connect(tmp_path / "irap_guidance.sqlite")
     method = db.execute("SELECT method FROM pages WHERE page = 'consumer-guide'").fetchone()[0]
     assert method == "http11"
 
 
-def test_history_keeps_sentences_that_leave_the_page(monkeypatch):
+def test_history_keeps_sentences_that_leave_the_page(monkeypatch, tmp_path):
     monkeypatch.delenv("CYBERAU_OFFLINE")
     monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
     overview = (FIXTURES / "irap_overview.html").read_bytes()
@@ -365,12 +365,12 @@ def test_history_keeps_sentences_that_leave_the_page(monkeypatch):
     source._TRANSPORT = httpx.MockTransport(live)
     assert irap_search_guidance("quay widgets")["data"]["coverage"] == "quoted"
     bodies["guide"] = guide.encode()
-    for path in Path(source._data_dir()).glob("http_cache.sqlite*"):
+    for path in tmp_path.glob("http_cache.sqlite*"):
         path.unlink()
     source._NOW = 100.0
     later = irap_search_guidance("quay widgets")
     assert later["data"]["coverage"] == "not covered"
-    db = sqlite3.connect(Path(source._data_dir()) / "irap_guidance.sqlite")
+    db = sqlite3.connect(tmp_path / "irap_guidance.sqlite")
     kept = db.execute("SELECT sentence FROM guidance WHERE paragraph_id = 'quay'").fetchone()
     assert kept is not None
     assert "quay widgets" in kept[0]

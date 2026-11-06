@@ -240,7 +240,7 @@ def _load(*, force_live: bool = False) -> _Bundle:
         bundle.warnings.insert(0, _OPERATOR)
         return bundle
     offline = runtime.offline() and not force_live
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("spamhaus-drop") / "http_cache.sqlite")
     if offline:
         cached = _from_http_cache(cache, allow_stale=True)
         if cached is not None:
@@ -310,7 +310,7 @@ def _get(client: HttpClient, url: str, *, force_live: bool):
 
 
 def _live_probe() -> list[tuple[str, str | None, str]]:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("spamhaus-drop") / "http_cache.sqlite")
     client = _client(cache)
     probed = []
     try:
@@ -487,7 +487,7 @@ def _snapshot_problem() -> tuple[str | None, str]:
             if problem:
                 return problem, ""
         return None, "schema ok"
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("spamhaus-drop") / "http_cache.sqlite")
     checked = False
     for name, url in LISTS:
         item = cache.get(_cache_key(cache, url))
@@ -505,7 +505,7 @@ def _snapshot_problem() -> tuple[str | None, str]:
 
 
 def _persist(kind: str, rows: list[dict], seen_at: str, warnings: list[str]) -> None:
-    path = _data_dir() / "drop_history.sqlite"
+    path = runtime.data_dir("spamhaus-drop") / "drop_history.sqlite"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(path) as conn:
@@ -617,7 +617,7 @@ def _needs_network(cache: HttpCache) -> bool:
 
 
 def _allow_refresh() -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("spamhaus-drop") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         "spamhaus-drop:refresh",
         rate=1 / 3600,
         burst=1,
@@ -632,7 +632,7 @@ def _client(cache: HttpCache) -> HttpClient:
         kwargs["resolver"] = _RESOLVER
     return runtime.http_client(
         "spamhaus-drop",
-        directory=_data_dir(),
+        directory=runtime.data_dir("spamhaus-drop"),
         policy=EgressPolicy(runtime.allowlist_path(), "spamhaus-drop", **kwargs),
         cache=cache,
         limiter_sleeper=_SLEEP,
@@ -687,12 +687,8 @@ def _response_schema(name: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("spamhaus-drop")
-
-
 def _iso(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(datetime.fromtimestamp(timestamp, UTC))
 
 
 register_connector("spamhaus-drop", connector)

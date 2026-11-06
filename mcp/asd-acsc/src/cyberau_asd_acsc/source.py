@@ -18,11 +18,7 @@ from zoneinfo import ZoneInfo
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
 from cyberau_common import runtime
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, safe_url, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -333,7 +329,7 @@ def _items_for_feed(feed: str) -> tuple[list[dict], str, str, str]:
 
 
 def _fetch_xml(feed: str, *, force_live: bool) -> tuple[str | None, str, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get(_OVERRIDE)) and not force_live
     if pinned:
         return _pinned_snapshot(feed)
@@ -403,12 +399,10 @@ def _feed_failure(result: tuple[str | None, str, str]) -> str:
 
 
 def _http(url: str, headers: dict, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
-    data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "asd-acsc",
-        policy=EgressPolicy(_allowlist(), "asd-acsc"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=runtime.data_dir("asd"),
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=4,
         burst=20,
@@ -443,7 +437,7 @@ def _http(url: str, headers: dict, *, ttl: int, skip_cache: bool) -> tuple[str |
 
 
 def _page(url: str) -> tuple[dict | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+    offline = runtime.offline()
     if offline or os.environ.get(_OVERRIDE):
         cached = _cached_page(url)
         if cached:
@@ -867,7 +861,7 @@ def _published(value: str) -> str:
 
 
 def _cached_body(url: str) -> str | None:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = runtime.http_cache(runtime.data_dir("asd"))
     key = cache.key("GET", url, None, b"", "anonymous")
     item = cache.get(key)
     if item is None:
@@ -882,7 +876,7 @@ def _cached_feed(feed: str) -> tuple[str, str] | None:
     text = _cached_body(_feed_url(feed))
     if text is None:
         return None
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = runtime.http_cache(runtime.data_dir("asd"))
     key = cache.key("GET", _feed_url(feed), None, b"", "anonymous")
     item = cache.get(key)
     if item is None:
@@ -910,7 +904,7 @@ def _feeds(feeds: list[str] | None) -> tuple[list[str], str]:
 
 
 def _limit(key: str, *, rate: float, burst: int) -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    runtime.rate_limiter(runtime.data_dir("asd"), sleeper=_SLEEP).acquire(
         key,
         rate=rate,
         burst=burst,
@@ -937,13 +931,9 @@ def _envelope(
     )
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("asd")
-
-
 @contextmanager
 def _db():
-    conn = sqlite3.connect(_data_dir() / "asd_advisories.sqlite")
+    conn = sqlite3.connect(runtime.data_dir("asd") / "asd_advisories.sqlite")
     conn.row_factory = sqlite3.Row
     conn.execute(
         """
@@ -991,10 +981,6 @@ def _db():
 
 def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
-
-
-def _allowlist() -> Path:
-    return runtime.allowlist_path()
 
 
 register_connector("asd-acsc", connector)

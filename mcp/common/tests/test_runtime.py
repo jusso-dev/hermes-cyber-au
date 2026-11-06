@@ -21,6 +21,15 @@ def test_data_dir_falls_back_to_the_connector_tmp_dir(monkeypatch):
     assert runtime.data_dir("kev") == Path("/tmp/cyberau-kev")
 
 
+def test_configured_data_dir_is_none_when_unset_and_not_created(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", " ")
+    assert runtime.configured_data_dir() is None
+    target = tmp_path / "later"
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(target))
+    assert runtime.configured_data_dir() == target
+    assert not target.exists()
+
+
 def test_data_dir_mode_applies_to_a_new_directory(tmp_path, monkeypatch):
     target = tmp_path / "private"
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(target))

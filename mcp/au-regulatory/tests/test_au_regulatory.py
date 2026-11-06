@@ -63,7 +63,7 @@ def _due(record: dict, name: str) -> dict:
     return {item["name"]: item for item in record["deadlines"]}[name]
 
 
-def test_obligations_quotes_and_deadlines():
+def test_obligations_quotes_and_deadlines(tmp_path):
     snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
     obligation_schema = json.loads((SCHEMA / "aureg_obligation.response.json").read_text())
     deadline_schema = json.loads((SCHEMA / "aureg_deadline.response.json").read_text())
@@ -102,7 +102,7 @@ def test_obligations_quotes_and_deadlines():
     assert paid["data"][0]["aware_at"] == "2026-10-16T00:00:00+11:00"
     assert _due(paid["data"][0], "report")["due_at"] == "2026-10-19T00:00:00+11:00"
     assert "within 72 hours" in paid["data"][0]["quote"]
-    stored = source._data_dir() / "aureg-obligations.jsonl"
+    stored = tmp_path / "aureg-obligations.jsonl"
     assert "suspected_breach" in stored.read_text(encoding="utf-8")
 
 

@@ -320,7 +320,7 @@ def _http(url: str, *, skip_cache: bool, fallback: bool) -> tuple[str | None, st
 
 
 def _block_path() -> Path:
-    return _data_dir() / "blocked.json"
+    return runtime.data_dir("scamwatch") / "blocked.json"
 
 
 def _note_block(warning: str) -> None:
@@ -347,7 +347,7 @@ def _recent_block() -> str:
 
 
 def _client() -> HttpClient:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("scamwatch")
     return runtime.http_client(
         "scamwatch",
         directory=data_dir,
@@ -365,7 +365,7 @@ def _client() -> HttpClient:
 
 
 def _take_budget() -> str:
-    limiter = RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP)
+    limiter = RateLimiter(runtime.data_dir("scamwatch") / "rate_limit.sqlite", sleeper=_SLEEP)
     try:
         limiter.acquire(
             "scamwatch:budget",
@@ -610,8 +610,8 @@ def _parse_page(html: str, url: str) -> dict:
 def _persist(rows: list[dict], *, body: str) -> None:
     if not rows:
         return
-    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    path = _data_dir() / "scamwatch-alerts.jsonl"
+    now = runtime.utc_now_iso()
+    path = runtime.data_dir("scamwatch") / "scamwatch-alerts.jsonl"
     with _db() as conn:
         for row in rows:
             url = str(row.get("url") or "")
@@ -672,7 +672,7 @@ def _persist(rows: list[dict], *, body: str) -> None:
 
 
 def _stored_body(url: str) -> str:
-    if not (_data_dir() / "scamwatch.sqlite").exists():
+    if not (runtime.data_dir("scamwatch") / "scamwatch.sqlite").exists():
         return ""
     with _db() as conn:
         row = conn.execute(
@@ -686,7 +686,7 @@ def _stored_body(url: str) -> str:
 
 @contextmanager
 def _db() -> Iterator[sqlite3.Connection]:
-    path = _data_dir() / "scamwatch.sqlite"
+    path = runtime.data_dir("scamwatch") / "scamwatch.sqlite"
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:
@@ -751,7 +751,7 @@ def _envelope(
 
 
 def _cached(url: str) -> tuple[str | None, str]:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("scamwatch") / "http_cache.sqlite")
     item = cache.get(cache.key("GET", url, None, b"", "anonymous"))
     if item is None or item.status >= 400:
         return None, "snapshot"
@@ -892,10 +892,6 @@ def _canonical(href: str) -> str:
 def _alert_id(url: str) -> str:
     digest = hashlib.sha1(url.encode()).hexdigest()
     return f"scamwatch:{digest}"
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("scamwatch")
 
 
 register_connector("scamwatch", connector)

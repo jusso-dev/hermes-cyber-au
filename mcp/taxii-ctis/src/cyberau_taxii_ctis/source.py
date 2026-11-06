@@ -419,7 +419,7 @@ def _ensure_stored() -> tuple[str, str]:
         return "snapshot", missing
     if _store_fresh():
         return "hit", ""
-    start = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = runtime.iso(datetime.now(UTC) - timedelta(days=30))
     _rows, cache, warning, _urls, _stamp = _gather_objects(
         start, ["indicator"], 1000, force_live=False
     )

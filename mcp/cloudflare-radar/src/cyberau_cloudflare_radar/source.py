@@ -362,7 +362,7 @@ def _fetch(path: str, params: dict, *, force_live: bool) -> tuple[dict | None, s
     query = {key: value for key, value in params.items() if value is not None}
     query["format"] = "json"
     url = f"{API}{path}?{urlencode(sorted(query.items()))}"
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("cloudflare-radar")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, None, b"", "keyed")
     offline = runtime.offline() and not force_live
@@ -539,10 +539,6 @@ def _envelope(
 def _redact(exc: BaseException, secret: str | None) -> str:
     message = redact(str(exc))
     return message.replace(secret, "[REDACTED]") if secret else message
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("cloudflare-radar")
 
 
 register_connector(KEY, connector)

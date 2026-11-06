@@ -389,7 +389,7 @@ def _http(
     headers = {"accept": "application/vnd.github+json"} if api else {}
     if secret:
         headers["authorization"] = f"Bearer {secret}"
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("ism")
     client = runtime.http_client(
         "asd-ism",
         directory=data_dir,
@@ -579,7 +579,7 @@ def _clean(exc: Exception, secret: str | None) -> str:
 
 
 def _limit(key: str, *, rate: float, burst: int) -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("ism") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         key,
         rate=rate,
         burst=burst,
@@ -600,10 +600,6 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("ism")
 
 
 def rebuild_shipped_snapshot(destination: Path | None = None, keep: int = 2) -> dict:

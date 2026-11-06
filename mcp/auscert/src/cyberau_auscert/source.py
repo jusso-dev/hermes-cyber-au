@@ -17,11 +17,10 @@ from zoneinfo import ZoneInfo
 
 import jsonschema
 from cyberau_common import USER_AGENT, runtime
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimited, RateLimiter
+from cyberau_common.http import HttpError
+from cyberau_common.ratelimit import RateLimited
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -191,11 +190,11 @@ def _fetch(*, force_live: bool = False) -> _Feed:
     snapshot = os.environ.get("CYBERAU_AUSCERT_SNAPSHOT")
     if snapshot and not force_live:
         return _Feed(_read(Path(snapshot)), "snapshot", override=True)
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-auscert"))
-    cache = HttpCache(data_dir / "http_cache.sqlite")
+    data_dir = runtime.data_dir("auscert")
+    cache = runtime.http_cache(data_dir)
     key = cache.key("GET", FEED_URL, None, b"", "anonymous")
     cached = cache.get(key)
-    if os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live:
+    if runtime.offline() and not force_live:
         if cached:
             if cache.fresh(cached):
                 return _Feed(_decode(cached.body), "hit", persist=True)
@@ -208,12 +207,10 @@ def _fetch(*, force_live: bool = False) -> _Feed:
     wait = _backoff_remaining(data_dir)
     if wait > 0:
         return _fallback(cached, f"AusCERT asked for a pause, retry in {int(wait)} seconds")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         "auscert",
-        policy=EgressPolicy(allowlist, "auscert"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         timeout=60,
         retries=0,
         user_agent=USER_AGENT,
@@ -379,7 +376,7 @@ def _as_of(root: ET.Element, records: list[dict]) -> str | None:
     built = _stamp(root.findtext("channel/lastBuildDate"))
     if built is None and records:
         built = records[0]["stamp"]
-    return built.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if built else None
+    return runtime.iso(built) if built else None
 
 
 def _clean(value: str | None) -> str:
@@ -402,9 +399,8 @@ def _validate(since: str | None, limit: int) -> str:
 def _persist(records: list[dict]) -> None:
     if not records:
         return
-    directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-auscert"))
-    directory.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    directory = runtime.data_dir("auscert")
+    now = runtime.utc_now_iso()
     with closing(sqlite3.connect(directory / "auscert_bulletins.sqlite", timeout=5)) as conn:
         with conn:
             conn.execute(
@@ -441,7 +437,7 @@ def _persist(records: list[dict]) -> None:
                         row["kind"],
                         row["title"],
                         row["link"],
-                        row["stamp"].astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        runtime.iso(row["stamp"]),
                         row["summary"],
                         json.dumps(row["cves"]),
                         now,
@@ -481,8 +477,7 @@ def _local_copy() -> str | None:
     snapshot = os.environ.get("CYBERAU_AUSCERT_SNAPSHOT")
     if snapshot:
         return _read(Path(snapshot))
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-auscert"))
-    cache = HttpCache(data_dir / "http_cache.sqlite")
+    cache = runtime.http_cache(runtime.data_dir("auscert"))
     cached = cache.get(cache.key("GET", FEED_URL, None, b"", "anonymous"))
     return _decode(cached.body) if cached else None
 
@@ -511,10 +506,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _allowlist() -> Path:
-    return runtime.allowlist_path()
 
 
 register_connector("auscert", connector)

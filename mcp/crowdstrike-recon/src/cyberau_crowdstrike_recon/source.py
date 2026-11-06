@@ -828,7 +828,7 @@ def _blank(since: str | None) -> str | None:
 def _fql(since: str | None) -> str | None:
     if not since:
         return None
-    stamp = _since_utc(since).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = runtime.iso(_since_utc(since))
     return f"created_date:>='{stamp}'"
 
 

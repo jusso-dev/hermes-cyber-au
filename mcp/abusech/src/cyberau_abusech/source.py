@@ -12,7 +12,7 @@ import sqlite3
 import time
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -20,11 +20,8 @@ from urllib.parse import urlsplit
 
 import jsonschema
 from cyberau_common import USER_AGENT, runtime
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError, Response
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -271,10 +268,10 @@ class _Session:
 
     def __init__(self, *, force_live: bool = False) -> None:
         self.force_live = force_live
-        self.offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+        self.offline = runtime.offline() and not force_live
         # A trailing newline from the .env file would make httpx reject the header and echo it.
         self.key = (lookup(ENV_KEY) or "").strip() or None
-        self.data_dir = _data_dir()
+        self.data_dir = runtime.data_dir("abusech")
         self._clients: dict[str, HttpClient] = {}
 
     def __enter__(self) -> "_Session":
@@ -335,18 +332,13 @@ class _Session:
     def _client(self, keyed: bool) -> HttpClient:
         scope = "keyed" if keyed else "anonymous"
         if scope not in self._clients:
-            self._clients[scope] = HttpClient(
+            self._clients[scope] = runtime.http_client(
                 SOURCE,
-                policy=EgressPolicy(
-                    _allowlist(),
-                    SOURCE,
-                    # Offline mode never opens a socket, so skip the DNS lookup too.
-                    resolver=_offline_resolver if self.offline else _RESOLVER,
-                ),
-                cache=HttpCache(self.data_dir / "http_cache.sqlite"),
-                limiter=RateLimiter(
-                    self.data_dir / "rate_limit.sqlite", clock=_CLOCK, sleeper=_SLEEP
-                ),
+                directory=self.data_dir,
+                # Offline mode never opens a socket, so skip the DNS lookup too.
+                resolver=_offline_resolver if self.offline else _RESOLVER,
+                limiter_clock=_CLOCK,
+                limiter_sleeper=_SLEEP,
                 user_agent=USER_AGENT,
                 rate=1.0,
                 burst=1,
@@ -832,7 +824,7 @@ def _iso(value: object) -> str | None:
             parsed = datetime.strptime(text, pattern)
         except ValueError:
             continue
-        return parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return runtime.iso(parsed)
     return None
 
 
@@ -912,9 +904,8 @@ def _remember(records: list[dict], outcomes: list[_Outcome]) -> list[str]:
 
 
 def _store(records: list[dict]) -> None:
-    observed = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    path = _data_dir() / "abusech_intel.sqlite"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    observed = runtime.utc_now_iso()
+    path = runtime.data_dir("abusech") / "abusech_intel.sqlite"
     with closing(sqlite3.connect(path, timeout=5)) as conn, conn:
         conn.execute(
             """
@@ -967,14 +958,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("abusech")
-
-
-def _allowlist() -> Path:
-    return runtime.allowlist_path()
 
 
 register_connector(SOURCE, connector)

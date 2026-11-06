@@ -30,7 +30,7 @@ Server manifest `required_env`: `INTEL471_EMAIL`, `INTEL471_API_KEY`.
 |---|---|---|---|---|
 | `INTEL471_API_KEY` | credential | yes | yes | `lookup` |
 | `INTEL471_EMAIL` | credential | yes | yes | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.configured_data_dir` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_INTEL471_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |

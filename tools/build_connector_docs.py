@@ -292,6 +292,7 @@ class _Extractor(ast.NodeVisitor):
 # cyberau_common.runtime helpers and the variable each one reads.
 RUNTIME_ENV_READS = {
     "data_dir": "CYBERAU_DATA_DIR",
+    "configured_data_dir": "CYBERAU_DATA_DIR",
     "allowlist_path": "CYBERAU_EGRESS_ALLOWLIST",
     "http_client": "CYBERAU_EGRESS_ALLOWLIST",
     "offline": "CYBERAU_OFFLINE",
@@ -666,10 +667,14 @@ def render_feed_section(feeds: list[dict], *, catalogue_present: bool = True) ->
     return "\n".join(lines)
 
 
+# HttpClient methods whose stale_if_error defaults to the shared get() default.
+_DEFAULT_STALE_CALLS = frozenset({"get", "head"})
+
+
 def keep_ttl(site: TtlSite) -> bool:
     if site.function == "health":
         return False
-    if site.call == "get":
+    if site.call in _DEFAULT_STALE_CALLS:
         return True
     forwarded = isinstance(site.ttl_node, ast.Name)
     return not (forwarded and site.stale_node is None)
@@ -684,7 +689,7 @@ def keep_rate(site: RateSite) -> bool:
 def stale_cell(site: TtlSite, default: int | None) -> str:
     if site.stale_node is not None:
         return seconds_text(site.stale_node)
-    if site.call == "get" and default is not None:
+    if site.call in _DEFAULT_STALE_CALLS and default is not None:
         return f"not set (shared client default {format_seconds(default)})"
     return "not set on this call"
 
@@ -692,7 +697,9 @@ def stale_cell(site: TtlSite, default: int | None) -> str:
 def render_cache(sites: list[TtlSite], default: int | None) -> str:
     kept = [site for site in sites if keep_ttl(site)]
     lines = ["HTTP cache `ttl` arguments in the connector source."]
-    omits_stale = any(site.call == "get" and site.stale_node is None for site in kept)
+    omits_stale = any(
+        site.call in _DEFAULT_STALE_CALLS and site.stale_node is None for site in kept
+    )
     if omits_stale and default is not None:
         lines.append(
             "A `get` call that omits `stale_if_error` uses the shared client default "

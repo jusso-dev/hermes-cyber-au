@@ -686,7 +686,7 @@ def validate_response(tool: str, payload: dict) -> str | None:
 def _http(
     url: str, *, ttl: int, stale_if_error: int, skip_cache: bool = False
 ) -> tuple[str | None, str, str]:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("attack")
     client = runtime.http_client(
         "mitre-attack",
         directory=data_dir,
@@ -755,7 +755,7 @@ def _newest_dir(root: Path, domain: str) -> str:
 
 
 def _stored_versions(domain: str) -> list[str]:
-    root = _data_dir() / "attack"
+    root = runtime.data_dir("attack") / "attack"
     versions = [
         path.parent.name
         for path in root.glob(f"*/{domain}-attack.json")
@@ -765,7 +765,7 @@ def _stored_versions(domain: str) -> list[str]:
 
 
 def _stored(version: str, domain: str) -> Path:
-    return _data_dir() / "attack" / version / f"{domain}-attack.json"
+    return runtime.data_dir("attack") / "attack" / version / f"{domain}-attack.json"
 
 
 def _store(path: Path, body: str) -> None:
@@ -792,10 +792,6 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
         warnings=list(dict.fromkeys(item for item in warnings if item)),
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("attack")
 
 
 register_connector("mitre-attack", connector)

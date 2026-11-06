@@ -474,7 +474,7 @@ def _exchange(
 
 
 def _client(scope: str) -> HttpClient:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("cfscan")
     return runtime.http_client(
         "cloudflare-urlscanner",
         directory=data_dir,
@@ -521,7 +521,7 @@ def _approval_status(url: str, token: str, *, consume: bool) -> str:
 
 
 def _approvals() -> sqlite3.Connection:
-    directory = _data_dir()
+    directory = runtime.data_dir("cfscan")
     if hasattr(os, "getuid") and directory.stat().st_uid != os.getuid():
         raise RuntimeError("approval store directory is not owned by the current user")
     path = directory / "cfscan-approvals.sqlite"
@@ -597,7 +597,7 @@ def _post_material(body: dict) -> bytes:
 
 
 def _read_cache(method: str, url: str, material: bytes, scope: str) -> tuple[dict | None, str]:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("cfscan") / "http_cache.sqlite")
     key = cache.key(method, url, None, material, scope)
     item = cache.get(key)
     if item is None:
@@ -665,7 +665,7 @@ def _as_of(payload: dict) -> str | None:
 
 
 def _persist(row: dict) -> None:
-    path = _data_dir() / "cfscan-observations.jsonl"
+    path = runtime.data_dir("cfscan") / "cfscan-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, sort_keys=True) + "\n")
 
@@ -734,10 +734,6 @@ def _account_or_blank() -> str:
     if _ACCOUNT.fullmatch(account):
         return account
     return ""
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("cfscan")
 
 
 def _envelope(

@@ -373,7 +373,7 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[str | None, str, str]
         return None, "snapshot", "skipped a page outside blueprint.asd.gov.au"
     client = runtime.http_client(
         "asd-blueprint",
-        directory=_data_dir(),
+        directory=runtime.data_dir("asd-blueprint"),
         policy=_policy(),
         limiter_clock=_CLOCK,
         limiter_sleeper=_SLEEP,
@@ -472,14 +472,14 @@ def _pinned_or_shipped() -> tuple[dict | None, str]:
 
 
 def _read_stored_index() -> tuple[dict | None, str]:
-    path = _data_dir() / "blueprint-index.json"
+    path = runtime.data_dir("asd-blueprint") / "blueprint-index.json"
     if not path.is_file():
         return None, ""
     return _read_json(path)
 
 
 def _write_index(document: dict) -> None:
-    directory = _data_dir()
+    directory = runtime.data_dir("asd-blueprint")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "blueprint-index.json"
     staged = path.with_suffix(".json.tmp")
@@ -604,7 +604,7 @@ def _present(row: dict) -> dict:
 def _persist(rows: list[dict], data_as_of: str | None) -> None:
     if not rows:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("asd-blueprint")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "blueprint-observations.jsonl"
     stamp = runtime.utc_now_iso()
@@ -673,7 +673,7 @@ def _allowed_page(url: str) -> bool:
 
 
 def _cached_body(url: str) -> str | None:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("asd-blueprint") / "http_cache.sqlite")
     key = cache.key("GET", url, None, b"", "anonymous")
     cached = cache.get(key)
     if cached is None:
@@ -685,10 +685,8 @@ def _cached_body(url: str) -> str | None:
 
 
 def _fresh(document: dict) -> bool:
-    raw = str(document.get("retrieved_at") or "")
-    try:
-        when = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
-    except ValueError:
+    when = runtime.parse_iso(document.get("retrieved_at"))
+    if when is None:
         return False
     return datetime.now(UTC) - when < timedelta(days=7)
 
@@ -721,10 +719,6 @@ def _squash(parts: list[str]) -> str:
 
 def _snapshot_path() -> Path:
     return _PACKAGE / "data" / SNAPSHOT_FILE
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("asd-blueprint")
 
 
 register_connector("asd-blueprint", connector)

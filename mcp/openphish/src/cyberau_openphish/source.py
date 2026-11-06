@@ -162,7 +162,7 @@ def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
     pinned = bool(os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT")) and not force_live
     if pinned:
         return _from_snapshot()
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("openphish") / "http_cache.sqlite")
     key = cache.key("GET", FEED_URL, None, b"", "anonymous")
     previous = cache.get(key)
     if not force_live and not offline and previous and cache.fresh(previous):
@@ -221,7 +221,7 @@ def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
 
 
 def _http(*, force_live: bool):
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("openphish")
     client = runtime.http_client(
         "openphish",
         directory=data_dir,
@@ -243,7 +243,7 @@ def _http(*, force_live: bool):
 
 def _limit_feed() -> None:
     """One logical feed fetch per hour. Hops inside that fetch use the HTTP client."""
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("openphish") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         "openphish:feed",
         rate=1 / 3600,
         burst=1,
@@ -285,7 +285,7 @@ def _local_copy() -> tuple[str | None, str]:
     if os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT"):
         text = _snapshot_text()
         return text, "pinned" if text is not None else "missing"
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("openphish") / "http_cache.sqlite")
     previous = cache.get(cache.key("GET", FEED_URL, None, b"", "anonymous"))
     if previous is None:
         return None, "none"
@@ -369,7 +369,7 @@ def _sibling_path(name: str) -> Path | None:
         return None
     if override:
         return Path(override)
-    return _data_dir() / relative
+    return runtime.data_dir("openphish") / relative
 
 
 def _urls_from_document(text: str) -> tuple[list[str] | None, str]:
@@ -428,7 +428,7 @@ def _persist(source: str, urls: list[str]) -> None:
     if not urls:
         return
     now = runtime.utc_now_iso()
-    with sqlite3.connect(_data_dir() / "openphish.sqlite") as conn:
+    with sqlite3.connect(runtime.data_dir("openphish") / "openphish.sqlite") as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS indicators (
@@ -563,10 +563,6 @@ def _envelope(data, cache: str, warnings: tuple[str, ...] = ()) -> dict:
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("openphish")
 
 
 register_connector("openphish", connector)

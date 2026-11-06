@@ -780,6 +780,28 @@ class TestHttp:
         assert len(calls) == 2
         client.close()
 
+    def test_head_is_cached_apart_from_get_and_held_to_the_allowlist(self, tmp_path: Path):
+        methods = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            methods.append(request.method)
+            body = b"" if request.method == "HEAD" else b"page"
+            return httpx.Response(200, content=body, headers={"x-total": "7"})
+
+        client = _client(tmp_path, handler)
+        url = "https://example.com/a"
+        first = client.head(url, params={"q": "x"}, headers={"x-token": "t"}, ttl=60)
+        assert first.cache == "miss" and first.status == 200
+        assert first.headers["x-total"] == "7"
+        assert client.head(url, params={"q": "x"}, ttl=60).cache == "hit"
+        assert client.get(url, params={"q": "x"}, ttl=60).body == b"page"
+        assert methods == ["HEAD", "GET"]
+        assert client.head(url, params={"q": "x"}, ttl=60, skip_cache=True).cache == "miss"
+        with pytest.raises(EgressDenied):
+            client.head("https://evil.test/a", ttl=60)
+        assert methods == ["HEAD", "GET", "HEAD"]
+        client.close()
+
     def test_upstream_errors_and_bare_redirect(self, tmp_path: Path):
         def five_hundred(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500)

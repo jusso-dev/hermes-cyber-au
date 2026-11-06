@@ -243,7 +243,7 @@ def _fetch(
     if os.environ.get("CYBERAU_OSV_SNAPSHOT") and not force_live:
         return runtime.load_json_object(_snapshot_text()), "snapshot", ""
     offline = runtime.offline() and not force_live
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("osv")
     client = runtime.http_client(
         "osv",
         directory=data_dir,
@@ -464,7 +464,7 @@ def _persist(rows: list[dict]) -> None:
 def _persist_ids(items: list[dict]) -> None:
     if not items:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("osv")
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / "osv-observations.jsonl").open("a", encoding="utf-8") as handle:
         for item in items:
@@ -473,10 +473,6 @@ def _persist_ids(items: list[dict]) -> None:
 
 def _snapshot_text() -> str:
     return Path(os.environ["CYBERAU_OSV_SNAPSHOT"]).read_text(encoding="utf-8")
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("osv")
 
 
 def _envelope(

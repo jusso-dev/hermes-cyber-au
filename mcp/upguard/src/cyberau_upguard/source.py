@@ -407,7 +407,7 @@ def _fetch(
             return None, "snapshot", f"the {_FIXTURES_ENV} snapshot for this call is not usable"
     if lookup("UPGUARD_API_KEY") is None:
         return None, "snapshot", "UPGUARD_API_KEY is not set"
-    directory = _data_dir()
+    directory = runtime.data_dir("upguard")
     disk = kind in {"typosquat", "typosquat_details"}
     cache = _ttl_cache(directory) if disk else _session_cache(directory)
     scope = _scope()
@@ -699,9 +699,10 @@ def _finding(
 
 
 def _persist(findings: list[ExposureFinding], watchlist: Watchlist) -> None:
-    if not findings or not os.environ.get("CYBERAU_DATA_DIR"):
+    data = runtime.configured_data_dir()
+    if not findings or data is None:
         return
-    store = ExposureStore(Path(os.environ["CYBERAU_DATA_DIR"]) / "intel.sqlite")
+    store = ExposureStore(data / "intel.sqlite")
     terms = get_vendor("upguard").terms
     for finding in findings:
         store.write(finding, terms=terms, watchlist=watchlist)
@@ -753,10 +754,6 @@ def _text(value: str) -> str:
     if not value.strip():
         return ""
     return untrusted_text(value, "upguard")
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("upguard")
 
 
 def _scope() -> str:

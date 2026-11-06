@@ -134,7 +134,7 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
     url = _url(ip)
     snapshot = os.environ.get("CYBERAU_GREYNOISE_SNAPSHOT")
     offline = runtime.offline() and not force_live
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("greynoise")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     secret = lookup("GREYNOISE_API_KEY")
     scope = "keyed" if secret else "anonymous"
@@ -247,7 +247,7 @@ def _response_problem(record: dict) -> str | None:
 
 
 def _persist(record: dict) -> None:
-    directory = _data_dir()
+    directory = runtime.data_dir("greynoise")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "greynoise-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
@@ -289,10 +289,6 @@ def _same_ip(left, right: str) -> bool:
 
 def _url(ip: str) -> str:
     return f"{COMMUNITY_API}/{ip}"
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("greynoise")
 
 
 def _snapshot_text() -> str:

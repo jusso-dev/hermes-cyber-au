@@ -304,13 +304,13 @@ def test_live_health_probes_each_group(monkeypatch):
     assert down.detail != "live ok"
 
 
-def test_auth_failure_names_the_env_var(monkeypatch):
+def test_auth_failure_names_the_env_var(monkeypatch, tmp_path):
     body = (FIXTURES / "hibp_401.json").read_bytes()
     for status in (401, 403):
         transport, _ = _fixed(status, body)
         monkeypatch.setattr(source, "_TRANSPORT", transport)
         token = _approve(monkeypatch, "hibp_get_breached_account", ACCOUNT)
-        monkeypatch.setenv("CYBERAU_DATA_DIR", str(Path(source._data_dir()) / str(status)))
+        monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data" / str(status)))
         denied = hibp_get_breached_account(ACCOUNT, approval_token=token)
         assert denied["data"] is None
         assert "HIBP_API_KEY" in denied["warnings"][0]

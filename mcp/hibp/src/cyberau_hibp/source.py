@@ -397,7 +397,9 @@ def _fetch_public(
     if os.environ.get("CYBERAU_HIBP_SNAPSHOT") and not force_live:
         return _from_snapshot(tool, arguments)
     offline = runtime.offline() and not force_live
-    cache = _NoCache() if force_live else _PublicCache(_data_dir() / "http_cache.sqlite")
+    cache = (
+        _NoCache() if force_live else _PublicCache(runtime.data_dir("hibp") / "http_cache.sqlite")
+    )
     client = _client(cache, "hibp", rate=1.0, burst=5, offline=offline)
     try:
         response = client.post_json(MCP_URL, _rpc_body(tool, arguments), headers=_HEADERS, ttl=ttl)
@@ -450,7 +452,7 @@ def _client(cache: HttpCache, name: str, *, rate: float, burst: int, offline: bo
         name,
         policy=EgressPolicy(runtime.allowlist_path(), "hibp", resolver=_RESOLVER),
         cache=cache,
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite"),
+        limiter=RateLimiter(runtime.data_dir("hibp") / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=rate,
         burst=burst,
@@ -662,7 +664,7 @@ def _observe(rows: list[dict], cache: str) -> None:
     if cache != "miss":
         return
     stamp = runtime.utc_now_iso()
-    path = _data_dir() / "hibp-observations.jsonl"
+    path = runtime.data_dir("hibp") / "hibp-observations.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
@@ -705,13 +707,9 @@ def _data_as_of(payload: dict | None, cache: str) -> str | None:
     return max(stamps) if stamps else None
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("hibp")
-
-
 def _audit_path() -> Path:
     override = os.environ.get("CYBERAU_HIBP_AUDIT_LOG")
-    return Path(override) if override else _data_dir() / "hibp-audit.jsonl"
+    return Path(override) if override else runtime.data_dir("hibp") / "hibp-audit.jsonl"
 
 
 register_connector("hibp", connector)

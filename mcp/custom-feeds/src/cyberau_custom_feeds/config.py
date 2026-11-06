@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from cyberau_common import runtime
+
 FILE_NAME = "watchlists.yaml"
 PACKS_DIR = Path(__file__).resolve().parents[2] / "packs"
 _ID = re.compile(r"[a-z0-9][a-z0-9-]{0,40}")
@@ -90,9 +92,9 @@ class Config:
 
 
 def data_dir() -> Path:
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw).expanduser()
+    configured = runtime.configured_data_dir()
+    if configured is not None:
+        return configured.expanduser()
     hermes = os.environ.get("HERMES_HOME")
     if hermes:
         return Path(hermes).expanduser() / "plugin-data" / "cyber-au"

@@ -15,7 +15,6 @@ import time
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
-from pathlib import Path
 
 from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
@@ -135,7 +134,7 @@ def filter_items(feed: Feed, items: list[dict], *, now: datetime | None = None) 
     wanted = {name.casefold() for name in feed.categories}
     kept = []
     for item in items:
-        if item["published"] and item["published"] < cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"):
+        if item["published"] and item["published"] < runtime.iso(cutoff):
             continue
         if wanted and not wanted & {name.casefold() for name in item["categories"]}:
             continue
@@ -206,7 +205,7 @@ class _FeedsConnector(Connector):
 
 
 def _fetch(feed: Feed, *, force_live: bool) -> tuple[str | None, str, str]:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("custom-feeds")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", feed.url, None, b"", "anonymous")
     offline = runtime.offline() and not force_live
@@ -311,13 +310,10 @@ def _date(text: str) -> str:
     try:
         moment = parsedate_to_datetime(raw)
     except (TypeError, ValueError):
-        try:
-            moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        except ValueError:
+        moment = runtime.parse_iso(raw)
+        if moment is None:
             return ""
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(moment)
 
 
 def _local(tag: str) -> str:
@@ -334,10 +330,6 @@ def _term(term: str) -> re.Pattern:
 
 def _envelope(data, cache: str, *, warnings=()) -> dict:
     return envelope(KEY, data, cache=cache, warnings=tuple(warnings), attribution=ATTRIBUTION)
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("custom-feeds")
 
 
 register_connector(KEY, connector)
