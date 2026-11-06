@@ -9,8 +9,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -47,8 +46,6 @@ SNAPSHOT_FILE = "blueprint_two_pages.json"
 # The shipped snapshot is refused once its retrieved_at date is older than this.
 SNAPSHOT_MAX_AGE_DAYS = 180
 LABEL = "ASD Blueprint"
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _SLEEP = time.sleep
 _CLOCK = time.monotonic
@@ -461,7 +458,7 @@ def _load_document() -> tuple[dict | None, str, str]:
         document.get("retrieved_at"),
         label=LABEL,
         max_age_days=SNAPSHOT_MAX_AGE_DAYS,
-        today=_TODAY() if _TODAY else None,
+        today=runtime.pinned_day(),
     )
     if refused:
         return None, "snapshot", unavailable(LABEL, refused)

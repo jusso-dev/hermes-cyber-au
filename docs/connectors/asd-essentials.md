@@ -26,6 +26,7 @@ No credential variable is declared for this connector.
 | `CYBERAU_E8_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
+| `CYBERAU_TODAY` | runtime | no | no | `runtime.pinned_day, runtime.today` |
 
 ## Rate limits
 

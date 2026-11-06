@@ -5,8 +5,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -67,7 +66,6 @@ _TRANSPORT = None
 _SLEEP = time.sleep
 # The shipped release list is refused once it is this old. Catalogues for a tag do not expire.
 SNAPSHOT_MAX_AGE_DAYS = 180
-_TODAY: Callable[[], date] | None = None
 
 
 def ism_get_control(control_id: _ControlId, release: str | None = None) -> dict:
@@ -556,7 +554,7 @@ def _override() -> Path | None:
 
 
 def _today() -> date:
-    return _TODAY() if _TODAY is not None else datetime.now(UTC).date()
+    return runtime.today(UTC)
 
 
 def _catalog_url(tag: str) -> str:

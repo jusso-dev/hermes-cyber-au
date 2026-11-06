@@ -45,12 +45,11 @@ def isolated(tmp_path, monkeypatch):
     source._NOW = 0.0
     source._RNG = lambda: 0.0
     source._TRANSPORT = None
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=1)
+    monkeypatch.setenv("CYBERAU_TODAY", (SHIPPED_DAY + timedelta(days=1)).isoformat())
     yield
     source._NOW = None
     source._RNG = random.random
     source._TRANSPORT = None
-    source._TODAY = None
 
 
 def test_search_and_checklist_quote_the_guide():
@@ -445,7 +444,10 @@ def _assert_unavailable(record: dict) -> None:
 
 def test_expired_shipped_snapshot_is_unavailable_offline(monkeypatch):
     monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    monkeypatch.setenv(
+        "CYBERAU_TODAY",
+        (SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat(),
+    )
     for record in (irap_search_guidance("assessment timelines"), irap_consumer_checklist()):
         _assert_unavailable(record)
         assert any("181 days old" in item for item in record["warnings"])
@@ -460,7 +462,10 @@ def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
         raise httpx.ConnectError("unreachable")
 
     source._TRANSPORT = httpx.MockTransport(down)
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    monkeypatch.setenv(
+        "CYBERAU_TODAY",
+        (SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat(),
+    )
     for record in (irap_search_guidance("assessment timelines"), irap_consumer_checklist()):
         _assert_unavailable(record)
         source._NOW = (source._NOW or 0.0) + 100.0
@@ -468,7 +473,7 @@ def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
 
 def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
     monkeypatch.delenv("CYBERAU_IRAP_SNAPSHOT")
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=10)
+    monkeypatch.setenv("CYBERAU_TODAY", (SHIPPED_DAY + timedelta(days=10)).isoformat())
     for record in (irap_search_guidance("assessment timelines"), irap_consumer_checklist()):
         assert record["data"]
         assert record["cache"] == "snapshot"

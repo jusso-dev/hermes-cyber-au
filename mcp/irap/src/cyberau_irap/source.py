@@ -10,9 +10,8 @@ import random
 import re
 import sqlite3
 import time
-from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -50,8 +49,6 @@ SNAPSHOT_NOTE = (
 # The shipped snapshot is refused once its data-retrieved date is older than this.
 SNAPSHOT_MAX_AGE_DAYS = 180
 LABEL = "IRAP guidance"
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _RETRIEVED = re.compile(r'data-retrieved="([^"]*)"')
 _STOP = frozenset(
     "about all and any are can does for from has have how its may not should that the their "
@@ -303,7 +300,7 @@ def _snapshot_page(page_id: str, url: str, filename: str, *, after_block: bool) 
                 as_of,
                 label=LABEL,
                 max_age_days=SNAPSHOT_MAX_AGE_DAYS,
-                today=_TODAY() if _TODAY else None,
+                today=runtime.pinned_day(),
             )
         if problem:
             warning = unavailable(f"{LABEL} ({page_id})", problem)

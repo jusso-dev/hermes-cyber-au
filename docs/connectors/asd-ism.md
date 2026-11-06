@@ -29,6 +29,7 @@ Server manifest `env` entry: `GITHUB_TOKEN=${GITHUB_TOKEN}`.
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_ISM_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
+| `CYBERAU_TODAY` | runtime | no | no | `runtime.today` |
 
 ## Rate limits
 

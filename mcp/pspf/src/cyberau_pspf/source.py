@@ -6,9 +6,8 @@ import os
 import re
 import sqlite3
 import time
-from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -49,8 +48,6 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 # The shipped snapshot is refused once its as_of date is older than this.
 SNAPSHOT_MAX_AGE_DAYS = 180
 LABEL = "PSPF"
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _WEEK = 7 * 24 * 3600
 _DIRECTION_FIELDS = ("id", "title", "published", "url")
 _REQUIREMENT_FIELDS = ("id", "title", "url")
@@ -300,7 +297,7 @@ def _servable(row: dict) -> bool:
         row.get("retrieved_at"),
         max_age_days=SNAPSHOT_MAX_AGE_DAYS,
         label=LABEL,
-        today=_TODAY() if _TODAY else None,
+        today=runtime.pinned_day(),
     )
     return not problem
 
@@ -764,7 +761,7 @@ def _shipped() -> tuple[dict | None, str]:
         payload.get("as_of"),
         label=LABEL,
         max_age_days=SNAPSHOT_MAX_AGE_DAYS,
-        today=_TODAY() if _TODAY else None,
+        today=runtime.pinned_day(),
     )
     if problem:
         return None, problem

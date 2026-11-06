@@ -5,8 +5,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from html import unescape
 from pathlib import Path
 from typing import Annotated, Literal
@@ -72,8 +71,6 @@ _AMENDMENTS = "check the source URL for amendments made since the snapshot date"
 _STALE_NOTE = (
     "answered from a locally stored copy of the snapshot, not a live fetch; " + _AMENDMENTS
 )
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _RESOLVER = None
 _CLOCK = None
@@ -299,7 +296,7 @@ def _shipped() -> tuple[dict | None, str, str]:
         payload.get("retrieved_at"),
         label=LABEL,
         max_age_days=SNAPSHOT_MAX_AGE_DAYS,
-        today=_TODAY() if _TODAY else None,
+        today=runtime.pinned_day(),
     )
     if problem:
         return None, cache, unavailable(LABEL, problem)

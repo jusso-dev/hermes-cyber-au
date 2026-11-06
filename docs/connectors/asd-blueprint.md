@@ -26,6 +26,7 @@ No credential variable is declared for this connector.
 | `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
+| `CYBERAU_TODAY` | runtime | no | no | `runtime.pinned_day` |
 
 ## Rate limits
 

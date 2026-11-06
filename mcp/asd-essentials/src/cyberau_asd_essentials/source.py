@@ -8,8 +8,7 @@ import hashlib
 import json
 import os
 import re
-from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated, Literal
@@ -56,8 +55,6 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 SNAPSHOT_MAX_AGE_DAYS = 180
 MATURITY_LABEL = "Essential Eight requirements"
 ESSENTIALS_LABEL = "ASD Essentials"
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _SLEEP = __import__("time").sleep
 _PHASE = re.compile(r"^Priority phase (\d+)\s*:\s*(.+)$", re.IGNORECASE)
@@ -1191,7 +1188,7 @@ def _snapshot_doc(pattern: str, label: str) -> tuple[dict | None, str, str]:
     if override:
         return document, "snapshot", _override_note(label, as_of)
     problem = check_shipped(
-        text, as_of, label=label, max_age_days=SNAPSHOT_MAX_AGE_DAYS, today=_today()
+        text, as_of, label=label, max_age_days=SNAPSHOT_MAX_AGE_DAYS, today=runtime.pinned_day()
     )
     if problem:
         return None, "snapshot", unavailable(label, problem)
@@ -1205,10 +1202,6 @@ def _override_note(label: str, as_of: object) -> str:
         f"served the operator-supplied {label} snapshot dated {when} from "
         "CYBERAU_E8_SNAPSHOT, not a live fetch. Check the source before relying on it"
     )
-
-
-def _today() -> date | None:
-    return _TODAY() if _TODAY else None
 
 
 def _data_as_of(document: dict) -> str | None:
@@ -1296,7 +1289,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     """Download the pinned public sources and write the shipped JSON snapshot."""
     destination = destination or (_PACKAGE / "data")
     destination.mkdir(parents=True, exist_ok=True)
-    retrieved_on = (_today() or datetime.now(UTC).date()).isoformat()
+    retrieved_on = runtime.today(UTC).isoformat()
     chapters = {}
     for key, url in CHAPTERS.items():
         text, _cache, warning = _http(url, ttl=86400, skip_cache=True)

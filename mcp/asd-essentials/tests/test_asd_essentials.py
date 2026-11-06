@@ -37,7 +37,6 @@ def isolated(tmp_path, monkeypatch):
     yield
     source._TRANSPORT = None
     source._SLEEP = time.sleep
-    source._TODAY = None
 
 
 def test_strategy_assignment_follows_section_and_statement():
@@ -293,7 +292,9 @@ def _all_tools() -> list[dict]:
 def test_expired_shipped_snapshot_is_not_served(monkeypatch):
     monkeypatch.delenv("CYBERAU_E8_SNAPSHOT")
     day = max(_shipped_day("e8-maturity-*.json"), _shipped_day("essentials-*.json"))
-    source._TODAY = lambda: day + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    monkeypatch.setenv(
+        "CYBERAU_TODAY", (day + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat()
+    )
     for record in _all_tools():
         assert record["data"] is None
         assert record["cache"] == "snapshot"
@@ -309,7 +310,9 @@ def test_expired_shipped_snapshot_is_not_served_when_live_fails(monkeypatch):
     monkeypatch.delenv("CYBERAU_OFFLINE")
     source._TRANSPORT = httpx.MockTransport(lambda request: httpx.Response(503))
     day = max(_shipped_day("e8-maturity-*.json"), _shipped_day("essentials-*.json"))
-    source._TODAY = lambda: day + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    monkeypatch.setenv(
+        "CYBERAU_TODAY", (day + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat()
+    )
     for record in _all_tools():
         assert record["data"] is None
         assert any("is unavailable" in item for item in record["warnings"])
@@ -319,7 +322,9 @@ def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
     monkeypatch.delenv("CYBERAU_E8_SNAPSHOT")
     maturity_day = _shipped_day("e8-maturity-*.json")
     essentials_day = _shipped_day("essentials-*.json")
-    source._TODAY = lambda: max(maturity_day, essentials_day) + timedelta(days=10)
+    monkeypatch.setenv(
+        "CYBERAU_TODAY", (max(maturity_day, essentials_day) + timedelta(days=10)).isoformat()
+    )
     requirements, chapter, transition = _all_tools()
     assert requirements["data"]["controls"]
     assert requirements["data_as_of"] == maturity_day.isoformat()
@@ -344,14 +349,14 @@ def test_synthetic_shipped_snapshot_is_refused(monkeypatch, tmp_path):
     document["note"] = "Synthetic rows for parser tests"
     target.write_text(json.dumps(document), encoding="utf-8")
     monkeypatch.setattr(source, "_PACKAGE", package)
-    source._TODAY = lambda: date(2026, 10, 18)
+    monkeypatch.setenv("CYBERAU_TODAY", date(2026, 10, 18).isoformat())
     record = e8_requirements("application_control", 2)
     assert record["data"] is None
     assert any("looks like test data" in item for item in record["warnings"])
 
 
-def test_operator_snapshot_is_labelled_without_an_age_limit():
-    source._TODAY = lambda: date(2030, 1, 1)
+def test_operator_snapshot_is_labelled_without_an_age_limit(monkeypatch):
+    monkeypatch.setenv("CYBERAU_TODAY", date(2030, 1, 1).isoformat())
     record = e8_requirements("application_control", 2)
     assert record["data"]["controls"]
     assert record["data_as_of"] == "2026-10-17"
