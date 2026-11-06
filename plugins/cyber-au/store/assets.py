@@ -36,6 +36,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from .paths import configured_data_dir
+from .vendors import VENDOR_ALIASES
 
 FILE_NAME = "assets.yaml"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "assets.example.yaml"
@@ -597,18 +598,10 @@ def field_match(left: str, right: str) -> bool:
     return a == b or a < b or b < a
 
 
-def _vendor_aliases() -> dict[str, tuple[str, ...]]:
-    try:
-        from .watchlists import VENDOR_ALIASES
-    except Exception:  # the shared alias table is optional here
-        return {}
-    return VENDOR_ALIASES
-
-
 def vendor_match(left: str, right: str) -> bool:
     if field_match(left, right):
         return True
-    for canonical, aliases in _vendor_aliases().items():
+    for canonical, aliases in VENDOR_ALIASES.items():
         group = (canonical, *aliases)
         if any(field_match(left, item) for item in group) and any(
             field_match(right, item) for item in group

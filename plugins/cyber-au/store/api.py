@@ -480,7 +480,7 @@ def search(
     Local search returns every TLP marking. Export is the path that withholds
     ``AMBER`` and above unless ``max_tlp`` is set.
     """
-    chosen = _require_kinds(kinds)
+    chosen = require_kinds(kinds)
     capped = _require_limit(limit, maximum=SEARCH_LIMIT_MAX)
     earliest = None if since is None else canonical_timestamp(since)
     match = _match_query(query, chosen)
@@ -572,7 +572,7 @@ def export_records(
     the DuckDB analytics export, which uses the same default ceiling, is in
     ``analytics.py``.
     """
-    chosen = _require_kinds(kinds)
+    chosen = require_kinds(kinds)
     ceiling = EXPORT_DEFAULT_TLP if max_tlp is None else require_tlp(max_tlp)
     store = open_store(path)
     conn = store.connection()
@@ -937,7 +937,8 @@ def _match_query(query: str, kinds: tuple[str, ...]) -> str:
     return f"({kind_clause}) AND {terms}"
 
 
-def _require_kinds(kinds: Sequence[str]) -> tuple[str, ...]:
+def require_kinds(kinds: Sequence[str]) -> tuple[str, ...]:
+    """Check a non-empty list of record kinds drawn from ``KINDS``."""
     if isinstance(kinds, str) or kinds is None:
         raise ValueError("kinds must be a list")
     chosen = tuple(kinds)
@@ -1037,6 +1038,7 @@ __all__ = [
     "lookup",
     "observation_index_text",
     "open_store",
+    "require_kinds",
     "rescore_indicator",
     "run_write",
     "search",

@@ -28,10 +28,11 @@ from pathlib import Path
 
 import idna
 
-from .canonical import canonical_timestamp, utc_now
+from .canonical import canonical_timestamp, utc_now, utc_stamp
 from .db import fts_rowid, open_store, resolve_db_path
 from .paths import configured_data_dir
 from .text import indexable_text, unwrap_untrusted
+from .vendors import VENDOR_ALIASES
 
 FILE_NAME = "watchlists.yaml"
 ROUTINE = "watchlist"
@@ -43,18 +44,6 @@ CRTSH_REF = "crtsh"
 # A crt.sh match is replaced only by a successful query for its domain. When queries keep
 # failing, or the nightly run stops passing --crtsh, the match ages out after this long.
 CRTSH_KEEP_SECONDS = 7 * 24 * 3600
-
-# Built-in vendor aliases. Keys and aliases are matched with the token rule below.
-VENDOR_ALIASES: dict[str, tuple[str, ...]] = {
-    "Microsoft": ("MSFT",),
-    "Fortinet": ("FortiGate", "FortiOS"),
-    "Palo Alto Networks": ("PAN-OS",),
-    "Cisco": (),
-    "Citrix": ("NetScaler",),
-    "Ivanti": ("Pulse Secure",),
-    "VMware": ("Broadcom VMware",),
-    "Atlassian": ("Confluence", "Jira"),
-}
 
 _MULTI_SUFFIXES = frozenset(
     {
@@ -679,7 +668,7 @@ def match_watches(conn, watches: Iterable, *, now: str | None = None) -> list[Ma
     ).fetchall()
     texts: dict[str, tuple[str, ...]] = {}
     for rule in watches:
-        cutoff = (moment - timedelta(days=rule.lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        cutoff = utc_stamp(moment - timedelta(days=rule.lookback_days))
         sources = {
             source if source.startswith("feed-") or source in _STORE_SOURCES else f"feed-{source}"
             for source in rule.sources
@@ -972,7 +961,7 @@ def _shift(stamp: str, seconds: int) -> str:
     from datetime import datetime, timedelta
 
     moment = datetime.fromisoformat(stamp.replace("Z", "+00:00")) + timedelta(seconds=seconds)
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return utc_stamp(moment)
 
 
 # Reading.

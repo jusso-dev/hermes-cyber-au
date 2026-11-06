@@ -20,8 +20,10 @@ from pathlib import Path
 from cyberau_common.audit import AuditLog
 
 from .api import (
+    KINDS,
     ensure_source,
     lookup,
+    require_kinds,
     upsert_advisory,
     upsert_indicator,
     upsert_vulnerability,
@@ -127,7 +129,7 @@ def export_stix(
     store: str | Path | None = None,
 ) -> dict:
     """Build a deterministic STIX 2.1 bundle and optionally write it."""
-    chosen = _require_kinds(kinds)
+    chosen = KINDS if kinds is None else require_kinds(kinds)
     ceiling, explicit = _require_stix_tlp(max_tlp)
     earliest = None if since is None else canonical_timestamp(canonical_date(since))
     destination = None if output is None else resolve_export_path(output, store)
@@ -853,18 +855,6 @@ def _clean_org(value: str) -> str:
     if not text:
         raise ValueError("organisation name is empty")
     return text
-
-
-def _require_kinds(kinds: Sequence[str] | None) -> tuple[str, ...]:
-    if kinds is None:
-        return ("indicator", "vulnerability", "advisory")
-    if isinstance(kinds, str) or not kinds:
-        raise ValueError("kinds must be a list")
-    chosen = tuple(kinds)
-    allowed = {"indicator", "vulnerability", "advisory"}
-    if any(kind not in allowed for kind in chosen):
-        raise ValueError("kinds must be indicator, vulnerability or advisory")
-    return chosen
 
 
 def _require_stix_tlp(value: str | None) -> tuple[str, bool]:
