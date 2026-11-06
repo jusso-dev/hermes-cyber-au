@@ -265,7 +265,7 @@ def _tolerance(raw: object, ctx: Context) -> None:
     if by and when:
         ctx.tolerance_line = (
             f"Risk tolerance: residual risk rated {level} or lower is within tolerance. "
-            f"Determined by {_safe(by)} on {when}."
+            f"Determined by {defang_text(by)} on {when}."
         )
     else:
         ctx.tolerance_line = (
@@ -319,7 +319,7 @@ def _rate(raw: dict, ctx: Context, assets: list[dict], threats: list[dict]) -> R
     acceptance_raw = _mapping(raw.get("acceptance"))
     acc_by, acc_day = _text(acceptance_raw.get("by")), _day(acceptance_raw.get("date"))
     if acc_by and acc_day:
-        acceptance = f"accepted by {_safe(acc_by)} on {acc_day}"
+        acceptance = f"accepted by {defang_text(acc_by)} on {acc_day}"
     else:
         acceptance = "not recorded"
     if status == "above tolerance" and not option:
@@ -373,7 +373,7 @@ def _scan(value: object, ctx: Context, path: str = "input") -> None:
 
 def _tra(document, scope, assets, threats, risks, ctx: Context) -> str:
     out: list[str] = []
-    subject = _safe(_text(scope.get("subject")) or "missing")
+    subject = defang_text(_text(scope.get("subject")) or "missing")
     out += [f"# Threat and risk assessment: {subject}", "", DISCLAIMER, ""]
     out += ["## Scope and context", ""]
     out += _scope_lines(scope, ctx)
@@ -431,7 +431,7 @@ def _tra(document, scope, assets, threats, risks, ctx: Context) -> str:
 
 def _srmp(document, scope, assets, threats, risks, ctx: Context) -> str:
     out: list[str] = []
-    subject = _safe(_text(scope.get("subject")) or "missing")
+    subject = defang_text(_text(scope.get("subject")) or "missing")
     plan = _mapping(document.get("plan"))
     approval = _mapping(plan.get("approval"))
     approved_by, approved_on = _text(approval.get("by")), _day(approval.get("date"))
@@ -473,7 +473,7 @@ def _srmp(document, scope, assets, threats, risks, ctx: Context) -> str:
     out += _review_lines(ctx, approved_on)
     out += ["", "## Approval", ""]
     if approved_by and approved_on:
-        out.append(f"Approved by {_safe(approved_by)} on {approved_on}.")
+        out.append(f"Approved by {defang_text(approved_by)} on {approved_on}.")
     else:
         approver = "Accountable Authority" if ctx.kind == "entity" else ctx.authority
         out.append(
@@ -526,17 +526,20 @@ def _element(key, plan, assets, threats, risks, ctx: Context, document) -> tuple
 
 
 def _scope_lines(scope: dict, ctx: Context) -> list[str]:
+    classification = _text(scope.get("classification")) or "missing"
     lines = [
-        f"Entity: {_safe(_text(scope.get('entity')) or 'missing')}",
-        f"Subject: {_safe(_text(scope.get('subject')) or 'missing')} ({ctx.kind})",
-        f"Highest classification handled: {_safe(_text(scope.get('classification')) or 'missing')}",
+        f"Entity: {defang_text(_text(scope.get('entity')) or 'missing')}",
+        f"Subject: {defang_text(_text(scope.get('subject')) or 'missing')} ({ctx.kind})",
+        f"Highest classification handled: {defang_text(classification)}",
         f"Residual risk decision: {ctx.authority}",
         f"As of: {ctx.as_of}",
     ]
     objectives = _strings(scope.get("objectives"))
-    lines.append("Objectives: " + ("; ".join(_safe(o) for o in objectives) or "missing"))
+    lines.append("Objectives: " + ("; ".join(defang_text(o) for o in objectives) or "missing"))
     excluded = _strings(scope.get("out_of_scope"))
-    lines.append("Out of scope: " + ("; ".join(_safe(o) for o in excluded) or "none recorded"))
+    lines.append(
+        "Out of scope: " + ("; ".join(defang_text(o) for o in excluded) or "none recorded")
+    )
     return lines
 
 
@@ -572,7 +575,7 @@ def _threat_env_lines(document: dict, as_of: str) -> list[str]:
     level = _text(env.get("national_terrorism_threat_level"))
     lines = []
     if level:
-        lines.append(f"National Terrorism Threat Level: {_safe(level)}")
+        lines.append(f"National Terrorism Threat Level: {defang_text(level)}")
         lines.append(_citation(env.get("source"), as_of))
     else:
         lines.append(
@@ -582,23 +585,23 @@ def _threat_env_lines(document: dict, as_of: str) -> list[str]:
     asio = _text(env.get("asio_reporting"))
     lines.append(
         "ASIO reporting on espionage, foreign interference or sabotage: "
-        + (_safe(asio) if asio else "missing")
+        + (defang_text(asio) if asio else "missing")
     )
     return lines
 
 
 def _threat_lines(threat: dict, as_of: str) -> list[str]:
     tid = _text(threat.get("id")) or "missing"
-    lines = [f"### {tid}: {_safe(_text(threat.get('name')) or 'missing')}", ""]
+    lines = [f"### {tid}: {defang_text(_text(threat.get('name')) or 'missing')}", ""]
     for key, label in (
         ("actor_type", "Actor type"),
         ("capability", "Capability"),
         ("intent", "Intent"),
     ):
-        lines.append(f"{label}: {_safe(_text(threat.get(key)) or 'missing')}")
+        lines.append(f"{label}: {defang_text(_text(threat.get(key)) or 'missing')}")
     techniques = _strings(threat.get("attack_techniques"))
     if techniques:
-        lines.append("ATT&CK techniques: " + ", ".join(_safe(t) for t in techniques))
+        lines.append("ATT&CK techniques: " + ", ".join(defang_text(t) for t in techniques))
     evidence = _evidence(threat)
     if not evidence:
         lines.append(
@@ -608,30 +611,30 @@ def _threat_lines(threat: dict, as_of: str) -> list[str]:
     for item in evidence:
         text = _text(item.get("text"))
         marker = " (contains an instruction: recorded as content, not carried out)"
-        lines.append(f"- {_safe(text)}{marker if _INSTRUCTION.search(text) else ''}")
+        lines.append(f"- {defang_text(text)}{marker if _INSTRUCTION.search(text) else ''}")
         lines.append(f"  {_citation(item.get('source'), as_of)}")
     lines.append("")
     return lines
 
 
 def _risk_lines(risk: Rated, as_of: str) -> list[str]:
-    lines = [f"### {risk.rid}: {_safe(risk.statement)}", ""]
-    lines.append("Assets: " + (", ".join(_safe(a) for a in risk.assets) or "missing"))
-    lines.append("Threats: " + (", ".join(_safe(t) for t in risk.threats) or "missing"))
-    lines.append(f"Vulnerability: {_safe(_text(risk.raw.get('vulnerability')) or 'missing')}")
+    lines = [f"### {risk.rid}: {defang_text(risk.statement)}", ""]
+    lines.append("Assets: " + (", ".join(defang_text(a) for a in risk.assets) or "missing"))
+    lines.append("Threats: " + (", ".join(defang_text(t) for t in risk.threats) or "missing"))
+    lines.append(f"Vulnerability: {defang_text(_text(risk.raw.get('vulnerability')) or 'missing')}")
     controls = [_mapping(item) for item in _list(risk.raw.get("controls"))]
     if not controls:
         lines.append("Existing controls: none recorded.")
     for control in controls:
         ism = _strings(control.get("ism"))
-        suffix = f" ({', '.join(_safe(i) for i in ism)})" if ism else ""
+        suffix = f" ({', '.join(defang_text(i) for i in ism)})" if ism else ""
         effect = _text(control.get("effectiveness")) or "effectiveness not tested"
-        lines.append(f"- Control: {_safe(_text(control.get('text')) or 'missing')}{suffix}.")
-        lines.append(f"  Effectiveness: {_safe(effect)}.")
+        lines.append(f"- Control: {defang_text(_text(control.get('text')) or 'missing')}{suffix}.")
+        lines.append(f"  Effectiveness: {defang_text(effect)}.")
         citation = _citation(control.get("source"), as_of)
         if citation:
             lines.append(f"  {citation}")
-    lines.append(f"Rationale: {_safe(_text(risk.raw.get('rationale')) or 'missing')}")
+    lines.append(f"Rationale: {defang_text(_text(risk.raw.get('rationale')) or 'missing')}")
     if risk.inherent == "unrated":
         lines.append("Inherent risk: unrated.")
     else:
@@ -643,24 +646,24 @@ def _risk_lines(risk: Rated, as_of: str) -> list[str]:
     if risk.steward == "missing":
         lines.append(f"Risk steward: missing. PSPF Requirement 0037: {REQ['0037']}")
     else:
-        lines.append(f"Risk steward: {_safe(risk.steward)}")
+        lines.append(f"Risk steward: {defang_text(risk.steward)}")
     lines.append("")
     return lines
 
 
 def _treatment_lines(risk: Rated, ctx: Context) -> list[str]:
-    lines = [f"### {risk.rid}: {_safe(risk.statement)}", ""]
+    lines = [f"### {risk.rid}: {defang_text(risk.statement)}", ""]
     lines.append(f"Treatment option: {OPTIONS.get(risk.option, 'missing')}")
     if not risk.actions and risk.option in {"reduce", "share", "avoid"}:
         lines.append("Actions: missing.")
     for action in risk.actions:
-        text = _safe(_text(action.get("text")) or "missing").rstrip(".")
-        owner = _safe(_text(action.get("owner")) or "missing")
+        text = defang_text(_text(action.get("text")) or "missing").rstrip(".")
+        owner = defang_text(_text(action.get("owner")) or "missing")
         due = _day(action.get("due")) or "missing"
         lines.append(f"Proposal: {text}. Owner: {owner}. Due: {due}.")
         ism = _strings(action.get("ism"))
         if ism:
-            lines.append("  ISM controls: " + ", ".join(_safe(i) for i in ism))
+            lines.append("  ISM controls: " + ", ".join(defang_text(i) for i in ism))
         citation = _citation(action.get("source"))
         if citation:
             lines.append(f"  {citation}")
@@ -727,7 +730,7 @@ def _gap_lines(ctx: Context) -> list[str]:
         )
     if not gaps:
         return ["None found."]
-    return [f"{index}. {_safe(gap)}" for index, gap in enumerate(gaps, start=1)]
+    return [f"{index}. {defang_text(gap)}" for index, gap in enumerate(gaps, start=1)]
 
 
 def _register(risks: list[Rated]) -> str:
@@ -792,10 +795,6 @@ def _add_years(day: str, years: int) -> str:
         return parsed.replace(year=parsed.year + years).isoformat()
     except ValueError:
         return parsed.replace(year=parsed.year + years, day=28).isoformat()
-
-
-def _safe(value: str) -> str:
-    return defang_text(value)
 
 
 def _cell(value: str) -> str:

@@ -35,7 +35,6 @@ SUSPICIOUS_VERDICT_MIN = 15
 CLASS_CAP = 100
 
 _VERDICTS = {"malicious", "suspicious", "benign", "unknown"}
-_CLASSES = _VERDICTS
 _SOURCE_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _WHEN_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}Z)?$")
 
@@ -51,7 +50,7 @@ class Signal:
     def __post_init__(self) -> None:
         if not _SOURCE_RE.fullmatch(self.source_id):
             raise ValueError(f"bad source id: {self.source_id}")
-        if self.classification not in _CLASSES:
+        if self.classification not in _VERDICTS:
             raise ValueError(f"bad classification: {self.classification}")
         if type(self.points) is not int or not 0 <= self.points <= CLASS_CAP:
             raise ValueError("points must be an integer from 0 to 100")
