@@ -39,6 +39,7 @@ from .text import (
 )
 
 KINDS = ("indicator", "advisory", "vulnerability")
+SEARCH_LIMIT_MAX = 100
 _TOKEN = re.compile(r"[0-9A-Za-z]{1,128}")
 _VULN_FIELDS = (
     "kev_date_added",
@@ -484,7 +485,7 @@ def search(
     ``AMBER`` and above unless ``max_tlp`` is set.
     """
     chosen = _require_kinds(kinds)
-    capped = _require_limit(limit, maximum=100)
+    capped = _require_limit(limit, maximum=SEARCH_LIMIT_MAX)
     earliest = None if since is None else canonical_timestamp(since)
     match = _match_query(query, chosen)
     store = open_store(path)

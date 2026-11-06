@@ -1,15 +1,13 @@
 """Checks for the cyber-au plugin entrypoint. No network and no Hermes install.
 
-The plugin started as a skeleton of stubs. The audit hooks, feed guard, org
-exposure tool, doctor, update and migrate commands have since landed, so these
-checks pin the registration contract. The intel store and evidence tools are
-still stubs and keep their not-installed checks.
+The plugin started as a skeleton of stubs. Every tool, hook and command has
+since landed, so these checks pin the registration contract and run the intel
+store and evidence tools against a temporary data directory.
 """
 
 from __future__ import annotations
 
 import argparse
-import builtins
 import contextlib
 import importlib.util
 import inspect
@@ -66,14 +64,9 @@ KNOWN_MANIFEST_FIELDS = {
     "provides_locales",
     "requires_auth",
 }
-STUB_TOOLS = [
-    "intel_search",
-    "intel_get",
-    "intel_add_observation",
-    "intel_export_stix",
-    "evidence_import",
-]
-TOOLS = [*STUB_TOOLS, "cyber_au_org_exposure"]
+STORE_TOOLS = ["intel_search", "intel_get", "intel_add_observation", "intel_export_stix"]
+TOOLS = [*STORE_TOOLS, "evidence_import", "cyber_au_org_exposure"]
+M365_REPORT = ROOT / "mcp" / "m365-secure" / "tests" / "fixtures" / "m365_secure_report_sample.json"
 HOOKS = ["pre_tool_call", "post_tool_call", "pre_llm_call", "on_session_start", "on_session_end"]
 SECRET = "fixture-secret-value"
 
@@ -152,6 +145,7 @@ class PluginSkeletonTest(unittest.TestCase):
         environ.start()
         self.addCleanup(environ.stop)
         os.environ.pop("CYBERAU_AUDIT_LOG_PATH", None)
+        self.addCleanup(self._close_store)
         started = time.perf_counter()
         self.plugin = load_plugin()
         self.ctx = FakeCtx()
@@ -160,6 +154,14 @@ class PluginSkeletonTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         _purge()
+
+    def _close_store(self) -> None:
+        db = sys.modules.get(f"{MODULE}.store.db")
+        if db is not None:
+            db.close_store(self.data / "intel.sqlite")
+
+    def _call(self, name: str, args: object) -> dict:
+        return json.loads(self.ctx.tools[name]["handler"](args, task_id="t"))
 
     def test_manifest_matches_pinned_hermes_and_the_ticket(self) -> None:
         manifest = yaml.safe_load((PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8"))
@@ -203,8 +205,7 @@ class PluginSkeletonTest(unittest.TestCase):
         for name, registered in self.ctx.tools.items():
             self.assertEqual(registered["toolset"], "cyber-au")
             self.assertEqual(registered["schema"]["name"], name)
-            if name in STUB_TOOLS:
-                self.assertIn("not installed yet", registered["schema"]["description"])
+            self.assertNotIn("not installed", registered["schema"]["description"])
 
     def test_tool_handlers_take_the_hermes_argument_dict(self) -> None:
         for name, registered in self.ctx.tools.items():
@@ -217,27 +218,54 @@ class PluginSkeletonTest(unittest.TestCase):
             )
             self.assertIs(parameters[-1].kind, inspect.Parameter.VAR_KEYWORD, name)
 
-    def test_tools_report_that_they_are_not_installed_and_do_not_echo_input(self) -> None:
-        secret_args = {
-            "query": SECRET,
-            "id_or_value": SECRET,
-            "value": SECRET,
-            "path": SECRET,
-            "note": SECRET,
+    def test_store_tools_write_search_get_and_export_the_temp_store(self) -> None:
+        added = self._call(
+            "intel_add_observation",
+            {"type": "domain", "value": "bad.example", "verdict": "malicious", "confidence": 80},
+        )
+        self.assertTrue(added["untrusted"])
+        self.assertEqual(added["data"][0]["value_norm"], "bad.example")
+        self.assertEqual(added["data"][0]["tlp"], "AMBER")
+        self.assertTrue((self.data / "intel.sqlite").is_file())
+        found = self._call("intel_search", {"query": "bad.example", "kinds": ["indicator"]})
+        self.assertEqual([item["id"] for item in found["data"]], [added["data"][0]["id"]])
+        got = self._call("intel_get", {"id_or_value": "bad.example", "type": "domain"})
+        self.assertEqual(got["data"][0]["verdict"], "malicious")
+        exported = self._call("intel_export_stix", {"max_tlp": "AMBER", "path": "out.json"})
+        self.assertEqual(exported["data"]["path"], "exports/out.json")
+        self.assertTrue((self.data / "exports" / "out.json").is_file())
+
+    def test_store_tool_errors_are_json_and_do_not_raise(self) -> None:
+        cases = {
+            "intel_search": {"query": "x", "limit": 1000},
+            "intel_get": {"id_or_value": ""},
+            "intel_add_observation": {"type": "nope", "value": "x"},
+            "intel_export_stix": {"path": "../outside.json"},
         }
-        expected = {
-            "intel_search": "The intel store is not installed yet.",
-            "intel_get": "The intel store is not installed yet.",
-            "intel_add_observation": "The intel store is not installed yet.",
-            "intel_export_stix": "STIX export is not installed yet.",
-            "evidence_import": "Evidence import is not installed yet.",
+        for name, args in cases.items():
+            self.assertIn("error", self._call(name, args), name)
+            self.assertIn("error", self._call(name, "not a dict"), name)
+        self.assertFalse((self.data.parent / "outside.json").exists())
+
+    def test_tool_schemas_use_the_store_constants(self) -> None:
+        store_api = sys.modules[f"{MODULE}.store.api"]
+        canonical = sys.modules[f"{MODULE}.store.canonical"]
+        scoring = sys.modules[f"{MODULE}.store.scoring"]
+        props = {
+            name: self.ctx.tools[name]["schema"]["parameters"]["properties"] for name in STORE_TOOLS
         }
-        for name, message in expected.items():
-            raw = self.ctx.tools[name]["handler"](secret_args, task_id="t")
-            payload = json.loads(raw)
-            self.assertFalse(payload["installed"])
-            self.assertEqual(payload["message"], message)
-            self.assertNotIn(SECRET, raw)
+        self.assertEqual(props["intel_search"]["kinds"]["items"]["enum"], list(store_api.KINDS))
+        self.assertEqual(props["intel_get"]["type"]["enum"], list(canonical.INDICATOR_TYPES))
+        self.assertEqual(props["intel_add_observation"]["verdict"]["enum"], list(scoring.VERDICTS))
+        self.assertEqual(props["intel_add_observation"]["tlp"]["enum"], list(canonical.TLP_RANK))
+
+    def test_evidence_import_parses_a_local_report(self) -> None:
+        imported = self._call("evidence_import", {"path": str(M365_REPORT)})
+        self.assertEqual(imported["source"], "m365-secure")
+        self.assertTrue(imported["data"]["records"])
+        missing = self._call("evidence_import", {"path": str(self.data / f"{SECRET}.json")})
+        self.assertEqual(missing["data"], {"records": []})
+        self.assertNotIn(SECRET, json.dumps(missing))
 
     def _call_hook(self, callback, tool_name: str):
         return callback(
@@ -361,28 +389,6 @@ class PluginSkeletonTest(unittest.TestCase):
             self.assertTrue(usage.startswith("Usage: /cyber-au doctor"), raw)
             self.assertNotIn(SECRET, usage)
 
-    def test_stub_tools_do_not_open_or_write_any_path(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            report = Path(tmp) / "report.docx"
-            report.write_bytes(b"fixture")
-            data = Path(tmp) / "data"
-            args = {"path": str(report), "note": SECRET}
-
-            def refuse(*_args, **_kwargs):
-                raise AssertionError("a stub touched the filesystem")
-
-            with (
-                mock.patch.dict(os.environ, {"CYBERAU_DATA_DIR": str(data)}),
-                mock.patch.object(builtins, "open", refuse),
-                mock.patch.object(os, "open", refuse),
-                mock.patch.object(Path, "open", refuse),
-            ):
-                for name in STUB_TOOLS:
-                    self.ctx.tools[name]["handler"](args, task_id="t")
-            self.assertFalse(data.exists())
-            self.assertEqual(report.read_bytes(), b"fixture")
-            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["report.docx"])
-
     def test_data_dir_uses_the_environment_and_does_not_create_it(self) -> None:
         override = ROOT / "plugin-data-should-not-exist"
         previous = os.environ.get("CYBERAU_DATA_DIR")
@@ -408,10 +414,6 @@ class PluginSkeletonTest(unittest.TestCase):
             for token in banned:
                 self.assertNotIn(token, text, f"{path.name} contains {token!r}")
             self.assertNotIn("import stix2", text)
-        # The remaining stubs must not touch the filesystem. Implemented modules
-        # (doctor, update, store) read and write files by design.
-        for stub in ("tools/store.py", "tools/evidence.py"):
-            self.assertNotIn("open(", (PLUGIN_DIR / stub).read_text(encoding="utf-8"), stub)
         prose = (PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8")
         self.assertNotIn("\u2014", prose)
         self.assertNotIn("\u2013", prose)
