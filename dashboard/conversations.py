@@ -258,17 +258,6 @@ def session_count(profile: Path) -> tuple[int, bool]:
     return count, unreadable
 
 
-def find_session(profile: Path, session_id: str) -> dict | None:
-    if not SESSION_ID_RE.fullmatch(session_id):
-        return None
-    for root in profile_roots(profile):
-        sessions, _problem = list_sessions(root)
-        for session in sessions:
-            if session["id"] == session_id and session["profile"] == root.name:
-                return session
-    return None
-
-
 def handoff_threads(records: list[dict]) -> list[list[dict]]:
     """Group handoff records into chronological conversations."""
     ordered = list(reversed(records))

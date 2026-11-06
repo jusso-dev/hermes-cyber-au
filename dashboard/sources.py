@@ -52,9 +52,6 @@ class SourceRow:
     origins: list[str] = field(default_factory=list)
 
 
-# --- small readers ------------------------------------------------------------------
-
-
 def parse_duration(value: str) -> timedelta | None:
     """ISO 8601 duration with days, hours, minutes and seconds. None when unreadable."""
     match = _DURATION_RE.fullmatch(str(value or "").strip())
@@ -363,9 +360,6 @@ def load_store_counts(path: Path) -> dict[str, dict]:
     finally:
         conn.close()
     return found
-
-
-# --- assembling ---------------------------------------------------------------------
 
 
 def _key_state(feed: dict, missing: dict[str, list[str]] | None, present: set[str] | None) -> str:

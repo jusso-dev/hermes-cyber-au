@@ -913,7 +913,7 @@ def _export_value(row: dict, key: str) -> object:
 
 def _csv_cell(value: object) -> str:
     text = "" if value is None else str(value)
-    if text.startswith(("=", "+", "-", "@")):
+    if text.startswith(("=", "+", "-", "@", "\t", "\r")):
         return "'" + text
     return text
 

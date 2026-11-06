@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import os
 import re
 import sqlite3
 import time
@@ -12,6 +13,20 @@ from pathlib import Path
 
 DAY = 86400
 PACKAGES = {"sigma_core.zip", "sigma_core+.zip", "sigma_emerging_threats_addon.zip"}
+# Every no-agent job in cron/jobs.json. Their output is a one-line status, so it
+# is disposable. Agent output (briefings) stays.
+SCRIPT_JOBS = (
+    "cyberau-ingest-asd",
+    "cyberau-ingest-auscert",
+    "cyberau-ingest-feodo",
+    "cyberau-ingest-kev",
+    "cyberau-ingest-epss",
+    "cyberau-ingest-custom",
+    "cyberau-software-watch-local",
+    "cyberau-store-expire",
+    "cyberau-watchlist",
+    "cyberau-store-maintenance",
+)
 
 
 def safe(path: Path, root: Path) -> bool:
@@ -33,41 +48,50 @@ def older_files(directory: Path, pattern: str, now: float, *, keep: int = 7) -> 
     return [p for p in files[keep:] if p.stat().st_mtime < now - 30 * DAY]
 
 
-def candidates(profile: Path, now: float) -> list[Path]:
-    data = profile / "plugin-data" / "cyber-au"
+def data_dir(profile: Path) -> Path:
+    """CYBERAU_DATA_DIR, else <profile>/plugin-data/cyber-au, as the plugin resolves it."""
+    override = os.environ.get("CYBERAU_DATA_DIR", "").strip()
+    if override:
+        path = Path(override).expanduser()
+        if path.is_symlink():
+            raise ValueError("data directory must not be a symlink")
+        return path.resolve()
+    path = profile / "plugin-data" / "cyber-au"
+    if not safe(path, profile):
+        raise ValueError("data directory must not contain symlinks")
+    return path
+
+
+def safe_in(path: Path, profile: Path, data: Path) -> bool:
+    """Check a path against whichever of the two roots holds it."""
+    return safe(path, data if path.is_relative_to(data) else profile)
+
+
+def candidates(profile: Path, data: Path, now: float) -> list[Path]:
     files = older_files(data / "backups", r"\d{8}T\d{6}Z-pre-migrate-intel(?:-\d+)?\.sqlite", now)
     files += older_files(
         profile / "intel" / "snapshots", r"public-\d{4}-\d{2}-\d{2}\.sqlite\.zst", now
     )
     # Sigma saves downloaded packages directly under CYBERAU_DATA_DIR/tag.
     releases = []
-    if data.is_dir() and safe(data, profile):
+    if data.is_dir():
         for directory in data.iterdir():
-            if not directory.is_dir() or not safe(directory, profile):
+            if not directory.is_dir() or not safe(directory, data):
                 continue
             children = list(directory.iterdir())
             if children and all(
-                p.name in PACKAGES and p.is_file() and safe(p, profile) for p in children
+                p.name in PACKAGES and p.is_file() and safe(p, data) for p in children
             ):
                 releases.append((max(p.stat().st_mtime for p in children), children))
     releases.sort(key=lambda entry: entry[0], reverse=True)
     for modified, children in releases[2:]:
         if modified < now - 30 * DAY:
             files.extend(children)
-    # Only script-only maintenance/ingest output is disposable. Briefings stay.
-    for job in (
-        "cyberau-store-expire",
-        "cyberau-store-maintenance",
-        "cyberau-ingest-asd",
-        "cyberau-ingest-auscert",
-        "cyberau-ingest-feodo",
-        "cyberau-ingest-kev",
-        "cyberau-ingest-epss",
-    ):
+    for job in SCRIPT_JOBS:
         files += older_files(
             profile / "cron" / "output" / job, r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.md", now
         )
-    return [p for p in files if safe(p, profile)]
+    return [p for p in files if safe_in(p, profile, data)]
 
 
 def cleanup(profile: Path, *, apply: bool = False, now: float | None = None) -> dict:
@@ -77,16 +101,14 @@ def cleanup(profile: Path, *, apply: bool = False, now: float | None = None) -> 
     # refuse all symlinks inside that boundary.
     profile = profile.resolve()
     moment = time.time() if now is None else now
-    data = profile / "plugin-data" / "cyber-au"
-    if not safe(data, profile):
-        raise ValueError("data directory must not contain symlinks")
+    data = data_dir(profile)
     data.mkdir(parents=True, exist_ok=True)
     lock = data / ".cleanup.lock"
-    if not safe(lock, profile):
+    if not safe(lock, data):
         raise ValueError("cleanup lock must not be a symlink")
     with lock.open("a") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        files = candidates(profile, moment)
+        files = candidates(profile, data, moment)
         result = {
             "apply": apply,
             "files": len(files),
@@ -97,8 +119,7 @@ def cleanup(profile: Path, *, apply: bool = False, now: float | None = None) -> 
         cache = data / "http_cache.sqlite"
         if cache.is_file():
             if not all(
-                safe(Path(str(cache) + suffix), profile)
-                for suffix in ("", "-wal", "-shm", "-journal")
+                safe(Path(str(cache) + suffix), data) for suffix in ("", "-wal", "-shm", "-journal")
             ):
                 raise ValueError("cache must not contain symlinks")
             before = cache.stat().st_size
@@ -122,7 +143,7 @@ def cleanup(profile: Path, *, apply: bool = False, now: float | None = None) -> 
                 conn.close()
         if apply:
             for path in files:
-                if not safe(path, profile):
+                if not safe_in(path, profile, data):
                     raise ValueError("cleanup candidate became a symlink")
                 path.unlink()
         return result

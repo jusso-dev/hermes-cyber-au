@@ -323,6 +323,11 @@ def test_batches_cap_at_100_and_a_500_row_export_is_five_batches():
     assert rank.render_csv(rows).count("\n") == 501
 
 
+@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
+def test_csv_cells_starting_a_formula_are_quoted(lead):
+    assert rank._csv_cell(lead + "cmd") == "'" + lead + "cmd"
+
+
 def test_scanner_headers_sbom_and_formula_cells():
     nessus = (
         "Plugin ID,CVE,CVSS,Risk,Host,Name\n"

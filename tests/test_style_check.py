@@ -94,6 +94,12 @@ class StyleCheckTest(unittest.TestCase):
             ("\u2015", "em dash"),
             ("\u2b50", "emoji"),
             ("\u23f0", "emoji"),
+            ("\u2934", "emoji"),
+            ("\u3030", "emoji"),
+            ("\u2302\u200d", "emoji"),
+            ("\U0001f7e2", "emoji"),
+            ("&" + "mdash;", "em dash"),
+            ("&" + "#x2014;", "em dash"),
         ):
             with _TempTree() as root:
                 (root / "notes.md").write_text(f"a {char} b\n", encoding="utf-8")
