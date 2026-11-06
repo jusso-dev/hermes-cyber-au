@@ -31,9 +31,6 @@ global_deny_cidrs:
   - "fec0::/10"
   - "ff00::/8"
 connectors:
-  stub:
-    hosts:
-      - example.com
   cisa-kev:
     hosts:
       - www.cisa.gov

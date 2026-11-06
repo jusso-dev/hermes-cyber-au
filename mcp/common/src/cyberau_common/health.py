@@ -99,9 +99,6 @@ def collect_connector_health(
                 today=stamp,
             )
         )
-    keyed = _keyed(feeds)
-    for row in rows:
-        row["keyed"] = row["key"] in keyed
     if state_path is not None and any(row["status"] == "ok" for row in rows):
         _write_state(state_path, saved)
     return {"checked_at": stamp.isoformat(), "connectors": rows}
@@ -161,11 +158,6 @@ def _auth_env(feed: dict) -> str | None:
     auth = feed.get("auth")
     env = auth.get("env") if isinstance(auth, dict) else None
     return env if isinstance(env, str) else None
-
-
-def _keyed(feeds: list[dict]) -> set[str]:
-    """Connectors that send a credential to any of their feeds, even an optional one."""
-    return {feed["connector"] for feed in feeds if _auth_env(feed)}
 
 
 def _unconfigured(feeds: list[dict]) -> dict[str, str]:

@@ -1255,7 +1255,7 @@ def _is_external(spec: object) -> bool:
     """A remote MCP URL, a vendored wrap or an operator-supplied command."""
     if not isinstance(spec, dict):
         return False
-    if spec.get("url") or spec.get("wrap") is True or spec.get("kind") == "wrap":
+    if spec.get("url") or spec.get("wrap") is True:
         return True
     command = spec.get("command")
     return isinstance(command, str) and bool(command) and "cyberau-mcp" not in command

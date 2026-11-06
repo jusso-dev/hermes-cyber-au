@@ -2,8 +2,8 @@
 
 One issue per broken connector, titled ``Connector health: <key> failing``.
 A repeat failure comments on that issue. Recovery closes it with a comment.
-Connectors that were not checked are left alone. Response bodies are never
-copied into the issue, and keyed connectors do not contribute free-text detail.
+Connectors that were not checked are left alone. Response bodies and free-text
+detail are never copied into the issue.
 """
 
 from __future__ import annotations

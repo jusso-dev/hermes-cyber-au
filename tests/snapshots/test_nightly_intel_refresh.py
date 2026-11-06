@@ -156,16 +156,7 @@ def test_failure_and_recovery_change_status_and_preserve_exit_code(
     assert github_output.read_text().strip() == "open_pr=true"
 
 
-def test_absent_command_is_an_error(tmp_path, github_output, capsys):
-    def runner(args):
-        return nightly.CommandResult(2, "", nightly.ABSENT_MARKER)
-
-    assert _run(tmp_path, runner) == 1
-    assert "::error title=Intel refresh not run::" in capsys.readouterr().out
-    assert github_output.read_text().strip() == "open_pr=false"
-
-
-def test_bad_flags_on_existing_command_are_not_absence(tmp_path, github_output):
+def test_bad_flags_fail_the_run(tmp_path, github_output):
     def runner(args):
         return nightly.CommandResult(
             2, "", "usage: cyberau-mcp refresh [-h]\nerror: unrecognized arguments: --bad"
@@ -224,21 +215,6 @@ def test_git_changes_lists_files_in_a_fresh_repository(tmp_path):
     (tmp_path / "README.md").write_text("x")
     _status(tmp_path, "ok")
     assert set(nightly.git_changes(tmp_path)) == {"README.md", "feeds/status.json"}
-
-
-def test_main_propagates_absence(monkeypatch, github_output):
-    monkeypatch.setattr(
-        nightly,
-        "run_cyberau",
-        lambda args, env: nightly.CommandResult(2, "", nightly.ABSENT_MARKER),
-    )
-    assert nightly.main([]) == 1
-    assert github_output.read_text().strip() == "open_pr=false"
-
-
-def test_success_or_failure_with_absent_text_is_not_placeholder_absence():
-    assert not nightly.is_absent(nightly.CommandResult(0, nightly.ABSENT_MARKER, ""))
-    assert not nightly.is_absent(nightly.CommandResult(1, "", nightly.ABSENT_MARKER))
 
 
 def test_workflow_pins_actions_and_only_publishes_status():

@@ -75,7 +75,6 @@ def _report() -> dict:
                 "error_class": "schema_drift",
                 "last_good": "2026-10-01",
                 "detail": "schema drift",
-                "keyed": False,
                 "body": SECRET,
                 "schema_diff": [
                     {
@@ -111,7 +110,6 @@ def _report() -> dict:
                 "schema_diff": [],
                 "last_good": None,
                 "detail": SECRET,
-                "keyed": True,
                 "body": SECRET,
                 "response": SECRET,
             },
@@ -205,7 +203,7 @@ def test_not_checked_does_not_close_an_existing_issue():
     assert nvd["body"] == "still open\n"
 
 
-def test_keyed_failure_omits_the_response(tmp_path: Path):
+def test_failure_omits_the_response(tmp_path: Path):
     module = load()
     github = FakeGitHub()
     report = {
@@ -216,7 +214,6 @@ def test_keyed_failure_omits_the_response(tmp_path: Path):
                 "status_code": 401,
                 "error_class": SECRET,
                 "detail": SECRET,
-                "keyed": True,
                 "body": SECRET,
                 "response": {"vulnerabilities": SECRET},
                 "schema_diff": [],

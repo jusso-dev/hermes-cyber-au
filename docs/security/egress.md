@@ -62,7 +62,7 @@ Two options, checked in the Hermes configuration and iron-proxy guides at the sa
 - Docker backend with no network: `terminal.backend: docker` and `terminal.docker_network: false` (`--network=none` for the terminal, code execution, and file-tool container).
 - `hermes egress` (iron-proxy), with `proxy.extra_allowed_hosts` set to the catalogue hosts. That setting adds hosts. It does not replace the inference hosts Hermes allows by default. Use `terminal.docker_network: false` when the sandbox should have no network at all.
 
-Catalogue hosts, one per line, excluding loopback names and the in-library stub:
+Catalogue hosts, one per line, excluding loopback names:
 
 ```bash
 uv run --project mcp python tools/ci/check_allowlist.py --print-hosts
