@@ -23,8 +23,9 @@ Credential values are read from the profile environment. Nothing on this page is
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `PHISHTANK_APP_KEY` | credential | no | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_PHISHTANK_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits
@@ -35,7 +36,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_download` | `HttpClient` |  | `1` | `4` | `rolling` |
+| `_download` | `http_client` |  | `1` | `4` | `rolling` |
 | `_hourly_limit` | `acquire` | `'phishtank:database'` | `1 / _HOUR` | `1` | `rolling` |
 
 ## Cache

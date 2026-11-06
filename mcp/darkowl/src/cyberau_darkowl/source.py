@@ -260,7 +260,7 @@ def _normalise(
     types: list[str] = []
     refs: list[str] = []
     for item in [*primary, *extra]:
-        parsed = _parse_time(item.get("crawlDate"))
+        parsed = runtime.parse_iso(item.get("crawlDate"), to_utc=True)
         if parsed is not None:
             dates.append(parsed)
         types.extend(_tokens(item.get("groups")))
@@ -589,19 +589,6 @@ def _hostile(value) -> str | None:
     cleaned = redact_text(_LINK.sub("[link removed]", flat))
     cleaned = _FENCE.sub(" ", cleaned)
     return untrusted_text(cleaned, "darkowl", max_len=_SNIPPET_MAX)
-
-
-def _parse_time(value) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip().replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
 
 
 def _scope(public_key: str) -> str:

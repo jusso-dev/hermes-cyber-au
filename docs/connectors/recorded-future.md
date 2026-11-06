@@ -36,9 +36,9 @@ Server manifest `required_env`: `RECORDED_FUTURE_API_TOKEN`.
 | `RECORDED_FUTURE_MCP_CLIENT_ID` | credential | yes | no | not read in connector source |
 | `RECORDED_FUTURE_MCP_CLIENT_SECRET` | credential | yes | no | not read in connector source |
 | `RECORDED_FUTURE_ORG_ID` | credential | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get, runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_RF_ALLOW_EXTERNAL` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_RF_LIVE` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_RF_SCHEMA_FIXTURE` | runtime | no | no | `os.environ.get` |
@@ -55,7 +55,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_client` | `HttpClient` |  | `5` | `20` | `rolling` |
+| `_client` | `http_client` |  | `5` | `20` | `rolling` |
 
 ## Cache
 

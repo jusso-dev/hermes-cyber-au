@@ -686,7 +686,7 @@ def _search_findings(
     for item in payload.get("data") or []:
         if not isinstance(item, dict):
             return [], _UNUSABLE
-        when = _parse_time(item.get("date_compromised"))
+        when = runtime.parse_iso(item.get("date_compromised"), to_utc=True)
         if when is None:
             return [], _UNUSABLE
         if since and when < _sydney_start(since):
@@ -734,7 +734,7 @@ def _overview_findings(payload: dict, domain: str) -> tuple[list[ExposureFinding
             return [], _UNUSABLE
         stamps = []
         for name in _OVERVIEW_TIMES:
-            parsed = _parse_time(item.get(name))
+            parsed = runtime.parse_iso(item.get(name), to_utc=True)
             if parsed is not None:
                 stamps.append(parsed)
         if not stamps:
@@ -813,21 +813,6 @@ def _count(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
-
-
-def _parse_time(value: object) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
 
 
 def _sydney_start(day: str) -> datetime:

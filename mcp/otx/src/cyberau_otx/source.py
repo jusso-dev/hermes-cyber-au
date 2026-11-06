@@ -685,26 +685,11 @@ def _persist(rows: list[dict]) -> None:
 
 
 def _kept(modified: str, day: str) -> bool:
-    parsed = _parse_time(modified)
+    parsed = runtime.parse_iso(modified)
     if parsed is None:
         return False
     start = datetime.fromisoformat(day).replace(tzinfo=_SYDNEY)
     return parsed >= start
-
-
-def _parse_time(value: str) -> datetime | None:
-    text = value.strip()
-    if not text:
-        return None
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=_UTC)
-    return parsed
 
 
 def _sydney_param(day: str) -> str:

@@ -140,8 +140,8 @@ def upguard_data_leaks(
     records, _findings = _leak_records(
         payload or {},
         watchlist=None,
-        since=_parse_time(since) if since else None,
-        until=_parse_time(until) if until else None,
+        since=runtime.parse_iso(since) if since else None,
+        until=runtime.parse_iso(until) if until else None,
         statuses=statuses,
     )
     return _envelope(records, cache, (DISCLOSURES_URL,), _served(cache))
@@ -343,9 +343,9 @@ def _validate_domain(domain: str) -> str:
 
 
 def _validate_leaks(since: str | None, until: str | None, statuses: list[str] | None) -> str:
-    if since and _parse_time(since) is None:
+    if since and runtime.parse_iso(since) is None:
         return "since must be a date-time"
-    if until and _parse_time(until) is None:
+    if until and runtime.parse_iso(until) is None:
         return "until must be a date-time"
     if statuses:
         unknown = [item for item in statuses if item not in _STATUSES]
@@ -505,7 +505,7 @@ def _breach_records(
     for slot in rows:
         if len(records) >= limit:
             break
-        observed = _parse_time(slot["when"])
+        observed = runtime.parse_iso(slot["when"])
         if observed is None:
             continue
         if since is not None and observed.astimezone(UTC).date() < since:
@@ -559,7 +559,7 @@ def _leak_records(
         status = str(item.get("status") or "")
         if allowed and status not in allowed:
             continue
-        observed = _parse_time(str(item.get("date_disclosed") or ""))
+        observed = runtime.parse_iso(str(item.get("date_disclosed") or ""))
         if observed is None:
             continue
         if since is not None and observed < since:
@@ -613,7 +613,7 @@ def _typosquat_rows(payload: dict):
         for item in payload.get(state) or []:
             hostname = str(item.get("hostname") or "").strip().rstrip(".")
             if hostname:
-                observed = _parse_time(str(item.get("date_detected") or ""))
+                observed = runtime.parse_iso(str(item.get("date_detected") or ""))
                 yield state, hostname, item, observed
 
 
@@ -756,21 +756,6 @@ def _text(value: str) -> str:
     if not value.strip():
         return ""
     return untrusted_text(value, "upguard")
-
-
-def _parse_time(value: str | None) -> datetime | None:
-    if not value or not isinstance(value, str):
-        return None
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed
 
 
 def _data_dir() -> Path:

@@ -8,7 +8,7 @@ import json
 import os
 import re
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
@@ -442,19 +442,6 @@ def _schema_sample(env_name: str, default: Path) -> dict:
     return payload or {}
 
 
-def _parse_time(value) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip().replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed
-
-
 def _valid_date(value: str) -> bool:
     if not _DATE.fullmatch(value):
         return False
@@ -512,7 +499,7 @@ def _summary_type(record: dict, requested: str | None) -> str:
 
 
 def _keep(record: dict, *, since: str | None, record_type: str | None, watchlist_type: str | None):
-    observed = _parse_time(record.get("spycloud_publish_date"))
+    observed = runtime.parse_iso(record.get("spycloud_publish_date"))
     if since:
         if observed is None or observed.astimezone(SYDNEY).date().isoformat() < since:
             return False
@@ -592,7 +579,7 @@ def _finding(record: dict, *, requested: str | None, watchlist_type: str | None)
     if not isinstance(document_id, str) or not document_id.strip():
         return None
     subject = _subject(record, watchlist_type)
-    observed = _parse_time(record.get("spycloud_publish_date"))
+    observed = runtime.parse_iso(record.get("spycloud_publish_date"))
     if subject is None or observed is None:
         return None
     kind = "infostealer_credential" if _infected(record) else "breach_credential"
@@ -853,7 +840,7 @@ def _breach_payload(record: dict, breach_id: str) -> dict | None:
         not isinstance(title, str)
         or isinstance(count, bool)
         or not isinstance(count, int)
-        or _parse_time(published) is None
+        or runtime.parse_iso(published) is None
     ):
         return None
     assets = record.get("assets") if isinstance(record.get("assets"), dict) else {}

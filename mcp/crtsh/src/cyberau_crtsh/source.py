@@ -314,7 +314,7 @@ def _serial(value) -> str:
 
 def _timestamp(value) -> str:
     """Pass a timestamp through only when it parses, so upstream text cannot ride in a date."""
-    if not isinstance(value, str) or _parse_time(value) is None:
+    if not isinstance(value, str) or runtime.parse_iso(value) is None:
         return ""
     return value.strip()
 
@@ -376,31 +376,16 @@ def _name_matches(name: str, domain: str, include_subdomains: bool) -> bool:
 
 
 def _is_expired(value: str, now: datetime) -> bool | None:
-    parsed = _parse_time(value)
+    parsed = runtime.parse_iso(value)
     if parsed is None:
         return None
     return parsed < now
 
 
-def _parse_time(value: str) -> datetime | None:
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1]
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed
-
-
 def _now() -> datetime:
     override = os.environ.get("CYBERAU_TODAY")
     if override:
-        parsed = _parse_time(override)
+        parsed = runtime.parse_iso(override)
         if parsed is not None:
             return parsed
     return datetime.now(UTC)

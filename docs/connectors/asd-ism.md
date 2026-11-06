@@ -25,9 +25,10 @@ Server manifest `env` entry: `GITHUB_TOKEN=${GITHUB_TOKEN}`.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `GITHUB_TOKEN` | credential | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_ISM_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 
@@ -37,7 +38,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_http` | `HttpClient` |  | `4` | `20` | `rolling` |
+| `_http` | `http_client` |  | `4` | `20` | `rolling` |
 | `_http` | `_limit` | `'asd-ism:github'` | `10 / 3600` | `10` |  |
 
 ## Cache
