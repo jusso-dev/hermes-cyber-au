@@ -19,12 +19,12 @@ from zoneinfo import ZoneInfo
 import httpx
 import jsonschema
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimited, RateLimiter
+from cyberau_common.http import HttpError
+from cyberau_common.ratelimit import RateLimited
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -38,7 +38,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.present import finding_payload
 from cyberau_premium.store import ExposureStore
@@ -211,10 +211,7 @@ class _HudsonRock(PremiumConnector):
                 ToolSpec("hudsonrock_domain_exposure", exposure, hudsonrock_domain_exposure),
                 ToolSpec("hudsonrock_domain_overview", overview, hudsonrock_domain_overview),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
@@ -254,7 +251,7 @@ class _HudsonRock(PremiumConnector):
             return Probe(self.key, configured.ok, configured.detail)
         if not live:
             return Probe(self.key, True, "offline ok")
-        if os.environ.get("CYBERAU_OFFLINE") == "1":
+        if runtime.offline():
             return Probe(self.key, False, "offline: the live probe was not run")
         domain = _probe_domain()
         if domain is None:
@@ -483,7 +480,7 @@ def _load_page(url: str, body: dict, *, force_live: bool) -> tuple[dict | None, 
         return None, "snapshot", f"{KEY_ENV} is not set."
     session = _session_cache()
     cache_key = session.key("POST", url, None, _body_bytes(body), _scope(secret))
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cached = session.get(cache_key)
     if cached and not force_live and (offline or session.fresh(cached)):
         payload = _load_cached(cached.body)
@@ -567,14 +564,14 @@ def _transport_json(url: str, body: dict) -> tuple[dict | None, str, str]:
 def _http(url: str, body: dict) -> tuple[int, dict[str, str], dict | None]:
     secret = lookup(KEY_ENV) or ""
     if _RESOLVER is None:
-        policy = EgressPolicy(_allowlist_path(), "hudson-rock")
+        policy = EgressPolicy(runtime.allowlist_path(), "hudson-rock")
     else:
-        policy = EgressPolicy(_allowlist_path(), "hudson-rock", resolver=_RESOLVER)
-    client = HttpClient(
+        policy = EgressPolicy(runtime.allowlist_path(), "hudson-rock", resolver=_RESOLVER)
+    client = runtime.http_client(
         "hudson-rock",
+        directory=data_dir(),
         policy=policy,
         cache=HttpCache(data_dir() / "hudsonrock-raw.sqlite", persistence="none"),
-        limiter=RateLimiter(data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE_PER_SECOND,
         burst=BURST,
@@ -686,7 +683,7 @@ def _search_findings(
     for item in payload.get("data") or []:
         if not isinstance(item, dict):
             return [], _UNUSABLE
-        when = _parse_time(item.get("date_compromised"))
+        when = runtime.parse_iso(item.get("date_compromised"), to_utc=True)
         if when is None:
             return [], _UNUSABLE
         if since and when < _sydney_start(since):
@@ -734,7 +731,7 @@ def _overview_findings(payload: dict, domain: str) -> tuple[list[ExposureFinding
             return [], _UNUSABLE
         stamps = []
         for name in _OVERVIEW_TIMES:
-            parsed = _parse_time(item.get(name))
+            parsed = runtime.parse_iso(item.get(name), to_utc=True)
             if parsed is not None:
                 stamps.append(parsed)
         if not stamps:
@@ -815,21 +812,6 @@ def _count(value: object) -> int | None:
     return value
 
 
-def _parse_time(value: object) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
-
-
 def _sydney_start(day: str) -> datetime:
     return datetime.combine(date.fromisoformat(day), time.min, tzinfo=SYDNEY)
 
@@ -895,13 +877,6 @@ def _session_cache() -> HttpCache:
             get_vendor(VENDOR).terms,
         )
     return _SESSION_CACHE
-
-
-def _allowlist_path() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return _PACKAGE.parent / "egress-allowlist.yaml"
 
 
 def _body_bytes(body: dict) -> bytes:

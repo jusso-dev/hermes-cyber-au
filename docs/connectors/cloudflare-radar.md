@@ -27,9 +27,9 @@ Server manifest `required_env`: `CLOUDFLARE_RADAR_API_TOKEN`.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `CLOUDFLARE_RADAR_API_TOKEN` | credential | yes | yes | not read in connector source |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 
@@ -39,7 +39,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_fetch` | `HttpClient` |  | `2` | `4` | `rolling` |
+| `_fetch` | `http_client` |  | `2` | `4` | `rolling` |
 
 ## Cache
 

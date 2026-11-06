@@ -24,7 +24,7 @@ No credential variable is declared for this connector.
 |---|---|---|---|---|
 | `CYBERAU_AUSCERT_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get, runtime.allowlist_path` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits

@@ -15,9 +15,9 @@ from cyberau_premium.catalog import TermsRejected, apply_terms, get_vendor
 from cyberau_premium.guard import pre_tool_call
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_obj, redact_text
-from cyberau_premium.samples import sample_finding
 from cyberau_premium.stix import export_stix
 from cyberau_premium.store import ExposureStore
+from premium_samples import sample_finding
 
 WATCH = Watchlist(domains=["example.com.au"])
 ALL_TERMS = TermsProfile(cache="none", store="metadata", stix_export=True, attribution="Test.")

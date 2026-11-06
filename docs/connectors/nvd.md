@@ -25,10 +25,10 @@ Server manifest `env` entry: `NVD_API_KEY=${NVD_API_KEY}`.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `NVD_API_KEY` | credential | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_NVD_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 
@@ -38,7 +38,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_fetch` | `HttpClient` |  | `burst / 30` | `burst` | `rolling` |
+| `_fetch` | `http_client` |  | `burst / 30` | `burst` | `rolling` |
 
 `_fetch` sets `burst` to `50 if secret else 5`.
 

@@ -30,8 +30,8 @@ Server manifest `required_env`: `SOCRADAR_API_KEY`, `SOCRADAR_COMPANY_ID`.
 |---|---|---|---|---|
 | `SOCRADAR_API_KEY` | credential | yes | yes | `lookup` |
 | `SOCRADAR_COMPANY_ID` | credential | yes | yes | `lookup` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_SOCRADAR_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits
@@ -42,7 +42,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_client` | `HttpClient` |  | `1.0` | `5` | `rolling` |
+| `_client` | `http_client` |  | `1.0` | `5` | `rolling` |
 
 ## Cache
 

@@ -242,6 +242,12 @@ class _Extractor(ast.NodeVisitor):
             if env_name:
                 self._env(env_name, "os.environ.get")
         keywords = {item.arg: item.value for item in node.keywords if item.arg}
+        if _is_runtime_call(node):
+            env_name = RUNTIME_ENV_READS.get(name)
+            if name == "http_client" and "policy" in keywords:
+                env_name = None
+            if env_name:
+                self._env(env_name, f"runtime.{name}")
         if self.server_name is None and "server_name" in keywords:
             self.server_name = const_str(keywords["server_name"])
         if "ttl" in keywords:
@@ -281,6 +287,26 @@ class _Extractor(ast.NodeVisitor):
             rates=self.rates,
             burst_assignments=self.burst_assignments,
         )
+
+
+# cyberau_common.runtime helpers and the variable each one reads.
+RUNTIME_ENV_READS = {
+    "data_dir": "CYBERAU_DATA_DIR",
+    "allowlist_path": "CYBERAU_EGRESS_ALLOWLIST",
+    "http_client": "CYBERAU_EGRESS_ALLOWLIST",
+    "offline": "CYBERAU_OFFLINE",
+    "today": "CYBERAU_TODAY",
+    "pinned_day": "CYBERAU_TODAY",
+}
+
+
+def _is_runtime_call(node: ast.Call) -> bool:
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "runtime"
+    )
 
 
 def _is_environ_get(node: ast.Call) -> bool:

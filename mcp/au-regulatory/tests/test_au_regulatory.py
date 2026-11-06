@@ -52,12 +52,11 @@ def isolated(tmp_path, monkeypatch):
     source._CLOCK = _Clock()
     source._RESOLVER = lambda _host: [ipaddress.ip_address("1.1.1.1")]
     source._TRANSPORT = None
-    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=1)
+    monkeypatch.setenv("CYBERAU_TODAY", (SNAPSHOT_DAY + timedelta(days=1)).isoformat())
     yield
     source._CLOCK = None
     source._RESOLVER = None
     source._TRANSPORT = None
-    source._TODAY = None
 
 
 def _due(record: dict, name: str) -> dict:
@@ -303,8 +302,11 @@ def _expired_answers() -> list[dict]:
     ]
 
 
-def test_expired_shipped_snapshot_is_unavailable():
-    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+def test_expired_shipped_snapshot_is_unavailable(monkeypatch):
+    monkeypatch.setenv(
+        "CYBERAU_TODAY",
+        (SNAPSHOT_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat(),
+    )
     snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
     for record in _expired_answers():
         assert record["data"] == []
@@ -320,7 +322,10 @@ def test_expired_shipped_snapshot_is_unavailable():
 def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
     monkeypatch.delenv("CYBERAU_OFFLINE")
     source._TRANSPORT = httpx.MockTransport(lambda request: httpx.Response(503))
-    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+    monkeypatch.setenv(
+        "CYBERAU_TODAY",
+        (SNAPSHOT_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat(),
+    )
     for record in _expired_answers():
         assert record["data"] == []
         assert any("is unavailable" in note for note in record["warnings"])
@@ -342,7 +347,7 @@ def test_synthetic_shipped_snapshot_is_refused(monkeypatch, tmp_path):
 
 def test_operator_snapshot_is_labelled_without_an_age_limit(monkeypatch):
     monkeypatch.setenv("CYBERAU_AUREG_SNAPSHOT", str(SNAPSHOT))
-    source._TODAY = lambda: SNAPSHOT_DAY + timedelta(days=1000)
+    monkeypatch.setenv("CYBERAU_TODAY", (SNAPSHOT_DAY + timedelta(days=1000)).isoformat())
     record = aureg_obligation("ndb")
     assert record["data"]
     assert record["data_as_of"] == SNAPSHOT_DAY.isoformat()

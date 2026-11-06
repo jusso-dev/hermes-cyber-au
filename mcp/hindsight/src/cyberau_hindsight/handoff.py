@@ -13,9 +13,9 @@ import math
 import os
 import re
 import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 
+from cyberau_common import runtime
 from cyberau_common.secrets import lookup, redact
 
 from cyberau_hindsight.constants import HANDOFF_ACTOR, TLP_MARKINGS
@@ -238,7 +238,7 @@ def _record(
         "confidence": _confidence(confidence),
         "tlp": _tlp(tlp),
         "untrusted": True,
-        "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "at": runtime.utc_now_iso(),
     }
     if set(record) != _RECORD_KEYS:
         raise HandoffError("handoff record has an unexpected field")

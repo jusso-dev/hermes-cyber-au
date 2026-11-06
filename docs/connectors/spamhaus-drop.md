@@ -22,10 +22,10 @@ No credential variable is declared for this connector.
 
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
 | `CYBERAU_DROP_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 

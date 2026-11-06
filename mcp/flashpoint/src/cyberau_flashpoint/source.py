@@ -16,16 +16,15 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_premium.base import ExposureFinding, PremiumConnector, Watchlist
-from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.caching import cache_once
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.redact import redact_text
 from pydantic import Field
 
@@ -107,7 +106,7 @@ class FlashpointConnector(PremiumConnector):
             if not os.environ.get("CYBERAU_FLASHPOINT_SNAPSHOT"):
                 return Probe(self.key, True, "schema ok, no local copy to check")
             try:
-                payload = _load(_snapshot_text())
+                payload = runtime.load_json_object(_snapshot_text())
             except OSError:
                 payload = None
             problem = schema_drift(payload or {})
@@ -141,10 +140,7 @@ def connector() -> FlashpointConnector:
         key="flashpoint",
         server_name="flashpoint",
         attribution=spec.terms.attribution,
-        vendor=spec.server,
-        licence_env=tuple(spec.licence_env),
-        terms=spec.terms,
-        quota=spec.quota,
+        **vendor_fields(spec),
         tools=[
             ToolSpec(
                 "flashpoint_indicator",
@@ -157,7 +153,7 @@ def connector() -> FlashpointConnector:
 
 def _fetch(*, force_live: bool = False) -> tuple[dict | None, str, str]:
     snapshot_env = os.environ.get("CYBERAU_FLASHPOINT_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cache = _cache()
     token = lookup("FLASHPOINT_API_TOKEN")
     key = cache.key("GET", INDICATORS_URL, None, b"", _scope(token))
@@ -169,7 +165,7 @@ def _fetch(*, force_live: bool = False) -> tuple[dict | None, str, str]:
             return payload, state, ""
     if snapshot_env and not force_live:
         try:
-            payload = _load(_snapshot_text())
+            payload = runtime.load_json_object(_snapshot_text())
         except OSError:
             payload = None
         if payload is None:
@@ -271,28 +267,21 @@ def _persist(rows: list[dict]) -> None:
 
 
 def _cache():
-    directory = str(_data_dir())
-    cached = _CACHES.get(directory)
-    if cached is not None:
-        return cached
-    created = cache_for_terms(
-        Path(directory) / "http_cache.sqlite",
-        get_vendor("flashpoint").terms,
+    directory = _data_dir()
+    return cache_once(
+        _CACHES, str(directory), directory / "http_cache.sqlite", get_vendor("flashpoint").terms
     )
-    _CACHES[directory] = created
-    return created
 
 
 def _client(cache) -> HttpClient:
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     kwargs = {}
     if _RESOLVER is not None:
         kwargs["resolver"] = _RESOLVER
-    return HttpClient(
+    return runtime.http_client(
         "flashpoint",
-        policy=EgressPolicy(allowlist, "flashpoint", **kwargs),
+        directory=_data_dir(),
+        policy=EgressPolicy(runtime.allowlist_path(), "flashpoint", **kwargs),
         cache=cache,
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=_RATE,
         burst=_BURST,
@@ -322,19 +311,9 @@ def _required_fields() -> tuple[str, ...]:
 
 def _decode(body: bytes) -> dict | None:
     try:
-        return _load(body.decode("utf-8"))
+        return runtime.load_json_object(body.decode("utf-8"))
     except UnicodeDecodeError:
         return None
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return payload
 
 
 def _notice(cache: str) -> str:
@@ -369,14 +348,7 @@ def _envelope(
 
 
 def _data_dir() -> Path:
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw)
-    return Path("/tmp") / "cyberau-flashpoint"
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("flashpoint")
 
 
 register_connector("flashpoint", connector)

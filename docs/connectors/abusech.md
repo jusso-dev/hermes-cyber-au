@@ -27,8 +27,8 @@ Server manifest `required_env`: `ABUSECH_AUTH_KEY`.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `ABUSECH_AUTH_KEY` | credential | yes | yes | not read in connector source |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits

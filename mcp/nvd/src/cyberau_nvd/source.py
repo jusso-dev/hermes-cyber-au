@@ -6,12 +6,9 @@ import re
 from pathlib import Path
 from typing import Annotated, Literal
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -150,7 +147,7 @@ class _NvdConnector(Connector):
         if check_schema and not live:
             if not os.environ.get("CYBERAU_NVD_SNAPSHOT"):
                 return Probe(self.key, True, "schema ok, no local copy to check")
-            payload = _load(_snapshot_text())
+            payload = runtime.load_json_object(_snapshot_text())
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
@@ -193,27 +190,25 @@ def _fetch(
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_NVD_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-nvd"))
+    offline = runtime.offline() and not force_live
+    data_dir = runtime.data_dir("nvd")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, params, b"", "anonymous")
     if snapshot and not force_live:
-        return _load(_snapshot_text()), "snapshot", ""
+        return runtime.load_json_object(_snapshot_text()), "snapshot", ""
     cached = cache.get(cache_key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "hit" if cache.fresh(cached) else "stale"
-        return _load(cached.body.decode("utf-8")), state, ""
+        return runtime.load_json_object(cached.body.decode("utf-8")), state, ""
     if offline:
         return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     secret = lookup("NVD_API_KEY")
     burst = 50 if secret else 5
     headers = {"apiKey": secret} if secret else None
-    client = HttpClient(
+    client = runtime.http_client(
         "nvd",
-        policy=EgressPolicy(allowlist, "nvd"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=burst / 30,
         burst=burst,
@@ -237,11 +232,11 @@ def _fetch(
             return None, "snapshot", message
         cached = cache.get(cache_key)
         if cached:
-            return _load(cached.body.decode("utf-8")), "stale", ""
+            return runtime.load_json_object(cached.body.decode("utf-8")), "stale", ""
         return None, "snapshot", unavailable(LABEL, f"the live fetch failed ({message})")
     finally:
         client.close()
-    return _load(response.body.decode("utf-8")), response.cache, ""
+    return runtime.load_json_object(response.body.decode("utf-8")), response.cache, ""
 
 
 def _matches(
@@ -293,7 +288,6 @@ def _validate_search(start: str | None, end: str | None, severity: str | None, l
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
     return Path(os.environ["CYBERAU_NVD_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
@@ -352,18 +346,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("nvd", connector)

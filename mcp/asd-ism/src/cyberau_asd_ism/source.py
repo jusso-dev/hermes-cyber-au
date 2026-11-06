@@ -5,16 +5,12 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date
 from pathlib import Path
 from typing import Annotated, Literal
 
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -70,7 +66,6 @@ _TRANSPORT = None
 _SLEEP = time.sleep
 # The shipped release list is refused once it is this old. Catalogues for a tag do not expire.
 SNAPSHOT_MAX_AGE_DAYS = 180
-_TODAY: Callable[[], date] | None = None
 
 
 def ism_get_control(control_id: _ControlId, release: str | None = None) -> dict:
@@ -237,7 +232,7 @@ class _IsmConnector(Connector):
             if warning:
                 return Probe(self.key, False, warning)
             text = _read_catalog(tag)
-            problem = schema_drift(_loads(text) if text else None)
+            problem = schema_drift(runtime.load_json(text) if text else None)
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -273,7 +268,7 @@ def _controls(tag: str) -> tuple[dict | None, str, str, str]:
     text, cache, warning = _catalog_text(tag, force_live=False)
     if text is None:
         return None, cache, warning, ""
-    payload = _loads(text)
+    payload = runtime.load_json(text)
     problem = schema_drift(payload)
     if problem:
         return None, cache, problem, ""
@@ -283,7 +278,7 @@ def _controls(tag: str) -> tuple[dict | None, str, str, str]:
 
 
 def _catalog_text(tag: str, *, force_live: bool) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if _override() is not None and not force_live:
         text = _read_catalog(tag)
         if text is None:
@@ -321,12 +316,12 @@ def _shipped_catalog(tag: str, reason: str) -> tuple[str | None, str, str]:
 
 
 def _releases(*, force_live: bool = False) -> tuple[object, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if _override() is not None and not force_live:
         path = _root() / "releases.json"
         if not path.is_file():
             return None, "snapshot", "ISM release snapshot is missing"
-        return _loads(path.read_text(encoding="utf-8")), "snapshot", ""
+        return runtime.load_json(path.read_text(encoding="utf-8")), "snapshot", ""
     if offline:
         return _shipped_releases("offline")
     text, cache, warning = _http(RELEASES_API, api=True, ttl=12 * 3600, skip_cache=force_live)
@@ -334,14 +329,14 @@ def _releases(*, force_live: bool = False) -> tuple[object, str, str]:
         if force_live:
             return None, "snapshot", _github_warning(warning or "live fetch failed")
         return _shipped_releases(_github_warning(warning or "release list was not usable"))
-    return _loads(text), cache, ""
+    return runtime.load_json(text), cache, ""
 
 
 def _shipped_releases(reason: str) -> tuple[object, str, str]:
     """The shipped release list picks the latest release, so it expires."""
     label = "ISM release list"
     text = read_shipped(_PACKAGE / "data" / "releases.json")
-    payload = _loads(text)
+    payload = runtime.load_json(text)
     if text is None or not isinstance(payload, dict):
         return None, "snapshot", unavailable(label, reason)
     as_of = payload.get("retrieved_on")
@@ -355,7 +350,7 @@ def _shipped_releases(reason: str) -> tuple[object, str, str]:
 
 
 def _shipped_retrieved_on() -> str | None:
-    payload = _loads(read_shipped(_PACKAGE / "data" / "releases.json"))
+    payload = runtime.load_json(read_shipped(_PACKAGE / "data" / "releases.json"))
     if isinstance(payload, dict) and payload.get("retrieved_on"):
         return str(payload["retrieved_on"])
     return None
@@ -368,7 +363,7 @@ def _baseline_ids(tag: str, baseline: str) -> tuple[list[str] | None, str]:
     else:
         # Published profiles do not change, so a shipped copy for this tag is current.
         text = read_shipped(_PACKAGE / "data" / tag / name)
-        if text is None and os.environ.get("CYBERAU_OFFLINE") != "1":
+        if text is None and not runtime.offline():
             text, _cache, warning = _http(
                 _profile_url(tag, baseline), api=False, ttl=7 * 86400, skip_cache=False
             )
@@ -376,7 +371,7 @@ def _baseline_ids(tag: str, baseline: str) -> tuple[list[str] | None, str]:
                 text = None
     if text is None:
         return None, f"{baseline} baseline snapshot is missing for {tag}"
-    payload = _loads(text)
+    payload = runtime.load_json(text)
     if not isinstance(payload, dict):
         return None, f"{baseline} baseline snapshot was not usable"
     found = []
@@ -395,11 +390,10 @@ def _http(
     if secret:
         headers["authorization"] = f"Bearer {secret}"
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "asd-ism",
-        policy=EgressPolicy(_allowlist(), "asd-ism"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=4,
         burst=20,
@@ -560,7 +554,7 @@ def _override() -> Path | None:
 
 
 def _today() -> date:
-    return _TODAY() if _TODAY is not None else datetime.now(UTC).date()
+    return runtime.today(UTC)
 
 
 def _catalog_url(tag: str) -> str:
@@ -569,15 +563,6 @@ def _catalog_url(tag: str) -> str:
 
 def _profile_url(tag: str, baseline: str) -> str:
     return f"{RAW_ROOT}/{tag}/ISM_{baseline}-baseline_profile.json"
-
-
-def _loads(text: str | None):
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
 
 
 def _github_warning(message: str) -> str:
@@ -618,13 +603,7 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-ism"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("ism")
 
 
 def rebuild_shipped_snapshot(destination: Path | None = None, keep: int = 2) -> dict:
@@ -642,7 +621,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None, keep: int = 2) -> 
         raise RuntimeError(_github_warning(warning or "release list was not usable"))
     rows = [
         {"tag_name": str(row["tag_name"]), "published_at": str(row.get("published_at") or "")}
-        for row in _release_rows(_loads(text))
+        for row in _release_rows(runtime.load_json(text))
         if row.get("tag_name") and not row.get("draft") and not row.get("prerelease")
     ]
     rows.sort(key=lambda row: row["published_at"], reverse=True)
@@ -659,7 +638,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None, keep: int = 2) -> 
         )
         if catalog is None or warning:
             raise RuntimeError(warning or f"{tag} catalogue was not usable")
-        problem = schema_drift(_loads(catalog))
+        problem = schema_drift(runtime.load_json(catalog))
         if problem:
             raise RuntimeError(f"{tag}: {problem}")
         files[tag] = {"ISM_catalog.json": catalog}
@@ -667,7 +646,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None, keep: int = 2) -> 
             profile, _cache, warning = _http(
                 _profile_url(tag, baseline), api=False, ttl=3600, skip_cache=True, budget=False
             )
-            if profile is None or warning or not isinstance(_loads(profile), dict):
+            if profile is None or warning or not isinstance(runtime.load_json(profile), dict):
                 raise RuntimeError(warning or f"{tag} {baseline} profile was not usable")
             files[tag][f"ISM_{baseline}-baseline_profile.json"] = profile
     destination.mkdir(parents=True, exist_ok=True)

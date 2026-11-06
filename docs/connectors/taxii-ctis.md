@@ -36,9 +36,9 @@ Server manifest `required_env`: `TAXII_API_ROOT`, `TAXII_COLLECTION_ID`, `TAXII_
 | `TAXII_COLLECTION_ID` | credential | yes | yes | `lookup` |
 | `TAXII_PASSWORD` | credential | yes | yes | `lookup` |
 | `TAXII_USERNAME` | credential | yes | yes | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_TAXII_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits
@@ -49,7 +49,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_http_json` | `HttpClient` |  | `10` | `30` | `rolling` |
+| `_http_json` | `http_client` |  | `10` | `30` | `rolling` |
 
 ## Cache
 

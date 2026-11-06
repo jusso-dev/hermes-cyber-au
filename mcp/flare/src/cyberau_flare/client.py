@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.http import HttpClient, HttpError
@@ -76,13 +76,6 @@ def reset_token() -> None:
 
 def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
-
-
-def allowlist_path() -> Path:
-    override = lookup("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return package_root().parent / "egress-allowlist.yaml"
 
 
 def fixture_dir() -> Path | None:
@@ -163,8 +156,8 @@ def _limiter() -> RateLimiter:
 
 def _policy() -> EgressPolicy:
     if RESOLVER is not None:
-        return EgressPolicy(allowlist_path(), "flare", resolver=RESOLVER)
-    return EgressPolicy(allowlist_path(), "flare")
+        return EgressPolicy(runtime.allowlist_path(), "flare", resolver=RESOLVER)
+    return EgressPolicy(runtime.allowlist_path(), "flare")
 
 
 def _max_pages() -> int:
@@ -240,8 +233,8 @@ def _from_fixture(url: str) -> Fetch:
 
 
 def _open(cache: HttpCache) -> HttpClient:
-    offline = lookup("CYBERAU_OFFLINE") == "1"
-    return HttpClient(
+    offline = runtime.offline()
+    return runtime.http_client(
         "flare",
         policy=_policy(),
         cache=cache,
@@ -307,7 +300,7 @@ def _issue_token() -> tuple[str | None, str | None]:
         )
     except (HttpError, EgressDenied, httpx.HTTPError) as exc:
         text = _scrub(str(exc))
-        if lookup("CYBERAU_OFFLINE") == "1" or "no cache" in text:
+        if runtime.offline() or "no cache" in text:
             return None, _NO_COPY
         return None, text or "unavailable"
     payload = _decode(response.body)
@@ -360,7 +353,7 @@ def _call(
         )
     except (HttpError, EgressDenied, httpx.HTTPError) as exc:
         text = _scrub(str(exc))
-        if lookup("CYBERAU_OFFLINE") == "1" or "no cache" in text:
+        if runtime.offline() or "no cache" in text:
             return Fetch([], "snapshot", (_NO_COPY,), {})
         return Fetch([], "snapshot", (text or "unavailable",), {})
     payload = _decode(response.body)

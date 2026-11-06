@@ -31,9 +31,9 @@ Server manifest `required_env`: `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCO
 | `CLOUDFLARE_ACCOUNT_ID` | credential | yes | yes | `lookup` |
 | `CLOUDFLARE_URLSCAN_API_TOKEN` | credential | yes | yes | `lookup` |
 | `CYBERAU_CFSCAN_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 

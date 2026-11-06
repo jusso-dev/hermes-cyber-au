@@ -5,8 +5,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Callable
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from html import unescape
 from pathlib import Path
 from typing import Annotated, Literal
@@ -15,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import jsonschema
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -71,8 +71,6 @@ _AMENDMENTS = "check the source URL for amendments made since the snapshot date"
 _STALE_NOTE = (
     "answered from a locally stored copy of the snapshot, not a live fetch; " + _AMENDMENTS
 )
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _RESOLVER = None
 _CLOCK = None
@@ -271,7 +269,7 @@ def _load() -> tuple[dict | None, str, str, tuple[str, ...]]:
         as_of = (payload or {}).get("retrieved_at")
         return payload, cache, warning, (_override_note(as_of), _AMENDMENTS)
     note = ""
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         current = _data_dir() / "obligations-current.json"
         if current.is_file():
             payload, _cache, warning = _read(current, "stale")
@@ -298,7 +296,7 @@ def _shipped() -> tuple[dict | None, str, str]:
         payload.get("retrieved_at"),
         label=LABEL,
         max_age_days=SNAPSHOT_MAX_AGE_DAYS,
-        today=_TODAY() if _TODAY else None,
+        today=runtime.pinned_day(),
     )
     if problem:
         return None, cache, unavailable(LABEL, problem)
@@ -447,7 +445,7 @@ def _persist(rows: list[dict]) -> str:
 
 
 def _fetch_page(url: str, *, force: bool, ttl: int = _WEEK) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force
+    offline = runtime.offline() and not force
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", url, None, b"", "anonymous")
@@ -534,17 +532,15 @@ def _limit(host: str) -> None:
 
 
 def _client(cache: HttpCache) -> HttpClient:
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    allowlist = runtime.allowlist_path()
     policy = EgressPolicy(allowlist, "au-regulatory", resolver=_RESOLVER)
-    return HttpClient(
+    return runtime.http_client(
         "au-regulatory",
+        directory=_data_dir(),
         policy=policy,
         cache=cache,
-        limiter=RateLimiter(
-            _data_dir() / "rate_limit.sqlite",
-            clock=_clock(),
-            sleeper=_sleeper(),
-        ),
+        limiter_clock=_clock(),
+        limiter_sleeper=_sleeper(),
         user_agent=USER_AGENT,
         rate=1 / 5,
         burst=1,
@@ -615,14 +611,7 @@ def _snapshot_path() -> Path | None:
 
 
 def _data_dir() -> Path:
-    raw = os.environ.get("CYBERAU_DATA_DIR", "").strip()
-    path = Path(raw) if raw else Path("/tmp/cyberau-aureg")
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("aureg")
 
 
 register_connector("au-regulatory", connector)

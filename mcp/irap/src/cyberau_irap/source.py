@@ -10,9 +10,8 @@ import random
 import re
 import sqlite3
 import time
-from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated
@@ -20,10 +19,9 @@ from zoneinfo import ZoneInfo
 
 import jsonschema
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common import runtime
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -51,8 +49,6 @@ SNAPSHOT_NOTE = (
 # The shipped snapshot is refused once its data-retrieved date is older than this.
 SNAPSHOT_MAX_AGE_DAYS = 180
 LABEL = "IRAP guidance"
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _RETRIEVED = re.compile(r'data-retrieved="([^"]*)"')
 _STOP = frozenset(
     "about all and any are can does for from has have how its may not should that the their "
@@ -90,7 +86,7 @@ def irap_search_guidance(query: _QUERY) -> dict:
     warnings = _page_warnings(pages)
     records = [row for page in pages for row in page["records"]]
     matched = [row for row in records if _matches(query, row["sentence"])]
-    cache = _merge_cache([page["cache"] for page in pages])
+    cache = runtime.merge_cache_states([page["cache"] for page in pages])
     urls = [page["url"] for page in pages]
     if not records:
         # No page could be read, so "not covered" would be a guess.
@@ -238,7 +234,7 @@ def _pages(only: tuple[str, ...] | None, *, force_live: bool = False) -> list[di
 
 
 def _fetch_page(page_id: str, url: str, filename: str, *, force_live: bool) -> dict:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get("CYBERAU_IRAP_SNAPSHOT")) and not force_live
     if pinned or (offline and not _stored_html(page_id)):
         return _snapshot_page(page_id, url, filename, after_block=False)
@@ -304,7 +300,7 @@ def _snapshot_page(page_id: str, url: str, filename: str, *, after_block: bool) 
                 as_of,
                 label=LABEL,
                 max_age_days=SNAPSHOT_MAX_AGE_DAYS,
-                today=_TODAY() if _TODAY else None,
+                today=runtime.pinned_day(),
             )
         if problem:
             warning = unavailable(f"{LABEL} ({page_id})", problem)
@@ -353,11 +349,11 @@ def _try_http11(warning: str) -> bool:
 
 def _http(url: str, headers: dict, *, skip_cache: bool) -> dict:
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "irap",
-        policy=EgressPolicy(_allowlist(), "irap"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", clock=_clock, sleeper=_sleep),
+        directory=data_dir,
+        limiter_clock=_clock,
+        limiter_sleeper=_sleep,
         user_agent=USER_AGENT,
         rate=4,
         burst=8,
@@ -683,18 +679,6 @@ def _done(
     }
 
 
-def _merge_cache(caches: list[str]) -> str:
-    if not caches:
-        return "snapshot"
-    if "stale" in caches:
-        return "stale"
-    if "miss" in caches:
-        return "miss"
-    if "hit" in caches:
-        return "hit"
-    return "snapshot"
-
-
 def _as_of(records: list[dict]) -> str | None:
     dates = [row["retrieved"] for row in records if row.get("retrieved")]
     if not dates:
@@ -739,9 +723,7 @@ def _sleep(seconds: float) -> None:
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-irap"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return runtime.data_dir("irap")
 
 
 @contextmanager
@@ -779,10 +761,6 @@ def _db():
         conn.commit()
     finally:
         conn.close()
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("irap", connector)

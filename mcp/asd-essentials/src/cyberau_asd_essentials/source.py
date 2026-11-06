@@ -8,18 +8,14 @@ import hashlib
 import json
 import os
 import re
-from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated, Literal
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common import runtime
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
@@ -59,8 +55,6 @@ _PACKAGE = Path(__file__).resolve().parents[2]
 SNAPSHOT_MAX_AGE_DAYS = 180
 MATURITY_LABEL = "Essential Eight requirements"
 ESSENTIALS_LABEL = "ASD Essentials"
-# Tests set this to simulate another day when the snapshot age is checked.
-_TODAY: Callable[[], date] | None = None
 _TRANSPORT = None
 _SLEEP = __import__("time").sleep
 _PHASE = re.compile(r"^Priority phase (\d+)\s*:\s*(.+)$", re.IGNORECASE)
@@ -1187,14 +1181,14 @@ def _snapshot_doc(pattern: str, label: str) -> tuple[dict | None, str, str]:
     if path is None:
         return None, "snapshot", unavailable(label, f"the {label} snapshot is missing")
     text = path.read_text(encoding="utf-8")
-    document = _loads(text)
+    document = runtime.load_json(text)
     if not isinstance(document, dict):
         return None, "snapshot", unavailable(label, f"the {label} snapshot was not usable")
     as_of = document.get("retrieved_on")
     if override:
         return document, "snapshot", _override_note(label, as_of)
     problem = check_shipped(
-        text, as_of, label=label, max_age_days=SNAPSHOT_MAX_AGE_DAYS, today=_today()
+        text, as_of, label=label, max_age_days=SNAPSHOT_MAX_AGE_DAYS, today=runtime.pinned_day()
     )
     if problem:
         return None, "snapshot", unavailable(label, problem)
@@ -1208,10 +1202,6 @@ def _override_note(label: str, as_of: object) -> str:
         f"served the operator-supplied {label} snapshot dated {when} from "
         "CYBERAU_E8_SNAPSHOT, not a live fetch. Check the source before relying on it"
     )
-
-
-def _today() -> date | None:
-    return _TODAY() if _TODAY else None
 
 
 def _data_as_of(document: dict) -> str | None:
@@ -1234,22 +1224,14 @@ def _latest(root: Path, pattern: str) -> Path | None:
     return found[-1] if found else None
 
 
-def _loads(text: str):
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
 def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return None, "snapshot", "offline"
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "asd-essentials",
-        policy=EgressPolicy(_allowlist(), "asd-essentials"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1 / 5,
         burst=2,
@@ -1300,20 +1282,14 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-e8"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("e8")
 
 
 def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     """Download the pinned public sources and write the shipped JSON snapshot."""
     destination = destination or (_PACKAGE / "data")
     destination.mkdir(parents=True, exist_ok=True)
-    retrieved_on = (_today() or datetime.now(UTC).date()).isoformat()
+    retrieved_on = runtime.today(UTC).isoformat()
     chapters = {}
     for key, url in CHAPTERS.items():
         text, _cache, warning = _http(url, ttl=86400, skip_cache=True)
@@ -1340,7 +1316,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
         if not text or warning:
             raise RuntimeError(warning or f"{filename} was empty")
         hashes[filename] = hashlib.sha256(text.encode()).hexdigest()
-        document = _loads(text)
+        document = runtime.load_json(text)
         if not isinstance(document, dict):
             raise RuntimeError(f"{filename} was not JSON")
         for row in parse_catalog(document):

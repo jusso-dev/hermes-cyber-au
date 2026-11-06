@@ -1,5 +1,4 @@
 import json
-import os
 import socket
 from pathlib import Path
 
@@ -20,9 +19,10 @@ FIXTURE_VALUES = (
 )
 
 
-def setup_function():
-    os.environ["CYBERAU_KEV_SNAPSHOT"] = str(SNAPSHOT)
-    os.environ["CYBERAU_TODAY"] = "2026-10-16"
+@pytest.fixture(autouse=True)
+def pinned(monkeypatch):
+    monkeypatch.setenv("CYBERAU_KEV_SNAPSHOT", str(SNAPSHOT))
+    monkeypatch.setenv("CYBERAU_TODAY", "2026-10-16")
 
 
 def test_lookup_and_search():

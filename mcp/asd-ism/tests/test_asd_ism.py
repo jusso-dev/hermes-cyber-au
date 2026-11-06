@@ -142,7 +142,7 @@ def _shipped_retrieved_on():
 
 def test_shipped_catalogue_is_full_and_labelled(monkeypatch):
     monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
-    monkeypatch.setattr(source, "_TODAY", _shipped_retrieved_on)
+    monkeypatch.setenv("CYBERAU_TODAY", _shipped_retrieved_on().isoformat())
     record = ism_get_control("ism-1546")
     assert record["data"]["control_id"] == "ism-1546"
     assert record["cache"] == "snapshot"
@@ -155,7 +155,7 @@ def test_shipped_catalogue_is_full_and_labelled(monkeypatch):
 def test_expired_shipped_release_list_is_refused(monkeypatch):
     monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT")
     expired = _shipped_retrieved_on() + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
-    monkeypatch.setattr(source, "_TODAY", lambda: expired)
+    monkeypatch.setenv("CYBERAU_TODAY", expired.isoformat())
     refused = ism_get_control("ism-1546")
     assert refused["data"] is None
     assert "ISM release list is unavailable" in refused["warnings"][0]
@@ -198,7 +198,7 @@ def test_rebuild_shipped_snapshot_writes_full_releases(tmp_path, monkeypatch):
     destination = tmp_path / "data"
     (destination / "v2025.12.9").mkdir(parents=True)
     (destination / "v2025.12.9" / "ISM_catalog.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(source, "_TODAY", lambda: date(2026, 10, 18))
+    monkeypatch.setenv("CYBERAU_TODAY", date(2026, 10, 18).isoformat())
     summary = source.rebuild_shipped_snapshot(destination, keep=2)
     assert summary["kept"] == ["v2026.09.4", "v2026.06.18"]
     assert summary["removed"] == ["v2025.12.9"]

@@ -17,7 +17,7 @@ from cyberau_darkowl.source import (
     sign_request,
 )
 from cyberau_premium.base import Watchlist
-from cyberau_premium.samples import SCHEMA as FINDING_SCHEMA
+from cyberau_premium.paths import finding_schema
 from cyberau_premium.status import load_servers, render_premium_servers
 from jsonschema import Draft202012Validator
 
@@ -30,7 +30,7 @@ RESPONSE = json.loads(
 )
 VALIDATOR = Draft202012Validator(RESPONSE)
 FINDING_VALIDATOR = Draft202012Validator(
-    FINDING_SCHEMA,
+    finding_schema(),
     format_checker=Draft202012Validator.FORMAT_CHECKER,
 )
 PUBLIC = "public-example"

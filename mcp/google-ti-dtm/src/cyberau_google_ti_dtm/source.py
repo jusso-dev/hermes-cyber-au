@@ -14,11 +14,10 @@ from zoneinfo import ZoneInfo
 
 import httpx
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -29,8 +28,8 @@ from cyberau_premium.base import (
     Watchlist,
     finding_id,
 )
-from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.caching import cache_once
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_text
 from cyberau_premium.store import ExposureStore
@@ -131,10 +130,7 @@ def connector() -> PremiumConnector:
                 fn=gti_dtm_monitors,
             ),
         ],
-        vendor=spec.server,
-        licence_env=tuple(spec.licence_env),
-        terms=spec.terms,
-        quota=spec.quota,
+        **vendor_fields(spec),
     )
 
 
@@ -315,7 +311,7 @@ def _fetch_one(
     *,
     force_live: bool = False,
 ) -> tuple[dict | None, str, str, dict, int]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get(_snapshot_env(kind)))
     cache = _session_cache()
     key = cache.key("GET", url, params, b"", _scope())
@@ -328,15 +324,14 @@ def _fetch_one(
     headers = _auth_headers()
     if headers is None:
         return None, "snapshot", _MISSING_KEY, {}, 0
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist_path())))
     policy_kwargs = {}
     if _RESOLVER is not None:
         policy_kwargs["resolver"] = _RESOLVER
-    client = HttpClient(
+    client = runtime.http_client(
         "google-ti-dtm",
-        policy=EgressPolicy(allowlist, "google-ti-dtm", **policy_kwargs),
+        directory=_root(),
+        policy=EgressPolicy(runtime.allowlist_path(), "google-ti-dtm", **policy_kwargs),
         cache=cache,
-        limiter=RateLimiter(_root() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=_RATE,
         burst=_BURST,
@@ -730,12 +725,7 @@ def _scope() -> str:
 
 def _session_cache():
     root = _root()
-    identity = f"{root}|{_scope()}"
-    cache = _CACHES.get(identity)
-    if cache is None:
-        cache = cache_for_terms(root / "http_cache.sqlite", _spec().terms)
-        _CACHES[identity] = cache
-    return cache
+    return cache_once(_CACHES, f"{root}|{_scope()}", root / "http_cache.sqlite", _spec().terms)
 
 
 def _root() -> Path:
@@ -766,10 +756,6 @@ def _snapshot_note(kind: str) -> str:
 
 def _response_schema_path(kind: str) -> Path:
     return _PACKAGE / "schema" / f"gti_dtm_{kind}.response.json"
-
-
-def _allowlist_path() -> Path:
-    return _PACKAGE.parent / "egress-allowlist.yaml"
 
 
 def _read_json(path: Path) -> dict | None:

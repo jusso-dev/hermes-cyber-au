@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import requests
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -32,7 +32,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.redact import redact_text
 from cyberau_premium.store import ExposureStore
@@ -108,10 +108,7 @@ class CrowdStrikeRecon(PremiumConnector):
                     cs_recon_rules,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
@@ -143,7 +140,7 @@ class CrowdStrikeRecon(PremiumConnector):
             return Probe(self.key, True, "not configured")
         if not live:
             return Probe(self.key, True, "offline ok")
-        if _offline():
+        if runtime.offline():
             return Probe(self.key, False, "CYBERAU_OFFLINE is set, live check not run")
         warning = _live_probe()
         if warning:
@@ -325,7 +322,7 @@ def _records(
         return [], [], "snapshot", missing
     item, cached = _recall(kind, since, limit)
     cache = _http_cache()
-    if _offline():
+    if runtime.offline():
         if cached is not None:
             return _present(kind, cached), cached, "stale", ""
         return _from_snapshot(kind, since, limit)
@@ -767,8 +764,7 @@ def _load_json(path: Path) -> dict | None:
 
 
 def _policy() -> EgressPolicy:
-    raw = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    path = Path(raw) if raw else Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    path = runtime.allowlist_path()
     if _RESOLVER is None:
         return EgressPolicy(path, "crowdstrike-recon")
     return EgressPolicy(path, "crowdstrike-recon", resolver=_RESOLVER)
@@ -780,10 +776,6 @@ def _limiter() -> RateLimiter:
 
 def _base_url() -> str:
     return (lookup("FALCON_BASE_URL") or DEFAULT_BASE).rstrip("/")
-
-
-def _offline() -> bool:
-    return os.environ.get("CYBERAU_OFFLINE") == "1"
 
 
 def _missing_licence() -> str:

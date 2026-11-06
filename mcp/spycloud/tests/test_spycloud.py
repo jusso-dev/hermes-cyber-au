@@ -14,7 +14,7 @@ from cyberau_common.server import build_server
 from cyberau_premium.base import Watchlist
 from cyberau_premium.budget import BudgetLedger
 from cyberau_premium.catalog import get_vendor
-from cyberau_premium.samples import SCHEMA
+from cyberau_premium.paths import finding_schema
 from cyberau_premium.status import format_premium_doctor, load_servers, render_premium_servers
 from cyberau_spycloud import source
 from cyberau_spycloud.source import (
@@ -46,7 +46,7 @@ ENVELOPE = {
         "data_as_of": {},
     },
 }
-FINDING = Draft202012Validator(SCHEMA, format_checker=Draft202012Validator.FORMAT_CHECKER)
+FINDING = Draft202012Validator(finding_schema(), format_checker=Draft202012Validator.FORMAT_CHECKER)
 SECRET_HEADER = re.compile(
     r"(?i)(authorization|auth-key|x-otx-api-key|x-api-key|api-key)\s*:\s*(?!\[REDACTED\]|\s*$)\S+"
 )

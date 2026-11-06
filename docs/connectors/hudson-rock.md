@@ -29,8 +29,8 @@ Server manifest `required_env`: `HUDSONROCK_API_KEY`.
 | `HUDSONROCK_API_KEY` | credential | yes | yes | not read in connector source |
 | `CYBERAU_CONFIG` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_ORG_WATCHLIST` | runtime | no | no | `os.environ.get` |
 
 ## Rate limits

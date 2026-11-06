@@ -19,8 +19,9 @@ from typing import Annotated
 from urllib.parse import urljoin, urlsplit
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
@@ -222,7 +223,7 @@ def schema_drift(html: str) -> str | None:
 def _fetch_home(*, force_live: bool) -> tuple[str | None, str, str]:
     if not force_live and os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT"):
         return _snapshot_text(), "snapshot", ""
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         return _offline_home()
     cached, state = _cached(HOME)
@@ -232,7 +233,7 @@ def _fetch_home(*, force_live: bool) -> tuple[str | None, str, str]:
 
 
 def _fetch_url(url: str, *, force_live: bool) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     mapped = _mapped_page(url)
     pages = os.environ.get("CYBERAU_SCAMWATCH_PAGES")
     if mapped is not None and not force_live and (offline or pages):
@@ -347,11 +348,10 @@ def _recent_block() -> str:
 
 def _client() -> HttpClient:
     data_dir = _data_dir()
-    return HttpClient(
+    return runtime.http_client(
         "scamwatch",
-        policy=EgressPolicy(_allowlist(), "scamwatch"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1.0,
         burst=4,
@@ -763,7 +763,6 @@ def _cached(url: str) -> tuple[str | None, str]:
 
 
 def _snapshot_text() -> str:
-    # Only the operator override is read. Nothing shipped in the package is served.
     override = os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT")
     if not override:
         return ""
@@ -896,16 +895,7 @@ def _alert_id(url: str) -> str:
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-scamwatch"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("scamwatch")
 
 
 register_connector("scamwatch", connector)

@@ -25,10 +25,10 @@ Server manifest `env` entry: `GREYNOISE_API_KEY=${GREYNOISE_API_KEY}`.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `GREYNOISE_API_KEY` | credential | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_GREYNOISE_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 
@@ -38,7 +38,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_fetch` | `HttpClient` |  | `1` | `1` | `rolling` |
+| `_fetch` | `http_client` |  | `1` | `1` | `rolling` |
 
 ## Cache
 

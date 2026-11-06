@@ -22,9 +22,11 @@ No credential variable is declared for this connector.
 
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_PSPF_SNAPSHOT` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_TODAY` | runtime | no | no | `runtime.pinned_day` |
 
 ## Rate limits
 
@@ -36,7 +38,7 @@ Limiter arguments in the connector source:
 |---|---|---|---|---|---|
 | `health` | `_limit` | `'pspf:health'` | `24 / 86400` | `3` |  |
 | `_inventory` | `_limit` | `'pspf:regen'` | `2 / _WEEK` | `2` |  |
-| `_http` | `HttpClient` |  | `4` | `20` | `rolling` |
+| `_http` | `http_client` |  | `4` | `20` | `rolling` |
 
 ## Cache
 

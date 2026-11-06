@@ -8,17 +8,16 @@ import json
 import os
 import re
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
@@ -33,7 +32,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_text
@@ -179,10 +178,6 @@ def _envelope(
     )
 
 
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
-
-
 def _session_cache() -> HttpCache:
     global _SESSION, _SESSION_DIR
     directory = str(data_dir())
@@ -233,7 +228,7 @@ def _read_json_file(path: Path) -> tuple[dict | None, str]:
 
 
 def _policy() -> EgressPolicy:
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    allowlist = runtime.allowlist_path()
     if _RESOLVER is None:
         return EgressPolicy(allowlist, "spycloud")
     return EgressPolicy(allowlist, "spycloud", resolver=_RESOLVER)
@@ -257,7 +252,7 @@ def _http_get(
         limiter.acquire(f"spycloud:{HOST}", rate=_RATE, burst=_BURST, window="rolling")
     except Exception as exc:
         return _from_error(cache, key, exc, force_live)
-    client = HttpClient(
+    client = runtime.http_client(
         "spycloud",
         policy=_policy(),
         cache=cache,
@@ -329,7 +324,7 @@ def _fetch_json(
     skip_cache: bool = False,
 ) -> tuple[dict | None, str, str]:
     override = os.environ.get(snapshot_var)
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if override and not force_live:
         payload, problem = _read_json_file(Path(override))
         if problem:
@@ -447,19 +442,6 @@ def _schema_sample(env_name: str, default: Path) -> dict:
     return payload or {}
 
 
-def _parse_time(value) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    text = value.strip().replace("Z", "+00:00")
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed
-
-
 def _valid_date(value: str) -> bool:
     if not _DATE.fullmatch(value):
         return False
@@ -517,7 +499,7 @@ def _summary_type(record: dict, requested: str | None) -> str:
 
 
 def _keep(record: dict, *, since: str | None, record_type: str | None, watchlist_type: str | None):
-    observed = _parse_time(record.get("spycloud_publish_date"))
+    observed = runtime.parse_iso(record.get("spycloud_publish_date"))
     if since:
         if observed is None or observed.astimezone(SYDNEY).date().isoformat() < since:
             return False
@@ -597,7 +579,7 @@ def _finding(record: dict, *, requested: str | None, watchlist_type: str | None)
     if not isinstance(document_id, str) or not document_id.strip():
         return None
     subject = _subject(record, watchlist_type)
-    observed = _parse_time(record.get("spycloud_publish_date"))
+    observed = runtime.parse_iso(record.get("spycloud_publish_date"))
     if subject is None or observed is None:
         return None
     kind = "infostealer_credential" if _infected(record) else "breach_credential"
@@ -858,7 +840,7 @@ def _breach_payload(record: dict, breach_id: str) -> dict | None:
         not isinstance(title, str)
         or isinstance(count, bool)
         or not isinstance(count, int)
-        or _parse_time(published) is None
+        or runtime.parse_iso(published) is None
     ):
         return None
     assets = record.get("assets") if isinstance(record.get("assets"), dict) else {}
@@ -993,15 +975,12 @@ class SpyCloudConnector(PremiumConnector):
                     spycloud_breach_info,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
         snapshot = os.environ.get(_WATCHLIST_SNAPSHOT)
-        offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+        offline = runtime.offline()
         if lookup("SPYCLOUD_API_KEY") is None and not snapshot and not offline:
             raise RuntimeError("SPYCLOUD_API_KEY is not set")
         if snapshot and not offline:

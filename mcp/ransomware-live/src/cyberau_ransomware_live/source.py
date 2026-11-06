@@ -10,12 +10,10 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -226,7 +224,7 @@ def _fetch(
     force_live: bool,
 ) -> tuple[object | None, str, str]:
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if snapshot and not force_live:
         return _load(_snapshot_text()), "snapshot", _PINNED_NOTE
     data_dir = _data_dir()
@@ -240,12 +238,10 @@ def _fetch(
     if offline:
         reason = "offline mode is on and no cached copy is stored"
         return None, "snapshot", unavailable(_LABEL, reason)
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         "ransomware-live",
-        policy=EgressPolicy(allowlist, "ransomware-live"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=POLL_RATE,
         burst=POLL_BURST,
@@ -602,7 +598,6 @@ def _load_bytes(body: bytes):
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
     if not snapshot:
         return ""
@@ -610,7 +605,7 @@ def _snapshot_text() -> str:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-ransomlive"))
+    return runtime.data_dir("ransomlive")
 
 
 def _safe(exc: Exception) -> str:
@@ -619,10 +614,6 @@ def _safe(exc: Exception) -> str:
     if secret:
         message = message.replace(secret, "[REDACTED]")
     return message
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("ransomware-live", connector)

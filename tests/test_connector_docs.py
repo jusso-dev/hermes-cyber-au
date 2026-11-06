@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -202,3 +203,24 @@ class ConnectorDocsTest(unittest.TestCase):
     def test_prose_ends_with_a_full_stop(self):
         self.assertEqual(self.docs.prose("one download a day", "x"), "One download a day.")
         self.assertEqual(self.docs.prose("Already done.", "x"), "Already done.")
+
+    def test_runtime_helpers_count_as_env_reads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.py"
+            source.write_text(
+                "def f():\n"
+                "    runtime.data_dir('x')\n"
+                "    runtime.offline()\n"
+                "    runtime.today()\n"
+                "    runtime.http_client('x', policy=p, rate=1, burst=1)\n",
+                encoding="utf-8",
+            )
+            env = self.docs.extract_source(source).env
+        self.assertEqual(
+            {name: sorted(item.via) for name, item in env.items()},
+            {
+                "CYBERAU_DATA_DIR": ["runtime.data_dir"],
+                "CYBERAU_OFFLINE": ["runtime.offline"],
+                "CYBERAU_TODAY": ["runtime.today"],
+            },
+        )

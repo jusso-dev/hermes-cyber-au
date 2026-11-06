@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import jsonschema
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient
@@ -30,8 +30,8 @@ from cyberau_premium.base import (
     clamp_to_terms,
     finding_id,
 )
-from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.caching import cache_once
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_text
@@ -133,10 +133,7 @@ class SocradarConnector(PremiumConnector):
                     socradar_incidents,
                 )
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
@@ -318,7 +315,7 @@ def _fetch_page(
         return None, "snapshot", detail
     url = f"https://{_HOST}/api/company/{company}/incidents/v4"
     params = _params(since=since, until=until, severity=severity, limit=limit, page=page)
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cache = _session_cache()
     cache_key = cache.key("GET", url, params, b"", "socradar")
     if offline:
@@ -326,7 +323,7 @@ def _fetch_page(
         if cached is None:
             return None, "snapshot", unavailable(_LABEL, "offline and no cached copy exists")
         state = "hit" if cache.fresh(cached) else "stale"
-        payload = _load(cached.body.decode("utf-8", "replace"))
+        payload = runtime.load_json_object(cached.body.decode("utf-8", "replace"))
         unusable = _unusable(payload)
         return (None if unusable else payload), state, unusable
     client = _client(cache, offline=False)
@@ -352,7 +349,7 @@ def _fetch_page(
         )
     if response.status >= 400:
         return None, response.cache, f"SOCRadar returned HTTP {response.status}"
-    payload = _load(response.body.decode("utf-8", "replace"))
+    payload = runtime.load_json_object(response.body.decode("utf-8", "replace"))
     unusable = _unusable(payload)
     if unusable:
         return None, response.cache, unusable
@@ -588,9 +585,9 @@ def _client(cache, *, offline: bool) -> HttpClient:
         limiter_kwargs["clock"] = _LIMITER_CLOCK
     if _LIMITER_SLEEPER is not None:
         limiter_kwargs["sleeper"] = _LIMITER_SLEEPER
-    return HttpClient(
+    return runtime.http_client(
         "socradar",
-        policy=EgressPolicy(_allowlist(), "socradar", **policy_kwargs),
+        policy=EgressPolicy(runtime.allowlist_path(), "socradar", **policy_kwargs),
         cache=cache,
         limiter=RateLimiter(data_dir() / "socradar-rate-limit.sqlite", **limiter_kwargs),
         user_agent=USER_AGENT,
@@ -606,21 +603,15 @@ def _client(cache, *, offline: bool) -> HttpClient:
 
 def _session_cache():
     path = data_dir() / "socradar-http-cache.sqlite"
-    key = str(path)
-    cache = _CACHES.get(key)
-    if cache is None:
-        cache = cache_for_terms(path, get_vendor("socradar").terms)
-        _CACHES[key] = cache
-    return cache
+    return cache_once(_CACHES, str(path), path, get_vendor("socradar").terms)
 
 
 def _read_snapshot() -> tuple[dict | None, str, str]:
-    """Read the operator-supplied snapshot file. There is no shipped default."""
     raw = os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT")
     if not raw:
         return None, "snapshot", unavailable(_LABEL, "no CYBERAU_SOCRADAR_SNAPSHOT file is set")
     try:
-        payload = _load(Path(raw).read_text(encoding="utf-8"))
+        payload = runtime.load_json_object(Path(raw).read_text(encoding="utf-8"))
     except OSError:
         reason = "the CYBERAU_SOCRADAR_SNAPSHOT file could not be read"
         return None, "snapshot", unavailable(_LABEL, reason)
@@ -645,7 +636,7 @@ def _schema_payload(*, allow_fixture: bool) -> dict:
     else:
         return {}
     try:
-        payload = _load(path.read_text(encoding="utf-8"))
+        payload = runtime.load_json_object(path.read_text(encoding="utf-8"))
     except OSError:
         return {}
     return payload or {}
@@ -780,21 +771,6 @@ def _weaker(left: str, right: str) -> str:
     if _CACHE_RANK[right] > _CACHE_RANK[left]:
         return right
     return left
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("socradar", connector)

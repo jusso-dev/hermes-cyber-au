@@ -17,6 +17,15 @@ def cache_for_terms(path, terms: TermsProfile, *, now=None) -> HttpCache:
     return cache
 
 
+def cache_once(registry: dict, key: str, path, terms: TermsProfile) -> HttpCache:
+    """The cache stored under ``key`` in ``registry``, built by cache_for_terms on first use."""
+    cache = registry.get(key)
+    if cache is None:
+        cache = cache_for_terms(path, terms)
+        registry[key] = cache
+    return cache
+
+
 def clear_session_caches() -> None:
     for cache in _SESSION:
         cache.clear_session()

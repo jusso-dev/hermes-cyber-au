@@ -28,11 +28,11 @@ Server manifest `env` entry: `CYBERAU_APPROVAL_KEY=${CYBERAU_APPROVAL_KEY}`.
 |---|---|---|---|---|
 | `HIBP_API_KEY` | credential | yes | no | `lookup` |
 | `CYBERAU_APPROVAL_KEY` | runtime | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
 | `CYBERAU_HIBP_AUDIT_LOG` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_HIBP_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 
