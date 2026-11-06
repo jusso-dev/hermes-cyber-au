@@ -729,7 +729,6 @@ def _response_problem(name: str, record: dict) -> str | None:
 
 
 def _snapshot_text() -> str | None:
-    """Read the operator-supplied snapshot. Nothing shipped in the package is ever read."""
     snapshot = os.environ.get("CYBERAU_OTX_SNAPSHOT")
     return _read_text(Path(snapshot)) if snapshot else None
 

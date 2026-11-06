@@ -296,7 +296,6 @@ def _data_dir() -> Path:
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
     return Path(os.environ["CYBERAU_GREYNOISE_SNAPSHOT"]).read_text(encoding="utf-8")
 
 

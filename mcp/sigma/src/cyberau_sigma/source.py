@@ -799,7 +799,6 @@ def _release_text(root: Path) -> str | None:
 
 
 def _root() -> Path | None:
-    """The operator-supplied snapshot directory. Nothing is shipped in the package."""
     override = os.environ.get("CYBERAU_SIGMA_SNAPSHOT")
     return Path(override) if override else None
 

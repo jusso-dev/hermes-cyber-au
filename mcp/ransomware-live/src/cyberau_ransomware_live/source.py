@@ -598,7 +598,6 @@ def _load_bytes(body: bytes):
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
     if not snapshot:
         return ""

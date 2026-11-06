@@ -787,7 +787,6 @@ def _persist(records: list[dict]) -> None:
 
 
 def _snapshot_text() -> str | None:
-    """The operator-supplied snapshot file. There is no shipped default."""
     snapshot = os.environ.get("CYBERAU_MISP_SNAPSHOT")
     if not snapshot:
         return None

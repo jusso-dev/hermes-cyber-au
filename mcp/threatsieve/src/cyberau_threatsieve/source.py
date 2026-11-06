@@ -246,7 +246,6 @@ def _read_snapshot() -> tuple[dict | None, str]:
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing shipped in the package is ever read."""
     snapshot = os.environ.get("CYBERAU_THREATSIEVE_SNAPSHOT")
     if not snapshot:
         raise FileNotFoundError("CYBERAU_THREATSIEVE_SNAPSHOT is not set")

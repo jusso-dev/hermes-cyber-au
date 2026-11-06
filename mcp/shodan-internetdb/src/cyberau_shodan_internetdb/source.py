@@ -329,7 +329,6 @@ def _persist(record: dict) -> None:
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
     return Path(os.environ["CYBERAU_INTERNETDB_SNAPSHOT"]).read_text(encoding="utf-8")
 
 

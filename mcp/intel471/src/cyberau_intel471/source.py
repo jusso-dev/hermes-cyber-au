@@ -799,7 +799,6 @@ def _snapshot_body(kind: str) -> str | None:
 
 
 def _schema_text() -> str:
-    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     raw = os.environ.get("CYBERAU_INTEL471_SNAPSHOT")
     if raw:
         path = Path(raw)

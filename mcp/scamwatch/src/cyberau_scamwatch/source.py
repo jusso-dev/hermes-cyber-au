@@ -763,7 +763,6 @@ def _cached(url: str) -> tuple[str | None, str]:
 
 
 def _snapshot_text() -> str:
-    # Only the operator override is read. Nothing shipped in the package is served.
     override = os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT")
     if not override:
         return ""

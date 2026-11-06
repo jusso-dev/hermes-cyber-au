@@ -571,7 +571,6 @@ def _response_problem(record: dict) -> str | None:
 
 
 def _snapshot_text() -> str | None:
-    """Read the operator snapshot file. Nothing shipped in the repo is ever read."""
     override = os.environ.get("CYBERAU_PHISHTANK_SNAPSHOT")
     if not override:
         return None

@@ -607,7 +607,6 @@ def _session_cache():
 
 
 def _read_snapshot() -> tuple[dict | None, str, str]:
-    """Read the operator-supplied snapshot file. There is no shipped default."""
     raw = os.environ.get("CYBERAU_SOCRADAR_SNAPSHOT")
     if not raw:
         return None, "snapshot", unavailable(_LABEL, "no CYBERAU_SOCRADAR_SNAPSHOT file is set")

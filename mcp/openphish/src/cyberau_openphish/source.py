@@ -258,7 +258,6 @@ def _feed_transport() -> httpx.BaseTransport:
 
 
 def _from_snapshot() -> tuple[str | None, str, str]:
-    """Serve the operator's pinned file. Nothing is shipped in the package."""
     text = _snapshot_text()
     if text is None:
         reason = "the pinned snapshot file named by CYBERAU_OPENPHISH_SNAPSHOT was not found"

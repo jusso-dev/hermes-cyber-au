@@ -577,7 +577,6 @@ def _page_payload(key: str, rows: list, limit: int, offset: int) -> dict:
 
 
 def _load_snapshot() -> dict | None:
-    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     override = os.environ.get("CYBERAU_HIBP_SNAPSHOT")
     if not override:
         return None

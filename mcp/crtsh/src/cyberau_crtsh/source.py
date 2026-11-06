@@ -430,7 +430,6 @@ def _response_schema() -> dict:
 
 
 def _snapshot_text() -> str | None:
-    # Only an operator-supplied snapshot is read. The package ships no data file.
     snapshot = os.environ.get("CYBERAU_CRTSH_SNAPSHOT")
     if not snapshot:
         return None

@@ -695,7 +695,6 @@ def _public_page(page: dict) -> dict:
 
 
 def _read_list_snapshot() -> str | None:
-    # Only the operator override is read. Nothing shipped in the package is served.
     override = os.environ.get(_OVERRIDE)
     if not override:
         return None

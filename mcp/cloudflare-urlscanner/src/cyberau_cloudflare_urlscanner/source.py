@@ -613,7 +613,6 @@ def _read_cache(method: str, url: str, material: bytes, scope: str) -> tuple[dic
 
 
 def _snapshot_path() -> Path | None:
-    """Only an operator-supplied snapshot is read. Nothing shipped in the package is."""
     override = os.environ.get("CYBERAU_CFSCAN_SNAPSHOT")
     if not override:
         return None
