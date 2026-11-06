@@ -56,12 +56,17 @@ _VENDORED_DIRS = {"data"}
 _VENDORED_ROOT = "mcp"
 _TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".toml", ".txt", ".sh", ".json"}
 _PROSE_SUFFIXES = {".md", ".txt", ".yml", ".yaml"}
-# U+2014 plus the look-alike dashes U+2015, U+2E3A, U+2E3B and U+FE58.
-_EM_DASH = re.compile("[\u2014\u2015\u2e3a\u2e3b\ufe58]")
+# U+2014 plus the look-alike dashes U+2015, U+2E3A, U+2E3B and U+FE58, and
+# their HTML entities.
+_EM_DASH = re.compile(
+    "[\u2014\u2015\u2e3a\u2e3b\ufe58]|&(?:mdash|horbar|#0*821[23]|#x0*201[45]);",
+    re.IGNORECASE,
+)
+# U+200D joins emoji sequences and U+20E3 makes keycaps.
 _EMOJI = re.compile(
-    "[\u231a\u231b\u23e9-\u23f3\u23f8-\u23fa\u25fd\u25fe"
-    "\u2600-\u27bf\u2b1b\u2b1c\u2b50\u2b55\ufe0f"
-    "\U0001f000-\U0001f6ff\U0001f900-\U0001faff]"
+    "[\u200d\u20e3\u231a\u231b\u23e9-\u23f3\u23f8-\u23fa\u25fd\u25fe"
+    "\u2600-\u27bf\u2934\u2935\u2b05-\u2b07\u2b1b\u2b1c\u2b50\u2b55"
+    "\u3030\u303d\u3297\u3299\ufe0f\U0001f000-\U0001faff]"
 )
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@+-]{2,}")
 _WORD = re.compile(r"[A-Za-z][A-Za-z'.-]{1,}")
