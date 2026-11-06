@@ -30,6 +30,7 @@ import idna
 
 from .canonical import canonical_timestamp, utc_now
 from .db import fts_rowid, open_store, resolve_db_path
+from .paths import configured_data_dir
 from .text import indexable_text, unwrap_untrusted
 
 FILE_NAME = "watchlists.yaml"
@@ -186,13 +187,10 @@ class CrtshResult:
 
 def data_dir() -> Path:
     """Profile data directory, the same one the store and org-exposure use."""
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw).expanduser()
-    hermes = os.environ.get("HERMES_HOME")
-    if hermes:
-        return Path(hermes).expanduser() / "plugin-data" / "cyber-au"
-    raise ValueError("set CYBERAU_DATA_DIR or HERMES_HOME, or pass --watchlist")
+    base = configured_data_dir()
+    if base is None:
+        raise ValueError("set CYBERAU_DATA_DIR or HERMES_HOME, or pass --watchlist")
+    return base
 
 
 def watchlist_path(path: str | Path | None = None) -> Path:

@@ -34,7 +34,7 @@ from .canonical import (
     more_restrictive,
     tlp_allows,
 )
-from .db import open_store, resolve_db_path
+from .db import open_store, store_data_dir
 from .text import clean_untrusted, unwrap_untrusted
 
 # RFC 4122 URL namespace. Domain objects must not use the SCO namespace.
@@ -144,7 +144,7 @@ def export_stix(
     relative = None
     if destination is not None:
         _write_export(destination, text)
-        relative = destination.resolve().relative_to(_data_dir(store).resolve()).as_posix()
+        relative = destination.resolve().relative_to(store_data_dir(store).resolve()).as_posix()
     if ceiling == "AMBER":
         _audit_amber(explicit, len(objects), relative)
     return {
@@ -215,7 +215,7 @@ def resolve_export_path(
     """
     if not isinstance(requested, str) or not requested.strip() or "\x00" in requested:
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
-    unresolved = _data_dir(store) / "exports"
+    unresolved = store_data_dir(store) / "exports"
     if unresolved.is_symlink():
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
     root = unresolved.resolve()
@@ -811,10 +811,6 @@ def _write_export(destination: Path, text: str) -> None:
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
-
-
-def _data_dir(store: str | Path | None) -> Path:
-    return resolve_db_path(store).parent
 
 
 def _config_paths() -> list[Path]:

@@ -402,6 +402,17 @@ class PluginSkeletonTest(unittest.TestCase):
                 os.environ["CYBERAU_DATA_DIR"] = previous
         self.assertFalse(override.exists())
 
+    def test_data_dir_falls_back_to_hermes_home_then_the_user_home(self) -> None:
+        paths = sys.modules[f"{MODULE}.store.paths"]
+        home = self.data.parent / "hermes"
+        with mock.patch.dict(os.environ, {"CYBERAU_DATA_DIR": "", "HERMES_HOME": str(home)}):
+            self.assertEqual(self.plugin.data_dir(), home / "plugin-data" / "cyber-au")
+            self.assertEqual(paths.configured_data_dir(), home / "plugin-data" / "cyber-au")
+        with mock.patch.dict(os.environ, {"CYBERAU_DATA_DIR": "", "HERMES_HOME": ""}):
+            fallback = Path.home() / ".hermes" / "plugin-data" / "cyber-au"
+            self.assertEqual(self.plugin.data_dir(), fallback)
+            self.assertIsNone(paths.configured_data_dir())
+
     def test_load_and_register_stay_under_300ms(self) -> None:
         self.assertLess(self.elapsed, 0.3)
 

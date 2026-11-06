@@ -22,8 +22,8 @@ from pathlib import Path
 from cyberau_common.audit import AuditLog
 
 from .canonical import EXPORT_DEFAULT_TLP, TLP_RANK, require_tlp, tlp_allows
-from .db import TABLES, open_store, resolve_db_path
-from .stix import _data_dir, resolve_export_path
+from .db import TABLES, open_store, resolve_db_path, store_data_dir
+from .stix import resolve_export_path
 
 INSTALL_HINT = (
     "DuckDB export needs the optional analytics extra: run uv sync --project mcp --extra analytics"
@@ -83,7 +83,7 @@ def export_duckdb(
             raise
     finally:
         src.close()
-    relative = destination.relative_to(_data_dir(store).resolve()).as_posix()
+    relative = destination.relative_to(store_data_dir(store).resolve()).as_posix()
     if TLP_RANK[ceiling] > TLP_RANK[EXPORT_DEFAULT_TLP]:
         _audit(ceiling, max_tlp is not None, counts, relative)
     return {
@@ -99,7 +99,7 @@ def export_duckdb(
 def _destination(requested: str, store: str | Path | None) -> Path:
     destination = resolve_export_path(requested, store, suffix=".duckdb")
     raw = Path(requested)
-    candidate = raw if raw.is_absolute() else _data_dir(store) / "exports" / raw
+    candidate = raw if raw.is_absolute() else store_data_dir(store) / "exports" / raw
     _refuse_symlink(candidate)
     return destination
 

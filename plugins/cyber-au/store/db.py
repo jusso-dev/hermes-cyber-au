@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import sqlite3
 import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
+
+from .paths import configured_data_dir
 
 _MIGRATIONS = (
     (Path(__file__).resolve().parent / "migrations" / "0001_init.sql", 1),
@@ -106,19 +107,20 @@ class Store:
 def resolve_db_path(path: str | Path | None = None) -> Path:
     """Resolve the store file.
 
-    An explicit path wins, then ``CYBERAU_DATA_DIR/intel.sqlite``, then
-    ``HERMES_HOME/plugin-data/cyber-au/intel.sqlite``. There is no shared
-    ``/tmp`` default.
+    An explicit path wins, then ``intel.sqlite`` in the configured data
+    directory. There is no home-directory or shared ``/tmp`` default.
     """
     if path is not None and str(path).strip():
         return Path(path).expanduser().resolve()
-    data_dir = os.environ.get("CYBERAU_DATA_DIR")
-    if data_dir:
-        return (Path(data_dir) / "intel.sqlite").expanduser().resolve()
-    hermes_home = os.environ.get("HERMES_HOME")
-    if hermes_home:
-        return (Path(hermes_home) / "plugin-data" / "cyber-au" / "intel.sqlite").resolve()
-    raise ValueError("set CYBERAU_DATA_DIR or pass a store path")
+    base = configured_data_dir()
+    if base is None:
+        raise ValueError("set CYBERAU_DATA_DIR or pass a store path")
+    return (base / "intel.sqlite").resolve()
+
+
+def store_data_dir(path: str | Path | None = None) -> Path:
+    """The directory holding the store file, where ``exports`` and ``audit`` live."""
+    return resolve_db_path(path).parent
 
 
 def open_store(path: str | Path | None = None) -> Store:
