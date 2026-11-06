@@ -43,9 +43,7 @@ from datetime import UTC, date, datetime, timedelta, tzinfo
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import yaml
-
-from cyberau_common.secrets import is_plain_config_name, redact
+from cyberau_common.secrets import redact, secret_values
 
 logger = logging.getLogger("cyberau.audit")
 
@@ -64,7 +62,6 @@ EVENTS = frozenset(
 )
 _LOG_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})\.jsonl$")
 _POINTER = re.compile(r"^(\d+) ([0-9a-f]{64}) (\d{4}-\d{2}-\d{2})$")
-_SECRET_ENV = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PASSWD)", re.IGNORECASE)
 _WRITE_TOKENS = frozenset(
     {
         "export",
@@ -180,7 +177,6 @@ _CSV_FIELDS = (
     "prev_hash",
     "hash",
 )
-_DIST_CACHE: tuple[float, frozenset[str]] | None = None
 
 _NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
@@ -307,61 +303,6 @@ def _is_secret_key(name: str) -> bool:
     if norm in _SECRET_KEY_EXACT or norm.endswith(_SECRET_KEY_SUFFIXES):
         return True
     return "authorization" in norm
-
-
-def _distribution_secret_names() -> frozenset[str]:
-    global _DIST_CACHE
-    path = _find_distribution()
-    if path is None:
-        return frozenset()
-    try:
-        mtime = path.stat().st_mtime
-    except OSError:
-        return frozenset()
-    if _DIST_CACHE is not None and _DIST_CACHE[0] == mtime:
-        return _DIST_CACHE[1]
-    names: set[str] = set()
-    try:
-        loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError):
-        return frozenset()
-    for item in loaded.get("env_requires") or []:
-        if isinstance(item, dict) and item.get("name"):
-            names.add(str(item["name"]))
-    found = frozenset(names)
-    _DIST_CACHE = (mtime, found)
-    return found
-
-
-def _find_distribution() -> Path | None:
-    override = os.environ.get("CYBERAU_DISTRIBUTION")
-    if override:
-        path = Path(override)
-        return path if path.is_file() else None
-    start = Path(__file__).resolve()
-    for parent in start.parents:
-        candidate = parent / "distribution.yaml"
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-def secret_values() -> tuple[str, ...]:
-    """Return secret environment values that must not appear in the log."""
-    names = _distribution_secret_names()
-    found: list[str] = []
-    seen: set[str] = set()
-    for name, value in os.environ.items():
-        if name not in names and _SECRET_ENV.search(name) is None:
-            continue
-        if is_plain_config_name(name) and _SECRET_ENV.search(name) is None:
-            continue
-        if len(value) < 8 or value == "[REDACTED]" or value in seen:
-            continue
-        seen.add(value)
-        found.append(value)
-    found.sort(key=len, reverse=True)
-    return tuple(found)
 
 
 def redact_text(text: str, secrets: tuple[str, ...] | None = None) -> str:
@@ -1104,57 +1045,6 @@ class AuditHooks:
             flags=["blocked"],
         )
 
-    def record_export(
-        self,
-        tool_name: str = "export",
-        args: dict | None = None,
-        result: object = None,
-        *,
-        task_id: str = "",
-        duration_ms: int | None = None,
-    ) -> dict[str, object]:
-        return self.log.record(
-            "export",
-            tool=tool_name,
-            args=args,
-            result=result,
-            task_id=task_id or None,
-            duration_ms=duration_ms,
-        )
-
-    def record_delivery(
-        self,
-        tool_name: str = "delivery",
-        args: dict | None = None,
-        result: object = None,
-        *,
-        task_id: str = "",
-        duration_ms: int | None = None,
-    ) -> dict[str, object]:
-        return self.log.record(
-            "delivery",
-            tool=tool_name,
-            args=args,
-            result=result,
-            task_id=task_id or None,
-            duration_ms=duration_ms,
-        )
-
-    def record_config_change(
-        self,
-        key: str,
-        new_value: object,
-        old_value: object = None,
-        *,
-        session_id: str = "",
-    ) -> dict[str, object]:
-        return self.log.record(
-            "config_change",
-            tool="config",
-            session_id=session_id or None,
-            args={"key": key, "old": old_value, "new": new_value},
-        )
-
     def _warn(self, tool_name: str) -> None:
         safe = redact_text(tool_name)
         self.last_warning = (
@@ -1186,30 +1076,6 @@ def _optional_text(value: object) -> str | None:
         return None
     text = str(value)
     return text or None
-
-
-def setup_cli(parser: argparse.ArgumentParser) -> None:
-    """Add ``audit verify`` and ``audit export`` to a cyber-au command parser."""
-    commands = parser.add_subparsers(dest="cyber_au_command", required=True)
-    audit = commands.add_parser("audit", help="Check or export the tamper-evident audit log")
-    audit_commands = audit.add_subparsers(dest="audit_command", required=True)
-    verify = audit_commands.add_parser("verify", help="Check the hash chain")
-    verify.add_argument("--from", dest="from_date", help="First day to check, as YYYY-MM-DD")
-    export = audit_commands.add_parser("export", help="Export records as jsonl or csv")
-    export.add_argument("--since", required=True, help="First day to include, as YYYY-MM-DD")
-    export.add_argument("--format", dest="export_format", required=True, choices=("jsonl", "csv"))
-
-
-def main(argv: list[str] | None = None) -> int:
-    """Run ``cyber-au audit verify`` or ``cyber-au audit export``."""
-    parser = argparse.ArgumentParser(prog="cyber-au")
-    setup_cli(parser)
-    try:
-        args = parser.parse_args(argv)
-    except SystemExit as exc:
-        code = exc.code
-        return int(code) if isinstance(code, int) else 2
-    return dispatch(args)
 
 
 def dispatch(args: argparse.Namespace, log: AuditLog | None = None) -> int:
@@ -1258,23 +1124,8 @@ def register_hooks(ctx: object, hooks: AuditHooks | None = None) -> AuditHooks:
     return audit
 
 
-def register_cli(ctx: object) -> None:
-    """Register ``hermes cyber-au audit`` on a Hermes plugin context."""
-    register = getattr(ctx, "register_cli_command")
-    register(
-        name="cyber-au",
-        help="Check or export the cyber-au audit log",
-        setup_fn=setup_cli,
-        handler_fn=lambda args: dispatch(args),
-    )
-
-
 def add_audit_parser(commands) -> None:
-    """Attach the audit command to an existing cyber-au subparser group.
-
-    The plugin skeleton owns the rest of the ``cyber-au`` command. It should
-    call this instead of registering a second top-level command.
-    """
+    """Add ``audit verify`` and ``audit export`` to the plugin's cyber-au subcommands."""
     audit = commands.add_parser("audit", help="Check or export the tamper-evident audit log")
     audit_commands = audit.add_subparsers(dest="audit_command", required=True)
     verify = audit_commands.add_parser("verify", help="Check the hash chain")
