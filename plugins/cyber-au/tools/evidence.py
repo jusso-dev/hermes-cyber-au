@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..evidence import m365_secure
-from .store import call_tool
+from .intel import call_tool
 
 EVIDENCE_IMPORT = {
     "name": m365_secure.TOOL_NAME,

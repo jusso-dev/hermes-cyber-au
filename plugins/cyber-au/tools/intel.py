@@ -148,7 +148,7 @@ _TOOLS = (
 )
 
 
-def register_store(ctx) -> None:
+def register_intel(ctx) -> None:
     """Register the intel_* tools."""
     for schema, handler in _TOOLS:
         ctx.register_tool(

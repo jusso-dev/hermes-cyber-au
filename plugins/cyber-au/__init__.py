@@ -69,9 +69,9 @@ def register(ctx) -> None:
     from .hooks.audit import register as register_audit
     from .middleware.untrusted import register as register_middleware
     from .tools.evidence import register_evidence
-    from .tools.store import register_store
+    from .tools.intel import register_intel
 
-    register_store(ctx)
+    register_intel(ctx)
     register_evidence(ctx)
     register_audit(ctx)
     register_middleware(ctx)
