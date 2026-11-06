@@ -65,6 +65,7 @@ A `get` call that omits `stale_if_error` uses the shared client default (1 day).
 
 | Function | Call | TTL | Stale if error |
 |---|---|---|---|
+| `_request` | `head` | forwards `ttl` | not set (shared client default 1 day) |
 | `_request` | `get` | forwards `ttl` | not set (shared client default 1 day) |
 | `rf_risklist_status` | `_request` | `0` (0 seconds) | not set on this call |
 | `_live_probe` | `_request` | `0` (0 seconds) | not set on this call |
