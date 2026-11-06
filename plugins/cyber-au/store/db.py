@@ -12,12 +12,15 @@ from pathlib import Path
 
 from .paths import configured_data_dir
 
-_MIGRATIONS = (
-    (Path(__file__).resolve().parent / "migrations" / "0001_init.sql", 1),
-    (Path(__file__).resolve().parent / "migrations" / "0002_retention.sql", 2),
-    (Path(__file__).resolve().parent / "migrations" / "0003_watchlist_matches.sql", 3),
+_MIGRATION_DIR = Path(__file__).resolve().parent / "migrations"
+# Schema files the store applies itself, tracked in ``schema_version``. The other
+# files in ``migrations`` belong to ``cyber-au migrate`` (update_path.py).
+MIGRATIONS = (
+    (_MIGRATION_DIR / "0001_init.sql", 1),
+    (_MIGRATION_DIR / "0002_retention.sql", 2),
+    (_MIGRATION_DIR / "0003_watchlist_matches.sql", 3),
 )
-SCHEMA_VERSION = _MIGRATIONS[-1][1]
+SCHEMA_VERSION = MIGRATIONS[-1][1]
 _LOCK = threading.Lock()
 _STORES: dict[str, Store] = {}
 
@@ -206,7 +209,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = _schema_version(conn)
-        for path, target in _MIGRATIONS:
+        for path, target in MIGRATIONS:
             if version >= target:
                 continue
             for statement in _statements(path.read_text(encoding="utf-8")):

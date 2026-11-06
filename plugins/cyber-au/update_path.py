@@ -14,11 +14,21 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+if __package__:
+    from .store.db import MIGRATIONS as STORE_MIGRATIONS
+else:
+    # install/bootstrap.sh runs cli.py directly, outside the plugin package.
+    _PLUGIN_DIR = str(Path(__file__).resolve().parent)
+    if _PLUGIN_DIR not in sys.path:
+        sys.path.append(_PLUGIN_DIR)
+    from store.db import MIGRATIONS as STORE_MIGRATIONS
 
 USER_OWNED_ROOTS = frozenset(
     {
@@ -71,7 +81,6 @@ JOB_DEFINITION_FIELDS = frozenset(
 
 PAUSED_REASON = "Installed from a profile distribution; review it, then resume."
 _MIGRATION_RE = re.compile(r"^(\d{4})_.*\.sql$")
-_STORE_OWNED_RE = re.compile(r"[\"'](\d{4}_[^\"'/]*\.sql)[\"']")
 _TRANSACTION_WORDS = frozenset({"BEGIN", "COMMIT", "ROLLBACK", "END"})
 _LEADING_COMMENTS_RE = re.compile(r"\A(?:\s+|--[^\n]*(?:\n|\Z)|/\*.*?\*/)+", re.DOTALL)
 
@@ -136,7 +145,7 @@ def resolve_migrations(profile: Path, override: Path | None = None) -> Path:
 def list_migrations(directory: Path) -> list[Path]:
     if not directory.is_dir():
         return []
-    owned = _store_owned_migrations(directory)
+    owned = _store_owned_migrations()
     found = [
         path
         for path in directory.iterdir()
@@ -145,18 +154,14 @@ def list_migrations(directory: Path) -> list[Path]:
     return sorted(found, key=lambda path: path.name)
 
 
-def _store_owned_migrations(directory: Path) -> set[str]:
+def _store_owned_migrations() -> set[str]:
     """Names the intel store applies itself when it opens the database.
 
-    ``store/db.py`` lists its own schema files and tracks them in
-    ``schema_version``. They share this directory but are not ours to run: they
-    create tables that already exist and set connection pragmas such as WAL,
-    which SQLite refuses inside a migration transaction.
+    They share the migrations directory but are not ours to run: they create
+    tables that already exist and set connection pragmas such as WAL, which
+    SQLite refuses inside a migration transaction.
     """
-    runner = directory.parent / "db.py"
-    if directory.name != "migrations" or not runner.is_file():
-        return set()
-    return set(_STORE_OWNED_RE.findall(runner.read_text(encoding="utf-8")))
+    return {path.name for path, _version in STORE_MIGRATIONS}
 
 
 def migration_id(name: str) -> str:
@@ -442,11 +447,7 @@ def _merge_dir(src: Path, dest: Path, profile: Path) -> None:
             continue
         if child.is_symlink():
             raise UpdateError(f"Refusing to copy symlink {child}")
-        target = dest / child.name
-        if child.is_dir():
-            _replace(child, target, profile)
-        else:
-            _replace(child, target, profile)
+        _replace(child, dest / child.name, profile)
 
 
 def _replace(src: Path, dest: Path, profile: Path) -> None:
