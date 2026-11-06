@@ -8,12 +8,11 @@ import time
 from pathlib import Path
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -94,7 +93,7 @@ class _GreyNoiseConnector(Connector):
         if check_schema and not live:
             if not os.environ.get("CYBERAU_GREYNOISE_SNAPSHOT"):
                 return Probe(self.key, True, "schema ok, no local copy to check")
-            payload = _load(_snapshot_text())
+            payload = runtime.load_json_object(_snapshot_text())
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
@@ -134,7 +133,7 @@ def schema_drift(payload: dict) -> str | None:
 def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]:
     url = _url(ip)
     snapshot = os.environ.get("CYBERAU_GREYNOISE_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     secret = lookup("GREYNOISE_API_KEY")
@@ -148,16 +147,16 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
     cached = cache.get(cache_key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "hit" if cache.fresh(cached) else "stale"
-        return _load(cached.body.decode("utf-8")), state, ""
+        return runtime.load_json_object(cached.body.decode("utf-8")), state, ""
     if offline:
         return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     headers = {"key": secret} if secret else None
-    client = HttpClient(
+    client = runtime.http_client(
         "greynoise",
-        policy=EgressPolicy(allowlist, "greynoise"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", clock=_CLOCK, sleeper=_LIMIT_SLEEP),
+        limiter_clock=_CLOCK,
+        limiter_sleeper=_LIMIT_SLEEP,
         user_agent=USER_AGENT,
         rate=1,
         burst=1,
@@ -174,7 +173,7 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
         if not force_live:
             cached = cache.get(cache_key)
             if cached:
-                return _load(cached.body.decode("utf-8")), "stale", ""
+                return runtime.load_json_object(cached.body.decode("utf-8")), "stale", ""
             reason = f"the live fetch failed ({_clean(exc, secret)})"
             return None, "snapshot", unavailable(LABEL, reason)
         return None, "snapshot", _clean(exc, secret)
@@ -190,7 +189,7 @@ def _fetch(ip: str, *, force_live: bool = False) -> tuple[dict | None, str, str]
     if response.status >= 400 and response.status != 404:
         reason = f"GreyNoise upstream status {response.status}"
         return None, response.cache, unavailable(LABEL, reason)
-    payload = _load(response.body.decode("utf-8"))
+    payload = runtime.load_json_object(response.body.decode("utf-8"))
     if payload is None:
         return None, response.cache, "GreyNoise response was not usable"
     return payload, response.cache, ""
@@ -293,7 +292,7 @@ def _url(ip: str) -> str:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-greynoise"))
+    return runtime.data_dir("greynoise")
 
 
 def _snapshot_text() -> str:
@@ -306,18 +305,10 @@ def _read(path: Path) -> tuple[dict | None, str]:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None, "GreyNoise snapshot could not be read"
-    payload = _load(text)
+    payload = runtime.load_json_object(text)
     if payload is None:
         return None, "GreyNoise response was not usable"
     return payload, ""
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
 
 
 def _envelope(
@@ -347,10 +338,6 @@ def _clean(exc: BaseException, secret: str | None) -> str:
     if secret:
         message = message.replace(secret, "[REDACTED]")
     return message
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("greynoise", connector)

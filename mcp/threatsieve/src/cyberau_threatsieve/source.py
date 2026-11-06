@@ -13,12 +13,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -124,7 +123,7 @@ class _ThreatSieveConnector(Connector):
             return Probe(self.key, True, "schema ok")
         if not live:
             return Probe(self.key, True, "offline ok")
-        if os.environ.get("CYBERAU_OFFLINE") == "1":
+        if runtime.offline():
             return Probe(self.key, False, "CYBERAU_OFFLINE is set, so no live probe was made")
         payload, cache, warning = _fetch("example.com", force_live=True)
         if warning or payload is None:
@@ -159,18 +158,18 @@ def schema_drift(payload: dict) -> str | None:
 def request_cache_key(indicator: str) -> str:
     """Cache key for one assess call. The key does not contain the API secret."""
     secret = lookup("THREATSIEVE_API_KEY")
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-threatsieve"))
+    data_dir = runtime.data_dir("threatsieve")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     return cache.key("POST", _assess_url(), None, _key_body(indicator), _auth_scope(secret))
 
 
 def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_THREATSIEVE_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if snapshot and not force_live:
         payload, problem = _read_snapshot()
         return payload, "snapshot", problem
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-threatsieve"))
+    data_dir = runtime.data_dir("threatsieve")
     secret = lookup("THREATSIEVE_API_KEY")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = request_cache_key(indicator)
@@ -186,12 +185,10 @@ def _fetch(indicator: str, *, force_live: bool = False) -> tuple[dict | None, st
             "snapshot",
             unavailable(_LABEL, "set THREATSIEVE_API_KEY to a ThreatSieve scoped API key"),
         )
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         "threatsieve",
-        policy=EgressPolicy(allowlist, "threatsieve"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -391,7 +388,7 @@ def _persist(rows: list[dict]) -> str:
     if not rows:
         return ""
     try:
-        directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-threatsieve"))
+        directory = runtime.data_dir("threatsieve")
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "threatsieve-observations.jsonl"
         with path.open("a", encoding="utf-8") as handle:
@@ -459,10 +456,6 @@ def _safe(text: str, secret: str | None) -> str:
     if secret:
         cleaned = cleaned.replace(secret, "[REDACTED]")
     return cleaned
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("threatsieve", connector)

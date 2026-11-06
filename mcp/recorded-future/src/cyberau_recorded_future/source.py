@@ -12,11 +12,10 @@ from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -128,16 +127,7 @@ def _attribution() -> str:
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-recorded-future"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return _PACKAGE.parents[2] / "egress-allowlist.yaml"
+    return runtime.data_dir("recorded-future")
 
 
 def _token() -> str | None:
@@ -158,7 +148,7 @@ def _cache():
 
 
 def _live_allowed() -> bool:
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return False
     if _TRANSPORT is not None:
         return True
@@ -227,18 +217,18 @@ def _client() -> HttpClient:
     policy_kwargs = {}
     if _RESOLVER is not None:
         policy_kwargs["resolver"] = _RESOLVER
-    return HttpClient(
+    return runtime.http_client(
         "recorded-future",
-        policy=EgressPolicy(_allowlist(), "recorded-future", **policy_kwargs),
+        directory=_data_dir(),
+        policy=EgressPolicy(runtime.allowlist_path(), "recorded-future", **policy_kwargs),
         cache=_cache(),
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=5,
         burst=20,
         window="rolling",
         timeout=60,
         auth_scope=scope,
-        offline=os.environ.get("CYBERAU_OFFLINE") == "1",
+        offline=runtime.offline(),
         transport=_TRANSPORT,
         sleeper=_SLEEPER,
         rng=_RNG,
@@ -258,7 +248,7 @@ def _request(
     """Return payload, cache state, warning, and the raw response."""
     if not _token():
         return None, "snapshot", "RECORDED_FUTURE_API_TOKEN is not set", None
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+    offline = runtime.offline()
     if not offline and not _live_allowed():
         return None, "snapshot", _unavailable("live calls are turned off"), None
     try:
@@ -315,7 +305,7 @@ def _unavailable(reason: str) -> str:
 
 
 def _cache_state(state: str) -> str:
-    if os.environ.get("CYBERAU_OFFLINE") == "1" and state == "hit":
+    if runtime.offline() and state == "hit":
         return "stale"
     return state
 
@@ -1084,7 +1074,7 @@ def rf_risklist_status(entity_type: str, risk_rule: str | None = None) -> dict:
     previous = seen.get(key) if isinstance(seen.get(key), str) else None
     changed = cache == "miss"
     if changed:
-        seen[key] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        seen[key] = runtime.utc_now_iso()
         _save_risk_seen(seen)
     last_pulled = seen.get(key) or previous
     return _result(
@@ -1415,7 +1405,7 @@ class RecordedFutureConnector(PremiumConnector):
 
 def _live_probe() -> str:
     """One cheap call per tool group. Only a fresh upstream answer counts as ok."""
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return "offline mode, no live check was made"
     checks = (
         (

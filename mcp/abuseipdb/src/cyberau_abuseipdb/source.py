@@ -7,14 +7,14 @@ import os
 import random
 import re
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
@@ -184,7 +184,7 @@ class _AbuseIpdbConnector(Connector):
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
             try:
-                payload = _load(_snapshot_text("check"))
+                payload = runtime.load_json_object(_snapshot_text("check"))
             except OSError as exc:
                 return Probe(self.key, False, str(exc))
             problem = schema_drift(payload or {})
@@ -270,7 +270,7 @@ def _fetch(
     rate: float,
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     snapshot_env = os.environ.get("CYBERAU_ABUSEIPDB_SNAPSHOT")
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
@@ -279,7 +279,7 @@ def _fetch(
         cached = cache.get(key)
         if cached and (offline or cache.fresh(cached)):
             state = "hit" if cache.fresh(cached) else "stale"
-            return _load(cached.body.decode("utf-8")), state, ""
+            return runtime.load_json_object(cached.body.decode("utf-8")), state, ""
     if not force_live and snapshot_env:
         return _offline_snapshot(endpoint)
     if offline:
@@ -304,16 +304,16 @@ def _fetch(
             return None, "snapshot", "AbuseIPDB local rate limit reached. Retry shortly."
         cached = None if force_live else cache.get(key)
         if cached:
-            return _load(cached.body.decode("utf-8")), "stale", ""
+            return runtime.load_json_object(cached.body.decode("utf-8")), "stale", ""
         return None, "snapshot", _safe(str(exc), secret)
     finally:
         client.close()
-    payload = _load(response.body.decode("utf-8", errors="replace"))
+    payload = runtime.load_json_object(response.body.decode("utf-8", errors="replace"))
     if response.status >= 300:
         if response.status == 429 and not force_live:
             cached = cache.get(key)
             if cached:
-                return _load(cached.body.decode("utf-8")), "stale", ""
+                return runtime.load_json_object(cached.body.decode("utf-8")), "stale", ""
         return None, "snapshot", _status_warning(response, payload, secret)
     return payload, response.cache, ""
 
@@ -323,14 +323,12 @@ def _offline_snapshot(endpoint: str) -> tuple[dict | None, str, str]:
         text = _snapshot_text(endpoint)
     except OSError:
         return None, "snapshot", "AbuseIPDB is unavailable offline and no cached check exists"
-    return _load(text), "snapshot", ""
+    return runtime.load_json_object(text), "snapshot", ""
 
 
 def _client(data_dir: Path, cache: HttpCache, endpoint: str, rate: float) -> HttpClient:
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    return HttpClient(
+    return runtime.http_client(
         "abuseipdb",
-        policy=EgressPolicy(allowlist, "abuseipdb"),
         cache=cache,
         limiter=_EndpointLimiter(RateLimiter(data_dir / "rate_limit.sqlite"), endpoint),
         user_agent=USER_AGENT,
@@ -423,7 +421,7 @@ def _history(ip: str, score: int, reports: int, country: str | None) -> dict:
         "abuse_confidence_score": score,
         "reports": reports,
         "country_code": country,
-        "observed_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "observed_at": runtime.utc_now_iso(),
     }
 
 
@@ -588,20 +586,8 @@ def _snapshot_text(endpoint: str) -> str:
     return Path(os.environ["CYBERAU_ABUSEIPDB_SNAPSHOT"]).read_text(encoding="utf-8")
 
 
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-abuseipdb"))
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("abuseipdb")
 
 
 def _envelope(

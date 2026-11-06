@@ -8,12 +8,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -162,7 +160,7 @@ def schema_drift(payload) -> str | None:
 
 def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str, str]:
     snapshot = os.environ.get("CYBERAU_CRTSH_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", API, params, b"", "anonymous")
@@ -185,11 +183,12 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str,
         return payload, "snapshot", SNAPSHOT_NOTE
     if offline:
         return None, "snapshot", unavailable(LABEL, "offline mode and no cached answer")
-    client = HttpClient(
+    client = runtime.http_client(
         "crtsh",
-        policy=EgressPolicy(_allowlist_path(), "crtsh"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", clock=_CLOCK, sleeper=_SLEEP),
+        limiter_clock=_CLOCK,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -499,16 +498,7 @@ def _envelope(
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-crtsh"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist_path() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("crtsh")
 
 
 register_connector("crtsh", connector)

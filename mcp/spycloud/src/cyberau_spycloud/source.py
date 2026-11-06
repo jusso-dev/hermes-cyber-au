@@ -14,11 +14,10 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
@@ -179,10 +178,6 @@ def _envelope(
     )
 
 
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
-
-
 def _session_cache() -> HttpCache:
     global _SESSION, _SESSION_DIR
     directory = str(data_dir())
@@ -233,7 +228,7 @@ def _read_json_file(path: Path) -> tuple[dict | None, str]:
 
 
 def _policy() -> EgressPolicy:
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    allowlist = runtime.allowlist_path()
     if _RESOLVER is None:
         return EgressPolicy(allowlist, "spycloud")
     return EgressPolicy(allowlist, "spycloud", resolver=_RESOLVER)
@@ -257,7 +252,7 @@ def _http_get(
         limiter.acquire(f"spycloud:{HOST}", rate=_RATE, burst=_BURST, window="rolling")
     except Exception as exc:
         return _from_error(cache, key, exc, force_live)
-    client = HttpClient(
+    client = runtime.http_client(
         "spycloud",
         policy=_policy(),
         cache=cache,
@@ -329,7 +324,7 @@ def _fetch_json(
     skip_cache: bool = False,
 ) -> tuple[dict | None, str, str]:
     override = os.environ.get(snapshot_var)
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if override and not force_live:
         payload, problem = _read_json_file(Path(override))
         if problem:
@@ -1001,7 +996,7 @@ class SpyCloudConnector(PremiumConnector):
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
         snapshot = os.environ.get(_WATCHLIST_SNAPSHOT)
-        offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+        offline = runtime.offline()
         if lookup("SPYCLOUD_API_KEY") is None and not snapshot and not offline:
             raise RuntimeError("SPYCLOUD_API_KEY is not set")
         if snapshot and not offline:

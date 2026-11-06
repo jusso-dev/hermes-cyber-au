@@ -13,7 +13,7 @@ from ipaddress import IPv4Address, IPv6Address, ip_address, ip_network
 from pathlib import Path
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -239,7 +239,7 @@ def _load(*, force_live: bool = False) -> _Bundle:
         bundle = _from_dir(Path(os.environ["CYBERAU_DROP_SNAPSHOT"]), "snapshot")
         bundle.warnings.insert(0, _OPERATOR)
         return bundle
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cache = HttpCache(_data_dir() / "http_cache.sqlite")
     if offline:
         cached = _from_http_cache(cache, allow_stale=True)
@@ -276,7 +276,7 @@ def _from_network(cache: HttpCache, *, force_live: bool) -> _Bundle:
             states.append(state)
     finally:
         client.close()
-    return _build(fetched, _merge_cache(states), warnings)
+    return _build(fetched, runtime.merge_cache_states(states), warnings)
 
 
 def _get(client: HttpClient, url: str, *, force_live: bool):
@@ -301,7 +301,7 @@ def _get(client: HttpClient, url: str, *, force_live: bool):
         text = response.body.decode("utf-8")
     except UnicodeDecodeError:
         return None, response.cache, "DROP payload was not UTF-8", None
-    when = _now()
+    when = runtime.utc_now_iso()
     if response.cache in {"hit", "stale"}:
         item = client.cache.get(_cache_key(client.cache, url))
         if item is not None:
@@ -352,7 +352,7 @@ def _from_http_cache(cache: HttpCache, *, allow_stale: bool) -> _Bundle | None:
             return None
         fetched[name] = (text, _iso(item.fetched_at))
         states.append("hit" if fresh else "stale")
-    return _build(fetched, _merge_cache(states), [])
+    return _build(fetched, runtime.merge_cache_states(states), [])
 
 
 def _from_dir(root: Path, cache: str) -> _Bundle:
@@ -630,11 +630,12 @@ def _client(cache: HttpCache) -> HttpClient:
     kwargs = {}
     if _RESOLVER is not None:
         kwargs["resolver"] = _RESOLVER
-    return HttpClient(
+    return runtime.http_client(
         "spamhaus-drop",
-        policy=EgressPolicy(_allowlist(), "spamhaus-drop", **kwargs),
+        directory=_data_dir(),
+        policy=EgressPolicy(runtime.allowlist_path(), "spamhaus-drop", **kwargs),
         cache=cache,
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP),
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=_HTTP_RATE,
         burst=_HTTP_BURST,
@@ -669,18 +670,6 @@ def _envelope(data, cache: str, data_as_of: str | None = None, warnings=()) -> d
     )
 
 
-def _merge_cache(states: list[str]) -> str:
-    if not states:
-        return "snapshot"
-    if "stale" in states:
-        return "stale"
-    if "miss" in states:
-        return "miss"
-    if "hit" in states:
-        return "hit"
-    return "snapshot"
-
-
 def _unique(items: list[str]) -> list[str]:
     seen: list[str] = []
     for item in items:
@@ -699,18 +688,7 @@ def _response_schema(name: str) -> dict:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-spamhaus-drop"))
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
-
-
-def _now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.data_dir("spamhaus-drop")
 
 
 def _iso(timestamp: float) -> str:

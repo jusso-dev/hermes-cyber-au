@@ -19,7 +19,7 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -970,14 +970,11 @@ def _envelope(
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-abusech"))
+    return runtime.data_dir("abusech")
 
 
 def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.allowlist_path()
 
 
 register_connector(SOURCE, connector)

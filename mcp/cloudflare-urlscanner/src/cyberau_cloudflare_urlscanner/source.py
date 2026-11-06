@@ -13,12 +13,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimited, RateLimiter
+from cyberau_common.ratelimit import RateLimited
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -67,7 +67,7 @@ def urlscan_submit_unlisted(url: str, approval_token: str) -> dict:
         body = _submit_body(url)
     except RuntimeError as exc:
         return _fail(str(exc))
-    if _offline():
+    if runtime.offline():
         problem = _approval_status(url, approval_token, consume=True)
         if problem:
             return _fail(problem)
@@ -86,7 +86,7 @@ def urlscan_get_result(scan_id: str) -> dict:
     problem = _validate_scan_id(scan_id)
     if problem:
         return _fail(problem)
-    if _offline():
+    if runtime.offline():
         return _offline_get(scan_id)
     creds = _credentials()
     if isinstance(creds, str):
@@ -475,15 +475,11 @@ def _exchange(
 
 def _client(scope: str) -> HttpClient:
     data_dir = _data_dir()
-    return HttpClient(
+    return runtime.http_client(
         "cloudflare-urlscanner",
-        policy=EgressPolicy(
-            _allowlist(),
-            "cloudflare-urlscanner",
-            resolver=_RESOLVER,
-        ),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        resolver=_RESOLVER,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -607,7 +603,7 @@ def _read_cache(method: str, url: str, material: bytes, scope: str) -> tuple[dic
     if item is None:
         return None, ""
     try:
-        payload = _load(item.body.decode("utf-8"))
+        payload = runtime.load_json_object(item.body.decode("utf-8"))
     except UnicodeDecodeError:
         return None, ""
     if payload is None:
@@ -629,7 +625,7 @@ def _snapshot_document() -> dict | None:
     path = _snapshot_path()
     if path is None:
         return None
-    return _load(path.read_text(encoding="utf-8"))
+    return runtime.load_json_object(path.read_text(encoding="utf-8"))
 
 
 def _snapshot_submit() -> dict | None:
@@ -741,21 +737,8 @@ def _account_or_blank() -> str:
     return ""
 
 
-def _offline() -> bool:
-    return os.environ.get("CYBERAU_OFFLINE") == "1"
-
-
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-cfscan"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("cfscan")
 
 
 def _envelope(
@@ -781,17 +764,9 @@ def _fail(message: str) -> dict:
     return _envelope([], "snapshot", warnings=(message,))
 
 
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
 def _load_bytes(body: bytes) -> dict | None:
     try:
-        return _load(body.decode("utf-8"))
+        return runtime.load_json_object(body.decode("utf-8"))
     except UnicodeDecodeError:
         return None
 

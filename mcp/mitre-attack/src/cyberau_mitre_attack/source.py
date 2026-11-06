@@ -8,12 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Literal
 
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -544,12 +540,12 @@ def _load(domain: str, *, force_live: bool = False) -> _Loaded:
     pinned = os.environ.get("CYBERAU_ATTACK_SNAPSHOT")
     if not force_live and pinned:
         return _from_root(Path(pinned), domain, "snapshot", [_PINNED_NOTE])
-    if not force_live and os.environ.get("CYBERAU_OFFLINE") == "1":
+    if not force_live and runtime.offline():
         return _stored_or_unavailable(domain, [], offline=True)
     text, cache, warning = _http(INDEX_URL, ttl=3600, stale_if_error=7 * 86400)
     if text is None:
         return _stored_or_unavailable(domain, [warning])
-    index = _loads(text)
+    index = runtime.load_json(text)
     version = _latest(index, domain)
     if not version:
         return _stored_or_unavailable(domain, [f"ATT&CK index has no {domain} version"])
@@ -569,7 +565,7 @@ def _load(domain: str, *, force_live: bool = False) -> _Loaded:
     body, _cache, warning = _http(url, ttl=86400, stale_if_error=0)
     if body is None:
         return _stored_or_unavailable(domain, [*warnings, warning])
-    model, problem = _build(_loads(body), domain, version)
+    model, problem = _build(runtime.load_json(body), domain, version)
     if model is None:
         return _stored_or_unavailable(
             domain, [*warnings, f"{domain} bundle was not usable: {problem}"]
@@ -652,7 +648,7 @@ def _live_probe(key: str) -> Probe:
     text, _cache, warning = _http(INDEX_URL, ttl=0, stale_if_error=0, skip_cache=True)
     if text is None:
         return Probe(key, False, warning)
-    version = _latest(_loads(text), "ics")
+    version = _latest(runtime.load_json(text), "ics")
     if not version:
         return Probe(key, False, "ATT&CK index has no ICS version")
     body, _cache, warning = _http(
@@ -660,7 +656,7 @@ def _live_probe(key: str) -> Probe:
     )
     if body is None:
         return Probe(key, False, warning)
-    model, problem = _build(_loads(body), "ics", version)
+    model, problem = _build(runtime.load_json(body), "ics", version)
     if model is None:
         return Probe(key, False, problem or "ICS bundle was not usable")
     checks = []
@@ -691,11 +687,11 @@ def _http(
     url: str, *, ttl: int, stale_if_error: int, skip_cache: bool = False
 ) -> tuple[str | None, str, str]:
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "mitre-attack",
-        policy=EgressPolicy(_allowlist(), "mitre-attack", resolver=_RESOLVER),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        resolver=_RESOLVER,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1 / 36,
         burst=5,
@@ -779,18 +775,9 @@ def _store(path: Path, body: str) -> None:
     os.replace(temp, path)
 
 
-def _loads(text: str | None):
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
 def _loads_file(path: Path):
     try:
-        return _loads(path.read_text(encoding="utf-8"))
+        return runtime.load_json(path.read_text(encoding="utf-8"))
     except OSError:
         return None
 
@@ -808,13 +795,7 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-attack"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("attack")
 
 
 register_connector("mitre-attack", connector)

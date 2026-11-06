@@ -5,17 +5,16 @@ import json
 import os
 import sqlite3
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import httpx
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -159,7 +158,7 @@ def _public_feed_path(path: str) -> bool:
 
 
 def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT")) and not force_live
     if pinned:
         return _from_snapshot()
@@ -223,11 +222,10 @@ def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
 
 def _http(*, force_live: bool):
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "openphish",
-        policy=EgressPolicy(_allowlist(), "openphish"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1 / 30,
         burst=4,
@@ -430,7 +428,7 @@ def _urls_from_json(payload) -> list[str] | None:
 def _persist(source: str, urls: list[str]) -> None:
     if not urls:
         return
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = runtime.utc_now_iso()
     with sqlite3.connect(_data_dir() / "openphish.sqlite") as conn:
         conn.execute(
             """
@@ -569,13 +567,7 @@ def _envelope(data, cache: str, warnings: tuple[str, ...] = ()) -> dict:
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-openphish"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("openphish")
 
 
 register_connector("openphish", connector)

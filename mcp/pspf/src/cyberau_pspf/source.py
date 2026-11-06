@@ -15,10 +15,9 @@ from typing import Annotated
 from urllib.parse import urljoin
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -212,7 +211,7 @@ def schema_drift(payload) -> str | None:
 
 
 def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get("CYBERAU_PSPF_SNAPSHOT")) and not force_live
     if pinned:
         payload = _load_snapshot_file()
@@ -269,7 +268,7 @@ def _inventory(*, force_live: bool) -> tuple[dict | None, str, str, str]:
             parsed, filled = _fill_gaps(parsed)
             warnings.extend(filled)
             note = "; ".join(item for item in warnings if item)
-            cache = "snapshot" if filled else _merge_cache(caches)
+            cache = "snapshot" if filled else runtime.merge_cache_states(caches)
             return parsed, cache, note, method
         if parsed is None:
             warnings.append("PSPF page was not usable")
@@ -356,11 +355,10 @@ def _http(
     url: str, headers: dict, *, ttl: int, skip_cache: bool, retries: int
 ) -> tuple[str | None, str, str]:
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "pspf",
-        policy=EgressPolicy(_allowlist(), "pspf"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=4,
         burst=20,
@@ -662,7 +660,7 @@ def _persist(payload: dict) -> None:
     rows = [*payload.get("requirements", []), *payload.get("directions", [])]
     if not rows:
         return
-    fetched = _now()
+    fetched = runtime.utc_now_iso()
     with _db() as conn:
         for row in rows:
             conn.execute(
@@ -839,12 +837,8 @@ def _retrieved(urls: list[str]) -> str:
         if cached is not None:
             times.append(cached.fetched_at)
     if not times:
-        return _now()
+        return runtime.utc_now_iso()
     return datetime.fromtimestamp(min(times), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _limit(key: str, *, rate: float, burst: int) -> None:
@@ -855,18 +849,6 @@ def _limit(key: str, *, rate: float, burst: int) -> None:
         window="rolling",
         timeout=1.0,
     )
-
-
-def _merge_cache(caches: list[str]) -> str:
-    if not caches:
-        return "snapshot"
-    if "stale" in caches:
-        return "stale"
-    if "miss" in caches:
-        return "miss"
-    if "hit" in caches:
-        return "hit"
-    return "snapshot"
 
 
 def _envelope(data, cache: str, data_as_of: str | None = None, warnings=()):
@@ -882,9 +864,7 @@ def _envelope(data, cache: str, data_as_of: str | None = None, warnings=()):
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-pspf"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return runtime.data_dir("pspf")
 
 
 @contextmanager
@@ -915,10 +895,6 @@ def _db():
         conn.commit()
     finally:
         conn.close()
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("pspf", connector)

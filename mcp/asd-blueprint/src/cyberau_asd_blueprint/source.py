@@ -17,11 +17,10 @@ from typing import Annotated
 from urllib.parse import urlsplit
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
@@ -94,7 +93,7 @@ def blueprint_search(query: _Query) -> dict:
 
 def refresh_index() -> dict:
     """Fetch the snapshot page URLs and store a fresh index. Weekly, one page every 5 seconds."""
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return _envelope([], "snapshot", warnings=("offline, Blueprint refresh skipped",))
     document, problem = _pinned_or_shipped()
     if problem or document is None:
@@ -106,7 +105,7 @@ def refresh_index() -> dict:
     if warnings or not pages:
         # A partial index would drop the failed pages from search, so keep the previous one.
         return _envelope([], "snapshot", warnings=tuple(warnings or ("Blueprint refresh failed",)))
-    refreshed = {"retrieved_at": _now(), "pages": pages}
+    refreshed = {"retrieved_at": runtime.utc_now_iso(), "pages": pages}
     _write_index(refreshed)
     rows = [
         {
@@ -144,7 +143,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     pages, warnings = _refetch(document)
     if warnings or not pages:
         raise RuntimeError("; ".join(warnings) or "Blueprint refresh failed")
-    rebuilt = {"retrieved_at": _now(), "pages": pages}
+    rebuilt = {"retrieved_at": runtime.utc_now_iso(), "pages": pages}
     destination.mkdir(parents=True, exist_ok=True)
     staged = current.with_suffix(".json.tmp")
     staged.write_text(json.dumps(rebuilt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -367,7 +366,7 @@ class _ArticleParser(HTMLParser):
 
 
 def _fetch(url: str, *, force_live: bool = False) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         cached = _cached_body(url)
         if cached is not None:
@@ -375,11 +374,12 @@ def _fetch(url: str, *, force_live: bool = False) -> tuple[str | None, str, str]
         return None, "snapshot", "offline and no cached Blueprint page"
     if not _allowed_page(url):
         return None, "snapshot", "skipped a page outside blueprint.asd.gov.au"
-    client = HttpClient(
+    client = runtime.http_client(
         "asd-blueprint",
+        directory=_data_dir(),
         policy=_policy(),
-        cache=HttpCache(_data_dir() / "http_cache.sqlite"),
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite", clock=_CLOCK, sleeper=_SLEEP),
+        limiter_clock=_CLOCK,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=PAGE_RATE,
         burst=1,
@@ -434,8 +434,8 @@ def _denied(status: int) -> str:
 
 def _policy() -> EgressPolicy:
     if _RESOLVER is None:
-        return EgressPolicy(_allowlist(), "asd-blueprint")
-    return EgressPolicy(_allowlist(), "asd-blueprint", resolver=_RESOLVER)
+        return EgressPolicy(runtime.allowlist_path(), "asd-blueprint")
+    return EgressPolicy(runtime.allowlist_path(), "asd-blueprint", resolver=_RESOLVER)
 
 
 def _load_document() -> tuple[dict | None, str, str]:
@@ -443,7 +443,7 @@ def _load_document() -> tuple[dict | None, str, str]:
     if pinned:
         document, problem = _read_json(Path(pinned))
         return document, "snapshot", problem
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+    offline = runtime.offline()
     stored, _index_problem = _read_stored_index()
     if stored is not None and schema_drift(stored) is None:
         state = "stale" if offline or not _fresh(stored) else "hit"
@@ -610,7 +610,7 @@ def _persist(rows: list[dict], data_as_of: str | None) -> None:
     directory = _data_dir()
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "blueprint-observations.jsonl"
-    stamp = _now()
+    stamp = runtime.utc_now_iso()
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
             record = {
@@ -718,10 +718,6 @@ def _as_of(document: dict) -> str | None:
     return raw or None
 
 
-def _now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _squash(parts: list[str]) -> str:
     return re.sub(r"\s+", " ", "".join(parts)).strip()
 
@@ -731,11 +727,7 @@ def _snapshot_path() -> Path:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-asd-blueprint"))
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("asd-blueprint")
 
 
 register_connector("asd-blueprint", connector)

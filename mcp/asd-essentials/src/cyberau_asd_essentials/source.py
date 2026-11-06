@@ -15,11 +15,8 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common import runtime
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
@@ -1187,7 +1184,7 @@ def _snapshot_doc(pattern: str, label: str) -> tuple[dict | None, str, str]:
     if path is None:
         return None, "snapshot", unavailable(label, f"the {label} snapshot is missing")
     text = path.read_text(encoding="utf-8")
-    document = _loads(text)
+    document = runtime.load_json(text)
     if not isinstance(document, dict):
         return None, "snapshot", unavailable(label, f"the {label} snapshot was not usable")
     as_of = document.get("retrieved_on")
@@ -1234,22 +1231,14 @@ def _latest(root: Path, pattern: str) -> Path | None:
     return found[-1] if found else None
 
 
-def _loads(text: str):
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
 def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return None, "snapshot", "offline"
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "asd-essentials",
-        policy=EgressPolicy(_allowlist(), "asd-essentials"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1 / 5,
         burst=2,
@@ -1300,13 +1289,7 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-e8"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("e8")
 
 
 def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
@@ -1340,7 +1323,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
         if not text or warning:
             raise RuntimeError(warning or f"{filename} was empty")
         hashes[filename] = hashlib.sha256(text.encode()).hexdigest()
-        document = _loads(text)
+        document = runtime.load_json(text)
         if not isinstance(document, dict):
             raise RuntimeError(f"{filename} was not JSON")
         for row in parse_catalog(document):

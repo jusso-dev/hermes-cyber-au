@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Annotated
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -343,7 +343,7 @@ def _envelope(
 
 
 def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.allowlist_path()
 
 
 def health_response() -> dict:

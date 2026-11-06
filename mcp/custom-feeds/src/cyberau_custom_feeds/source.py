@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import html
-import os
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -18,12 +17,11 @@ from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy, normalise_host
 from cyberau_common.envelope import envelope, safe_url, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -211,18 +209,20 @@ def _fetch(feed: Feed, *, force_live: bool) -> tuple[str | None, str, str]:
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", feed.url, None, b"", "anonymous")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cached = cache.get(cache_key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "hit" if cache.fresh(cached) else "stale"
         return cached.body.decode("utf-8", "replace"), state, ""
     if offline:
         return None, "snapshot", unavailable(feed.label, "offline mode and no cached copy")
-    client = HttpClient(
+    client = runtime.http_client(
         KEY,
+        directory=data_dir,
         policy=_policy(feed),
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", clock=_CLOCK, sleeper=_LIMIT_SLEEP),
+        limiter_clock=_CLOCK,
+        limiter_sleeper=_LIMIT_SLEEP,
         user_agent=USER_AGENT,
         rate=1,
         burst=2,
@@ -246,7 +246,7 @@ def _fetch(feed: Feed, *, force_live: bool) -> tuple[str | None, str, str]:
 
 
 def _policy(feed: Feed) -> EgressPolicy:
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    allowlist = runtime.allowlist_path()
     policy = EgressPolicy(allowlist, KEY)
     # A feed the user configured brings its own host. Shipped packs use allowlisted hosts.
     policy.hosts.add(normalise_host(feed.host))
@@ -337,11 +337,7 @@ def _envelope(data, cache: str, *, warnings=()) -> dict:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-custom-feeds"))
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("custom-feeds")
 
 
 register_connector(KEY, connector)

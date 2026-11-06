@@ -17,6 +17,7 @@ from cyberau_asd_blueprint.source import (
     refresh_index,
     schema_drift,
 )
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.server import build_server
 
@@ -198,7 +199,7 @@ def test_offline_index_is_stale_and_fresh_index_is_a_hit(tmp_path, monkeypatch):
     assert stale["cache"] == "stale"
     assert "On" in _row(stale, "Enable policy")["value"]
 
-    index["retrieved_at"] = source._now()
+    index["retrieved_at"] = runtime.utc_now_iso()
     (tmp_path / "blueprint-index.json").write_text(json.dumps(index), encoding="utf-8")
     monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
     fresh = blueprint_search("enable policy")

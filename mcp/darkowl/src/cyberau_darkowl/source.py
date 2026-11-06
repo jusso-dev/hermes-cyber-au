@@ -19,11 +19,10 @@ from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -63,7 +62,6 @@ _SNAPSHOT_WARNING = (
 _MISSING_KEYS = "not configured: set DARKOWL_PUBLIC_KEY and DARKOWL_PRIVATE_KEY"
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _PACKAGE = Path(__file__).resolve().parents[2]
-_ALLOWLIST = _PACKAGE.parent / "egress-allowlist.yaml"
 # Read only by the offline schema-drift probe. Never served to a tool caller.
 _SCHEMA_FIXTURE = _PACKAGE / "tests" / "fixtures" / "search_synthetic.json"
 _DOMAIN = re.compile(
@@ -289,8 +287,8 @@ def _normalise(
         "term": term,
         "subject_type": _subject_type(term, watchlist),
         "hit_count": hit_count,
-        "first_seen": None if first is None else _iso(first),
-        "last_seen": None if last is None else _iso(last),
+        "first_seen": None if first is None else runtime.iso(first),
+        "last_seen": None if last is None else runtime.iso(last),
         "source_types": _dedupe(types),
         "source_refs": _dedupe(refs),
     }
@@ -349,7 +347,7 @@ def _authorised(
     private = lookup("DARKOWL_PRIVATE_KEY")
     if not public or not private:
         return None, "snapshot", _NOT_CONFIGURED
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         payload, state = _from_session(url, public)
         if payload is None:
@@ -361,13 +359,12 @@ def _authorised(
     when = formatdate(usegmt=True)
     header = sign_request(method, signed_path, when, public, private)
     cache = _session_cache()
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_ALLOWLIST)))
     policy_kwargs = {} if _RESOLVER is None else {"resolver": _RESOLVER}
-    client = HttpClient(
+    client = runtime.http_client(
         "darkowl",
-        policy=EgressPolicy(allowlist, "darkowl", **policy_kwargs),
+        directory=data_dir(),
+        policy=EgressPolicy(runtime.allowlist_path(), "darkowl", **policy_kwargs),
         cache=cache,
-        limiter=RateLimiter(data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=_RATE,
         burst=_BURST,
@@ -605,10 +602,6 @@ def _parse_time(value) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
-
-
-def _iso(moment: datetime) -> str:
-    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _scope(public_key: str) -> str:

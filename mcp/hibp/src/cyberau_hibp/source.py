@@ -8,11 +8,10 @@ import hmac
 import json
 import os
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -371,7 +370,7 @@ def _guard(tool: str, subject: str, token: str | None) -> str:
 def _audit(event: str, tool: str, subject: str) -> None:
     """One line per decision. The subject is a truncated hash, never the address or domain."""
     line = {
-        "ts": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ts": runtime.utc_now_iso(),
         "connector": "hibp",
         "event": event,
         "tool": tool,
@@ -397,7 +396,7 @@ def _fetch_public(
     """Return the wrapped server's structured content, the cache state, and a warning."""
     if os.environ.get("CYBERAU_HIBP_SNAPSHOT") and not force_live:
         return _from_snapshot(tool, arguments)
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cache = _NoCache() if force_live else _PublicCache(_data_dir() / "http_cache.sqlite")
     client = _client(cache, "hibp", rate=1.0, burst=5, offline=offline)
     try:
@@ -426,7 +425,7 @@ def _fetch_gated(tool: str, arguments: dict) -> tuple[dict | None, str, str]:
                 "token with an active subscription. Public tools work without it."
             ),
         )
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         reason = "offline mode is on and account and domain lookups are never cached"
         return None, "snapshot", unavailable("HIBP", reason)
     client = _client(_NoCache(), "hibp-keyed", rate=10 / 60, burst=1, offline=False)
@@ -447,13 +446,11 @@ def _fetch_gated(tool: str, arguments: dict) -> tuple[dict | None, str, str]:
 
 
 def _client(cache: HttpCache, name: str, *, rate: float, burst: int, offline: bool) -> HttpClient:
-    data_dir = _data_dir()
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    return HttpClient(
+    return runtime.http_client(
         name,
-        policy=EgressPolicy(allowlist, "hibp", resolver=_RESOLVER),
+        policy=EgressPolicy(runtime.allowlist_path(), "hibp", resolver=_RESOLVER),
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
+        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=rate,
         burst=burst,
@@ -665,7 +662,7 @@ def _observe(rows: list[dict], cache: str) -> None:
     """Keep public breach metadata for history. Account and domain results never come here."""
     if cache != "miss":
         return
-    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = runtime.utc_now_iso()
     path = _data_dir() / "hibp-observations.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -710,16 +707,12 @@ def _data_as_of(payload: dict | None, cache: str) -> str | None:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-hibp"))
+    return runtime.data_dir("hibp")
 
 
 def _audit_path() -> Path:
     override = os.environ.get("CYBERAU_HIBP_AUDIT_LOG")
     return Path(override) if override else _data_dir() / "hibp-audit.jsonl"
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("hibp", connector)

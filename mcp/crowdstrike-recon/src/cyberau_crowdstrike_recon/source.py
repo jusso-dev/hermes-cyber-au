@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import requests
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -143,7 +143,7 @@ class CrowdStrikeRecon(PremiumConnector):
             return Probe(self.key, True, "not configured")
         if not live:
             return Probe(self.key, True, "offline ok")
-        if _offline():
+        if runtime.offline():
             return Probe(self.key, False, "CYBERAU_OFFLINE is set, live check not run")
         warning = _live_probe()
         if warning:
@@ -325,7 +325,7 @@ def _records(
         return [], [], "snapshot", missing
     item, cached = _recall(kind, since, limit)
     cache = _http_cache()
-    if _offline():
+    if runtime.offline():
         if cached is not None:
             return _present(kind, cached), cached, "stale", ""
         return _from_snapshot(kind, since, limit)
@@ -780,10 +780,6 @@ def _limiter() -> RateLimiter:
 
 def _base_url() -> str:
     return (lookup("FALCON_BASE_URL") or DEFAULT_BASE).rstrip("/")
-
-
-def _offline() -> bool:
-    return os.environ.get("CYBERAU_OFFLINE") == "1"
 
 
 def _missing_licence() -> str:

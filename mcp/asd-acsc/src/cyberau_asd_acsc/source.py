@@ -17,6 +17,7 @@ from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, safe_url, untrusted_text
@@ -96,7 +97,9 @@ def asd_list_items(
         warnings.append("no ASD items matched")
     if rows and os.environ.get(_OVERRIDE):
         warnings.append(_OVERRIDE_NOTE)
-    return _envelope(rows[:limit], _merge_cache(caches), urls, newest or None, tuple(warnings))
+    return _envelope(
+        rows[:limit], runtime.merge_cache_states(caches), urls, newest or None, tuple(warnings)
+    )
 
 
 def asd_get_item(url: _Url) -> dict:
@@ -909,18 +912,6 @@ def _limit(key: str, *, rate: float, burst: int) -> None:
     )
 
 
-def _merge_cache(caches: list[str]) -> str:
-    if not caches:
-        return "snapshot"
-    if "stale" in caches:
-        return "stale"
-    if "miss" in caches:
-        return "miss"
-    if "hit" in caches:
-        return "hit"
-    return "snapshot"
-
-
 def _envelope(
     data,
     cache: str,
@@ -940,9 +931,7 @@ def _envelope(
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-asd"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return runtime.data_dir("asd")
 
 
 @contextmanager
@@ -998,7 +987,7 @@ def _local(tag: str) -> str:
 
 
 def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.allowlist_path()
 
 
 register_connector("asd-acsc", connector)

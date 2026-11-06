@@ -18,11 +18,10 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -207,7 +206,7 @@ class _UpGuardConnector(PremiumConnector):
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
-        if not _offline() and lookup("UPGUARD_API_KEY") is None:
+        if not runtime.offline() and lookup("UPGUARD_API_KEY") is None:
             raise ValueError("UPGUARD_API_KEY is not set")
         findings: list[ExposureFinding] = []
         payload, _cache, warning = _load_breaches(1000)
@@ -361,7 +360,7 @@ def _load_breaches(limit: int) -> tuple[dict | None, str, str]:
         "sort_by": "date_last_breach",
         "sort_desc": "true",
     }
-    if _offline():
+    if runtime.offline():
         return _fetch(BREACHES_URL, params, kind="breaches")
     identities: list[dict] = []
     breaches: list[dict] = []
@@ -395,7 +394,7 @@ def _fetch(
     kind: str,
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
-    offline = _offline() and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         # Offline mode only serves files the operator pointed at. Nothing shipped
         # in the package is served as UpGuard data.
@@ -416,13 +415,12 @@ def _fetch(
     cache = _ttl_cache(directory) if disk else _session_cache(directory)
     scope = _scope()
     cache_key = cache.key("GET", url, params, b"", scope)
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     kwargs = {"resolver": _RESOLVER} if _RESOLVER is not None else {}
-    client = HttpClient(
+    client = runtime.http_client(
         "upguard",
-        policy=EgressPolicy(allowlist, "upguard", **kwargs),
+        directory=directory,
+        policy=EgressPolicy(runtime.allowlist_path(), "upguard", **kwargs),
         cache=cache,
-        limiter=RateLimiter(directory / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -775,12 +773,8 @@ def _parse_time(value: str | None) -> datetime | None:
     return parsed
 
 
-def _offline() -> bool:
-    return os.environ.get("CYBERAU_OFFLINE") == "1"
-
-
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-upguard"))
+    return runtime.data_dir("upguard")
 
 
 def _scope() -> str:
@@ -836,10 +830,6 @@ def _load_body(body: bytes) -> dict | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
-
-
-def _allowlist() -> Path:
-    return _PACKAGE.parent / "egress-allowlist.yaml"
 
 
 register_connector("upguard", connector)

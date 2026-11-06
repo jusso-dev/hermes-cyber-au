@@ -2,7 +2,6 @@
 
 import hashlib
 import io
-import json
 import os
 import re
 import time
@@ -12,12 +11,8 @@ from typing import Annotated, Literal, NamedTuple
 
 import httpx
 import yaml
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressPolicy
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -201,7 +196,7 @@ class _SigmaConnector(Connector):
             root = _root()
             if root is None:
                 return Probe(self.key, True, "no local copy to check")
-            payload = _loads(_release_text(root))
+            payload = runtime.load_json(_release_text(root))
             problem = schema_drift(payload)
             if problem:
                 return Probe(self.key, False, problem)
@@ -315,7 +310,7 @@ def _technique_hit(techniques: list[str], wanted: str) -> bool:
 
 
 def _corpus(*, force_live: bool = False) -> _Loaded:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get("CYBERAU_SIGMA_SNAPSHOT")) and not force_live
     if pinned:
         return _snapshot_corpus()
@@ -383,7 +378,7 @@ def _snapshot_corpus() -> _Loaded:
     if root is None:
         return _stored_corpus(())
     text = _release_text(root)
-    payload = _loads(text)
+    payload = runtime.load_json(text)
     problem = schema_drift(payload) if text is not None else "Sigma release snapshot is missing"
     if text is not None and payload is None:
         problem = "Sigma release payload was not usable"
@@ -420,13 +415,13 @@ def _snapshot_corpus() -> _Loaded:
 
 
 def _release(*, force_live: bool) -> tuple[object, str, tuple[str, ...]]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get("CYBERAU_SIGMA_SNAPSHOT")) and not force_live
     if pinned:
         text = _release_text(_root())
         if text is None:
             return None, "snapshot", ("Sigma release snapshot is missing",)
-        payload = _loads(text)
+        payload = runtime.load_json(text)
         if payload is None:
             return None, "snapshot", ("Sigma release payload was not usable",)
         return payload, "snapshot", ()
@@ -440,7 +435,7 @@ def _release(*, force_live: bool) -> tuple[object, str, tuple[str, ...]]:
         text = body.decode("utf-8")
     except UnicodeDecodeError:
         return None, cache, ("Sigma release payload was not UTF-8",)
-    payload = _loads(text)
+    payload = runtime.load_json(text)
     if payload is None:
         return None, cache, ("Sigma release payload was not usable",)
     return payload, cache, (warning,) if warning else ()
@@ -500,11 +495,10 @@ def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[bytes | None, str, s
     if secret:
         headers["authorization"] = f"Bearer {secret}"
     data_dir = _data_dir()
-    client = HttpClient(
+    client = runtime.http_client(
         "sigma",
-        policy=EgressPolicy(_allowlist(), "sigma"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=10 / 3600,
         burst=10,
@@ -804,15 +798,6 @@ def _release_text(root: Path) -> str | None:
     return None
 
 
-def _loads(text: str | None):
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
 def _root() -> Path | None:
     """The operator-supplied snapshot directory. Nothing is shipped in the package."""
     override = os.environ.get("CYBERAU_SIGMA_SNAPSHOT")
@@ -854,13 +839,7 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
 
 
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-sigma"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("sigma")
 
 
 register_connector("sigma", connector)

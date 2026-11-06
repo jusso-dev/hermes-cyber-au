@@ -6,19 +6,17 @@ text such as outage descriptions and organisation names is wrapped as untrusted.
 """
 
 import json
-import os
 import re
 import time
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, safe_url, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -367,7 +365,7 @@ def _fetch(path: str, params: dict, *, force_live: bool) -> tuple[dict | None, s
     data_dir = _data_dir()
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, None, b"", "keyed")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cached = cache.get(cache_key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "hit" if cache.fresh(cached) else "stale"
@@ -377,12 +375,12 @@ def _fetch(path: str, params: dict, *, force_live: bool) -> tuple[dict | None, s
     secret = lookup(TOKEN_ENV)
     if secret is None:
         return None, "snapshot", unavailable(LABEL, f"{TOKEN_ENV} is not set")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         KEY,
-        policy=EgressPolicy(allowlist, KEY),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", clock=_CLOCK, sleeper=_LIMIT_SLEEP),
+        limiter_clock=_CLOCK,
+        limiter_sleeper=_LIMIT_SLEEP,
         user_agent=USER_AGENT,
         rate=2,
         burst=4,
@@ -544,11 +542,7 @@ def _redact(exc: BaseException, secret: str | None) -> str:
 
 
 def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-cloudflare-radar"))
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.data_dir("cloudflare-radar")
 
 
 register_connector(KEY, connector)

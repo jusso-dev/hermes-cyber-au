@@ -19,12 +19,12 @@ from zoneinfo import ZoneInfo
 import httpx
 import jsonschema
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimited, RateLimiter
+from cyberau_common.http import HttpError
+from cyberau_common.ratelimit import RateLimited
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -254,7 +254,7 @@ class _HudsonRock(PremiumConnector):
             return Probe(self.key, configured.ok, configured.detail)
         if not live:
             return Probe(self.key, True, "offline ok")
-        if os.environ.get("CYBERAU_OFFLINE") == "1":
+        if runtime.offline():
             return Probe(self.key, False, "offline: the live probe was not run")
         domain = _probe_domain()
         if domain is None:
@@ -483,7 +483,7 @@ def _load_page(url: str, body: dict, *, force_live: bool) -> tuple[dict | None, 
         return None, "snapshot", f"{KEY_ENV} is not set."
     session = _session_cache()
     cache_key = session.key("POST", url, None, _body_bytes(body), _scope(secret))
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     cached = session.get(cache_key)
     if cached and not force_live and (offline or session.fresh(cached)):
         payload = _load_cached(cached.body)
@@ -567,14 +567,14 @@ def _transport_json(url: str, body: dict) -> tuple[dict | None, str, str]:
 def _http(url: str, body: dict) -> tuple[int, dict[str, str], dict | None]:
     secret = lookup(KEY_ENV) or ""
     if _RESOLVER is None:
-        policy = EgressPolicy(_allowlist_path(), "hudson-rock")
+        policy = EgressPolicy(runtime.allowlist_path(), "hudson-rock")
     else:
-        policy = EgressPolicy(_allowlist_path(), "hudson-rock", resolver=_RESOLVER)
-    client = HttpClient(
+        policy = EgressPolicy(runtime.allowlist_path(), "hudson-rock", resolver=_RESOLVER)
+    client = runtime.http_client(
         "hudson-rock",
+        directory=data_dir(),
         policy=policy,
         cache=HttpCache(data_dir() / "hudsonrock-raw.sqlite", persistence="none"),
-        limiter=RateLimiter(data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE_PER_SECOND,
         burst=BURST,
@@ -895,13 +895,6 @@ def _session_cache() -> HttpCache:
             get_vendor(VENDOR).terms,
         )
     return _SESSION_CACHE
-
-
-def _allowlist_path() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return _PACKAGE.parent / "egress-allowlist.yaml"
 
 
 def _body_bytes(body: dict) -> bytes:
