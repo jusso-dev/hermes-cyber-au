@@ -60,10 +60,6 @@ def main(argv: list[str] | None = None) -> int:
     regen.add_argument("--force", action="store_true")
     regen.add_argument("--fetch", action="store_true", help="Download upstream data first")
 
-    parser_check = sub.add_parser("parser-check", help="Re-check advisory parsers")
-    parser_check.add_argument("--sources", default="")
-    parser_check.add_argument("--json", dest="json_path", default="")
-
     sub.add_parser("store", help="Query and update the local intel store")
     sub.add_parser("assets", help="Import, list and match the local asset inventory")
     sub.add_parser("provenance", help="Print the provenance footer for connector results")
@@ -112,18 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.fetch:
             forwarded.append("--fetch")
         return regen_main(forwarded)
-    if args.command == "parser-check":
-        from cyberau_common.regen import parser_check_main
-
-        forwarded = ["--sources", args.sources]
-        if args.json_path:
-            forwarded.extend(["--json", args.json_path])
-        return parser_check_main(forwarded)
-    print(
-        f"{args.command} is not part of the shared library yet",
-        file=sys.stderr,
-    )
-    return 2
+    raise AssertionError(f"unhandled command {args.command}")
 
 
 def _health_all(args) -> int:

@@ -28,8 +28,6 @@ from pathlib import Path
 
 from cyberau_common.snapshot import parse_day
 
-PARSER_CHECK_ABSENT = "parser-check is absent: not part of the shared library yet"
-
 # Refresh the retrieval date of unchanged data once it is this old. Connectors
 # refuse shipped reference data after 180 days, so this leaves plenty of margin.
 RESTAMP_DAYS = 30
@@ -87,24 +85,6 @@ def regen_main(argv: list[str], root: Path | None = None) -> int:
     except (ValueError, RuntimeError, OSError) as exc:
         print(f"regen {args.source} failed: {exc}", file=sys.stderr)
         return 1
-
-
-def parser_check_main(argv: list[str]) -> int:
-    """The advisory parsers are not in this checkout. Say so and do not fetch pages."""
-    parser = argparse.ArgumentParser(prog="cyberau-mcp parser-check")
-    parser.add_argument("--sources", default="")
-    parser.add_argument("--json", dest="json_path", default="")
-    args = parser.parse_args(argv)
-    print(PARSER_CHECK_ABSENT, file=sys.stderr)
-    if args.json_path:
-        payload = {
-            "absent": True,
-            "detail": PARSER_CHECK_ABSENT,
-            "results": [],
-            "sources": [part for part in args.sources.split(",") if part],
-        }
-        Path(args.json_path).write_text(_dumps(payload), encoding="utf-8")
-    return 2
 
 
 def regenerate(
@@ -276,7 +256,7 @@ def render_report(root: Path) -> str:
             continue
         reference = _write_reference(source, directory, skill_dir)
         lines.append(f"- Skill references: wrote {_relative(root, reference)}")
-    lines.extend(["", PARSER_CHECK_ABSENT, ""])
+    lines.append("")
     return "\n".join(lines)
 
 

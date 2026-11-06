@@ -9,6 +9,7 @@ removed) and wraps exception text, which can carry an upstream response.
 from __future__ import annotations
 
 import re
+import runpy
 from pathlib import Path
 
 import pytest
@@ -101,6 +102,7 @@ def test_connector_tools_harden_feed_text(key):
 
 
 def test_the_tool_wrapper_calls_invoke_tool(monkeypatch):
+    runpy.run_path(str(ROOT / "mcp" / "common" / "tests" / "stub_connector.py"))
     connector = get_connector("stub")
     seen = []
 

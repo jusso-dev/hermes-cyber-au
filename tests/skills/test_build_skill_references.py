@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from cyberau_common.regen import PARSER_CHECK_ABSENT, missing_message, render_report
+from cyberau_common.regen import missing_message, render_report
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "build_skill_references.py"
@@ -27,7 +27,6 @@ def test_report_names_absent_sources_and_does_not_invent_skills(tmp_path):
     assert "skills/ism-control-lookup is absent. Not writing references." in text
     for source in ("e8", "aureg"):
         assert missing_message(source) in text
-    assert PARSER_CHECK_ABSENT in text
     assert "\u2014" not in text
     assert "egress policy" in text
     assert not (tmp_path / "skills").exists()
@@ -66,7 +65,6 @@ def test_checkout_report_does_not_create_skill_directories(tmp_path):
     assert completed.returncode == 0, completed.stderr
     text = destination.read_text(encoding="utf-8")
     assert "using mcp/asd-ism/data" in text
-    assert PARSER_CHECK_ABSENT in text
     for source in ("ism", "e8", "aureg"):
         assert missing_message(source) not in text
     assert "Essential Eight: using mcp/asd-essentials/data" in text
@@ -87,6 +85,5 @@ def test_script_on_an_empty_root(tmp_path):
     )
     assert completed.returncode == 0, completed.stderr
     text = destination.read_text(encoding="utf-8")
-    assert PARSER_CHECK_ABSENT in text
     assert missing_message("ism") in text
     assert "\u2014" not in text

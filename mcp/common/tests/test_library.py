@@ -20,7 +20,7 @@ from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError, _EgressBackend, egress_transport
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import RedactFilter, redact
-from cyberau_common.server import Connector, ToolSpec, build_server
+from cyberau_common.server import Connector, ToolSpec, build_server, get_connector
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -875,8 +875,10 @@ class TestServer:
         # cyclonedx), and jsonschema builds its Lark grammar on import, which costs
         # about half a second. The shipped runtime set (tools/release/sbom.py) does
         # not include it, so hide it to time what users actually start.
+        stub = Path(__file__).with_name("stub_connector.py")
         launch = (
-            "import sys; sys.modules['rfc3987_syntax'] = None; "
+            "import runpy, sys; sys.modules['rfc3987_syntax'] = None; "
+            f"runpy.run_path({str(stub)!r}); "
             "from cyberau_common.cli import main; "
             "raise SystemExit(main(['serve', 'stub']))"
         )
@@ -919,9 +921,7 @@ class TestServer:
         async def run():
             failed = await server.call_tool("demo_boom", {})
             passed = await server.call_tool("demo_pass", {})
-            ping = await build_server(
-                __import__("cyberau_common.stub", fromlist=["connector"]).connector()
-            ).call_tool("stub_ping", {"echo": "hi"})
+            ping = await build_server(get_connector("stub")).call_tool("stub_ping", {"echo": "hi"})
             return failed, passed, ping
 
         failed, passed, ping = asyncio.run(run())

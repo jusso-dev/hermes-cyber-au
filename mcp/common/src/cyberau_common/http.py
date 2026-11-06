@@ -6,6 +6,7 @@ import datetime
 import email.utils
 import math
 import random
+import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
@@ -75,7 +76,7 @@ class HttpClient:
         self.window = window
         self.auth_scope = auth_scope
         self.offline = offline
-        self._sleep = sleeper or __import__("time").sleep
+        self._sleep = sleeper or time.sleep
         self._rng = rng or random.random
         self.max_bytes = max_bytes
         self.max_retry_wait = max_retry_wait
