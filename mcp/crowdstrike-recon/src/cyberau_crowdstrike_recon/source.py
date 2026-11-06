@@ -764,8 +764,7 @@ def _load_json(path: Path) -> dict | None:
 
 
 def _policy() -> EgressPolicy:
-    raw = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    path = Path(raw) if raw else Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    path = runtime.allowlist_path()
     if _RESOLVER is None:
         return EgressPolicy(path, "crowdstrike-recon")
     return EgressPolicy(path, "crowdstrike-recon", resolver=_RESOLVER)

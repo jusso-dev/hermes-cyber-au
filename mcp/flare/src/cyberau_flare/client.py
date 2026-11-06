@@ -78,13 +78,6 @@ def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def allowlist_path() -> Path:
-    override = lookup("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return package_root().parent / "egress-allowlist.yaml"
-
-
 def fixture_dir() -> Path | None:
     if lookup("CYBERAU_FLARE_HTTP") == "1":
         return None
@@ -163,8 +156,8 @@ def _limiter() -> RateLimiter:
 
 def _policy() -> EgressPolicy:
     if RESOLVER is not None:
-        return EgressPolicy(allowlist_path(), "flare", resolver=RESOLVER)
-    return EgressPolicy(allowlist_path(), "flare")
+        return EgressPolicy(runtime.allowlist_path(), "flare", resolver=RESOLVER)
+    return EgressPolicy(runtime.allowlist_path(), "flare")
 
 
 def _max_pages() -> int:
