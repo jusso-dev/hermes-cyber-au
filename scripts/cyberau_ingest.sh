@@ -10,32 +10,18 @@
 # (asd, kev, epss, auscert, the public Feodo list, and the public custom feeds
 # turned on in watchlists.yaml).
 set -euo pipefail
-unset CDPATH
-
-script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
-if [[ -n ${HERMES_HOME:-} ]]; then
-  profile=$HERMES_HOME
-else
-  profile=$(cd -- "$script_dir/.." && pwd)
-fi
-
-bin="${profile}/mcp/.venv/bin/cyberau-mcp"
-if [[ ! -x "$bin" ]]; then
-  printf 'ingest failed: cyberau-mcp is not installed under mcp/.venv\n'
-  exit 1
-fi
+# shellcheck source-path=SCRIPTDIR source=_cyberau_lib.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/_cyberau_lib.sh"
+require_cli 'ingest'
 
 # One argument picks the sources (comma separated). The per-feed jobs pass
 # one source each so every feed runs on its own cadence.
 sources=${1:-asd,kev,epss,auscert,feodo}
 refresh_args=(refresh --sources "$sources" --store)
 if [[ ",${sources//[[:space:]]/}," == *",kev,"* ]]; then
-  refresh_args+=(--kev-snapshot "${profile}/plugin-data/cyber-au/snapshots/kev.json")
+  refresh_args+=(--kev-snapshot "${data_dir}/snapshots/kev.json")
 fi
 if ! output=$("$bin" "${refresh_args[@]}" 2>&1); then
-  line=${output%%$'\n'*}
-  line=${line:0:200}
-  printf 'ingest failed: %s\n' "${line:-refresh failed}"
-  exit 1
+  die_first_line 'ingest failed' "$output" 'refresh failed'
 fi
 printf 'ingest ok: %s\n' "$sources"

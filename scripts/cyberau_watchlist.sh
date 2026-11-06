@@ -6,25 +6,8 @@
 # Hermes runs this file from $HERMES_HOME/scripts with a sanitised environment.
 # Do not read the profile .env. stdout is delivered verbatim.
 set -euo pipefail
-unset CDPATH
-
-script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
-if [[ -n ${HERMES_HOME:-} ]]; then
-  profile=$HERMES_HOME
-else
-  profile=$(cd -- "$script_dir/.." && pwd)
-fi
-
-bin="${profile}/mcp/.venv/bin/cyberau-mcp"
-if [[ ! -x "$bin" ]]; then
-  printf 'watchlist failed: cyberau-mcp is not installed under mcp/.venv\n'
-  exit 1
-fi
-
-if ! output=$("$bin" store watchlist run --crtsh 2>&1); then
-  line=${output%%$'\n'*}
-  line=${line:0:200}
-  printf 'watchlist failed: %s\n' "${line:-command failed}"
-  exit 1
-fi
+# shellcheck source-path=SCRIPTDIR source=_cyberau_lib.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/_cyberau_lib.sh"
+require_cli 'watchlist'
+run_cli 'watchlist failed' store watchlist run --crtsh
 printf 'watchlist ok\n'

@@ -8,35 +8,11 @@
 # compaction), then `store vacuum`. Backup runs first so a failed compaction
 # still leaves a copy.
 set -euo pipefail
-unset CDPATH
-
-script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
-if [[ -n ${HERMES_HOME:-} ]]; then
-  profile=$HERMES_HOME
-else
-  profile=$(cd -- "$script_dir/.." && pwd)
-fi
-
-bin="${profile}/mcp/.venv/bin/cyberau-mcp"
-if [[ ! -x "$bin" ]]; then
-  printf 'store maintenance failed: cyberau-mcp is not installed under mcp/.venv\n'
-  exit 1
-fi
-
-run_step() {
-  local step=$1
-  shift
-  local output
-  if ! output=$("$bin" "$@" 2>&1); then
-    local line=${output%%$'\n'*}
-    line=${line:0:200}
-    printf 'store maintenance failed at %s: %s\n' "$step" "${line:-command failed}"
-    exit 1
-  fi
-}
-
-run_step backup store backup
-run_step retention store compact
-run_step vacuum store vacuum
+# shellcheck source-path=SCRIPTDIR source=_cyberau_lib.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/_cyberau_lib.sh"
+require_cli 'store maintenance'
+run_cli 'store maintenance failed at backup' store backup
+run_cli 'store maintenance failed at retention' store compact
+run_cli 'store maintenance failed at vacuum' store vacuum
 python3 "$script_dir/cyberau_cleanup.py" --profile-home "$profile" --apply
 printf 'store maintenance ok: backup, retention, vacuum\n'

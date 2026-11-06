@@ -4,7 +4,7 @@
 # indicator counters and reclaims free pages. Advisories are kept.
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 
 if [ -x "$root/mcp/.venv/bin/cyberau-mcp" ]; then
   bin="$root/mcp/.venv/bin/cyberau-mcp"
