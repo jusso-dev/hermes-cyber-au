@@ -118,6 +118,29 @@ class HttpClient:
             skip_cache=skip_cache,
         )
 
+    def head(
+        self,
+        url: str,
+        *,
+        params=None,
+        headers=None,
+        ttl: int,
+        stale_if_error: int = 86400,
+        skip_cache: bool = False,
+    ) -> Response:
+        """A HEAD request, cached and held to the allowlist like ``get``. Its cache key is
+        separate from the GET for the same URL."""
+        return self._fetch(
+            "HEAD",
+            url,
+            params=params,
+            headers=headers,
+            content=None,
+            ttl=ttl,
+            stale_if_error=stale_if_error,
+            skip_cache=skip_cache,
+        )
+
     def post_json(
         self,
         url: str,

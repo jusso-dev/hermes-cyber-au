@@ -21,6 +21,7 @@ from pathlib import Path
 
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
+from cyberau_common.envelope import TIMESTAMP_FORMAT
 from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.snapshot import parse_day
@@ -28,17 +29,22 @@ from cyberau_common.snapshot import parse_day
 # mcp/common/src/cyberau_common/runtime.py -> mcp/. Bootstrap installs the workspace
 # editable, so this is the profile's mcp/ copy as well as the checkout's.
 MCP_DIR = Path(__file__).resolve().parents[3]
-TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def _env(name: str) -> str:
     return os.environ.get(name, "").strip()
 
 
+def configured_data_dir() -> Path | None:
+    """CYBERAU_DATA_DIR as the profile set it, or None. Not created. For state that belongs
+    in the profile or nowhere: restricted records, the watchlist, the profile config."""
+    raw = _env("CYBERAU_DATA_DIR")
+    return Path(raw) if raw else None
+
+
 def data_dir(default_name: str, *, mode: int = 0o777) -> Path:
     """The connector's state directory, created if missing."""
-    raw = _env("CYBERAU_DATA_DIR")
-    path = Path(raw) if raw else Path("/tmp") / f"cyberau-{default_name}"
+    path = configured_data_dir() or Path("/tmp") / f"cyberau-{default_name}"
     path.mkdir(mode=mode, parents=True, exist_ok=True)
     return path
 

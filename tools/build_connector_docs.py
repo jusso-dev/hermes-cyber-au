@@ -292,6 +292,7 @@ class _Extractor(ast.NodeVisitor):
 # cyberau_common.runtime helpers and the variable each one reads.
 RUNTIME_ENV_READS = {
     "data_dir": "CYBERAU_DATA_DIR",
+    "configured_data_dir": "CYBERAU_DATA_DIR",
     "allowlist_path": "CYBERAU_EGRESS_ALLOWLIST",
     "http_client": "CYBERAU_EGRESS_ALLOWLIST",
     "offline": "CYBERAU_OFFLINE",
