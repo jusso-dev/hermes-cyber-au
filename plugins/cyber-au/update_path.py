@@ -23,14 +23,14 @@ from pathlib import Path
 
 if __package__:
     from .store.db import MIGRATIONS as STORE_MIGRATIONS
-    from .store.paths import profile_data_dir
+    from .store.paths import foreign_data_dir, profile_data_dir
 else:
     # install/bootstrap.sh runs cli.py directly, outside the plugin package.
     _PLUGIN_DIR = str(Path(__file__).resolve().parent)
     if _PLUGIN_DIR not in sys.path:
         sys.path.append(_PLUGIN_DIR)
     from store.db import MIGRATIONS as STORE_MIGRATIONS
-    from store.paths import profile_data_dir
+    from store.paths import foreign_data_dir, profile_data_dir
 
 USER_OWNED_ROOTS = frozenset(
     {
@@ -123,14 +123,37 @@ def read_manifest(path: Path) -> Manifest:
     )
 
 
+_WARNED_FOREIGN: set[tuple[str, str]] = set()
+
+
+def _data_dir(profile: Path) -> Path:
+    """The profile's data directory. ``CYBERAU_DATA_DIR`` counts only inside the profile.
+
+    A value that points elsewhere, for example a shell still set up for another profile,
+    is ignored with a warning, so ``update --profile-home A`` never migrates B's store.
+    """
+    foreign = foreign_data_dir(profile)
+    if foreign is not None:
+        key = (str(profile), str(foreign))
+        if key not in _WARNED_FOREIGN:
+            _WARNED_FOREIGN.add(key)
+            print(
+                f"Warning: CYBERAU_DATA_DIR ({foreign}) is outside the profile {profile}. "
+                f"Ignoring it and using {Path(profile) / 'plugin-data' / 'cyber-au'}.",
+                file=sys.stderr,
+            )
+    return profile_data_dir(profile)
+
+
 def intel_store_path(profile: Path) -> Path:
-    """The store the plugin uses for this profile. ``CYBERAU_DATA_DIR`` wins."""
-    return profile_data_dir(profile) / "intel.sqlite"
+    """The store the plugin uses for this profile. ``CYBERAU_DATA_DIR`` wins when it is
+    inside the profile."""
+    return _data_dir(profile) / "intel.sqlite"
 
 
 def backup_dir(profile: Path) -> Path:
     """Pre-migration snapshots, beside the store, where cyberau_cleanup prunes them."""
-    return profile_data_dir(profile) / "backups"
+    return _data_dir(profile) / "backups"
 
 
 def repo_migrations() -> Path:
@@ -249,9 +272,8 @@ def migrate(profile: Path, migrations: Path | None = None) -> None:
     store = intel_store_path(profile)
     if store.is_symlink():
         raise UpdateError(f"Refusing to migrate through a symlinked intel store: {store}")
-    # The default store must not escape the profile through a symlink. A
-    # CYBERAU_DATA_DIR outside the profile is the operator's explicit choice.
-    _assert_inside(profile if store.is_relative_to(profile) else store.parent, store)
+    # The store must not escape the profile, through a symlink or otherwise.
+    _assert_inside(profile, store)
     existed = store.is_file()
     store.parent.mkdir(parents=True, exist_ok=True)
     if not existed:

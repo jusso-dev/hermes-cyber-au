@@ -36,11 +36,11 @@ The command reinstalls the distribution files from that tag in the git checkout 
 
 If the tag's store migrations are older than the migrations already applied to the intel store, the command stops before it changes the profile and prints a refusal. Store downgrades are not supported. `--source` runs the same check against the checkout it applies.
 
-The directory `backups/` at the profile root is yours. An update never overwrites it. Migration snapshots are written to `plugin-data/cyber-au/backups/` instead (or `$CYBERAU_DATA_DIR/backups/` when that variable is set), which the file replace also leaves alone.
+The directory `backups/` at the profile root is yours. An update never overwrites it. Migration snapshots are written to `plugin-data/cyber-au/backups/` instead (or `$CYBERAU_DATA_DIR/backups/` when that variable is set to a directory inside the profile), which the file replace also leaves alone.
 
 ## Store migrations
 
-Migrations are numbered SQL files, `plugins/cyber-au/store/migrations/NNNN_*.sql`. They run in filename order. Each file runs inside a transaction. Statements are split by SQLite, so triggers and comments containing semicolons are safe. Migration files must not issue `BEGIN`, `COMMIT`, `ROLLBACK` or `END` of their own. Before the first file runs, a copy of `plugin-data/cyber-au/intel.sqlite` is written under `plugin-data/cyber-au/backups/`. When `CYBERAU_DATA_DIR` is set, both the store and the backups live there instead.
+Migrations are numbered SQL files, `plugins/cyber-au/store/migrations/NNNN_*.sql`. They run in filename order. Each file runs inside a transaction. Statements are split by SQLite, so triggers and comments containing semicolons are safe. Migration files must not issue `BEGIN`, `COMMIT`, `ROLLBACK` or `END` of their own. Before the first file runs, a copy of `plugin-data/cyber-au/intel.sqlite` is written under `plugin-data/cyber-au/backups/`. When `CYBERAU_DATA_DIR` names a directory inside the profile, both the store and the backups live there instead. A `CYBERAU_DATA_DIR` outside the profile you named (for example a shell still set up for another profile) is ignored with a warning, so an update never migrates another profile's store.
 
 If a migration fails for any reason, including an unreadable file, the store is restored from that copy and the command prints the backup path. Rows that were already in the store stay as they were.
 

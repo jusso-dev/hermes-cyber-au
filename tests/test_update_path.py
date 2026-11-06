@@ -659,19 +659,23 @@ def test_store_and_backups_follow_the_named_profile_not_hermes_home(tmp_path, mo
     assert mod.backup_dir(profile) == data / "backups"
 
 
-def test_migration_uses_cyberau_data_dir(tmp_path, monkeypatch):
-    mod = _load()
-    profile = tmp_path / "profile"
-    _prepare_profile(profile)
-    data = tmp_path / "data"
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
-    assert mod.intel_store_path(profile) == data / "intel.sqlite"
-    assert mod.backup_dir(profile) == data / "backups"
+def _schema_only_migrations(tmp_path: Path) -> Path:
     migrations = tmp_path / "migrations"
     migrations.mkdir()
     origin = ROOT / "plugins" / "cyber-au" / "store" / "migrations" / "0001_schema.sql"
     shutil.copy(origin, migrations)
-    mod.migrate(profile, migrations)
+    return migrations
+
+
+def test_migration_uses_cyberau_data_dir_inside_the_profile(tmp_path, monkeypatch, capsys):
+    mod = _load()
+    profile = tmp_path / "profile"
+    _prepare_profile(profile)
+    data = profile / "state"
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    assert mod.intel_store_path(profile) == data / "intel.sqlite"
+    assert mod.backup_dir(profile) == data / "backups"
+    mod.migrate(profile, _schema_only_migrations(tmp_path))
     assert (data / "intel.sqlite").is_file()
     assert [path.name for path in (data / "backups").iterdir()][0].endswith(
         "-pre-migrate-intel.sqlite"
@@ -679,3 +683,68 @@ def test_migration_uses_cyberau_data_dir(tmp_path, monkeypatch):
     assert _stats(profile) == (1000, 499500), "the profile default store is left alone"
     assert not (profile / "plugin-data" / "cyber-au" / "backups").exists()
     assert mod.applied_schema_ids(profile) == {"0001"}
+    assert "Warning" not in capsys.readouterr().err
+
+
+def test_cyberau_data_dir_for_another_profile_is_ignored_with_a_warning(
+    tmp_path, monkeypatch, capsys
+):
+    mod = _load()
+    profile = tmp_path / "profile-a"
+    _prepare_profile(profile)
+    other = tmp_path / "profile-b" / "plugin-data" / "cyber-au"
+    other.mkdir(parents=True)
+    other_store = other / "intel.sqlite"
+    sqlite3.connect(other_store).close()
+    before = other_store.read_bytes()
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(other))
+    own = profile / "plugin-data" / "cyber-au"
+    assert mod.intel_store_path(profile) == own / "intel.sqlite"
+    assert mod.backup_dir(profile) == own / "backups"
+    err = capsys.readouterr().err
+    assert err.count("Warning: CYBERAU_DATA_DIR") == 1, "warned once, not per call"
+    assert str(other) in err and str(profile) in err
+    mod.migrate(profile, _schema_only_migrations(tmp_path))
+    assert mod.applied_schema_ids(profile) == {"0001"}
+    assert other_store.read_bytes() == before, "profile B's store is untouched"
+    assert not (other / "backups").exists()
+    assert any((own / "backups").iterdir())
+
+
+def test_cyberau_data_dir_escaping_the_profile_through_a_symlink_is_ignored(tmp_path, monkeypatch):
+    mod = _load()
+    profile = tmp_path / "profile"
+    _prepare_profile(profile)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (profile / "linked").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(profile / "linked"))
+    assert mod.intel_store_path(profile) == profile / "plugin-data" / "cyber-au" / "intel.sqlite"
+    mod.migrate(profile, _schema_only_migrations(tmp_path))
+    assert not (outside / "intel.sqlite").exists()
+
+
+def test_bootstrap_migrates_the_named_profile_not_the_shell_data_dir(tmp_path: Path) -> None:
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    other = tmp_path / "other" / "plugin-data" / "cyber-au"
+    env = {**os.environ, "CYBERAU_DATA_DIR": str(other)}
+    env.pop("HERMES_HOME", None)
+    result = subprocess.run(
+        [
+            "sh",
+            str(ROOT / "install" / "bootstrap.sh"),
+            "--profile",
+            "cyber-au",
+            "--profile-home",
+            str(profile),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert _versions(profile) == ["0001_schema.sql"]
+    assert not other.exists()
+    assert "Warning: CYBERAU_DATA_DIR" not in result.stderr
