@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 
 import yaml
@@ -29,25 +30,10 @@ SECRET_HEADER_NAMES = frozenset(
     }
 )
 
-# pytest-recording matches header names as written, so keep the common casings.
-FILTER_HEADERS = (
-    "authorization",
-    "Authorization",
-    "auth-key",
-    "Auth-Key",
-    "x-otx-api-key",
-    "X-OTX-API-KEY",
-    "x-api-key",
-    "X-Api-Key",
-    "x-apikey",
-    "api-key",
-    "apiKey",
-    "apikey",
-    "api_key",
-    "key",
-    "Key",
-    "x-rftoken",
-    "X-RFToken",
+# vcrpy matches filter_headers against a case-insensitive header map.
+FILTER_HEADERS = tuple(sorted(SECRET_HEADER_NAMES))
+_HEADER_NAMES = "|".join(
+    re.escape(name) for name in sorted(SECRET_HEADER_NAMES, key=len, reverse=True)
 )
 
 _PLACEHOLDER = re.compile(r"^\$\{(?:env:)?[A-Za-z_][A-Za-z0-9_]*\}$")
@@ -55,34 +41,26 @@ _QUERY_RE = re.compile(r"(?i)([?&](?:api[_-]?key|token|auth|key|access_token)=)(
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+\S+")
 _HEADER_RE = re.compile(
     r"(?i)(?<![?&])(?P<head>[\"']?\b"
-    r"(?P<name>authorization|auth-key|x-otx-api-key|x-api-key|x-apikey|x-rftoken|api[_-]?key|key)"
+    rf"(?P<name>{_HEADER_NAMES})"
     r"\b[\"']?\s*[:=]\s*[\"']?)"
     r"(?P<value>(?:(?:bearer|basic|token|digest)\s+)?[^\"'\s,}&]+)"
 )
-_SECRET_ASSIGN = re.compile(
-    r"(?i)\b("
-    r"[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)"
-    r"|authorization|auth-key|x-otx-api-key|x-api-key|x-apikey|x-rftoken|api[_-]?key"
-    r")\b\s*[:=]\s*[\"']?(?:(?:bearer|basic|token)\s+)?([^\"'\s#]+)"
-)
-_TOKEN_RE = re.compile(
-    r"AKIA[0-9A-Z]{16}"
-    r"|ghp_[A-Za-z0-9]{20,}"
-    r"|github_pat_[A-Za-z0-9_]{20,}"
-    r"|xox[baprs]-[A-Za-z0-9-]{10,}"
-    r"|sk-(?:live|test|proj)-[A-Za-z0-9]{10,}"
-    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
+# An environment variable whose last name segment is one of these holds a
+# credential, whether or not distribution.yaml declares it: ``NVD_API_KEY``,
+# ``GITHUB_TOKEN``, ``TAXII_PASSWORD``, or a bare ``TOKEN``. A word in the middle
+# does not count, so ``UV_KEYRING_PROVIDER`` and ``CA_KEY_FILE`` stay readable.
+# ``*_CREDENTIALS`` (plural) is left out on purpose: by convention it names a
+# credentials file, as ``GOOGLE_APPLICATION_CREDENTIALS`` does, not the secret.
+_SECRET_ENV = re.compile(
+    r"(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)$|APIKEY$", re.IGNORECASE
 )
 _NAME_CACHE: tuple[str, float, tuple[str, ...]] | None = None
+_VALUE_CACHE: tuple[tuple, tuple[str, ...]] | None = None
 # Values shorter than this collide with ordinary words, so they are not
 # substituted globally. Header patterns still cover them.
 _MIN_SECRET_LEN = 8
 _PLAIN_TYPES = (datetime.date, datetime.time, decimal.Decimal, uuid.UUID)
 _PLACEHOLDER_VALUES = {"", "[REDACTED]", "XXXX"}
-
-
-class LiteralSecretError(ValueError):
-    """A config value looks like a literal credential."""
 
 
 def lookup(name: str) -> str | None:
@@ -105,18 +83,34 @@ def is_plain_config_name(name: str) -> bool:
     return name.upper().endswith(_PLAIN_CONFIG_SUFFIXES)
 
 
+def is_secret_env_name(name: str, declared: tuple[str, ...] | None = None) -> bool:
+    """True when an environment variable holds a credential.
+
+    That is a credential-shaped name, or a name declared in distribution.yaml
+    that is not plain configuration such as a URL. ``declared`` defaults to
+    :func:`distribution_env_names`.
+    """
+    if _SECRET_ENV.search(name) is not None:
+        return True
+    names = distribution_env_names() if declared is None else declared
+    return name in names and not is_plain_config_name(name)
+
+
 def distribution_env_names(path: Path | None = None) -> tuple[str, ...]:
     """Names declared in distribution.yaml. Values are not read."""
     global _NAME_CACHE
     found = path or _distribution_path()
-    if found is None or not found.is_file():
+    if found is None:
         return ()
-    mtime = found.stat().st_mtime
-    if _NAME_CACHE and _NAME_CACHE[0] == str(found) and _NAME_CACHE[1] == mtime:
-        return _NAME_CACHE[2]
-    data = yaml.safe_load(found.read_text(encoding="utf-8")) or {}
+    try:
+        mtime = found.stat().st_mtime
+        if _NAME_CACHE and _NAME_CACHE[0] == str(found) and _NAME_CACHE[1] == mtime:
+            return _NAME_CACHE[2]
+        data = yaml.safe_load(found.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return ()
     names: list[str] = []
-    for item in data.get("env_requires") or []:
+    for item in (data.get("env_requires") if isinstance(data, dict) else None) or []:
         if not isinstance(item, dict):
             continue
         name = item.get("name")
@@ -127,10 +121,36 @@ def distribution_env_names(path: Path | None = None) -> tuple[str, ...]:
     return loaded
 
 
+def secret_values(environ: Mapping[str, str] | None = None) -> tuple[str, ...]:
+    """Environment values that must never be logged, returned or exported, longest first.
+
+    A value counts when its name is declared in distribution.yaml (other than a
+    plain configuration name such as a URL) or :func:`is_secret_env_name` says
+    it is a credential. ``environ`` defaults to ``os.environ``.
+    """
+    global _VALUE_CACHE
+    declared = distribution_env_names()
+    pairs = tuple((os.environ if environ is None else environ).items())
+    if _VALUE_CACHE is not None and _VALUE_CACHE[0] == (declared, pairs):
+        return _VALUE_CACHE[1]
+    found: set[str] = set()
+    for name, value in pairs:
+        if not is_secret_env_name(name, declared):
+            continue
+        if len(value) < _MIN_SECRET_LEN or value in _PLACEHOLDER_VALUES:
+            continue
+        if value.startswith("${") and value.endswith("}"):
+            continue
+        found.add(value)
+    values = tuple(sorted(found, key=len, reverse=True))
+    _VALUE_CACHE = ((declared, pairs), values)
+    return values
+
+
 def redact(text: str) -> str:
     """Replace secret-shaped header, query, and known env values with a marker."""
     rendered = text if isinstance(text, str) else str(text)
-    for secret in _secret_values():
+    for secret in secret_values():
         if secret in rendered:
             rendered = rendered.replace(secret, "[REDACTED]")
     rendered = _QUERY_RE.sub(_query_sub, rendered)
@@ -243,25 +263,6 @@ def append_audit(path: Path, record: dict) -> None:
         return
 
 
-def export_audit(path: Path) -> str:
-    """Export audit JSONL, redacting again so a tampered line cannot leak."""
-    if not path.is_file():
-        return ""
-    lines: list[str] = []
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        if not raw.strip():
-            continue
-        try:
-            record = json.loads(raw)
-        except json.JSONDecodeError:
-            lines.append(redact(raw))
-            continue
-        lines.append(json.dumps(redact_data(record), sort_keys=True, separators=(",", ":")))
-    if not lines:
-        return ""
-    return "\n".join(lines) + "\n"
-
-
 def record_tool_audit(tool: str, args: tuple, kwargs: dict, error: str | None) -> None:
     """Write a redacted tool event when CYBERAU_AUDIT_LOG is set."""
     dest = os.environ.get("CYBERAU_AUDIT_LOG")
@@ -305,107 +306,6 @@ def format_doctor(result: dict[str, str]) -> str:
     if result.get("fix"):
         lines.append(f"fix: {result['fix']}")
     return "\n".join(lines)
-
-
-def parse_env_placeholder(item: str) -> tuple[str, str]:
-    """Split NAME=${NAME}. Refuse anything that is not a placeholder."""
-    text = str(item).strip()
-    if "=" not in text:
-        raise LiteralSecretError("env entry must be NAME=${NAME}")
-    name, value = text.split("=", 1)
-    name = name.strip()
-    value = value.strip().strip("'\"")
-    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
-        raise LiteralSecretError("env entry name is not an identifier")
-    if _PLACEHOLDER.fullmatch(value) is None:
-        raise LiteralSecretError(f"{name} must be a ${{VAR}} placeholder")
-    return name, value
-
-
-def render_mcp_servers(
-    servers: dict,
-    *,
-    command: str,
-    data_dir: str,
-    allowlist: str,
-) -> dict:
-    """Build mcp_servers entries. Env values stay as ${VAR} and are never resolved."""
-    rendered: dict = {}
-    for name, spec in servers.items():
-        if not isinstance(spec, dict):
-            raise LiteralSecretError(f"{name} is not a server entry")
-        env = {
-            "CYBERAU_DATA_DIR": data_dir,
-            "CYBERAU_EGRESS_ALLOWLIST": allowlist,
-        }
-        for item in spec.get("env") or []:
-            key, value = parse_env_placeholder(str(item))
-            env[key] = value
-        rendered[name] = {
-            "command": command,
-            "args": [str(arg) for arg in (spec.get("args") or [])],
-            "env": env,
-            "trust": spec.get("trust", "untrusted"),
-            "lazy": bool(spec.get("lazy", True)),
-            "timeout": spec.get("timeout", 30),
-            "enabled": bool(spec.get("enabled_by_default", True)),
-        }
-    return rendered
-
-
-def render_profile_config(
-    root: Path,
-    *,
-    command: str,
-    data_dir: str,
-    allowlist: str,
-) -> str:
-    """Render config.yaml text from the repo files. Does not read the environment."""
-    base = yaml.safe_load((root / "config.yaml").read_text(encoding="utf-8")) or {}
-    loaded = yaml.safe_load((root / "mcp" / "servers.yaml").read_text(encoding="utf-8")) or {}
-    if not isinstance(base, dict):
-        raise LiteralSecretError("config.yaml must be a mapping")
-    servers = loaded.get("servers") if isinstance(loaded, dict) else None
-    if not isinstance(servers, dict):
-        raise LiteralSecretError("servers.yaml must contain a servers mapping")
-    base["mcp_servers"] = render_mcp_servers(
-        servers, command=command, data_dir=data_dir, allowlist=allowlist
-    )
-    return yaml.safe_dump(base, sort_keys=False)
-
-
-def literal_key_findings(text: str, *, label: str) -> list[str]:
-    """Report credential assignments that are not ${VAR} placeholders.
-
-    Findings name the variable, never the value.
-    """
-    findings: list[str] = []
-    for lineno, raw in enumerate(text.splitlines(), 1):
-        code = raw.split("#", 1)[0]
-        if _TOKEN_RE.search(code):
-            findings.append(f"{label}:{lineno}: token-shaped literal")
-        for match in _SECRET_ASSIGN.finditer(code):
-            value = match.group(2).strip().strip("'\"")
-            if _PLACEHOLDER.fullmatch(value):
-                continue
-            findings.append(f"{label}:{lineno}: {match.group(1)} is not a ${{VAR}} placeholder")
-    return findings
-
-
-def placeholder_findings(root: Path) -> list[str]:
-    """Scan servers.yaml, config.yaml, and the rendered config."""
-    findings: list[str] = []
-    for rel in ("mcp/servers.yaml", "config.yaml"):
-        text = (root / rel).read_text(encoding="utf-8")
-        findings.extend(literal_key_findings(text, label=rel))
-    rendered = render_profile_config(
-        root,
-        command="cyberau-mcp",
-        data_dir="/profile/plugin-data/cyber-au",
-        allowlist="/profile/mcp/egress-allowlist.yaml",
-    )
-    findings.extend(literal_key_findings(rendered, label="rendered config.yaml"))
-    return findings
 
 
 def scrub_uri(uri: str) -> str:
@@ -520,26 +420,6 @@ def _distribution_path() -> Path | None:
         if candidate.is_file():
             return candidate
     return None
-
-
-def _secret_values() -> list[str]:
-    found: list[str] = []
-    for name in distribution_env_names():
-        if is_plain_config_name(name):
-            continue
-        value = os.environ.get(name)
-        if value:
-            found.append(value)
-    unique: list[str] = []
-    seen: set[str] = set()
-    for value in sorted(found, key=len, reverse=True):
-        if value in seen or len(value) < _MIN_SECRET_LEN:
-            continue
-        if value.startswith("${") and value.endswith("}"):
-            continue
-        seen.add(value)
-        unique.append(value)
-    return unique
 
 
 def _query_sub(match: re.Match[str]) -> str:

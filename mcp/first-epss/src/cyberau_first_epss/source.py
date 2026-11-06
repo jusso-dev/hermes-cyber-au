@@ -7,12 +7,10 @@ import re
 from pathlib import Path
 from typing import Annotated
 
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common import USER_AGENT, runtime
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -159,11 +157,23 @@ def schema_drift(payload: dict) -> str | None:
     return None
 
 
+def score_batch(cve_ids: list[str]) -> tuple[list[dict] | None, str, str]:
+    """Current scores for these CVE IDs in one request.
+
+    Returns the rows (None when there is no usable payload), the cache state and a warning.
+    """
+    payload, cache, warning = _fetch({"cve": ",".join(cve_ids)})
+    if warning or payload is None:
+        return None, cache, warning
+    rows, problems = _rows(payload, history=False)
+    return (None if problems else rows), cache, "; ".join(problems)
+
+
 def _fetch(params: dict, *, force_live: bool = False) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_EPSS_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-epss"))
-    cache = HttpCache(data_dir / "http_cache.sqlite")
+    offline = runtime.offline() and not force_live
+    data_dir = runtime.data_dir("epss")
+    cache = runtime.http_cache(data_dir)
     key = cache.key("GET", API, params, b"", "anonymous")
     if not force_live and not snapshot:
         cached = cache.get(key)
@@ -176,12 +186,10 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[dict | None, str,
         return payload, "snapshot", ""
     if offline:
         return None, "snapshot", unavailable(LABEL, "offline mode and no cached copy")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         "first-epss",
-        policy=EgressPolicy(allowlist, "first-epss"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=1000 / 60,
         burst=50,
@@ -288,8 +296,7 @@ def _validate_top(min_epss: float, limit: int) -> str:
 def _persist(rows: list[dict]) -> None:
     if not rows:
         return
-    directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-epss"))
-    directory.mkdir(parents=True, exist_ok=True)
+    directory = runtime.data_dir("epss")
     path = directory / "epss-observations.jsonl"
     previous = directory / "epss-observations.jsonl.1"
     lock = directory / ".epss-observations.lock"
@@ -340,10 +347,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 def health_response() -> dict:

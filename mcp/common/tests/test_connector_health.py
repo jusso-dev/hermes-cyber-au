@@ -100,7 +100,6 @@ def test_checkout_without_a_response_schema_is_not_checked(tmp_path: Path):
     assert set(called) == with_schema - {"first-epss"} - unconfigured
     assert by_key["first-epss"]["status"] == "ok"
     assert by_key["first-epss"]["detail"] == "schema ok"
-    assert by_key["first-epss"]["keyed"] is False
     unchecked = [
         key
         for key, row in by_key.items()
@@ -112,7 +111,6 @@ def test_checkout_without_a_response_schema_is_not_checked(tmp_path: Path):
         assert by_key[key]["status"] == "not_checked"
         assert by_key[key]["detail"] == "not checked"
         assert by_key[key]["schema_diff"] == []
-    assert by_key["nvd"]["keyed"] is True
     assert SECRET not in json.dumps(report)
 
 

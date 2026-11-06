@@ -21,11 +21,11 @@ from typing import Annotated
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -132,7 +132,7 @@ def taxii_lookup_indicator(value: _Indicator) -> dict:
         return _envelope([], "snapshot", warnings=(problem,))
     try:
         cache, warning = _ensure_stored()
-        local = bool(os.environ.get("CYBERAU_TAXII_SNAPSHOT")) or _offline()
+        local = bool(os.environ.get("CYBERAU_TAXII_SNAPSHOT")) or runtime.offline()
         if warning and _missing_env() and not local:
             return _envelope([], "snapshot", warnings=(warning,))
         rows, extra = _search(value.strip())
@@ -255,7 +255,7 @@ def schema_drift(payload: dict, *, kind: str) -> str | None:
 def _list_collections(*, force_live: bool) -> tuple[list[dict], str, str, list[str]]:
     if not force_live and os.environ.get("CYBERAU_TAXII_SNAPSHOT"):
         return _collections_from_payload(*_snapshot_payload("collections.json", "collections"), [])
-    if not force_live and _offline():
+    if not force_live and runtime.offline():
         url = _offline_collections_url()
         if url:
             payload, state = _cached_payload(url, {})
@@ -294,7 +294,7 @@ def _gather_objects(
     *,
     force_live: bool,
 ) -> tuple[list[dict], str, str, list[str], str | None]:
-    if not force_live and (os.environ.get("CYBERAU_TAXII_SNAPSHOT") or _offline()):
+    if not force_live and (os.environ.get("CYBERAU_TAXII_SNAPSHOT") or runtime.offline()):
         if os.environ.get("CYBERAU_TAXII_SNAPSHOT"):
             payload, cache, warning = _snapshot_payload("objects.json", "objects")
             urls: list[str] = []
@@ -373,16 +373,16 @@ def _page_objects(
         )
         caches.append(cache)
         if problem or payload is None:
-            return collected, _merge_cache(caches), problem or UNAVAILABLE, saw_more
+            return collected, runtime.merge_cache_states(caches), problem or UNAVAILABLE, saw_more
         drift = schema_drift(payload, kind="objects")
         if drift:
-            return [], _merge_cache(caches), drift, saw_more
+            return [], runtime.merge_cache_states(caches), drift, saw_more
         for item in payload.get("objects") or []:
             if isinstance(item, dict):
                 collected.append(item)
         kept = [item for item in collected if _keep(item, None, types)]
         if len(kept) >= limit or not payload.get("more"):
-            return collected, _merge_cache(caches), "", bool(payload.get("more"))
+            return collected, runtime.merge_cache_states(caches), "", bool(payload.get("more"))
         saw_more = True
         token = payload.get("next")
         if not isinstance(token, str) or not token or token in seen:
@@ -392,7 +392,7 @@ def _page_objects(
         params = {**first, "next": token}
     else:
         warning = "TAXII page cap reached for this poll."
-    return collected, _merge_cache(caches), warning, saw_more
+    return collected, runtime.merge_cache_states(caches), warning, saw_more
 
 
 def _store_fresh() -> bool:
@@ -411,7 +411,7 @@ def _store_fresh() -> bool:
 
 
 def _ensure_stored() -> tuple[str, str]:
-    if os.environ.get("CYBERAU_TAXII_SNAPSHOT") or _offline():
+    if os.environ.get("CYBERAU_TAXII_SNAPSHOT") or runtime.offline():
         _rows, cache, warning, _urls, _stamp = _gather_objects(None, None, 1000, force_live=False)
         return cache, warning
     missing = _missing_env()
@@ -419,7 +419,7 @@ def _ensure_stored() -> tuple[str, str]:
         return "snapshot", missing
     if _store_fresh():
         return "hit", ""
-    start = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = runtime.iso(datetime.now(UTC) - timedelta(days=30))
     _rows, cache, warning, _urls, _stamp = _gather_objects(
         start, ["indicator"], 1000, force_live=False
     )
@@ -482,7 +482,7 @@ def _http_json(
 ) -> tuple[dict | None, str, str]:
     if not force_live and os.environ.get("CYBERAU_TAXII_SNAPSHOT"):
         return _snapshot_payload(_snapshot_name(kind), kind if kind != "discovery" else "")
-    if not force_live and _offline():
+    if not force_live and runtime.offline():
         payload, state = _cached_payload(url, params)
         if payload is not None:
             return payload, state, ""
@@ -498,11 +498,12 @@ def _http_json(
     if limited:
         return None, "snapshot", limited
     cache = _cache()
-    client = HttpClient(
+    client = runtime.http_client(
         "taxii-ctis",
+        directory=_data_dir(),
         policy=_policy(),
         cache=cache,
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP),
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=10,
         burst=30,
@@ -791,7 +792,7 @@ def _search(value: str) -> tuple[list[dict], str]:
 
 def _persist_objects(raw_objects: list[dict]) -> None:
     collection = _active_collection()
-    now = _now()
+    now = runtime.utc_now_iso()
     with _db() as conn:
         for obj in raw_objects:
             if "id" not in obj or "type" not in obj:
@@ -858,7 +859,7 @@ def _persist_objects(raw_objects: list[dict]) -> None:
 
 
 def _save_collections(rows: list[dict]) -> None:
-    now = _now()
+    now = runtime.utc_now_iso()
     with _db() as conn:
         for row in rows:
             conn.execute(
@@ -1087,10 +1088,6 @@ def _offline_objects() -> tuple[dict | None, str, str, list[str]]:
     return None, "snapshot", UNAVAILABLE, []
 
 
-def _offline() -> bool:
-    return os.environ.get("CYBERAU_OFFLINE") == "1"
-
-
 def _snapshot_dir() -> Path | None:
     override = os.environ.get("CYBERAU_TAXII_SNAPSHOT")
     return Path(override) if override else None
@@ -1113,12 +1110,8 @@ def _allowed(url: str) -> bool:
 
 
 def _policy() -> EgressPolicy:
-    path = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    path = runtime.allowlist_path()
     return EgressPolicy(path, "taxii-ctis", resolver=_RESOLVER)
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 def _cache() -> HttpCache:
@@ -1182,25 +1175,8 @@ def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
-def _now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _merge_cache(caches: list[str]) -> str:
-    if not caches:
-        return "snapshot"
-    if "stale" in caches:
-        return "stale"
-    if "miss" in caches:
-        return "miss"
-    if "hit" in caches:
-        return "hit"
-    return "snapshot"
-
-
 def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-taxii"))
-    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path = runtime.data_dir("taxii", mode=0o700)
     # The store holds licensed CTIS objects. Refuse a directory someone else owns.
     if path.stat().st_uid != os.getuid():
         raise PermissionError(f"{path} is not owned by the current user")

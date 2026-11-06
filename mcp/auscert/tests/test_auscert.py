@@ -393,3 +393,14 @@ def test_no_secret_is_present_in_fixtures_or_output():
         assert "api-key" not in text
         assert "token" not in text
     assert "token" not in json.dumps(auscert_bulletins()).lower()
+
+
+def test_poll_bulletins_needs_a_live_answer_and_records_it(monkeypatch, tmp_path):
+    records, problem = source.poll_bulletins()
+    assert records == [] and problem
+    live(monkeypatch, serve())
+    records, problem = source.poll_bulletins()
+    assert problem == ""
+    assert records[0]["bulletin_id"] == "ESB-2026.9003"
+    with sqlite3.connect(tmp_path / "auscert_bulletins.sqlite") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM bulletins").fetchone()[0] == len(records)

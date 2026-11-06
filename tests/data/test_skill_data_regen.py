@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -17,13 +15,7 @@ import pytest
 import yaml
 from cyberau_common import regen
 from cyberau_common.cli import main
-from cyberau_common.regen import (
-    PARSER_CHECK_ABSENT,
-    SOURCES,
-    missing_message,
-    parser_check_main,
-    regen_main,
-)
+from cyberau_common.regen import SOURCES, missing_message, regen_main
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "skill-data-regen.yml"
@@ -33,16 +25,7 @@ PINS = {
     "actions/checkout": ("3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1"),
     "actions/setup-python": ("5fda3b95a4ea91299a34e894583c3862153e4b97", "v7.0.0"),
     "actions/upload-artifact": ("cf430e030ddbb5b0abf93d22962f4752f3646cd9", "v7.0.2"),
-    "actions/download-artifact": ("9000827ccba6bdab643e8b6fd33ac0654aef8333", "v8.0.2"),
 }
-
-
-def _issues():
-    path = ROOT / "tools" / "ci" / "open_health_issues.py"
-    spec = importlib.util.spec_from_file_location("open_health_issues", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _catalog(directory: Path, control_id: str) -> None:
@@ -67,18 +50,6 @@ def _ism_tree(root: Path) -> Path:
     return data
 
 
-def test_parser_check_is_absent(tmp_path, capsys):
-    destination = tmp_path / "parser-check.json"
-    assert parser_check_main(["--sources", "asd,auscert,e8,aureg", "--json", str(destination)]) == 2
-    captured = capsys.readouterr()
-    assert PARSER_CHECK_ABSENT in captured.err
-    payload = json.loads(destination.read_text(encoding="utf-8"))
-    assert payload["absent"] is True
-    assert payload["results"] == []
-    assert payload["sources"] == ["asd", "auscert", "e8", "aureg"]
-    assert TOKEN not in captured.out + captured.err
-
-
 def test_cli_regen_forwards_flags(tmp_path, capsys, monkeypatch):
     _ism_tree(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -90,13 +61,6 @@ def test_cli_regen_forwards_flags(tmp_path, capsys, monkeypatch):
     assert "Regenerated ISM data" in capsys.readouterr().out
     assert main(["regen", "e8"]) == 1
     assert missing_message("e8") in capsys.readouterr().err
-
-
-def test_cli_parser_check_is_absent(tmp_path, capsys):
-    destination = tmp_path / "parser-check.json"
-    assert main(["parser-check", "--json", str(destination)]) == 2
-    assert PARSER_CHECK_ABSENT in capsys.readouterr().err
-    assert json.loads(destination.read_text(encoding="utf-8"))["absent"] is True
 
 
 def test_missing_data_directories_are_errors(tmp_path, capsys, monkeypatch):
@@ -308,16 +272,10 @@ def test_workflow_skips_missing_sources_and_pins_actions():
         assert spec.data_dir in text
     for gone in ("mcp/e8/", "mcp/aureg/", "mcp/attack/", "mcp/ism/"):
         assert gone not in text
-    assert PARSER_CHECK_ABSENT in text
-    assert "tools/ci/open_health_issues.py is absent. Not opening an issue." in text
+    assert "parser-check" not in text
     assert "tools/build_skill_references.py --write PR_BODY.md" in text
     assert "uv run --project mcp pytest -q tests/skills tests/data --block-network" in text
-    assert (
-        "cyberau-mcp parser-check --sources asd,auscert,e8,aureg --json parser-check.json" in text
-    )
-    assert WORKFLOW == ROOT / ".github" / "workflows" / "skill-data-regen.yml"
-    assert text.count("${{ github.token }}") == 1
-    assert "GH_TOKEN: ${{ github.token }}" in text
+    assert "${{ github.token }}" not in text
     for banned in (
         "ghp_",
         "github_pat_",
@@ -340,7 +298,7 @@ def test_workflow_skips_missing_sources_and_pins_actions():
     assert "DATA_PR_TOKEN: ${{ secrets.DATA_PR_TOKEN }}" in text
     document = yaml.safe_load(text)
     assert document["permissions"] == {"contents": "read"}
-    assert document["jobs"]["parser-issue"]["permissions"]["issues"] == "write"
+    assert set(document["jobs"]) == {"regen", "fetch-failed", "pr"}
 
 
 def test_actionlint_on_the_copied_layout():
@@ -364,177 +322,6 @@ def test_actionlint_on_the_copied_layout():
         capture_output=True,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
-
-
-class _FakeGh:
-    def __init__(self, issues=None):
-        self.issues = list(issues or [])
-        self.calls = []
-
-    def __call__(self, args, input_text=None):
-        self.calls.append(args)
-        if args[:2] == ["issue", "list"]:
-            return json.dumps([{"number": number, "title": title} for number, title in self.issues])
-        if args[:2] == ["issue", "create"]:
-            title = args[args.index("--title") + 1]
-            self.issues.append((len(self.issues) + 1, title))
-            return "created\n"
-        if args[:2] == ["issue", "comment"]:
-            return ""
-        raise AssertionError(args)
-
-
-def test_failing_parser_opens_an_issue_only_when_the_script_exists(tmp_path, monkeypatch):
-    module = _issues()
-    payload = [
-        {"source": "asd", "ok": True, "detail": "fine"},
-        {"source": "auscert", "ok": False, "detail": f"selector missing {TOKEN}"},
-    ]
-    path = tmp_path / "parser-check.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    monkeypatch.setenv("GH_TOKEN", TOKEN)
-    hidden = _FakeGh()
-    assert (
-        module.main(["--kind", "parser", "--input", str(path)], root=tmp_path, runner=hidden) == 0
-    )
-    assert hidden.calls == []
-
-    present = _FakeGh()
-    assert module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=present) == 0
-    created = [call for call in present.calls if call[:2] == ["issue", "create"]]
-    assert len(created) == 1
-    assert "Parser check: auscert failing" in created[0]
-    body = created[0][created[0].index("--body") + 1]
-    assert TOKEN not in body
-    assert "[REDACTED]" in body
-    assert "untrusted data" in body
-    for label in ("type:task", "area:skills", "area:ci", "priority:p1"):
-        assert label in created[0]
-
-    again = _FakeGh(issues=[(7, "Parser check: auscert failing")])
-    assert module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=again) == 0
-    assert any(call[:2] == ["issue", "comment"] for call in again.calls)
-    assert not any(call[:2] == ["issue", "create"] for call in again.calls)
-
-
-def test_absent_parser_check_does_not_open_an_issue(tmp_path, capsys):
-    module = _issues()
-    path = tmp_path / "parser-check.json"
-    path.write_text(
-        json.dumps({"absent": True, "detail": PARSER_CHECK_ABSENT, "results": []}),
-        encoding="utf-8",
-    )
-    runner = _FakeGh()
-    assert module.main(["--kind", "parser", "--input", str(path)], root=ROOT, runner=runner) == 0
-    assert runner.calls == []
-    assert PARSER_CHECK_ABSENT in capsys.readouterr().out
-
-
-def test_issue_script_refuses_a_missing_token(monkeypatch):
-    module = _issues()
-    monkeypatch.delenv("GH_TOKEN", raising=False)
-    with pytest.raises(SystemExit, match="GH_TOKEN is not set"):
-        module.default_runner(["issue", "list"])
-
-
-def test_issue_script_entrypoint_says_when_path_is_absent(tmp_path):
-    payload = tmp_path / "parser-check.json"
-    payload.write_text(json.dumps([{"source": "asd", "ok": False}]), encoding="utf-8")
-    env = os.environ.copy()
-    env["GH_TOKEN"] = TOKEN
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "tools" / "ci" / "open_health_issues.py"),
-            "--kind",
-            "parser",
-            "--input",
-            str(payload),
-        ],
-        check=False,
-        cwd=tmp_path,
-        text=True,
-        capture_output=True,
-        env=env,
-    )
-    assert completed.returncode == 0
-    assert "tools/ci/open_health_issues.py is absent. Not opening an issue." in completed.stdout
-    assert TOKEN not in completed.stdout + completed.stderr
-
-
-def _parser_step() -> str:
-    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-    for step in document["jobs"]["regen"]["steps"]:
-        if step.get("id") == "parsers":
-            return step["run"]
-    raise AssertionError("parsers step is missing")
-
-
-def _run_parser_step(tmp_path, stderr, exit_code, payload):
-    """Run the workflow step with a stand-in for uv. Nothing is fetched."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    fake = bin_dir / "uv"
-    write = ""
-    if payload is not None:
-        write = f"printf '%s' '{json.dumps(payload)}' > parser-check.json\n"
-    fake.write_text(f"#!/bin/sh\n{write}echo '{stderr}' >&2\nexit {exit_code}\n", encoding="utf-8")
-    fake.chmod(0o755)
-    work = tmp_path / "work"
-    work.mkdir()
-    output = tmp_path / "github_output"
-    output.write_text("", encoding="utf-8")
-    env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
-    env["GITHUB_OUTPUT"] = str(output)
-    completed = subprocess.run(
-        ["bash", "-eo", "pipefail", "-c", _parser_step()],
-        check=False,
-        cwd=work,
-        text=True,
-        capture_output=True,
-        env=env,
-    )
-    return completed, output.read_text(encoding="utf-8"), work
-
-
-@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is absent")
-@pytest.mark.parametrize(
-    ("stderr", "code", "payload"),
-    [
-        (PARSER_CHECK_ABSENT, 2, {"absent": True, "results": []}),
-        ("parser-check is not part of the shared library yet", 2, None),
-    ],
-)
-def test_parser_step_treats_an_absent_command_as_zero_failures(tmp_path, stderr, code, payload):
-    completed, output, work = _run_parser_step(tmp_path, stderr, code, payload)
-    assert completed.returncode == 0, completed.stderr
-    assert "failures=0" in output
-    assert PARSER_CHECK_ABSENT in completed.stdout
-    assert json.loads((work / "parser-check.json").read_text(encoding="utf-8"))["absent"]
-
-
-@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is absent")
-def test_parser_step_does_not_mistake_a_usage_error_for_absence(tmp_path):
-    completed, output, _work = _run_parser_step(
-        tmp_path, "cyberau-mcp: error: unrecognized arguments: --bogus", 2, None
-    )
-    assert completed.returncode == 1
-    assert "failures=" not in output
-
-
-@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is absent")
-@pytest.mark.parametrize(
-    "payload",
-    [
-        [{"source": "asd", "ok": True}, {"source": "auscert", "ok": False}],
-        {"results": [{"source": "asd", "ok": True}, {"source": "auscert", "ok": False}]},
-    ],
-)
-def test_parser_step_counts_failures_even_when_the_command_exits_nonzero(tmp_path, payload):
-    completed, output, _work = _run_parser_step(tmp_path, "auscert failed", 1, payload)
-    assert completed.returncode == 0, completed.stderr
-    assert "failures=1" in output
 
 
 def test_obligations_workflow_does_not_claim_unsupported_live_refresh():

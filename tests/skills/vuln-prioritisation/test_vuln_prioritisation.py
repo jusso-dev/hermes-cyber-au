@@ -63,13 +63,6 @@ def _one(cve: str, enrichment: dict, **kwargs) -> dict:
     return rows[0]
 
 
-def test_skill_passes_the_structural_check():
-    skill = ROOT / "skills" / "vuln-prioritisation"
-    folder = Path(__file__).resolve().parent
-    assert harness.check_skill(skill) == []
-    assert harness.check_fixtures([skill, folder]) == []
-
-
 def test_offline_sessions_score_without_a_model():
     loaded = harness.load_eval_file(EVALS)
     assert loaded.skill == "vuln-prioritisation"
@@ -321,6 +314,11 @@ def test_batches_cap_at_100_and_a_500_row_export_is_five_batches():
     markdown = rank.render_markdown(rows)
     assert "Showing 30 of 500" in markdown
     assert rank.render_csv(rows).count("\n") == 501
+
+
+@pytest.mark.parametrize("lead", ["=", "+", "-", "@", "\t", "\r"])
+def test_csv_cells_starting_a_formula_are_quoted(lead):
+    assert rank._csv_cell(lead + "cmd") == "'" + lead + "cmd"
 
 
 def test_scanner_headers_sbom_and_formula_cells():

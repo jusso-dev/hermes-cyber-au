@@ -6,29 +6,28 @@ import io
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 import pytest
 import yaml
+from cyberau_common.audit import redact_text
 from cyberau_common.cli import main
 from cyberau_common.envelope import envelope
 from cyberau_common.http import HttpError
 from cyberau_common.secrets import (
     FILTER_HEADERS,
-    LiteralSecretError,
     RedactFilter,
     cassette_findings,
     check_env_mode,
-    export_audit,
+    distribution_env_names,
     install_cassette_scrubber,
-    literal_key_findings,
-    parse_env_placeholder,
-    placeholder_findings,
+    is_secret_env_name,
     redact,
     redact_data,
     redact_headers,
-    render_profile_config,
     scrub_cassette,
+    secret_values,
 )
 from cyberau_common.server import Connector, ToolSpec, invoke_tool
 
@@ -45,11 +44,101 @@ def test_redact_covers_ticket_header_names():
         assert name in FILTER_HEADERS or name.lower() in {item.lower() for item in FILTER_HEADERS}
 
 
-def test_vcr_filter_headers_cover_ticket_names(vcr_config):
-    lowered = {name.lower() for name in vcr_config["filter_headers"]}
-    for name in ("authorization", "auth-key", "x-otx-api-key", "apikey", "key"):
-        assert name in lowered
-    assert "apiKey" in vcr_config["filter_headers"]
+def test_vcr_filter_headers_match_any_casing(vcr_config):
+    from vcr.filters import replace_headers
+    from vcr.request import Request
+
+    # Every secret header a connector sends, in the casing it sends it.
+    sent = ("X-RFToken", "X-API-KEY", "Api-Key", "api-key", "x-apikey")
+    headers = {name: SEEDED for name in TICKET_HEADERS + sent}
+    request = Request("GET", "https://example.com/", b"", headers)
+    replacements = [(name, None) for name in vcr_config["filter_headers"]]
+    assert dict(replace_headers(request, replacements).headers) == {}
+
+
+def test_envelopes_redact_what_the_audit_log_redacts(monkeypatch, tmp_path):
+    empty = tmp_path / "distribution.yaml"
+    empty.write_text("env_requires: []\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_DISTRIBUTION", str(empty))
+    monkeypatch.setenv("UNDECLARED_VENDOR_PASSWORD", SEEDED)
+    monkeypatch.setenv("SOME_SERVICE_URL", "https://plain.example/value")
+    assert SEEDED in secret_values()
+    assert "https://plain.example/value" not in secret_values()
+    assert SEEDED not in redact(f"upstream said {SEEDED}")
+    assert redact_text(f"upstream said {SEEDED}") == redact(f"upstream said {SEEDED}")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "NVD_API_KEY",
+        "ABUSECH_AUTH_KEY",
+        "DARKOWL_PRIVATE_KEY",
+        "CYBERAU_APPROVAL_KEY",
+        "GITHUB_TOKEN",
+        "FALCON_CLIENT_SECRET",
+        "TAXII_PASSWORD",
+        "LEGACY_PASSWD",
+        "VENDOR_CREDENTIAL",
+        "VENDORAPIKEY",
+        "TOKEN",
+        "secret",
+        "github_token",
+    ],
+)
+def test_credential_names_are_secret(name):
+    assert is_secret_env_name(name, declared=())
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "UV_KEYRING_PROVIDER",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "SSL_KEY_FILE",
+        "API_KEY_PATH",
+        "TOKEN_DIR",
+        "SECRET_PROVIDER",
+        "TOKEN_URL",
+        "KEYBOARD_LAYOUT",
+        "MONKEY",
+        "PASSWORDLESS",
+    ],
+)
+def test_names_that_only_mention_a_credential_word_are_not_secret(name):
+    assert not is_secret_env_name(name, declared=())
+
+
+def test_plain_settings_stay_readable_in_redacted_text(monkeypatch, tmp_path):
+    empty = tmp_path / "distribution.yaml"
+    empty.write_text("env_requires: []\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_DISTRIBUTION", str(empty))
+    monkeypatch.setenv("UV_KEYRING_PROVIDER", "subprocess")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/srv/gcp/service-account.json")
+    text = "keyring subprocess, credentials at /srv/gcp/service-account.json"
+    assert redact(text) == text
+
+
+def test_every_declared_credential_is_secret():
+    declared = distribution_env_names(ROOT / "distribution.yaml")
+    template = ROOT / ".env.template"
+    names = set(declared) | set(
+        re.findall(r"(?m)^#?\s*([A-Z][A-Z0-9_]+)=", template.read_text(encoding="utf-8"))
+    )
+    credential = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|PASSWD)$")
+    for name in names:
+        if credential.search(name):
+            assert is_secret_env_name(name, declared=()), name
+        if name in declared and not name.endswith(("_URL", "_API_ROOT", "_COLLECTION_ID")):
+            assert is_secret_env_name(name, declared=declared), name
+
+
+def test_explicit_environment_is_used_instead_of_os_environ(monkeypatch, tmp_path):
+    empty = tmp_path / "distribution.yaml"
+    empty.write_text("env_requires: []\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_DISTRIBUTION", str(empty))
+    values = secret_values({"OTX_API_KEY": SEEDED, "UV_KEYRING_PROVIDER": "subprocess-x"})
+    assert values == (SEEDED,)
 
 
 def test_distribution_env_values_are_redacted(monkeypatch):
@@ -113,10 +202,6 @@ def test_seeded_fake_key_never_leaks(tmp_path, monkeypatch, capsys):
     stored = audit.read_text(encoding="utf-8")
     assert SEEDED not in stored
     assert audit.stat().st_mode & 0o777 == 0o600
-    exported = export_audit(audit)
-    assert SEEDED not in exported
-    audit.write_text(stored + json.dumps({"note": SEEDED}) + "\n", encoding="utf-8")
-    assert SEEDED not in export_audit(audit)
 
     captured = capsys.readouterr()
     assert SEEDED not in captured.out
@@ -150,38 +235,6 @@ def test_doctor_warns_when_env_is_not_mode_600(tmp_path, capsys):
 
 def test_missing_env_file_is_ok(tmp_path):
     assert check_env_mode(tmp_path / ".env")["status"] == "ok"
-
-
-def test_rendered_config_has_placeholders_only(monkeypatch):
-    monkeypatch.setenv("NVD_API_KEY", SEEDED)
-    monkeypatch.setenv("GITHUB_TOKEN", SEEDED)
-    assert placeholder_findings(ROOT) == []
-    rendered = render_profile_config(
-        ROOT,
-        command="cyberau-mcp",
-        data_dir="/profile/plugin-data/cyber-au",
-        allowlist="/profile/mcp/egress-allowlist.yaml",
-    )
-    assert SEEDED not in rendered
-    loaded = yaml.safe_load(rendered)
-    assert loaded["mcp_servers"]["nvd"]["env"]["NVD_API_KEY"] == "${NVD_API_KEY}"
-    assert loaded["mcp_servers"]["ism"]["env"]["GITHUB_TOKEN"] == "${GITHUB_TOKEN}"
-    for server in loaded["mcp_servers"].values():
-        for name, value in server["env"].items():
-            if name in {"CYBERAU_DATA_DIR", "CYBERAU_EGRESS_ALLOWLIST"}:
-                assert SEEDED not in str(value)
-                continue
-            assert str(value).startswith("${") and str(value).endswith("}")
-
-
-def test_literal_env_value_is_rejected_without_echoing_it():
-    literal = "example-value"
-    with pytest.raises(LiteralSecretError) as caught:
-        parse_env_placeholder(f"NVD_API_KEY={literal}")
-    assert literal not in str(caught.value)
-    findings = literal_key_findings(f"env:\n  NVD_API_KEY: {literal}\n", label="config.yaml")
-    assert findings
-    assert literal not in "\n".join(findings)
 
 
 def test_cassettes_have_placeholder_headers_only():
@@ -301,13 +354,6 @@ def test_github_token_value_is_redacted(monkeypatch):
     assert SEEDED not in redact(f"GitHub said {SEEDED}")
 
 
-def test_bearer_placeholder_in_config_is_not_a_literal():
-    ok = 'headers:\n  Authorization: "Bearer ${GITHUB_TOKEN}"\n'
-    assert literal_key_findings(ok, label="servers.yaml") == []
-    bad = f"headers:\n  Authorization: Bearer {SEEDED}\n"
-    assert literal_key_findings(bad, label="servers.yaml")
-
-
 def test_cassette_scan_covers_cassettes_directories(tmp_path):
     folder = tmp_path / "mcp" / "demo" / "tests" / "cassettes"
     folder.mkdir(parents=True)
@@ -317,3 +363,38 @@ def test_cassette_scan_covers_cassettes_directories(tmp_path):
         encoding="utf-8",
     )
     assert cassette_findings(tmp_path)
+
+
+_PLACEHOLDER = re.compile(r"^\$\{(?:env:)?[A-Za-z_][A-Za-z0-9_]*\}$")
+_SECRET_ASSIGN = re.compile(
+    r"(?i)\b("
+    r"[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)"
+    r"|authorization|auth-key|x-otx-api-key|x-api-key|x-apikey|x-rftoken|api[_-]?key"
+    r")\b\s*[:=]\s*[\"']?(?:(?:bearer|basic|token)\s+)?([^\"'\s#]+)"
+)
+_TOKEN_SHAPE = re.compile(
+    r"AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
+    r"|xox[baprs]-[A-Za-z0-9-]{10,}|sk-(?:live|test|proj)-[A-Za-z0-9]{10,}"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
+)
+
+
+def _literal_credentials(text: str) -> list[str]:
+    """Line numbers and names of credential assignments that are not ${VAR} placeholders."""
+    findings = []
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        code = raw.split("#", 1)[0]
+        if _TOKEN_SHAPE.search(code):
+            findings.append(f"{lineno}: token-shaped literal")
+        for match in _SECRET_ASSIGN.finditer(code):
+            if not _PLACEHOLDER.fullmatch(match.group(2).strip().strip("'\"")):
+                findings.append(f"{lineno}: {match.group(1)}")
+    return findings
+
+
+def test_shipped_config_holds_placeholders_only():
+    for rel in ("mcp/servers.yaml", "config.yaml"):
+        assert _literal_credentials((ROOT / rel).read_text(encoding="utf-8")) == [], rel
+    assert _literal_credentials('headers:\n  Authorization: "Bearer ${GITHUB_TOKEN}"\n') == []
+    assert _literal_credentials(f"headers:\n  Authorization: Bearer {SEEDED}\n")
+    assert _literal_credentials(f"env:\n  NVD_API_KEY: {SEEDED}\n")

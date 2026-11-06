@@ -24,10 +24,10 @@ Distributions do not ship `.env`, filled `.env.EXAMPLE` files, or a credential s
 - `X-OTX-API-KEY`
 - `key`
 
-It also replaces the value of every variable named in `distribution.yaml` when that value appears in those outputs. Values shorter than 8 characters are not substituted globally, because they collide with ordinary words. The header patterns above still cover them.
+It also replaces the value of every variable named in `distribution.yaml`, and of every variable whose name ends in a credential word, when that value appears in those outputs. The word is the last `_` segment of the name (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD` or `CREDENTIAL`, as in `NVD_API_KEY` or `GITHUB_TOKEN`), or the name ends in `APIKEY`. A word elsewhere in the name does not count, so `UV_KEYRING_PROVIDER`, `SSL_KEY_FILE` and `GOOGLE_APPLICATION_CREDENTIALS` (a file path) stay readable. Configuration names such as `*_URL` declared in `distribution.yaml` are not substituted unless their name also looks like a credential. Values shorter than 8 characters are not substituted globally, because they collide with ordinary words. The header patterns above still cover them.
 
 Recorded HTTP cassettes use pytest-recording `filter_headers` for those header names. A post-record scrubber rewrites any remaining non-placeholder value to `[REDACTED]`. The test suite fails if a cassette still has one of those headers set to anything other than a `${VAR}` placeholder, `[REDACTED]`, or the recorder's `XXXX` marker.
 
 ## CI
 
-`.github/workflows/ci.yml` runs gitleaks over the full git history. `.gitleaks.toml` allowlists a ticket frontmatter line of the form `key: "slug"`, which is an identifier. A unit test rejects literal credentials in `mcp/servers.yaml`, `config.yaml`, and the rendered config.
+`.github/workflows/ci.yml` runs gitleaks over the full git history. `.gitleaks.toml` allowlists a ticket frontmatter line of the form `key: "slug"`, which is an identifier. A unit test rejects literal credentials in `mcp/servers.yaml` and `config.yaml`, and the installer refuses to render a literal env value.

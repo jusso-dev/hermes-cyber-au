@@ -42,6 +42,12 @@ cyber_au:
         monthly_budget_units: 100
 ```
 
+## Org-exposure watchlist
+
+`cyberau watchlist init --org` creates your org-exposure watchlist at `<profile>/watchlists/org-exposure.yaml`. The org exposure tool and the premium connectors that load a watchlist read that same file. The profile is `$HERMES_HOME` when it is set, otherwise the profile above `$CYBERAU_DATA_DIR` (`<profile>/plugin-data/cyber-au`), otherwise `~/.hermes`. To keep the file somewhere else, set `CYBERAU_ORG_WATCHLIST` to its path. The older name `CYBERAU_WATCHLIST` still works. When both are set, `CYBERAU_ORG_WATCHLIST` wins.
+
+SOCRadar is the exception: it reads its own `watchlist.yaml` in the profile data directory.
+
 ## Budgets
 
 The ledger is `plugin-data/cyber-au/premium-ledger.sqlite`, or `$CYBERAU_DATA_DIR/premium-ledger.sqlite` when that variable is set. It records calls and cost units per vendor, per day, in Australia/Sydney.

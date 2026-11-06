@@ -48,11 +48,10 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("CYBERAU_PSPF_SNAPSHOT", str(FIXTURES / "pspf_snapshot_two_directions.json"))
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     source._SLEEP = lambda _seconds: None
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=1)
+    monkeypatch.setenv("CYBERAU_TODAY", (SHIPPED_DAY + timedelta(days=1)).isoformat())
     yield
     source._TRANSPORT = None
     source._SLEEP = time.sleep
-    source._TODAY = None
 
 
 def test_search_and_directions_quote_the_snapshot():
@@ -449,8 +448,11 @@ def test_search_matches_title_quotation_and_id_only():
     assert pspf_search("001-2026")["data"][0]["id"] == "001-2026"
 
 
-def _expire_shipped() -> None:
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)
+def _expire_shipped(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "CYBERAU_TODAY",
+        (SHIPPED_DAY + timedelta(days=source.SNAPSHOT_MAX_AGE_DAYS + 1)).isoformat(),
+    )
 
 
 def _assert_unavailable(record: dict) -> None:
@@ -464,7 +466,7 @@ def _assert_unavailable(record: dict) -> None:
 
 def test_expired_shipped_snapshot_is_unavailable_offline(monkeypatch):
     monkeypatch.delenv("CYBERAU_PSPF_SNAPSHOT")
-    _expire_shipped()
+    _expire_shipped(monkeypatch)
     for record in (pspf_list_directions(), pspf_search("Cisco"), pspf_search("PSPF")):
         _assert_unavailable(record)
         assert any("181 days old" in item for item in record["warnings"])
@@ -477,14 +479,14 @@ def test_expired_shipped_snapshot_is_unavailable_when_live_fails(monkeypatch):
         raise httpx.ConnectError("timed out")
 
     source._TRANSPORT = httpx.MockTransport(down)
-    _expire_shipped()
+    _expire_shipped(monkeypatch)
     for record in (pspf_list_directions(), pspf_search("Cisco")):
         _assert_unavailable(record)
 
 
 def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
     monkeypatch.delenv("CYBERAU_PSPF_SNAPSHOT")
-    source._TODAY = lambda: SHIPPED_DAY + timedelta(days=10)
+    monkeypatch.setenv("CYBERAU_TODAY", (SHIPPED_DAY + timedelta(days=10)).isoformat())
     listed = pspf_list_directions()
     assert listed["data"]
     assert listed["cache"] == "snapshot"
@@ -498,7 +500,7 @@ def test_fresh_shipped_snapshot_is_labelled(monkeypatch):
 def test_expired_snapshot_rows_are_not_searched_after_a_live_poll(monkeypatch):
     monkeypatch.delenv("CYBERAU_PSPF_SNAPSHOT")
     assert pspf_list_directions()["data"]
-    _expire_shipped()
+    _expire_shipped(monkeypatch)
     monkeypatch.delenv("CYBERAU_OFFLINE")
     source._TRANSPORT = httpx.MockTransport(_site)
     found = pspf_search("PSPF on a page")
@@ -514,7 +516,7 @@ def test_partial_live_page_does_not_fill_from_an_expired_snapshot(monkeypatch):
         return httpx.Response(200, content=b"<html><body><p>Publications</p></body></html>")
 
     source._TRANSPORT = httpx.MockTransport(partial)
-    _expire_shipped()
+    _expire_shipped(monkeypatch)
     listed = pspf_list_directions()
     assert listed["data"] == []
     assert any("181 days old" in item for item in listed["warnings"])

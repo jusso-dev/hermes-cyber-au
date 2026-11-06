@@ -296,3 +296,27 @@ def test_every_shipped_skill_has_an_eval_and_ci_runs_the_full_set():
     )[0]
     assert "python tests/skills/harness.py" in eval_step
     assert "--evals" not in eval_step
+
+
+@pytest.mark.parametrize(
+    "eval_path",
+    harness.discover_eval_files(),
+    ids=lambda path: path.parent.name,
+)
+def test_shipped_eval_passes_offline_without_a_provider_key(
+    eval_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    for name in harness.PROVIDER_ENV_VARS:
+        monkeypatch.setenv(name, "")
+    monkeypatch.setenv("CYBERAU_EVAL_MODELS", "should-not-run")
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("hermes was called")
+
+    monkeypatch.setattr(harness, "run_hermes", boom)
+    report = harness.run_eval_file(eval_path)
+    assert report["model_matrix"] == {"ran": False, "reason": "skipped: offline run", "models": []}
+    assert report["cases"]
+    failed = {case["id"]: case["failures"] for case in report["cases"] if not case["ok"]}
+    assert failed == {}

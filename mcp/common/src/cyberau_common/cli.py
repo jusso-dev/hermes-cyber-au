@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import logging
 import os
 import sys
 from pathlib import Path
 
+from cyberau_common import runtime
 from cyberau_common.health import collect_connector_health, run_health
 from cyberau_common.secrets import (
     RedactFilter,
@@ -21,21 +23,13 @@ from cyberau_common.server import build_server, get_connector
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] == "store":
+    if argv and argv[0] in _PLUGIN_COMMANDS:
         _configure_logging()
-        return _store_command(argv[1:])
+        return _plugin_command(_PLUGIN_COMMANDS[argv[0]], argv[1:])
     if argv and argv[0] == "provenance":
         from cyberau_common.provenance import main as provenance_main
 
         return provenance_main(argv[1:])
-    if argv and argv[0] == "assets":
-        _configure_logging()
-        return _assets_command(argv[1:])
-    if argv and argv[0] == "refresh":
-        from cyberau_common.refresh import refresh_main
-
-        _configure_logging()
-        return refresh_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="cyberau-mcp")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -67,15 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     regen.add_argument("--force", action="store_true")
     regen.add_argument("--fetch", action="store_true", help="Download upstream data first")
 
-    parser_check = sub.add_parser("parser-check", help="Re-check advisory parsers")
-    parser_check.add_argument("--sources", default="")
-    parser_check.add_argument("--json", dest="json_path", default="")
-
     sub.add_parser("store", help="Query and update the local intel store")
     sub.add_parser("assets", help="Import, list and match the local asset inventory")
     sub.add_parser("provenance", help="Print the provenance footer for connector results")
 
-    # Parsed by refresh_main; listed here for --help.
     sub.add_parser("refresh", help="Refresh public feeds and optionally load the intel store")
 
     doctor = sub.add_parser("doctor", help="Warn when .env is not mode 600")
@@ -120,29 +109,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.fetch:
             forwarded.append("--fetch")
         return regen_main(forwarded)
-    if args.command == "parser-check":
-        from cyberau_common.regen import parser_check_main
-
-        forwarded = ["--sources", args.sources]
-        if args.json_path:
-            forwarded.extend(["--json", args.json_path])
-        return parser_check_main(forwarded)
-    print(
-        f"{args.command} is not part of the shared library yet",
-        file=sys.stderr,
-    )
-    return 2
+    raise AssertionError(f"unhandled command {args.command}")
 
 
 def _health_all(args) -> int:
     live = bool(args.live) and not args.offline
     fixtures = os.environ.get("CYBERAU_HEALTH_FIXTURES")
-    data_dir = os.environ.get("CYBERAU_DATA_DIR")
     report = collect_connector_health(
         live=live,
         check_schema=bool(args.schema_drift),
         fixtures=Path(fixtures) if fixtures else None,
-        state_path=Path(data_dir) / "connector-health-state.json" if data_dir else None,
+        state_path=runtime.profile_data_dir() / "connector-health-state.json",
     )
     if args.json_path:
         Path(args.json_path).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -152,7 +129,11 @@ def _health_all(args) -> int:
     return 1 if failed else 0
 
 
-def _store_command(argv: list[str]) -> int:
+# Subcommands parsed by a ``store.<module>.main`` in the cyber-au plugin.
+_PLUGIN_COMMANDS = {"store": "cli", "assets": "assets", "refresh": "refresh"}
+
+
+def _plugin_command(module: str, argv: list[str]) -> int:
     root = _plugin_root()
     if root is None:
         print("intel store is not installed", file=sys.stderr)
@@ -161,27 +142,14 @@ def _store_command(argv: list[str]) -> int:
     if entry not in sys.path:
         sys.path.insert(0, entry)
     try:
-        from store.cli import main as store_main
+        loaded = importlib.import_module(f"store.{module}")
     except ModuleNotFoundError as exc:
         missing = exc.name or ""
         if missing == "store" or missing.startswith("store."):
             print("intel store is not installed", file=sys.stderr)
             return 2
         raise
-    return store_main(argv)
-
-
-def _assets_command(argv: list[str]) -> int:
-    root = _plugin_root()
-    if root is None:
-        print("intel store is not installed", file=sys.stderr)
-        return 2
-    entry = str(root)
-    if entry not in sys.path:
-        sys.path.insert(0, entry)
-    from store.assets import main as assets_main
-
-    return assets_main(argv)
+    return loaded.main(argv)
 
 
 def _plugin_root() -> Path | None:
@@ -205,17 +173,21 @@ def _plugin_root() -> Path | None:
     return None
 
 
+# Connectors whose source module has ``import_feed(path, feed)``.
+_IMPORTERS = {"asd": "cyberau_asd_acsc.source"}
+
+
 def _import_feed(name: str, path: str, feed: str) -> int:
-    if name != "asd":
+    if name not in _IMPORTERS:
         print(f"import does not support {name}", file=sys.stderr)
         return 2
     try:
-        from cyberau_asd_acsc.source import import_feed
+        source = importlib.import_module(_IMPORTERS[name])
     except ModuleNotFoundError:
-        print("asd connector is not installed", file=sys.stderr)
+        print(f"{name} connector is not installed", file=sys.stderr)
         return 2
     try:
-        print(import_feed(path, feed))
+        print(source.import_feed(path, feed))
     except (OSError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

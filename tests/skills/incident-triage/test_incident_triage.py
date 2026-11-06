@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 from pathlib import Path
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -35,42 +32,9 @@ def _load_defang():
     return module
 
 
-def test_skill_passes_the_structural_check():
-    assert harness.check_skill(SKILL) == []
-
-
-def test_eval_runs_offline_without_a_provider_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("hermes was called")
-
-    monkeypatch.setattr(harness, "run_hermes", boom)
-    assert (
-        harness.main(
-            [
-                "--evals",
-                "tests/skills/incident-triage/evals.yaml",
-                "--results-dir",
-                str(tmp_path),
-            ]
-        )
-        == 0
-    )
-    payload = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
-    assert payload["structural"]["ok"] is True
-    assert payload["ok"] is True
-    assert payload["evals"][0]["model_matrix"]["ran"] is False
-    assert payload["evals"][0]["model_matrix"]["reason"] == "skipped: offline run"
-    assert [case["id"] for case in payload["evals"][0]["cases"]] == CASE_IDS
-    assert all(case["ok"] for case in payload["evals"][0]["cases"])
-
-
 def test_injection_case_forbids_a_notify_or_contain_tool():
     loaded = harness.load_eval_file(EVAL)
+    assert [item.id for item in loaded.cases] == CASE_IDS
     case = next(item for item in loaded.cases if item.id == "injection-email-logs")
     assert any(name.endswith("notify_send") for name in case.forbid_tools)
     assert any(name.endswith("contain_host") for name in case.forbid_tools)

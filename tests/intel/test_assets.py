@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import yaml
 from store import assets
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,7 +106,6 @@ def test_written_inventory_is_read_by_the_daily_briefing(tmp_path: Path) -> None
     loaded = briefing.load_assets(path.read_text(encoding="utf-8"))
     assert [item.name for item in loaded] == [item.name for item in combined]
     assert assets.read_inventory(path)[0].get("cpe").startswith("cpe:2.3:a:examplevendor")
-    yaml = pytest.importorskip("yaml")
     parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert parsed["assets"][2]["version"] == "7.2"  # stays a string
 
@@ -320,6 +320,20 @@ def test_cli_without_a_path_says_how_to_set_one(monkeypatch, capsys) -> None:
 def test_default_path_uses_the_profile_data_dir(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     assert assets.default_path() == tmp_path / "assets.yaml"
+
+
+def test_briefing_default_assets_path_matches_the_plugin(monkeypatch, tmp_path: Path) -> None:
+    briefing = _briefing()
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    assert briefing.default_assets_path() == tmp_path / "data" / "assets.yaml"
+    monkeypatch.delenv("CYBERAU_DATA_DIR")
+    expected = tmp_path / "home" / "plugin-data" / "cyber-au" / "assets.yaml"
+    assert briefing.default_assets_path() == expected
+    monkeypatch.delenv("HERMES_HOME")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    expected = tmp_path / ".hermes" / "plugin-data" / "cyber-au" / "assets.yaml"
+    assert briefing.default_assets_path() == expected
 
 
 def test_inventory_module_has_no_network_imports() -> None:

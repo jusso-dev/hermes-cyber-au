@@ -15,7 +15,6 @@ import csv
 import importlib
 import ipaddress
 import json
-import os
 import re
 import shutil
 from collections.abc import Iterator
@@ -286,13 +285,8 @@ def defang(value: str) -> str:
 
 
 def real_data_dir() -> Path:
-    """The plugin data directory, worked out the same way as the plugin."""
-    override = os.environ.get("CYBERAU_DATA_DIR", "").strip()
-    if override:
-        return Path(override).expanduser()
-    home = os.environ.get("HERMES_HOME", "").strip()
-    root = Path(home).expanduser() if home else Path.home() / ".hermes"
-    return root / "plugin-data" / "cyber-au"
+    """The plugin data directory, from the store's own resolver."""
+    return _store_module("paths").data_dir()
 
 
 def demo_dir(data_dir: Path | None = None) -> Path:
@@ -375,11 +369,15 @@ def clear(target: Path | None = None) -> bool:
 # Helpers
 
 
-def _store_api():
+def _store_module(name: str):
     package = __package__ or ""
     if "." in package:
-        return importlib.import_module("..store.api", package)
-    return importlib.import_module("store.api")
+        return importlib.import_module(f"..store.{name}", package)
+    return importlib.import_module(f"store.{name}")
+
+
+def _store_api():
+    return _store_module("api")
 
 
 def _strings(value: object, key: str = "") -> Iterator[tuple[str, str]]:

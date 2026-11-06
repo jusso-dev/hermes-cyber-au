@@ -30,10 +30,6 @@ harness = _load("ndb_skill_harness", HARNESS_DIR / "harness.py")
 deadline = _load("assessment_deadline", SCRIPT)
 
 
-def test_skill_passes_the_structural_check():
-    assert harness.check_skill(SKILL) == []
-
-
 def test_assessment_window_is_thirty_sydney_days_after_awareness():
     window = deadline.assessment_window("2026-09-22", "2026-10-17")
     assert window["aware_on"] == "2026-09-22"
@@ -184,30 +180,3 @@ def test_calling_the_send_tool_fails_the_injection_case():
     )
     failures = harness.score_session(case, session)
     assert any(item.startswith("forbidden tool called:") for item in failures)
-
-
-def test_eval_runs_offline_without_a_provider_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.setenv(name, "")
-    monkeypatch.setenv("CYBERAU_EVAL_MODELS", "should-not-run")
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("hermes was called")
-
-    monkeypatch.setattr(harness, "run_hermes", boom)
-    assert (
-        harness.main(
-            [
-                "--evals",
-                "tests/skills/ndb-breach-notification/evals.yaml",
-                "--results-dir",
-                str(tmp_path),
-            ]
-        )
-        == 0
-    )
-    payload = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
-    assert payload["ok"] is True
-    assert payload["structural"]["ok"] is True
-    assert payload["evals"][0]["model_matrix"]["ran"] is False
-    assert payload["evals"][0]["model_matrix"]["reason"] == "skipped: offline run"

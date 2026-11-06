@@ -1,5 +1,4 @@
 import json
-import os
 import socket
 from pathlib import Path
 
@@ -20,9 +19,10 @@ FIXTURE_VALUES = (
 )
 
 
-def setup_function():
-    os.environ["CYBERAU_KEV_SNAPSHOT"] = str(SNAPSHOT)
-    os.environ["CYBERAU_TODAY"] = "2026-10-16"
+@pytest.fixture(autouse=True)
+def pinned(monkeypatch):
+    monkeypatch.setenv("CYBERAU_KEV_SNAPSHOT", str(SNAPSHOT))
+    monkeypatch.setenv("CYBERAU_TODAY", "2026-10-16")
 
 
 def test_lookup_and_search():
@@ -108,3 +108,11 @@ def test_failed_live_fetch_serves_no_shipped_data(tmp_path, monkeypatch):
     results = _tools()
     _assert_unavailable(results)
     assert "503" in results["kev_lookup"]["warnings"][0]
+
+
+def test_catalogue_returns_the_catalogue_and_cache_state():
+    from cyberau_cisa_kev.source import catalogue
+
+    catalog, cache = catalogue()
+    assert cache == "snapshot"
+    assert catalog == json.loads(SNAPSHOT.read_text(encoding="utf-8"))

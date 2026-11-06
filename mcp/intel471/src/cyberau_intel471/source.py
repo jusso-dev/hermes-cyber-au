@@ -13,11 +13,11 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
@@ -30,7 +30,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.store import ExposureStore
 from jsonschema import Draft202012Validator
@@ -203,10 +203,7 @@ class Intel471Connector(PremiumConnector):
                     intel471_credential_exposure,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
@@ -228,7 +225,7 @@ class Intel471Connector(PremiumConnector):
         if check_schema and not live:
             if not _snapshot_active():
                 return Probe(self.key, True, "no local copy to check")
-            payload = _load(_schema_text())
+            payload = runtime.load_json_object(_schema_text())
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
@@ -464,7 +461,7 @@ def _alert_record(
         "uid": uid,
         "watcher_name": untrusted_text(name, "intel471"),
         "source_type": source_type,
-        "observed_at": _iso(moment),
+        "observed_at": runtime.iso(moment),
         "finding": _public_finding(finding),
     }
 
@@ -495,7 +492,7 @@ def _breach_record(item: dict, watchlist: Watchlist, since: str | None) -> dict 
         _remember(finding, watchlist)
     record = {
         "uid": uid,
-        "observed_at": _iso(moment),
+        "observed_at": runtime.iso(moment),
         "title": untrusted_text(title, "intel471"),
         "stays_in_profile": True,
         "finding": _public_finding(finding),
@@ -561,7 +558,7 @@ def _credential_record(
     _remember(finding, watchlist)
     return {
         "domain": domain,
-        "observed_at": _iso(observed),
+        "observed_at": runtime.iso(observed),
         "counts": counts,
         "finding": _public_finding(finding),
     }
@@ -604,7 +601,7 @@ def _remember(finding: ExposureFinding, watchlist: Watchlist) -> None:
     if _snapshot_active():
         # A snapshot is a fixture, not an observation. It never becomes history.
         return
-    store = ExposureStore(_data_root() / "intel.sqlite")
+    store = ExposureStore(data_dir() / "intel.sqlite")
     store.write(finding, terms=_terms(), watchlist=watchlist)
 
 
@@ -621,7 +618,7 @@ def _fetch(
     if not force_live:
         body = _snapshot_body(kind)
         if body is not None:
-            payload = _load(body)
+            payload = runtime.load_json_object(body)
             if payload is None:
                 return None, "snapshot", "Intel 471 payload was not usable"
             return payload, "snapshot", ""
@@ -630,14 +627,14 @@ def _fetch(
     if not _configured():
         reason = "it is not configured. Set INTEL471_EMAIL and INTEL471_API_KEY"
         return None, "snapshot", _failed(reason, force_live)
-    root = _data_root()
+    root = data_dir()
     cache = _cache_for(root, kind)
     cache_key = cache.key("GET", url, params, b"", _scope())
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         cached = cache.get(cache_key)
         if cached is not None:
-            payload = _load(cached.body.decode("utf-8"))
+            payload = runtime.load_json_object(cached.body.decode("utf-8"))
             state = "hit" if cache.fresh(cached) else "stale"
             return payload, state, ""
         reason = "offline mode is on and no cached copy is stored"
@@ -658,7 +655,7 @@ def _fetch(
     except (HttpError, TimeoutError, RateLimited) as exc:
         cached = None if force_live else cache.get(cache_key)
         if cached is not None:
-            payload = _load(cached.body.decode("utf-8"))
+            payload = runtime.load_json_object(cached.body.decode("utf-8"))
             return payload, "stale", ""
         return None, "snapshot", _failed(_scrub(str(exc)), force_live)
     finally:
@@ -675,7 +672,7 @@ def _fetch(
     if response.status >= 400:
         message = f"Intel 471 returned HTTP {response.status}"
         return None, "snapshot", _failed(message, force_live)
-    payload = _load(response.body.decode("utf-8"))
+    payload = runtime.load_json_object(response.body.decode("utf-8"))
     if payload is None:
         return None, response.cache, "Intel 471 payload was not usable"
     return payload, response.cache, ""
@@ -709,12 +706,10 @@ def _client(root: Path, cache):
         kwargs["sleeper"] = _SLEEPER
     if _RNG is not None:
         kwargs["rng"] = _RNG
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    return HttpClient(
+    return runtime.http_client(
         "intel471",
-        policy=EgressPolicy(allowlist, "intel471"),
+        directory=root,
         cache=cache,
-        limiter=RateLimiter(root / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=_RATE,
         burst=_BURST,
@@ -804,7 +799,6 @@ def _snapshot_body(kind: str) -> str | None:
 
 
 def _schema_text() -> str:
-    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     raw = os.environ.get("CYBERAU_INTEL471_SNAPSHOT")
     if raw:
         path = Path(raw)
@@ -813,14 +807,6 @@ def _schema_text() -> str:
         if path.is_file():
             return path.read_text(encoding="utf-8")
     return ""
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
 
 
 def _drift_rows(
@@ -860,14 +846,7 @@ def _check_records(name: str, records: list[dict]) -> str:
 
 
 def _load_watchlist() -> tuple[Watchlist | None, str]:
-    raw = os.environ.get("CYBERAU_WATCHLIST")
-    if raw:
-        path = Path(raw)
-    else:
-        base = os.environ.get("CYBERAU_DATA_DIR")
-        if not base:
-            return None, ""
-        path = Path(base) / "watchlists" / "org-exposure.yaml"
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return None, ""
     try:
@@ -1176,12 +1155,6 @@ def _from_value(since: str | None) -> str | None:
     return str(int(day.timestamp() * 1000))
 
 
-def _iso(moment: datetime) -> str:
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _check_since(since: str | None) -> str:
     if since is None or since == "":
         return ""
@@ -1247,24 +1220,11 @@ def _envelope(data, cache: str, urls: tuple[str, ...], warnings: tuple[str, ...]
     )
 
 
-def _data_root() -> Path:
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        path = Path(raw)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-    return data_dir()
-
-
 def _scope() -> str:
     email = lookup("INTEL471_EMAIL") or ""
     if not email:
         return "anonymous"
     return hashlib.sha256(email.encode()).hexdigest()[:16]
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 def connector() -> Intel471Connector:

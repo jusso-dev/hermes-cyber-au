@@ -110,7 +110,6 @@ def test_advertised_schema_and_drift_probe(monkeypatch):
     assert tool.input_schema["required"] == ["ip"]
     assert tool.annotations.read_only_hint is True
     assert tool.annotations.open_world_hint is True
-    assert len("mcp__internetdb__internetdb_ip") == 30
     assert connector().health(live=False, check_schema=True).ok is True
     monkeypatch.setenv("CYBERAU_INTERNETDB_SNAPSHOT", str(FIXTURES / "ip_drift.json"))
     failed = connector().health(live=False, check_schema=True)

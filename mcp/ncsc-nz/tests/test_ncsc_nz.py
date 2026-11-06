@@ -1,6 +1,7 @@
 import asyncio
 import ipaddress
 import json
+import os
 import shutil
 import sqlite3
 import time
@@ -370,7 +371,7 @@ def test_fresh_cache_skips_a_second_fetch(monkeypatch):
 
 def _clear_rate_db() -> None:
     for name in ("rate_limit.sqlite", "rate_limit.sqlite-wal", "rate_limit.sqlite-shm"):
-        path = source._data_dir() / name
+        path = Path(os.environ["CYBERAU_DATA_DIR"]) / name
         if path.exists():
             path.unlink()
 

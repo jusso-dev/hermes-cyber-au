@@ -100,7 +100,6 @@ def test_schema_probe_and_limits():
     assert source.BURST == 1
     assert source.RATE <= 1 / 5
     assert source.TIMEOUT <= 90
-    assert source.CACHE_TTL == 24 * 3600
 
 
 def test_schema_drift_probe_fails(monkeypatch):

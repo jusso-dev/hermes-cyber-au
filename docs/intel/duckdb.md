@@ -44,7 +44,7 @@ The ceiling works like the record export (`docs/intel/scoring.md`). When `--max-
 
 Keyed and analyst sources follow the same rule as the record export: their rows are included when the marking is within the ceiling. Use `cyberau-mcp store snapshot --public` when you need a file with only public-source `CLEAR` data.
 
-An export with a ceiling above `GREEN` appends a line to `plugin-data/cyber-au/audit/<date>.jsonl`.
+An export with a ceiling above `GREEN` is recorded as an `export` event in the hash-chained audit log (`plugin-data/cyber-au/audit/<date>.jsonl`).
 
 ## Example queries
 

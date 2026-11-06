@@ -62,7 +62,7 @@ Two options, checked in the Hermes configuration and iron-proxy guides at the sa
 - Docker backend with no network: `terminal.backend: docker` and `terminal.docker_network: false` (`--network=none` for the terminal, code execution, and file-tool container).
 - `hermes egress` (iron-proxy), with `proxy.extra_allowed_hosts` set to the catalogue hosts. That setting adds hosts. It does not replace the inference hosts Hermes allows by default. Use `terminal.docker_network: false` when the sandbox should have no network at all.
 
-Catalogue hosts, one per line, excluding loopback names and the in-library stub:
+Catalogue hosts, one per line, excluding loopback names:
 
 ```bash
 uv run --project mcp python tools/ci/check_allowlist.py --print-hosts
@@ -116,6 +116,6 @@ For a container deployment, give the agent no direct route to the network. The o
 
 ## CI
 
-`tools/ci/check_allowlist.py` compares `mcp/egress-allowlist.yaml` with the connector inventory (`tools/tickets/inventory.py`, `inventory_added.py`, and `inventory_premium.py`). It fails when a host is added or removed on only one side. Connectors whose inventory host is supplied by the operator must have an empty host list until a real host is reviewed in. The in-library `stub` connector is the only extra key, and its only host is `example.com`.
+`tools/ci/check_allowlist.py` compares `mcp/egress-allowlist.yaml` with the connector inventory (`tools/tickets/inventory.py`, `inventory_added.py`, and `inventory_premium.py`). It fails when a host is added or removed on only one side. Connectors whose inventory host is supplied by the operator must have an empty host list until a real host is reviewed in.
 
 The same script fails when `global_deny_cidrs` no longer contains every floor network. Adding a network is allowed. Removing one is not.

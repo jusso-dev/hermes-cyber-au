@@ -17,10 +17,10 @@ from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import FAKE_IP_ENV, EgressDenied, EgressPolicy, EgressUnresolved
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError, _EgressBackend, egress_transport
+from cyberau_common.http import HttpClient, HttpError, egress_transport
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import RedactFilter, redact
-from cyberau_common.server import Connector, ToolSpec, build_server
+from cyberau_common.server import Connector, ToolSpec, build_server, get_connector
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -370,44 +370,67 @@ class TestConnectTimeEgress:
         with pytest.raises(EgressDenied, match="blocked"):
             EgressPolicy(path, "demo").check("https://198.18.0.1/", resolve=False)
 
+    @staticmethod
+    def _default_client(tmp_path: Path, policy: EgressPolicy) -> HttpClient:
+        """A client with no transport override, so it builds its own wiring."""
+        return HttpClient(
+            "demo",
+            policy=policy,
+            cache=HttpCache(tmp_path / "cache.sqlite"),
+            limiter=RateLimiter(tmp_path / "limit.sqlite"),
+            user_agent=USER_AGENT,
+            retries=0,
+        )
+
+    @staticmethod
+    def _record_sockets(monkeypatch) -> list[str]:
+        """Replace the real socket layer. Every connect is recorded and refused."""
+        hosts: list[str] = []
+
+        def connect_tcp(self, host, port, **kwargs):
+            hosts.append(host)
+            raise httpcore.ConnectError("no sockets in tests")
+
+        monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", connect_tcp)
+        return hosts
+
     def test_proxy_requests_do_not_resolve_locally(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
         monkeypatch.setenv("NO_PROXY", "direct.example")
+        sockets = self._record_sockets(monkeypatch)
+        resolved: list[str] = []
 
         def resolver(host):
-            raise AssertionError("resolved locally")
+            resolved.append(host)
+            return [_ip("1.1.1.1")]
 
         path = tmp_path / "allow.yaml"
         path.write_text(
             "connectors:\n  demo:\n    hosts: [example.com, direct.example]\n",
             encoding="utf-8",
         )
-        policy = EgressPolicy(path, "demo", resolver=resolver)
-        client = HttpClient(
-            "demo",
-            policy=policy,
-            cache=HttpCache(tmp_path / "cache.sqlite"),
-            limiter=RateLimiter(tmp_path / "limit.sqlite"),
-            user_agent=USER_AGENT,
-        )
-        proxied = client._client._transport_for_url(httpx.URL("https://example.com/a"))
-        assert isinstance(proxied._pool, httpcore.HTTPProxy)
-        direct = client._client._transport_for_url(httpx.URL("https://direct.example/a"))
-        assert isinstance(direct._pool._network_backend, _EgressBackend)
-        policy.check("https://example.com/a", resolve=False)
+        client = self._default_client(tmp_path, EgressPolicy(path, "demo", resolver=resolver))
+        with pytest.raises(HttpError):
+            client.get("https://example.com/a", ttl=5)
+        assert resolved == []
+        assert sockets == ["proxy.example"]
+        # NO_PROXY hosts connect directly, to the address the policy vetted.
+        with pytest.raises(HttpError):
+            client.get("https://direct.example/a", ttl=5)
+        assert resolved == ["direct.example"]
+        assert sockets == ["proxy.example", "1.1.1.1"]
         client.close()
 
-    def test_direct_requests_use_the_egress_transport(self, tmp_path: Path, monkeypatch):
+    def test_direct_requests_are_vetted_at_connect_time(self, tmp_path: Path, monkeypatch):
         monkeypatch.setattr("cyberau_common.http.get_environment_proxies", dict)
-        client = HttpClient(
-            "demo",
-            policy=_policy(tmp_path, self.ALLOW),
-            cache=HttpCache(tmp_path / "cache.sqlite"),
-            limiter=RateLimiter(tmp_path / "limit.sqlite"),
-            user_agent=USER_AGENT,
-        )
-        transport = client._client._transport_for_url(httpx.URL("https://example.com/a"))
-        assert isinstance(transport._pool._network_backend, _EgressBackend)
+        sockets = self._record_sockets(monkeypatch)
+        path = tmp_path / "allow.yaml"
+        path.write_text(self.ALLOW, encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("10.0.0.1")])
+        client = self._default_client(tmp_path, policy)
+        with pytest.raises(EgressDenied, match="blocked"):
+            client.get("https://example.com/a", ttl=5)
+        assert sockets == []
         client.close()
 
 
@@ -757,6 +780,28 @@ class TestHttp:
         assert len(calls) == 2
         client.close()
 
+    def test_head_is_cached_apart_from_get_and_held_to_the_allowlist(self, tmp_path: Path):
+        methods = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            methods.append(request.method)
+            body = b"" if request.method == "HEAD" else b"page"
+            return httpx.Response(200, content=body, headers={"x-total": "7"})
+
+        client = _client(tmp_path, handler)
+        url = "https://example.com/a"
+        first = client.head(url, params={"q": "x"}, headers={"x-token": "t"}, ttl=60)
+        assert first.cache == "miss" and first.status == 200
+        assert first.headers["x-total"] == "7"
+        assert client.head(url, params={"q": "x"}, ttl=60).cache == "hit"
+        assert client.get(url, params={"q": "x"}, ttl=60).body == b"page"
+        assert methods == ["HEAD", "GET"]
+        assert client.head(url, params={"q": "x"}, ttl=60, skip_cache=True).cache == "miss"
+        with pytest.raises(EgressDenied):
+            client.head("https://evil.test/a", ttl=60)
+        assert methods == ["HEAD", "GET", "HEAD"]
+        client.close()
+
     def test_upstream_errors_and_bare_redirect(self, tmp_path: Path):
         def five_hundred(request: httpx.Request) -> httpx.Response:
             return httpx.Response(500)
@@ -875,8 +920,10 @@ class TestServer:
         # cyclonedx), and jsonschema builds its Lark grammar on import, which costs
         # about half a second. The shipped runtime set (tools/release/sbom.py) does
         # not include it, so hide it to time what users actually start.
+        stub = Path(__file__).with_name("stub_connector.py")
         launch = (
-            "import sys; sys.modules['rfc3987_syntax'] = None; "
+            "import runpy, sys; sys.modules['rfc3987_syntax'] = None; "
+            f"runpy.run_path({str(stub)!r}); "
             "from cyberau_common.cli import main; "
             "raise SystemExit(main(['serve', 'stub']))"
         )
@@ -919,9 +966,7 @@ class TestServer:
         async def run():
             failed = await server.call_tool("demo_boom", {})
             passed = await server.call_tool("demo_pass", {})
-            ping = await build_server(
-                __import__("cyberau_common.stub", fromlist=["connector"]).connector()
-            ).call_tool("stub_ping", {"echo": "hi"})
+            ping = await build_server(get_connector("stub")).call_tool("stub_ping", {"echo": "hi"})
             return failed, passed, ping
 
         failed, passed, ping = asyncio.run(run())

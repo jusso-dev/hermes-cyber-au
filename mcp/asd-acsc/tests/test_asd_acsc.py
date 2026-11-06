@@ -497,3 +497,14 @@ def test_failed_live_fetch_serves_no_shipped_data(monkeypatch):
         lambda _request: httpx.Response(500, content=(FIXTURES / "http_500.txt").read_bytes())
     )
     _assert_unavailable(asd_list_items(feeds=["advisories"]), [])
+
+
+def test_poll_feed_reports_whether_the_items_are_live(monkeypatch):
+    items, live, _warning = source.poll_feed("alerts")
+    assert items and live is False
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    monkeypatch.delenv("CYBERAU_ASD_SNAPSHOT")
+    body = (FIXTURES / "alerts.xml").read_bytes()
+    source._TRANSPORT = httpx.MockTransport(lambda _request: httpx.Response(200, content=body))
+    items, live, warning = source.poll_feed("alerts")
+    assert items and live is True and warning == ""

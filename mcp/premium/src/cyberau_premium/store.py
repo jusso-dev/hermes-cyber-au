@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+
+from cyberau_common import runtime
 
 from cyberau_premium.base import (
     ExposureFinding,
@@ -38,12 +40,6 @@ CREATE INDEX IF NOT EXISTS exposures_subject ON exposures(subject_type, subject_
 """
 
 _RETENTION_DAYS = 90
-
-
-def _iso(moment: datetime) -> str:
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class ExposureStore:
@@ -110,7 +106,7 @@ class ExposureStore:
         with self._connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM exposures WHERE expires_at < ?",
-                (_iso(now),),
+                (runtime.iso(now),),
             )
             return cursor.rowcount
 
@@ -140,12 +136,12 @@ def _row(finding: ExposureFinding, *, now: datetime) -> dict:
         "watchlist_entry": watchlist_entry,
         "counts_json": counts,
         "data_classes": data_classes,
-        "first_seen": _iso(first),
-        "observed_at": _iso(observed),
+        "first_seen": runtime.iso(first),
+        "observed_at": runtime.iso(observed),
         "source_ref": source_ref,
         "confidence": finding.confidence,
         "licence_scope": finding.licence_scope,
         "stix_exportable": 1 if finding.stix_exportable else 0,
         "has_pi": 1 if finding.contains_personal_information else 0,
-        "expires_at": _iso(now + timedelta(days=_RETENTION_DAYS)),
+        "expires_at": runtime.iso(now + timedelta(days=_RETENTION_DAYS)),
     }

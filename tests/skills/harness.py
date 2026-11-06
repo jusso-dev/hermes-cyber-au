@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+STUB_CONNECTOR = ROOT / "mcp" / "common" / "tests" / "stub_connector.py"
 SKILLS_ROOT = ROOT / "skills"
 EVALS_ROOT = ROOT / "tests" / "skills"
 RESULTS_ROOT = EVALS_ROOT / "results"
@@ -693,7 +695,12 @@ def _call_connector(connector_key: str, tool: str, arguments: dict, env: Mapping
 
 
 def _load_connector(get_connector, connector_key: str):
-    """Load a connector from the workspace, then from ``mcp/<key>/src`` if needed."""
+    """Load a connector from the workspace, then from ``mcp/<key>/src`` if needed.
+
+    ``stub`` is the test connector in ``mcp/common/tests``. Loading it registers it.
+    """
+    if connector_key == "stub":
+        runpy.run_path(str(STUB_CONNECTOR))
     try:
         return get_connector(connector_key)
     except KeyError as exc:

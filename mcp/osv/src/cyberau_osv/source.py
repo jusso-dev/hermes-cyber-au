@@ -6,12 +6,10 @@ import re
 from pathlib import Path
 from typing import Annotated
 
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common import USER_AGENT, runtime
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError, Response
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError, Response
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -115,7 +113,7 @@ def osv_batch(queries: _Queries) -> dict:
     warnings: list[str] = []
     if cache == "snapshot":
         warnings.append(SNAPSHOT_NOTE)
-        pool = _load(_snapshot_text())
+        pool = runtime.load_json_object(_snapshot_text())
         problem = schema_drift(pool) if pool is not None else "snapshot is not JSON"
         if problem:
             return _envelope([], cache, warnings=(problem,))
@@ -175,7 +173,7 @@ class _OsvConnector(Connector):
         if check_schema and not live:
             if not os.environ.get("CYBERAU_OSV_SNAPSHOT"):
                 return Probe(self.key, True, "schema ok, no local copy to check")
-            payload = _load(_snapshot_text())
+            payload = runtime.load_json_object(_snapshot_text())
             problem = schema_drift(payload) if payload is not None else "snapshot is not JSON"
             if problem:
                 return Probe(self.key, False, problem)
@@ -243,15 +241,12 @@ def _fetch(
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
     if os.environ.get("CYBERAU_OSV_SNAPSHOT") and not force_live:
-        return _load(_snapshot_text()), "snapshot", ""
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    data_dir = _data_dir()
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+        return runtime.load_json_object(_snapshot_text()), "snapshot", ""
+    offline = runtime.offline() and not force_live
+    data_dir = runtime.data_dir("osv")
+    client = runtime.http_client(
         "osv",
-        policy=EgressPolicy(allowlist, "osv"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
+        directory=data_dir,
         user_agent=USER_AGENT,
         rate=10,
         burst=10,
@@ -275,7 +270,7 @@ def _fetch(
     warning = _status_warning(response)
     if warning:
         return None, response.cache, warning
-    return _load(response.body.decode("utf-8", "replace")), response.cache, ""
+    return runtime.load_json_object(response.body.decode("utf-8", "replace")), response.cache, ""
 
 
 def _status_warning(response: Response) -> str:
@@ -469,7 +464,7 @@ def _persist(rows: list[dict]) -> None:
 def _persist_ids(items: list[dict]) -> None:
     if not items:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("osv")
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / "osv-observations.jsonl").open("a", encoding="utf-8") as handle:
         for item in items:
@@ -477,20 +472,7 @@ def _persist_ids(items: list[dict]) -> None:
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing shipped in the repo is read."""
     return Path(os.environ["CYBERAU_OSV_SNAPSHOT"]).read_text(encoding="utf-8")
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-osv"))
 
 
 def _envelope(
@@ -518,10 +500,6 @@ def _as_of(data) -> str | None:
         if isinstance(row, dict) and isinstance(row.get("modified"), str) and row["modified"]
     ]
     return max(stamps) if stamps else None
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("osv", connector)

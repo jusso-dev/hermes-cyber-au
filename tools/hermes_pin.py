@@ -58,17 +58,18 @@ def redact(text: str) -> str:
     return _SECRET.sub("[redacted]", text)
 
 
-def _shown(tag: str) -> str:
-    text = redact(tag.replace("\n", "\\n").replace("\r", "\\r"))
-    if len(text) > 80:
-        return text[:80] + "..."
+def shown(value: str, limit: int = 80) -> str:
+    """One redacted line, cut to ``limit`` characters, for an error message."""
+    text = redact(value.replace("\n", "\\n").replace("\r", "\\r"))
+    if len(text) > limit:
+        return text[:limit] + "..."
     return text
 
 
 def validate_tag(tag: str) -> str:
     if TAG_RE.fullmatch(tag):
         return tag
-    raise PinError(f"Refusing tag {_shown(tag)!r}. Expected a release like v0.22.2.")
+    raise PinError(f"Refusing tag {shown(tag)!r}. Expected a release like v0.22.2.")
 
 
 def floor_version(tag: str) -> str:
@@ -172,7 +173,7 @@ def check_ci(root: Path) -> None:
     for match in CI_RE.finditer(path.read_text(encoding="utf-8")):
         if match.group("tag") != tag:
             raise PinError(
-                f"{CI_REL.as_posix()} hardcodes HERMES_IMAGE {_shown(match.group('tag'))}, "
+                f"{CI_REL.as_posix()} hardcodes HERMES_IMAGE {shown(match.group('tag'))}, "
                 f"but the pin is {tag}. Read it with tools/hermes_pin.py image instead."
             )
 

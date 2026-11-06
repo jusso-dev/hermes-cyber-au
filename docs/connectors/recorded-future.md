@@ -36,13 +36,14 @@ Server manifest `required_env`: `RECORDED_FUTURE_API_TOKEN`.
 | `RECORDED_FUTURE_MCP_CLIENT_ID` | credential | yes | no | not read in connector source |
 | `RECORDED_FUTURE_MCP_CLIENT_SECRET` | credential | yes | no | not read in connector source |
 | `RECORDED_FUTURE_ORG_ID` | credential | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.configured_data_dir, runtime.data_dir, runtime.org_watchlist_path` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
+| `CYBERAU_ORG_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_path` |
 | `CYBERAU_RF_ALLOW_EXTERNAL` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_RF_LIVE` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_RF_SCHEMA_FIXTURE` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_WATCHLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_path` |
 | `PYTEST_CURRENT_TEST` | runtime | no | no | `os.environ.get` |
 
 `RECORDED_FUTURE_API_TOKEN` is optional in `SOURCE.md`. `mcp/servers.yaml` lists it under `required_env`.
@@ -55,7 +56,7 @@ Limiter arguments in the connector source:
 
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
-| `_client` | `HttpClient` |  | `5` | `20` | `rolling` |
+| `_client` | `http_client` |  | `5` | `20` | `rolling` |
 
 ## Cache
 
@@ -65,7 +66,7 @@ A `get` call that omits `stale_if_error` uses the shared client default (1 day).
 
 | Function | Call | TTL | Stale if error |
 |---|---|---|---|
-| `_request` | `_fetch` | forwards `ttl` | `86400` (1 day) |
+| `_request` | `head` | forwards `ttl` | not set (shared client default 1 day) |
 | `_request` | `get` | forwards `ttl` | not set (shared client default 1 day) |
 | `rf_risklist_status` | `_request` | `0` (0 seconds) | not set on this call |
 | `_live_probe` | `_request` | `0` (0 seconds) | not set on this call |

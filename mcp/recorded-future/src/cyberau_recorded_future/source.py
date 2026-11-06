@@ -12,11 +12,10 @@ from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -30,7 +29,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.guard import pre_tool_call
 from cyberau_premium.redact import redact_obj, redact_text
 from cyberau_premium.store import ExposureStore
@@ -127,19 +126,6 @@ def _attribution() -> str:
     return _terms().attribution
 
 
-def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-recorded-future"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return _PACKAGE.parents[2] / "egress-allowlist.yaml"
-
-
 def _token() -> str | None:
     return lookup("RECORDED_FUTURE_API_TOKEN")
 
@@ -150,7 +136,7 @@ def _org_id() -> str | None:
 
 def _cache():
     global _CACHE, _CACHE_PATH
-    path = _data_dir() / "http_cache.sqlite"
+    path = runtime.data_dir("recorded-future") / "http_cache.sqlite"
     if _CACHE is None or _CACHE_PATH != path:
         _CACHE = cache_for_terms(path, _terms())
         _CACHE_PATH = path
@@ -158,7 +144,7 @@ def _cache():
 
 
 def _live_allowed() -> bool:
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return False
     if _TRANSPORT is not None:
         return True
@@ -197,10 +183,10 @@ def _config() -> dict | None:
     """Profile config.yaml, found from CYBERAU_DATA_DIR. No file means no `enabled: true`."""
     if _CONFIG is not None:
         return _CONFIG
-    data = os.environ.get("CYBERAU_DATA_DIR")
-    if not data:
+    data = runtime.configured_data_dir()
+    if data is None:
         return None
-    path = Path(data).resolve().parent.parent / "config.yaml"
+    path = data.resolve().parent.parent / "config.yaml"
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
@@ -227,18 +213,18 @@ def _client() -> HttpClient:
     policy_kwargs = {}
     if _RESOLVER is not None:
         policy_kwargs["resolver"] = _RESOLVER
-    return HttpClient(
+    return runtime.http_client(
         "recorded-future",
-        policy=EgressPolicy(_allowlist(), "recorded-future", **policy_kwargs),
+        directory=runtime.data_dir("recorded-future"),
+        policy=EgressPolicy(runtime.allowlist_path(), "recorded-future", **policy_kwargs),
         cache=_cache(),
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=5,
         burst=20,
         window="rolling",
         timeout=60,
         auth_scope=scope,
-        offline=os.environ.get("CYBERAU_OFFLINE") == "1",
+        offline=runtime.offline(),
         transport=_TRANSPORT,
         sleeper=_SLEEPER,
         rng=_RNG,
@@ -258,7 +244,7 @@ def _request(
     """Return payload, cache state, warning, and the raw response."""
     if not _token():
         return None, "snapshot", "RECORDED_FUTURE_API_TOKEN is not set", None
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+    offline = runtime.offline()
     if not offline and not _live_allowed():
         return None, "snapshot", _unavailable("live calls are turned off"), None
     try:
@@ -271,15 +257,7 @@ def _request(
         if method == "POST":
             response = client.post_json(url, body or {}, headers=headers, ttl=ttl)
         elif method == "HEAD":
-            response = client._fetch(
-                "HEAD",
-                url,
-                params=params,
-                headers=headers,
-                content=None,
-                ttl=ttl,
-                stale_if_error=86400,
-            )
+            response = client.head(url, params=params, headers=headers, ttl=ttl)
         else:
             response = client.get(url, params=params, headers=headers, ttl=ttl)
     except (HttpError, Exception) as exc:
@@ -315,14 +293,14 @@ def _unavailable(reason: str) -> str:
 
 
 def _cache_state(state: str) -> str:
-    if os.environ.get("CYBERAU_OFFLINE") == "1" and state == "hit":
+    if runtime.offline() and state == "hit":
         return "stale"
     return state
 
 
 def _since_iso(day: date) -> str:
     start = datetime(day.year, day.month, day.day, tzinfo=SYDNEY)
-    return start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(start)
 
 
 def _parse_day(value: str | None) -> date | None:
@@ -440,19 +418,9 @@ def _matched_subject(text: str, watchlist: Watchlist) -> tuple[str, str] | None:
     return None
 
 
-def _watchlist_path() -> Path | None:
-    override = os.environ.get("CYBERAU_WATCHLIST")
-    if override:
-        return Path(override)
-    data = os.environ.get("CYBERAU_DATA_DIR")
-    if not data:
-        return None
-    return Path(data).resolve().parent.parent / "watchlists" / "org-exposure.yaml"
-
-
 def _watch_file() -> dict:
-    path = _watchlist_path()
-    if path is None or not path.is_file():
+    path = runtime.org_watchlist_path()
+    if not path.is_file():
         return {}
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return raw if isinstance(raw, dict) else {}
@@ -1084,7 +1052,7 @@ def rf_risklist_status(entity_type: str, risk_rule: str | None = None) -> dict:
     previous = seen.get(key) if isinstance(seen.get(key), str) else None
     changed = cache == "miss"
     if changed:
-        seen[key] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        seen[key] = runtime.utc_now_iso()
         _save_risk_seen(seen)
     last_pulled = seen.get(key) or previous
     return _result(
@@ -1101,7 +1069,7 @@ def rf_risklist_status(entity_type: str, risk_rule: str | None = None) -> dict:
 
 
 def _risk_seen() -> dict:
-    path = _data_dir() / _RISK_SEEN_NAME
+    path = runtime.data_dir("recorded-future") / _RISK_SEEN_NAME
     if not path.is_file():
         return {}
     try:
@@ -1112,7 +1080,7 @@ def _risk_seen() -> dict:
 
 
 def _save_risk_seen(seen: dict) -> None:
-    path = _data_dir() / _RISK_SEEN_NAME
+    path = runtime.data_dir("recorded-future") / _RISK_SEEN_NAME
     path.write_text(json.dumps(seen), encoding="utf-8")
 
 
@@ -1232,10 +1200,7 @@ class RecordedFutureConnector(PremiumConnector):
                     rf_risklist_status,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(
@@ -1415,7 +1380,7 @@ class RecordedFutureConnector(PremiumConnector):
 
 def _live_probe() -> str:
     """One cheap call per tool group. Only a fresh upstream answer counts as ok."""
-    if os.environ.get("CYBERAU_OFFLINE") == "1":
+    if runtime.offline():
         return "offline mode, no live check was made"
     checks = (
         (

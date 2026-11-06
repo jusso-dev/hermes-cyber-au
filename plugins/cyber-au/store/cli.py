@@ -9,8 +9,11 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from cyberau_common.audit import AuditError
+
 from .analytics import DuckDBUnavailable, export_duckdb
 from .api import (
+    KINDS,
     export_records,
     ingest_kev_catalogue,
     table_counts,
@@ -18,6 +21,7 @@ from .api import (
     upsert_indicator,
     upsert_vulnerability,
 )
+from .canonical import EXPORT_DEFAULT_TLP
 from .db import open_store, resolve_db_path
 from .expiry import expire_by_age
 from .maintenance import (
@@ -48,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2 if code is None else int(code)
     try:
         return args.func(args)
-    except (OSError, ValueError, sqlite3.Error) as exc:
+    except (AuditError, OSError, ValueError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
@@ -386,12 +390,12 @@ def _cmd_export(args: argparse.Namespace) -> int:
         return 0
     if args.output or args.since:
         raise ValueError("--output needs --format stix21 or duckdb, --since needs stix21")
-    kinds = args.kinds if args.kinds else ("indicator", "advisory", "vulnerability")
+    kinds = args.kinds if args.kinds else KINDS
     records = export_records(kinds=kinds, max_tlp=args.max_tlp, path=args.path)
     _emit(
         {
             "untrusted": True,
-            "max_tlp": "GREEN" if args.max_tlp is None else args.max_tlp,
+            "max_tlp": EXPORT_DEFAULT_TLP if args.max_tlp is None else args.max_tlp,
             "explicit_max_tlp": args.max_tlp is not None,
             "records": records,
         }

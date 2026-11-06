@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -18,17 +19,28 @@ from cyberau_common.audit import (
     AuditUsageError,
     AuditVerifyError,
     AuditWriteError,
+    add_audit_parser,
     canonical_json,
     chain_hash,
     default_audit_dir,
-    main,
-    register_cli,
+    dispatch,
     register_hooks,
     tool_writes,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
 SECRET = "fake-token-value-0123456789"
+
+
+def main(argv: list[str]) -> int:
+    """Parse ``audit ...`` the way the plugin's ``hermes cyber-au`` command does."""
+    parser = argparse.ArgumentParser(prog="cyber-au")
+    add_audit_parser(parser.add_subparsers(dest="cyber_au_command", required=True))
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 2
+    return dispatch(args)
 
 
 def _log(tmp_path: Path, **kwargs) -> AuditLog:
@@ -72,16 +84,20 @@ class TestChain:
         hooks.post_tool_call("intel_search", {"q": "kev"}, '{"ok": true}', "task-1", 4)
         hooks.record_approval("intel_export_stix", {"id": "1"}, approved=True, task_id="task-1")
         hooks.record_block("intel_add_observation", {"id": "1"}, task_id="task-1", reason="no")
-        hooks.record_export(
-            "intel_export_stix",
-            {"id": "1"},
+        log.record(
+            "export",
+            tool="intel_export_stix",
+            args={"id": "1"},
             result="STIX-BUNDLE-BODY",
             task_id="task-1",
         )
-        hooks.record_delivery(
-            "brief_deliver", {"to": "queue"}, result="sent-body", task_id="task-1"
+        log.record("delivery", tool="brief_deliver", args={"to": "queue"}, result="sent-body")
+        log.record(
+            "config_change",
+            tool="config",
+            session_id="sess",
+            args={"key": "retention_days", "old": 90, "new": 30},
         )
-        hooks.record_config_change("retention_days", 30, old_value=90, session_id="sess")
         clock.advance(timedelta(hours=2))
         hooks.on_session_end("sess", completed=True, platform="cli")
         assert log.verify() == 8
@@ -258,9 +274,10 @@ class TestRedaction:
     ):
         monkeypatch.setenv("GREYNOISE_API_KEY", SECRET)
         log = _log(tmp_path)
-        hooks = AuditHooks(log)
-        record = hooks.record_config_change(
-            "api_token", SECRET, old_value="old-fake-token-9876543210"
+        record = log.record(
+            "config_change",
+            tool="config",
+            args={"key": "api_token", "old": "old-fake-token-9876543210", "new": SECRET},
         )
         blob = next((tmp_path / "audit").glob("*.jsonl")).read_text(encoding="utf-8")
         assert SECRET not in blob
@@ -441,26 +458,20 @@ class TestHooks:
         class Ctx:
             def __init__(self):
                 self.hooks = {}
-                self.cli = None
 
             def register_hook(self, name, fn):
                 self.hooks[name] = fn
-
-            def register_cli_command(self, **kwargs):
-                self.cli = kwargs
 
         log = _log(tmp_path)
         hooks = AuditHooks(log)
         ctx = Ctx()
         register_hooks(ctx, hooks)
-        register_cli(ctx)
         assert set(ctx.hooks) == {
             "pre_tool_call",
             "post_tool_call",
             "on_session_start",
             "on_session_end",
         }
-        assert ctx.cli["name"] == "cyber-au"
         ctx.hooks["on_session_start"]("sess", model="local", platform="cli")
         ctx.hooks["post_tool_call"]("brief_deliver", {"to": "queue"}, "body", "task", 2)
         assert log.verify() == 2
@@ -472,10 +483,14 @@ class TestHooks:
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        assert module.pre_tool_call("intel_search", {"q": "a"}, task_id="t") is None
-        module.post_tool_call("intel_search", {"q": "a"}, result="{}", task_id="t", duration_ms=1)
-        module.on_session_start("plugin-sess", model="local", platform="cli")
-        module.on_session_end("plugin-sess", completed=True, platform="cli")
+        plugin_ctx = Ctx()
+        module.register(plugin_ctx)
+        assert plugin_ctx.hooks["pre_tool_call"]("intel_search", {"q": "a"}, task_id="t") is None
+        plugin_ctx.hooks["post_tool_call"](
+            "intel_search", {"q": "a"}, result="{}", task_id="t", duration_ms=1
+        )
+        plugin_ctx.hooks["on_session_start"]("plugin-sess", model="local", platform="cli")
+        plugin_ctx.hooks["on_session_end"]("plugin-sess", completed=True, platform="cli")
         plugin_log = AuditLog()
         assert plugin_log.verify() == 3
 

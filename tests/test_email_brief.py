@@ -177,6 +177,7 @@ def _profile(tmp_path: Path, hermes: str | None) -> tuple[Path, dict]:
     profile = tmp_path / "profile"
     (profile / "scripts").mkdir(parents=True)
     shutil.copy(ROOT / "scripts" / "cyberau_morning_email.sh", profile / "scripts")
+    shutil.copy(ROOT / "scripts" / "_cyberau_lib.sh", profile / "scripts")
     skill = profile / "skills" / "daily-briefing"
     (skill / "scripts").mkdir(parents=True)
     (skill / "references").mkdir(parents=True)

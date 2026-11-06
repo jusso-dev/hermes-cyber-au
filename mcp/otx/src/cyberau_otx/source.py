@@ -12,12 +12,12 @@ from urllib.parse import quote, urlsplit
 from zoneinfo import ZoneInfo
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimited, RateLimiter
+from cyberau_common.http import HttpError
+from cyberau_common.ratelimit import RateLimited
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -144,7 +144,7 @@ class _OtxConnector(Connector):
             # Only an operator-supplied snapshot is checked offline. Test fixtures are not.
             if not os.environ.get("CYBERAU_OTX_SNAPSHOT"):
                 return Probe(self.key, True, "no local copy to check")
-            payload = _load(_snapshot_text() or "")
+            payload = runtime.load_json_object(_snapshot_text() or "")
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
@@ -330,7 +330,7 @@ def _gather_pulses(
         nxt = current.get("next")
         if not isinstance(nxt, str) or not nxt or len(rows) >= limit:
             break
-        if state == "snapshot" or os.environ.get("CYBERAU_OFFLINE") == "1":
+        if state == "snapshot" or runtime.offline():
             break
         nxt = _absolute_next(nxt)
         if nxt in seen_urls or not _allowed_page(nxt):
@@ -355,7 +355,7 @@ def _fetch(
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_OTX_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if snapshot and not force_live:
         text = _read_text(Path(snapshot))
         if text is None:
@@ -364,8 +364,8 @@ def _fetch(
                 "snapshot",
                 unavailable(_LABEL, "the operator-supplied snapshot is missing"),
             )
-        return _load(text), "snapshot", ""
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-otx"))
+        return runtime.load_json_object(text), "snapshot", ""
+    data_dir = runtime.data_dir("otx")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     secret = lookup("OTX_API_KEY")
     scope = _auth_scope(secret)
@@ -373,17 +373,15 @@ def _fetch(
     cached = cache.get(cache_key)
     if cached and not force_live and (offline or cache.fresh(cached)):
         state = "hit" if cache.fresh(cached) else "stale"
-        return _load(cached.body.decode("utf-8")), state, ""
+        return runtime.load_json_object(cached.body.decode("utf-8")), state, ""
     if offline:
         return None, "snapshot", unavailable(_LABEL, "offline and no cached copy is stored")
     if not secret:
         return None, "snapshot", unavailable(_LABEL, "OTX_API_KEY is not set")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         "otx",
-        policy=EgressPolicy(allowlist, "otx"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=1,
         burst=1,
@@ -403,7 +401,7 @@ def _fetch(
                 return None, "snapshot", _safe(exc, secret)
             stale = cache.get(cache_key)
             if stale:
-                return _load(stale.body.decode("utf-8")), "stale", ""
+                return runtime.load_json_object(stale.body.decode("utf-8")), "stale", ""
             return None, "snapshot", unavailable(_LABEL, _safe(exc, secret))
     finally:
         client.close()
@@ -416,7 +414,7 @@ def _fetch(
     if response.status == 429:
         stale = None if force_live else cache.get(cache_key)
         if stale:
-            return _load(stale.body.decode("utf-8")), "stale", ""
+            return runtime.load_json_object(stale.body.decode("utf-8")), "stale", ""
         return None, "snapshot", unavailable(_LABEL, "OTX returned 429 after backing off")
     if response.status >= 500:
         return None, "snapshot", unavailable(_LABEL, f"OTX returned {response.status}")
@@ -426,7 +424,7 @@ def _fetch(
         text = response.body.decode("utf-8")
     except UnicodeDecodeError:
         return None, response.cache, "OTX payload was not usable"
-    return _load(text), response.cache, ""
+    return runtime.load_json_object(text), response.cache, ""
 
 
 def _headers(secret: str) -> dict[str, str]:
@@ -678,7 +676,7 @@ def _pulse_observation(row: dict) -> dict:
 def _persist(rows: list[dict]) -> None:
     if not rows:
         return
-    directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-otx"))
+    directory = runtime.data_dir("otx")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "otx-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
@@ -687,26 +685,11 @@ def _persist(rows: list[dict]) -> None:
 
 
 def _kept(modified: str, day: str) -> bool:
-    parsed = _parse_time(modified)
+    parsed = runtime.parse_iso(modified)
     if parsed is None:
         return False
     start = datetime.fromisoformat(day).replace(tzinfo=_SYDNEY)
     return parsed >= start
-
-
-def _parse_time(value: str) -> datetime | None:
-    text = value.strip()
-    if not text:
-        return None
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=_UTC)
-    return parsed
 
 
 def _sydney_param(day: str) -> str:
@@ -746,7 +729,6 @@ def _response_problem(name: str, record: dict) -> str | None:
 
 
 def _snapshot_text() -> str | None:
-    """Read the operator-supplied snapshot. Nothing shipped in the package is ever read."""
     snapshot = os.environ.get("CYBERAU_OTX_SNAPSHOT")
     return _read_text(Path(snapshot)) if snapshot else None
 
@@ -755,16 +737,6 @@ def _read_text(path: Path) -> str | None:
     if not path.is_file():
         return None
     return path.read_text(encoding="utf-8")
-
-
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return payload
 
 
 def _envelope(
@@ -783,10 +755,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("otx", connector)

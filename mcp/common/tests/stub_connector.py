@@ -1,4 +1,7 @@
-"""In-library connector used to prove server startup. It does not call the network."""
+"""Test connector that proves server startup and backs skill eval replays.
+
+Importing this file registers it as ``stub``. It does not call the network.
+"""
 
 from __future__ import annotations
 

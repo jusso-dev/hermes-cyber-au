@@ -310,12 +310,11 @@ def test_offline_uses_cache_then_snapshot(tmp_path, monkeypatch):
     assert any("is unavailable" in item for item in fallback["warnings"])
 
 
-def test_cassettes_are_redacted(vcr_config):
+def test_cassettes_are_redacted():
     import vcr
     from vcr.serialize import deserialize
     from vcr.serializers import yamlserializer
 
-    assert "authorization" in vcr_config["filter_headers"]
     player = vcr.VCR(record_mode="none")
     for name in READ_TOOLS:
         path = FIXTURES / f"{name}.yaml"
@@ -385,7 +384,8 @@ def test_restricted_records_stay_in_the_profile_data_dir(tmp_path, monkeypatch):
     assert "amber" in stored.read_text(encoding="utf-8")
     assert stored.stat().st_mode & 0o077 == 0
     monkeypatch.delenv("CYBERAU_DATA_DIR")
-    monkeypatch.setattr(source, "_data_dir", lambda: tmp_path / "fallback")
+    # Unset, the data dir is the /tmp fallback. Point it at tmp_path to keep the test local.
+    monkeypatch.setattr(source.runtime, "data_dir", lambda *_a, **_k: tmp_path / "fallback")
     source._persist([{"id": "x", "tlp": "amber"}, {"id": "y", "tlp": "white"}])
     kept = (tmp_path / "fallback" / "misp-events.jsonl").read_text(encoding="utf-8")
     assert '"y"' in kept

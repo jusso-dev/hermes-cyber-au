@@ -152,7 +152,28 @@ def _add_workspace_member(path: Path, key: str) -> None:
     rendered = ", ".join(f'"{item}"' for item in current)
     replacement = f"members = [{rendered}]"
     updated = text[: match.start()] + replacement + text[match.end() :]
-    path.write_text(updated, encoding="utf-8")
+    path.write_text(_add_testpath(updated, f"{key}/tests"), encoding="utf-8")
+
+
+def _add_testpath(text: str, entry: str) -> str:
+    """Append ``entry`` to ``[tool.pytest.ini_options].testpaths`` when that list exists."""
+    section = re.search(r"(?m)^\[tool\.pytest\.ini_options\]\s*$", text)
+    if section is None:
+        return text
+    match = re.compile(r"(?m)^testpaths = \[([^\]]*)\]").search(text, section.end())
+    if match is None:
+        return text
+    following = re.compile(r"(?m)^\[").search(text, section.end())
+    if following is not None and following.start() < match.start():
+        return text
+    if f'"{entry}"' in match.group(1):
+        return text
+    body = match.group(1).rstrip()
+    if "\n" in match.group(1):
+        body = f'{body}\n  "{entry}",\n'
+    else:
+        body = f'{body}, "{entry}"' if body.strip() else f'"{entry}"'
+    return text[: match.start(1)] + body + text[match.end(1) :]
 
 
 def _add_server(path: Path, key: str, server: str) -> None:

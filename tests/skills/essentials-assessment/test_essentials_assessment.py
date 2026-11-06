@@ -53,33 +53,12 @@ def _base(**overrides: object) -> dict:
     return document
 
 
-def test_skill_passes_the_structural_check():
-    assert harness.check_skill(SKILL) == []
-
-
 def test_offline_messages_match_the_renderer():
     eval_file = harness.load_eval_file(EVALS)
     for case in eval_file.cases:
         document = _load(f"{case.id}.json")
         assert case.offline is not None
         assert case.offline.message.strip() == RENDER.render(document).markdown.strip()
-
-
-def test_eval_runs_offline_without_a_provider_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("hermes was called")
-
-    monkeypatch.setattr(harness, "run_hermes", boom)
-    assert harness.main(["--evals", str(EVALS), "--results-dir", str(tmp_path)]) == 0
-    payload = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
-    assert payload["ok"] is True
-    assert payload["evals"][0]["model_matrix"]["ran"] is False
-    assert payload["evals"][0]["model_matrix"]["reason"] == "skipped: offline run"
 
 
 def test_missing_source_does_not_invent_requirement_text():

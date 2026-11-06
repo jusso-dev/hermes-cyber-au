@@ -7,16 +7,13 @@ registered name and business names, and only those names are sent.
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
 import httpx
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 
 # ATO modulus 89. Subtract 1 from the first digit, then apply these weights.
@@ -116,13 +113,12 @@ def lookup_names(abn: str, *, transport=None, resolver=None) -> list[str]:
 
 def _client(*, transport, resolver) -> HttpClient:
     directory = data_dir()
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_default_allowlist())))
+    allowlist = runtime.allowlist_path()
     policy = EgressPolicy(allowlist, "org-exposure", resolver=resolver)
-    return HttpClient(
+    return runtime.http_client(
         "org-exposure",
+        directory=directory,
         policy=policy,
-        cache=HttpCache(directory / "http_cache.sqlite"),
-        limiter=RateLimiter(directory / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=1.0,
         burst=1,
@@ -192,19 +188,4 @@ def _strip_guid(text: str, guid: str) -> str:
 def data_dir() -> Path:
     """Profile data directory. Routine state, the ledger and the audit log live here, so it
     must be the same on every run. Tests point CYBERAU_DATA_DIR at a temporary directory."""
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw)
-    return profile_home() / "plugin-data" / "cyber-au"
-
-
-def profile_home() -> Path:
-    """Hermes profile directory: HERMES_HOME, otherwise ~/.hermes."""
-    raw = os.environ.get("HERMES_HOME")
-    if raw:
-        return Path(raw)
-    return Path.home() / ".hermes"
-
-
-def _default_allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
+    return runtime.profile_data_dir()

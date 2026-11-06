@@ -242,6 +242,12 @@ class _Extractor(ast.NodeVisitor):
             if env_name:
                 self._env(env_name, "os.environ.get")
         keywords = {item.arg: item.value for item in node.keywords if item.arg}
+        if _is_runtime_call(node):
+            env_names = RUNTIME_ENV_READS.get(name, ())
+            if name == "http_client" and "policy" in keywords:
+                env_names = ()
+            for env_name in env_names:
+                self._env(env_name, f"runtime.{name}")
         if self.server_name is None and "server_name" in keywords:
             self.server_name = const_str(keywords["server_name"])
         if "ttl" in keywords:
@@ -281,6 +287,31 @@ class _Extractor(ast.NodeVisitor):
             rates=self.rates,
             burst_assignments=self.burst_assignments,
         )
+
+
+# cyberau_common.runtime helpers and the CYBERAU_* variables each one reads.
+_ORG_WATCHLIST_ENV = ("CYBERAU_ORG_WATCHLIST", "CYBERAU_WATCHLIST")
+RUNTIME_ENV_READS: dict[str, tuple[str, ...]] = {
+    "data_dir": ("CYBERAU_DATA_DIR",),
+    "configured_data_dir": ("CYBERAU_DATA_DIR",),
+    "profile_data_dir": ("CYBERAU_DATA_DIR",),
+    "org_watchlist_override": _ORG_WATCHLIST_ENV,
+    "org_watchlist_path": (*_ORG_WATCHLIST_ENV, "CYBERAU_DATA_DIR"),
+    "allowlist_path": ("CYBERAU_EGRESS_ALLOWLIST",),
+    "http_client": ("CYBERAU_EGRESS_ALLOWLIST",),
+    "offline": ("CYBERAU_OFFLINE",),
+    "today": ("CYBERAU_TODAY",),
+    "pinned_day": ("CYBERAU_TODAY",),
+}
+
+
+def _is_runtime_call(node: ast.Call) -> bool:
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "runtime"
+    )
 
 
 def _is_environ_get(node: ast.Call) -> bool:
@@ -640,10 +671,14 @@ def render_feed_section(feeds: list[dict], *, catalogue_present: bool = True) ->
     return "\n".join(lines)
 
 
+# HttpClient methods whose stale_if_error defaults to the shared get() default.
+_DEFAULT_STALE_CALLS = frozenset({"get", "head"})
+
+
 def keep_ttl(site: TtlSite) -> bool:
     if site.function == "health":
         return False
-    if site.call == "get":
+    if site.call in _DEFAULT_STALE_CALLS:
         return True
     forwarded = isinstance(site.ttl_node, ast.Name)
     return not (forwarded and site.stale_node is None)
@@ -658,7 +693,7 @@ def keep_rate(site: RateSite) -> bool:
 def stale_cell(site: TtlSite, default: int | None) -> str:
     if site.stale_node is not None:
         return seconds_text(site.stale_node)
-    if site.call == "get" and default is not None:
+    if site.call in _DEFAULT_STALE_CALLS and default is not None:
         return f"not set (shared client default {format_seconds(default)})"
     return "not set on this call"
 
@@ -666,7 +701,9 @@ def stale_cell(site: TtlSite, default: int | None) -> str:
 def render_cache(sites: list[TtlSite], default: int | None) -> str:
     kept = [site for site in sites if keep_ttl(site)]
     lines = ["HTTP cache `ttl` arguments in the connector source."]
-    omits_stale = any(site.call == "get" and site.stale_node is None for site in kept)
+    omits_stale = any(
+        site.call in _DEFAULT_STALE_CALLS and site.stale_node is None for site in kept
+    )
     if omits_stale and default is not None:
         lines.append(
             "A `get` call that omits `stale_if_error` uses the shared client default "

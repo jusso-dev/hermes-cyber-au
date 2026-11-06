@@ -56,7 +56,7 @@ def _isolated(monkeypatch, tmp_path):
     monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
 
 
-def test_offline_submit_and_result_match_schemas():
+def test_offline_submit_and_result_match_schemas(tmp_path):
     approval = issue_unlisted_approval(URL)
     submitted = urlscan_submit_unlisted(URL, approval)
     _assert_envelope(submitted)
@@ -82,7 +82,7 @@ def test_offline_submit_and_result_match_schemas():
     assert "phishing" in row["categories"]
     assert found["data_as_of"] == "2026-10-16T01:02:03.000Z"
     _validate_record("urlscan_get_result", row)
-    history = Path(source._data_dir() / "cfscan-observations.jsonl").read_text(encoding="utf-8")
+    history = (tmp_path / "cfscan-observations.jsonl").read_text(encoding="utf-8")
     assert "malicious" in history
     assert API_TOKEN not in history
     assert approval not in history
@@ -323,8 +323,6 @@ def test_live_health_and_advertised_tools(monkeypatch):
     jsonschema.Draft202012Validator.check_schema(result_schema)
     assert submit_schema["required"] == ["url", "approval_token"]
     assert result_schema["required"] == ["scan_id"]
-    assert len("mcp__cfscan__urlscan_submit_unlisted") == 36
-    assert len("mcp__cfscan__urlscan_get_result") == 31
 
 
 def test_default_stays_off_and_docs_quote_the_terms(monkeypatch):
@@ -492,9 +490,9 @@ def test_enabled_flag_only_survives_when_literally_true():
     assert render_mcp_enabled(True) is True
 
 
-def test_approval_store_is_private_and_refuses_foreign_owner(monkeypatch):
+def test_approval_store_is_private_and_refuses_foreign_owner(monkeypatch, tmp_path):
     issue_unlisted_approval(URL)
-    store = source._data_dir() / "cfscan-approvals.sqlite"
+    store = tmp_path / "cfscan-approvals.sqlite"
     assert store.stat().st_mode & 0o077 == 0
     monkeypatch.setattr(source.os, "getuid", lambda: store.parent.stat().st_uid + 1)
     calls = _arm(monkeypatch, _submit_handler())

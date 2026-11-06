@@ -121,7 +121,7 @@ class HttpCache:
         if self.persistence == "ttl" and self.ttl_max is not None:
             ttl = min(int(ttl), int(self.ttl_max))
         kept = {
-            name: value
+            name.lower(): value
             for name, value in headers.items()
             if name.lower() in {"content-type", "etag", "last-modified", "link"}
         }
@@ -132,8 +132,8 @@ class HttpCache:
                 headers=kept,
                 body=body,
                 fetched_at=self._now(),
-                etag=kept.get("etag") or kept.get("ETag"),
-                last_modified=kept.get("last-modified") or kept.get("Last-Modified"),
+                etag=kept.get("etag"),
+                last_modified=kept.get("last-modified"),
                 ttl=ttl,
             )
             return
@@ -158,8 +158,8 @@ class HttpCache:
                     json.dumps(kept),
                     self._compressor.compress(body),
                     self._now(),
-                    kept.get("etag") or kept.get("ETag"),
-                    kept.get("last-modified") or kept.get("Last-Modified"),
+                    kept.get("etag"),
+                    kept.get("last-modified"),
                     ttl,
                 ),
             )

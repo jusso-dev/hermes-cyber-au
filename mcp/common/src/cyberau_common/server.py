@@ -53,13 +53,10 @@ def register_connector(key: str, factory: Callable[[], Connector]) -> None:
 
 def get_connector(key: str) -> Connector:
     if key not in _REGISTRY:
-        if key == "stub":
-            import cyberau_common.stub  # noqa: F401
-        else:
-            try:
-                importlib.import_module(f"cyberau_{key.replace('-', '_')}")
-            except ModuleNotFoundError as exc:
-                raise KeyError(key) from exc
+        try:
+            importlib.import_module(f"cyberau_{key.replace('-', '_')}")
+        except ModuleNotFoundError as exc:
+            raise KeyError(key) from exc
     if key not in _REGISTRY:
         raise KeyError(key)
     return _REGISTRY[key]()

@@ -8,12 +8,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -162,8 +160,8 @@ def schema_drift(payload) -> str | None:
 
 def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str, str]:
     snapshot = os.environ.get("CYBERAU_CRTSH_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    data_dir = _data_dir()
+    offline = runtime.offline() and not force_live
+    data_dir = runtime.data_dir("crtsh")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", API, params, b"", "anonymous")
     if not force_live and not snapshot:
@@ -185,11 +183,12 @@ def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str,
         return payload, "snapshot", SNAPSHOT_NOTE
     if offline:
         return None, "snapshot", unavailable(LABEL, "offline mode and no cached answer")
-    client = HttpClient(
+    client = runtime.http_client(
         "crtsh",
-        policy=EgressPolicy(_allowlist_path(), "crtsh"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", clock=_CLOCK, sleeper=_SLEEP),
+        limiter_clock=_CLOCK,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -315,7 +314,7 @@ def _serial(value) -> str:
 
 def _timestamp(value) -> str:
     """Pass a timestamp through only when it parses, so upstream text cannot ride in a date."""
-    if not isinstance(value, str) or _parse_time(value) is None:
+    if not isinstance(value, str) or runtime.parse_iso(value) is None:
         return ""
     return value.strip()
 
@@ -377,40 +376,24 @@ def _name_matches(name: str, domain: str, include_subdomains: bool) -> bool:
 
 
 def _is_expired(value: str, now: datetime) -> bool | None:
-    parsed = _parse_time(value)
+    parsed = runtime.parse_iso(value)
     if parsed is None:
         return None
     return parsed < now
 
 
-def _parse_time(value: str) -> datetime | None:
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1]
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed
-
-
 def _now() -> datetime:
-    override = os.environ.get("CYBERAU_TODAY")
-    if override:
-        parsed = _parse_time(override)
-        if parsed is not None:
-            return parsed
+    """Midnight UTC on CYBERAU_TODAY when it is pinned, else the current time."""
+    pinned = runtime.pinned_day()
+    if pinned is not None:
+        return datetime.combine(pinned, datetime.min.time(), UTC)
     return datetime.now(UTC)
 
 
 def _persist(domain: str, rows: list[dict]) -> None:
     if not rows:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("crtsh")
     path = directory / "crtsh-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
@@ -446,7 +429,6 @@ def _response_schema() -> dict:
 
 
 def _snapshot_text() -> str | None:
-    # Only an operator-supplied snapshot is read. The package ships no data file.
     snapshot = os.environ.get("CYBERAU_CRTSH_SNAPSHOT")
     if not snapshot:
         return None
@@ -496,19 +478,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-crtsh"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist_path() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("crtsh", connector)

@@ -480,8 +480,6 @@ def test_docs_fixtures_and_tool_contract():
     tools = {tool.name: tool for tool in listed}
     assert tools["cs_recon_notifications"].annotations.read_only_hint is True
     assert tools["cs_recon_notifications"].annotations.open_world_hint is True
-    assert len("mcp__csrecon__cs_recon_notifications") == 36
-    assert len("mcp__csrecon__cs_recon_rules") == 28
     missing = connector().health(live=False)
     assert missing.detail in {"not configured", "offline ok"}
 
@@ -511,7 +509,11 @@ def test_snapshot_and_stale_results_carry_a_warning(tmp_path, monkeypatch):
 
 def test_snapshot_never_becomes_a_stored_finding(tmp_path, monkeypatch):
     _keys(monkeypatch)
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    # Laid out as an install: the data directory is <profile>/plugin-data/cyber-au and the
+    # org-exposure watchlist is <profile>/watchlists/org-exposure.yaml.
+    data = tmp_path / "plugin-data" / "cyber-au"
+    data.mkdir(parents=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     _operator_snapshots(monkeypatch)
     watch = Watchlist(domains=["example.com.au"])
@@ -519,8 +521,9 @@ def test_snapshot_never_becomes_a_stored_finding(tmp_path, monkeypatch):
     path = tmp_path / "watchlists"
     path.mkdir()
     (path / "org-exposure.yaml").write_text("domains: [example.com.au]\n", encoding="utf-8")
+    assert source._load_watchlist() == watch
     assert cs_recon_notifications(since="2026-06-01")["cache"] == "snapshot"
-    intel = tmp_path / "intel.sqlite"
+    intel = data / "intel.sqlite"
     if intel.exists():
         rows = sqlite3.connect(intel).execute("select count(*) from exposures").fetchone()
         assert rows[0] == 0

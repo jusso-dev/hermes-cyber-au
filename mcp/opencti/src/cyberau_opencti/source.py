@@ -10,12 +10,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy, normalise_host
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -311,17 +309,16 @@ def _graphql(
     endpoint, problem = _endpoint(url)
     if problem:
         return None, "snapshot", problem, ""
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-opencti"))
+    offline = runtime.offline() and not force_live
+    data_dir = runtime.data_dir("opencti")
     try:
         policy = _policy(endpoint)
     except EgressDenied as exc:
         return None, "snapshot", str(exc), endpoint
-    client = HttpClient(
+    client = runtime.http_client(
         "opencti",
+        directory=data_dir,
         policy=policy,
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -377,7 +374,7 @@ def _graphql(
 
 
 def _policy(url: str) -> EgressPolicy:
-    policy = EgressPolicy(_allowlist(), "opencti", resolver=_RESOLVER)
+    policy = EgressPolicy(runtime.allowlist_path(), "opencti", resolver=_RESOLVER)
     host = urlsplit(url).hostname or ""
     if host:
         policy.hosts.add(normalise_host(host))
@@ -672,13 +669,6 @@ def _load_bytes(body: bytes) -> dict | None:
     except (json.JSONDecodeError, UnicodeDecodeError):
         return None
     return payload if isinstance(payload, dict) else None
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("opencti", connector)

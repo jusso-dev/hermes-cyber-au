@@ -341,7 +341,8 @@ _CERTS = [
 
 @pytest.fixture
 def crtsh(monkeypatch):
-    source = pytest.importorskip("cyberau_crtsh.source")
+    from cyberau_crtsh import source
+
     for name in (
         "CYBERAU_OFFLINE",
         "CYBERAU_CRTSH_SNAPSHOT",

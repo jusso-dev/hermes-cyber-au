@@ -16,11 +16,10 @@ from urllib.parse import urlsplit
 
 import jsonschema
 import yaml
-from cyberau_common import USER_AGENT
-from cyberau_common.cache import HttpCache
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -212,7 +211,7 @@ class _MispConnector(Connector):
     def health(self, *, live: bool, check_schema: bool = False) -> Probe:
         if check_schema and not live:
             text = _snapshot_text() or _read(_SCHEMA_FIXTURE)
-            payload = None if text is None else _load(text)
+            payload = None if text is None else runtime.load_json_object(text)
             if not payload:
                 return Probe(self.key, False, "MISP snapshot was not usable")
             problem = schema_drift(payload)
@@ -267,7 +266,7 @@ def schema_drift(payload: dict) -> str | None:
 
 def tool_request(server: str = "misp") -> None:
     """Budget for one tool call, keyed by server name."""
-    RateLimiter(_data_dir() / "rate_limit.sqlite").acquire(
+    RateLimiter(runtime.data_dir("misp", mode=0o700) / "rate_limit.sqlite").acquire(
         server,
         rate=RATE,
         burst=BURST,
@@ -283,7 +282,7 @@ def _fetch(path: str, body: dict, *, force_live: bool = False) -> tuple[dict | N
         return _live(path, body, offline=False)
     if os.environ.get("CYBERAU_MISP_SNAPSHOT"):
         return _from_snapshot()
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+    offline = runtime.offline()
     if offline and _config_problem() == "":
         payload, cache, warning = _live(path, body, offline=True)
         if payload is None:
@@ -303,7 +302,7 @@ def _from_snapshot() -> tuple[dict | None, str, str]:
     text = _snapshot_text()
     if text is None:
         return None, "snapshot", unavailable(LABEL, "the CYBERAU_MISP_SNAPSHOT file is missing")
-    payload = _load(text)
+    payload = runtime.load_json_object(text)
     if payload is None:
         return None, "snapshot", "MISP payload was not usable"
     warning = _document_warning(payload)
@@ -336,11 +335,10 @@ def _live(path: str, body: dict, *, offline: bool) -> tuple[dict | None, str, st
         reason = "the tool budget is exhausted for this profile"
         return None, "snapshot", unavailable(LABEL, reason)
     host = urlsplit(base).hostname or ""
-    client = HttpClient(
+    client = runtime.http_client(
         "misp",
+        directory=runtime.data_dir("misp", mode=0o700),
         policy=EgressPolicy(_runtime_allowlist(host), "misp", resolver=_RESOLVER),
-        cache=HttpCache(_data_dir() / "http_cache.sqlite"),
-        limiter=RateLimiter(_data_dir() / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -373,7 +371,7 @@ def _live(path: str, body: dict, *, offline: bool) -> tuple[dict | None, str, st
         )
     if response.status >= 400:
         return None, response.cache, f"MISP returned HTTP {response.status}."
-    payload = _load(response.body.decode("utf-8", errors="replace"))
+    payload = runtime.load_json_object(response.body.decode("utf-8", errors="replace"))
     if payload is None:
         return None, response.cache, "MISP payload was not usable"
     warning = _document_warning(payload)
@@ -723,7 +721,7 @@ def _parse_base(raw: str) -> tuple[str | None, str]:
 
 
 def _runtime_allowlist(host: str) -> Path:
-    directory = _data_dir()
+    directory = runtime.data_dir("misp", mode=0o700)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / "misp-egress.yaml"
     hosts: list[str] = []
@@ -737,7 +735,7 @@ def _runtime_allowlist(host: str) -> Path:
 
 
 def _static_hosts() -> list[str]:
-    path = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    path = runtime.allowlist_path()
     if not path.is_file():
         return []
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -766,7 +764,7 @@ def _as_of(events: list[dict]) -> str | None:
     if not digits:
         return None
     newest = max(digits, key=int)
-    return datetime.fromtimestamp(int(newest), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(datetime.fromtimestamp(int(newest), UTC))
 
 
 def _key_scope(secret: str) -> str:
@@ -775,11 +773,11 @@ def _key_scope(secret: str) -> str:
 
 
 def _persist(records: list[dict]) -> None:
-    if "CYBERAU_DATA_DIR" not in os.environ:
+    if runtime.configured_data_dir() is None:
         records = [item for item in records if not _restricted(item)]
     if not records:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("misp", mode=0o700)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / "misp-events.jsonl"
     descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
@@ -789,7 +787,6 @@ def _persist(records: list[dict]) -> None:
 
 
 def _snapshot_text() -> str | None:
-    """The operator-supplied snapshot file. There is no shipped default."""
     snapshot = os.environ.get("CYBERAU_MISP_SNAPSHOT")
     if not snapshot:
         return None
@@ -809,14 +806,6 @@ def _noted(cache: str, warnings: tuple[str, ...]) -> tuple[str, ...]:
     return warnings
 
 
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
 def _envelope(
     data,
     cache: str,
@@ -834,14 +823,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-misp"))
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("misp", connector)

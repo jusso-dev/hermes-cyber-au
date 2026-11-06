@@ -8,10 +8,10 @@ import json
 import re
 import sys
 import time
+import tomllib
 from pathlib import Path
 
 import jsonschema
-import pytest
 import yaml
 from cyberau_common.scaffold import generate
 from cyberau_common.server import build_server, get_connector
@@ -205,8 +205,7 @@ def test_repo_connector_contract(tmp_path: Path, monkeypatch):
     # A cache left in /tmp by an earlier run would turn a miss into a hit with no warning.
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     packages = _repo_connectors()
-    if not packages:
-        pytest.skip("no connector packages yet")
+    assert packages, "no connector packages found under mcp/"
     for package in packages:
         wrapped = _wrap_entry(package)
         if wrapped is not None:
@@ -222,3 +221,31 @@ def test_generated_stubs_pass_contract_quickly(tmp_path: Path):
         generate(tmp_path, key, server="stub", hosts=["example.com"])
         check_connector(tmp_path / "mcp" / key)
     assert time.perf_counter() - started < 60
+
+
+def _pytest_targets(pyproject: Path) -> tuple[list[str], set[str]]:
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    members = data["tool"]["uv"]["workspace"]["members"]
+    return members, set(data["tool"]["pytest"]["ini_options"]["testpaths"])
+
+
+def test_every_workspace_member_with_tests_is_collected():
+    members, testpaths = _pytest_targets(ROOT / "mcp" / "pyproject.toml")
+    for member in members:
+        tests = ROOT / "mcp" / member / "tests"
+        if tests.is_dir() and any(tests.glob("test_*.py")):
+            assert f"{member}/tests" in testpaths, member
+
+
+def test_generated_connector_tests_are_collected(tmp_path: Path):
+    mcp = tmp_path / "mcp"
+    mcp.mkdir()
+    (mcp / "pyproject.toml").write_text(
+        '[tool.uv.workspace]\nmembers = ["common"]\n\n'
+        '[tool.pytest.ini_options]\ntestpaths = [\n  "common/tests",\n]\naddopts = "-q"\n',
+        encoding="utf-8",
+    )
+    generate(tmp_path, "newfeed", server="newfeed", hosts=["example.com"])
+    members, testpaths = _pytest_targets(mcp / "pyproject.toml")
+    assert members == ["common", "newfeed"]
+    assert testpaths == {"common/tests", "newfeed/tests"}

@@ -14,11 +14,23 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+if __package__:
+    from .store.db import MIGRATIONS as STORE_MIGRATIONS
+    from .store.paths import foreign_data_dir, profile_data_dir
+else:
+    # install/bootstrap.sh runs cli.py directly, outside the plugin package.
+    _PLUGIN_DIR = str(Path(__file__).resolve().parent)
+    if _PLUGIN_DIR not in sys.path:
+        sys.path.append(_PLUGIN_DIR)
+    from store.db import MIGRATIONS as STORE_MIGRATIONS
+    from store.paths import foreign_data_dir, profile_data_dir
 
 USER_OWNED_ROOTS = frozenset(
     {
@@ -71,7 +83,6 @@ JOB_DEFINITION_FIELDS = frozenset(
 
 PAUSED_REASON = "Installed from a profile distribution; review it, then resume."
 _MIGRATION_RE = re.compile(r"^(\d{4})_.*\.sql$")
-_STORE_OWNED_RE = re.compile(r"[\"'](\d{4}_[^\"'/]*\.sql)[\"']")
 _TRANSACTION_WORDS = frozenset({"BEGIN", "COMMIT", "ROLLBACK", "END"})
 _LEADING_COMMENTS_RE = re.compile(r"\A(?:\s+|--[^\n]*(?:\n|\Z)|/\*.*?\*/)+", re.DOTALL)
 
@@ -112,12 +123,37 @@ def read_manifest(path: Path) -> Manifest:
     )
 
 
+_WARNED_FOREIGN: set[tuple[str, str]] = set()
+
+
+def _data_dir(profile: Path) -> Path:
+    """The profile's data directory. ``CYBERAU_DATA_DIR`` counts only inside the profile.
+
+    A value that points elsewhere, for example a shell still set up for another profile,
+    is ignored with a warning, so ``update --profile-home A`` never migrates B's store.
+    """
+    foreign = foreign_data_dir(profile)
+    if foreign is not None:
+        key = (str(profile), str(foreign))
+        if key not in _WARNED_FOREIGN:
+            _WARNED_FOREIGN.add(key)
+            print(
+                f"Warning: CYBERAU_DATA_DIR ({foreign}) is outside the profile {profile}. "
+                f"Ignoring it and using {Path(profile) / 'plugin-data' / 'cyber-au'}.",
+                file=sys.stderr,
+            )
+    return profile_data_dir(profile)
+
+
 def intel_store_path(profile: Path) -> Path:
-    return profile / "plugin-data" / "cyber-au" / "intel.sqlite"
+    """The store the plugin uses for this profile. ``CYBERAU_DATA_DIR`` wins when it is
+    inside the profile."""
+    return _data_dir(profile) / "intel.sqlite"
 
 
 def backup_dir(profile: Path) -> Path:
-    return profile / "plugin-data" / "cyber-au" / "backups"
+    """Pre-migration snapshots, beside the store, where cyberau_cleanup prunes them."""
+    return _data_dir(profile) / "backups"
 
 
 def repo_migrations() -> Path:
@@ -136,7 +172,7 @@ def resolve_migrations(profile: Path, override: Path | None = None) -> Path:
 def list_migrations(directory: Path) -> list[Path]:
     if not directory.is_dir():
         return []
-    owned = _store_owned_migrations(directory)
+    owned = _store_owned_migrations()
     found = [
         path
         for path in directory.iterdir()
@@ -145,18 +181,14 @@ def list_migrations(directory: Path) -> list[Path]:
     return sorted(found, key=lambda path: path.name)
 
 
-def _store_owned_migrations(directory: Path) -> set[str]:
+def _store_owned_migrations() -> set[str]:
     """Names the intel store applies itself when it opens the database.
 
-    ``store/db.py`` lists its own schema files and tracks them in
-    ``schema_version``. They share this directory but are not ours to run: they
-    create tables that already exist and set connection pragmas such as WAL,
-    which SQLite refuses inside a migration transaction.
+    They share the migrations directory but are not ours to run: they create
+    tables that already exist and set connection pragmas such as WAL, which
+    SQLite refuses inside a migration transaction.
     """
-    runner = directory.parent / "db.py"
-    if directory.name != "migrations" or not runner.is_file():
-        return set()
-    return set(_STORE_OWNED_RE.findall(runner.read_text(encoding="utf-8")))
+    return {path.name for path, _version in STORE_MIGRATIONS}
 
 
 def migration_id(name: str) -> str:
@@ -240,6 +272,7 @@ def migrate(profile: Path, migrations: Path | None = None) -> None:
     store = intel_store_path(profile)
     if store.is_symlink():
         raise UpdateError(f"Refusing to migrate through a symlinked intel store: {store}")
+    # The store must not escape the profile, through a symlink or otherwise.
     _assert_inside(profile, store)
     existed = store.is_file()
     store.parent.mkdir(parents=True, exist_ok=True)
@@ -442,11 +475,7 @@ def _merge_dir(src: Path, dest: Path, profile: Path) -> None:
             continue
         if child.is_symlink():
             raise UpdateError(f"Refusing to copy symlink {child}")
-        target = dest / child.name
-        if child.is_dir():
-            _replace(child, target, profile)
-        else:
-            _replace(child, target, profile)
+        _replace(child, dest / child.name, profile)
 
 
 def _replace(src: Path, dest: Path, profile: Path) -> None:

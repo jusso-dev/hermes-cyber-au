@@ -19,9 +19,6 @@ from cyberau_common.egress import FLOOR_CIDRS, normalise_host
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ALLOWLIST = ROOT / "mcp" / "egress-allowlist.yaml"
 
-# In-library connector. It does not call the network and is not an inventory row.
-_STUB = "stub"
-_STUB_HOSTS = frozenset({"example.com"})
 _ORG_EXPOSURE = "org-exposure"
 _ORG_EXPOSURE_HOSTS = frozenset({"abr.business.gov.au"})
 _LOOPBACK = frozenset({"localhost", "127.0.0.1"})
@@ -90,11 +87,6 @@ def differences(allowlist_path: Path, rows: list[dict]) -> list[str]:
             problems.append(f"{key} allowlist has extra hosts: {', '.join(extra)}")
 
     for key in sorted(set(listed) - set(expected)):
-        if key == _STUB:
-            actual = _listed_hosts(listed[key], key, problems)
-            if actual is not None and actual != _STUB_HOSTS:
-                problems.append("stub hosts must stay example.com")
-            continue
         if key == _ORG_EXPOSURE:
             actual = _listed_hosts(listed[key], key, problems)
             if actual is not None and actual != _ORG_EXPOSURE_HOSTS:
@@ -108,9 +100,7 @@ def catalogue_hosts(allowlist_path: Path) -> list[str]:
     data = yaml.safe_load(allowlist_path.read_text(encoding="utf-8")) or {}
     connectors = data.get("connectors") or {}
     found: set[str] = set()
-    for key, spec in connectors.items():
-        if key == _STUB:
-            continue
+    for spec in connectors.values():
         hosts = spec.get("hosts", spec) if isinstance(spec, dict) else spec
         if not isinstance(hosts, list):
             continue

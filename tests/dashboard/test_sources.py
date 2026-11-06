@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 10, 18, 9, 0, tzinfo=UTC)
@@ -179,7 +180,6 @@ def test_fallback_parser_reads_the_test_catalogue() -> None:
 
 
 def test_fallback_parser_agrees_with_yaml_on_the_shipped_catalogue() -> None:
-    yaml = pytest.importorskip("yaml")
     text = (ROOT / "feeds" / "catalogue.yaml").read_text(encoding="utf-8")
     expected = yaml.safe_load(text)["feeds"]
     keys = ("id", "name", "server", "connector", "keyed", "enabled_by_default", "poll")

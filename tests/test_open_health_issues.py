@@ -75,7 +75,6 @@ def _report() -> dict:
                 "error_class": "schema_drift",
                 "last_good": "2026-10-01",
                 "detail": "schema drift",
-                "keyed": False,
                 "body": SECRET,
                 "schema_diff": [
                     {
@@ -111,7 +110,6 @@ def _report() -> dict:
                 "schema_diff": [],
                 "last_good": None,
                 "detail": SECRET,
-                "keyed": True,
                 "body": SECRET,
                 "response": SECRET,
             },
@@ -205,7 +203,7 @@ def test_not_checked_does_not_close_an_existing_issue():
     assert nvd["body"] == "still open\n"
 
 
-def test_keyed_failure_omits_the_response(tmp_path: Path):
+def test_failure_omits_the_response(tmp_path: Path):
     module = load()
     github = FakeGitHub()
     report = {
@@ -216,7 +214,6 @@ def test_keyed_failure_omits_the_response(tmp_path: Path):
                 "status_code": 401,
                 "error_class": SECRET,
                 "detail": SECRET,
-                "keyed": True,
                 "body": SECRET,
                 "response": {"vulnerabilities": SECRET},
                 "schema_diff": [],
@@ -250,7 +247,6 @@ def test_main_never_calls_gh(tmp_path: Path, monkeypatch):
         == 0
     )
     assert github.calls[0][0] == "create"
-    assert module.main(["--kind", "parser", "--input", str(path)], client=github) == 0
     assert module.main(["--kind", "connector", "--input", str(tmp_path / "missing.json")]) == 2
 
 

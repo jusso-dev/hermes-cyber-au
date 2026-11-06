@@ -14,15 +14,14 @@ the store. See ``docs/intel/duckdb.md``.
 from __future__ import annotations
 
 import importlib
-import json
 import os
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .canonical import EXPORT_DEFAULT_TLP, TLP_RANK, require_tlp, tlp_allows, utc_now
-from .db import TABLES, open_store, resolve_db_path
-from .stix import _data_dir, resolve_export_path
+from .canonical import EXPORT_DEFAULT_TLP, TLP_RANK, require_tlp, tlp_allows
+from .db import TABLES, open_store, resolve_db_path, store_data_dir
+from .stix import export_audit_log, resolve_export_path
 
 INSTALL_HINT = (
     "DuckDB export needs the optional analytics extra: run uv sync --project mcp --extra analytics"
@@ -59,6 +58,8 @@ def export_duckdb(
         _refuse_symlink(path)
         path.unlink(missing_ok=True)
 
+    relative = destination.relative_to(store_data_dir(store).resolve()).as_posix()
+    audited = TLP_RANK[ceiling] > TLP_RANK[EXPORT_DEFAULT_TLP]
     open_store(store).connection()  # applies pending migrations before the read
     source = resolve_db_path(store)
     src = sqlite3.connect(f"{source.as_uri()}?mode=ro", uri=True, timeout=30)
@@ -72,6 +73,9 @@ def export_duckdb(
                 counts, omitted = _copy_tables(src, con, ceiling)
             finally:
                 con.close()
+            if audited:
+                # Fail closed: the file only appears once the audit record is written.
+                _audit(store, ceiling, max_tlp is not None, counts, relative)
             os.replace(partial, destination)
         except BaseException as exc:
             for path in leftovers:
@@ -82,9 +86,6 @@ def export_duckdb(
             raise
     finally:
         src.close()
-    relative = destination.relative_to(_data_dir(store).resolve()).as_posix()
-    if TLP_RANK[ceiling] > TLP_RANK[EXPORT_DEFAULT_TLP]:
-        _audit(store, ceiling, max_tlp is not None, counts, relative)
     return {
         "explicit_max_tlp": max_tlp is not None,
         "format": "duckdb",
@@ -98,7 +99,7 @@ def export_duckdb(
 def _destination(requested: str, store: str | Path | None) -> Path:
     destination = resolve_export_path(requested, store, suffix=".duckdb")
     raw = Path(requested)
-    candidate = raw if raw.is_absolute() else _data_dir(store) / "exports" / raw
+    candidate = raw if raw.is_absolute() else store_data_dir(store) / "exports" / raw
     _refuse_symlink(candidate)
     return destination
 
@@ -200,22 +201,17 @@ def _audit(
     counts: dict[str, int],
     output: str,
 ) -> None:
-    moment = utc_now()
-    directory = _data_dir(store) / "audit"
-    directory.mkdir(parents=True, exist_ok=True)
-    record = {
-        "event": "export",
-        "explicit_max_tlp": explicit,
-        "format": "duckdb",
-        "max_tlp": ceiling,
-        "output": output,
-        "row_count": sum(counts.values()),
-        "tool": "store_export_duckdb",
-        "ts": moment,
-    }
-    line = json.dumps(record, ensure_ascii=False, sort_keys=True)
-    with (directory / f"{moment[:10]}.jsonl").open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+    export_audit_log(store).record(
+        "export",
+        tool="store_export_duckdb",
+        args={
+            "explicit_max_tlp": explicit,
+            "format": "duckdb",
+            "max_tlp": ceiling,
+            "output": output,
+            "row_count": sum(counts.values()),
+        },
+    )
 
 
 __all__ = ["INSTALL_HINT", "DuckDBUnavailable", "export_duckdb", "load_duckdb"]

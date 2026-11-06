@@ -19,8 +19,9 @@ from typing import Annotated
 from urllib.parse import urljoin, urlsplit
 
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
@@ -222,7 +223,7 @@ def schema_drift(html: str) -> str | None:
 def _fetch_home(*, force_live: bool) -> tuple[str | None, str, str]:
     if not force_live and os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT"):
         return _snapshot_text(), "snapshot", ""
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         return _offline_home()
     cached, state = _cached(HOME)
@@ -232,7 +233,7 @@ def _fetch_home(*, force_live: bool) -> tuple[str | None, str, str]:
 
 
 def _fetch_url(url: str, *, force_live: bool) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     mapped = _mapped_page(url)
     pages = os.environ.get("CYBERAU_SCAMWATCH_PAGES")
     if mapped is not None and not force_live and (offline or pages):
@@ -319,7 +320,7 @@ def _http(url: str, *, skip_cache: bool, fallback: bool) -> tuple[str | None, st
 
 
 def _block_path() -> Path:
-    return _data_dir() / "blocked.json"
+    return runtime.data_dir("scamwatch") / "blocked.json"
 
 
 def _note_block(warning: str) -> None:
@@ -346,12 +347,11 @@ def _recent_block() -> str:
 
 
 def _client() -> HttpClient:
-    data_dir = _data_dir()
-    return HttpClient(
+    data_dir = runtime.data_dir("scamwatch")
+    return runtime.http_client(
         "scamwatch",
-        policy=EgressPolicy(_allowlist(), "scamwatch"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1.0,
         burst=4,
@@ -365,7 +365,7 @@ def _client() -> HttpClient:
 
 
 def _take_budget() -> str:
-    limiter = RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP)
+    limiter = RateLimiter(runtime.data_dir("scamwatch") / "rate_limit.sqlite", sleeper=_SLEEP)
     try:
         limiter.acquire(
             "scamwatch:budget",
@@ -610,8 +610,8 @@ def _parse_page(html: str, url: str) -> dict:
 def _persist(rows: list[dict], *, body: str) -> None:
     if not rows:
         return
-    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    path = _data_dir() / "scamwatch-alerts.jsonl"
+    now = runtime.utc_now_iso()
+    path = runtime.data_dir("scamwatch") / "scamwatch-alerts.jsonl"
     with _db() as conn:
         for row in rows:
             url = str(row.get("url") or "")
@@ -672,7 +672,7 @@ def _persist(rows: list[dict], *, body: str) -> None:
 
 
 def _stored_body(url: str) -> str:
-    if not (_data_dir() / "scamwatch.sqlite").exists():
+    if not (runtime.data_dir("scamwatch") / "scamwatch.sqlite").exists():
         return ""
     with _db() as conn:
         row = conn.execute(
@@ -686,7 +686,7 @@ def _stored_body(url: str) -> str:
 
 @contextmanager
 def _db() -> Iterator[sqlite3.Connection]:
-    path = _data_dir() / "scamwatch.sqlite"
+    path = runtime.data_dir("scamwatch") / "scamwatch.sqlite"
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:
@@ -751,7 +751,7 @@ def _envelope(
 
 
 def _cached(url: str) -> tuple[str | None, str]:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("scamwatch") / "http_cache.sqlite")
     item = cache.get(cache.key("GET", url, None, b"", "anonymous"))
     if item is None or item.status >= 400:
         return None, "snapshot"
@@ -763,7 +763,6 @@ def _cached(url: str) -> tuple[str | None, str]:
 
 
 def _snapshot_text() -> str:
-    # Only the operator override is read. Nothing shipped in the package is served.
     override = os.environ.get("CYBERAU_SCAMWATCH_SNAPSHOT")
     if not override:
         return ""
@@ -893,19 +892,6 @@ def _canonical(href: str) -> str:
 def _alert_id(url: str) -> str:
     digest = hashlib.sha1(url.encode()).hexdigest()
     return f"scamwatch:{digest}"
-
-
-def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-scamwatch"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("scamwatch", connector)

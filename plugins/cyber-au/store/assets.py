@@ -35,6 +35,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 
+from .paths import configured_data_dir
+from .vendors import VENDOR_ALIASES
+
 FILE_NAME = "assets.yaml"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "assets.example.yaml"
 MAX_BYTES = 20 * 1024 * 1024
@@ -148,13 +151,8 @@ class ImportResult:
 
 def default_path() -> Path | None:
     """``CYBERAU_DATA_DIR/assets.yaml``, else ``HERMES_HOME/plugin-data/cyber-au/assets.yaml``."""
-    data_dir = os.environ.get("CYBERAU_DATA_DIR", "").strip()
-    if data_dir:
-        return Path(data_dir).expanduser() / FILE_NAME
-    home = os.environ.get("HERMES_HOME", "").strip()
-    if home:
-        return Path(home).expanduser() / "plugin-data" / "cyber-au" / FILE_NAME
-    return None
+    base = configured_data_dir()
+    return None if base is None else base / FILE_NAME
 
 
 # --- value cleaning -----------------------------------------------------------------
@@ -600,18 +598,10 @@ def field_match(left: str, right: str) -> bool:
     return a == b or a < b or b < a
 
 
-def _vendor_aliases() -> dict[str, tuple[str, ...]]:
-    try:
-        from .watchlists import VENDOR_ALIASES
-    except Exception:  # the shared alias table is optional here
-        return {}
-    return VENDOR_ALIASES
-
-
 def vendor_match(left: str, right: str) -> bool:
     if field_match(left, right):
         return True
-    for canonical, aliases in _vendor_aliases().items():
+    for canonical, aliases in VENDOR_ALIASES.items():
         group = (canonical, *aliases)
         if any(field_match(left, item) for item in group) and any(
             field_match(right, item) for item in group

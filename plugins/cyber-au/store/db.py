@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import sqlite3
 import threading
 import time
@@ -11,12 +10,17 @@ from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
 
-_MIGRATIONS = (
-    (Path(__file__).resolve().parent / "migrations" / "0001_init.sql", 1),
-    (Path(__file__).resolve().parent / "migrations" / "0002_retention.sql", 2),
-    (Path(__file__).resolve().parent / "migrations" / "0003_watchlist_matches.sql", 3),
+from .paths import configured_data_dir
+
+_MIGRATION_DIR = Path(__file__).resolve().parent / "migrations"
+# Schema files the store applies itself, tracked in ``schema_version``. The other
+# files in ``migrations`` belong to ``cyber-au migrate`` (update_path.py).
+MIGRATIONS = (
+    (_MIGRATION_DIR / "0001_init.sql", 1),
+    (_MIGRATION_DIR / "0002_retention.sql", 2),
+    (_MIGRATION_DIR / "0003_watchlist_matches.sql", 3),
 )
-SCHEMA_VERSION = _MIGRATIONS[-1][1]
+SCHEMA_VERSION = MIGRATIONS[-1][1]
 _LOCK = threading.Lock()
 _STORES: dict[str, Store] = {}
 
@@ -106,19 +110,20 @@ class Store:
 def resolve_db_path(path: str | Path | None = None) -> Path:
     """Resolve the store file.
 
-    An explicit path wins, then ``CYBERAU_DATA_DIR/intel.sqlite``, then
-    ``HERMES_HOME/plugin-data/cyber-au/intel.sqlite``. There is no shared
-    ``/tmp`` default.
+    An explicit path wins, then ``intel.sqlite`` in the configured data
+    directory. There is no home-directory or shared ``/tmp`` default.
     """
     if path is not None and str(path).strip():
         return Path(path).expanduser().resolve()
-    data_dir = os.environ.get("CYBERAU_DATA_DIR")
-    if data_dir:
-        return (Path(data_dir) / "intel.sqlite").expanduser().resolve()
-    hermes_home = os.environ.get("HERMES_HOME")
-    if hermes_home:
-        return (Path(hermes_home) / "plugin-data" / "cyber-au" / "intel.sqlite").resolve()
-    raise ValueError("set CYBERAU_DATA_DIR or pass a store path")
+    base = configured_data_dir()
+    if base is None:
+        raise ValueError("set CYBERAU_DATA_DIR or pass a store path")
+    return (base / "intel.sqlite").resolve()
+
+
+def store_data_dir(path: str | Path | None = None) -> Path:
+    """The directory holding the store file, where ``exports`` and ``audit`` live."""
+    return resolve_db_path(path).parent
 
 
 def open_store(path: str | Path | None = None) -> Store:
@@ -204,7 +209,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = _schema_version(conn)
-        for path, target in _MIGRATIONS:
+        for path, target in MIGRATIONS:
             if version >= target:
                 continue
             for statement in _statements(path.read_text(encoding="utf-8")):

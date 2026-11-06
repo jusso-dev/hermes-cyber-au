@@ -304,13 +304,13 @@ def test_live_health_probes_each_group(monkeypatch):
     assert down.detail != "live ok"
 
 
-def test_auth_failure_names_the_env_var(monkeypatch):
+def test_auth_failure_names_the_env_var(monkeypatch, tmp_path):
     body = (FIXTURES / "hibp_401.json").read_bytes()
     for status in (401, 403):
         transport, _ = _fixed(status, body)
         monkeypatch.setattr(source, "_TRANSPORT", transport)
         token = _approve(monkeypatch, "hibp_get_breached_account", ACCOUNT)
-        monkeypatch.setenv("CYBERAU_DATA_DIR", str(Path(source._data_dir()) / str(status)))
+        monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data" / str(status)))
         denied = hibp_get_breached_account(ACCOUNT, approval_token=token)
         assert denied["data"] is None
         assert "HIBP_API_KEY" in denied["warnings"][0]
@@ -651,7 +651,3 @@ def test_fixtures_carry_no_secrets_or_real_addresses():
     assert emails <= {ACCOUNT, MULTIPLE}
     for path in (PACKAGE / "src").rglob("*.py"):
         assert chr(0x2014) not in path.read_text(encoding="utf-8")
-
-
-def test_hibp_vcr_config_filters_credentials(vcr_config):
-    assert "authorization" in vcr_config["filter_headers"]

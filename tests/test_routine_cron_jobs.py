@@ -134,6 +134,7 @@ SCRIPTS = (
     "cyberau_watchlist.sh",
     "cyberau_store_maintenance.sh",
 )
+LIB = "_cyberau_lib.sh"
 
 
 EXPECTED = [
@@ -363,11 +364,11 @@ class RoutineCronJobsTest(unittest.TestCase):
         shellcheck = shutil.which("shellcheck")
         if shellcheck is None:
             self.skipTest("shellcheck is not installed")
-        for name in SCRIPTS:
+        for name in (*SCRIPTS, LIB):
             path = ROOT / "scripts" / name
-            self.assertTrue(os.access(path, os.X_OK), name)
+            self.assertEqual(os.access(path, os.X_OK), name != LIB, name)
             completed = subprocess.run(
-                [shellcheck, "-s", "bash", str(path)],
+                [shellcheck, "-x", "-s", "bash", str(path)],
                 check=False,
                 text=True,
                 capture_output=True,
@@ -391,6 +392,28 @@ class RoutineCronJobsTest(unittest.TestCase):
                 (home / "calls").read_text(encoding="utf-8"),
                 "refresh --sources asd,kev,epss,auscert,feodo --store --kev-snapshot "
                 f"{home}/plugin-data/cyber-au/snapshots/kev.json\n",
+            )
+
+    def test_scripts_follow_cyberau_data_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            data = Path(tmp) / "data"
+            home.mkdir()
+            (data / "snapshots").mkdir(parents=True)
+            (data / "assets.yaml").write_text("assets: []\n", encoding="utf-8")
+            (data / "snapshots" / "kev.json").write_text("{}", encoding="utf-8")
+            _plant_profile(home)
+            _plant_cli(home, 'printf \'%s\\n\' "$*" >> "$HERMES_HOME/calls"\nexit 0\n')
+            for name in ("cyberau_ingest_kev.sh", "cyberau_asset_watch.sh"):
+                result = _run_script(home, name, CYBERAU_DATA_DIR=str(data))
+                self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                (home / "calls").read_text(encoding="utf-8").splitlines(),
+                [
+                    f"refresh --sources kev --store --kev-snapshot {data}/snapshots/kev.json",
+                    f"assets check --inventory {data}/assets.yaml --kev "
+                    f"{data}/snapshots/kev.json --output {data}/software-watch.json",
+                ],
             )
 
     def test_local_software_watch_needs_local_inventory_and_snapshot(self):
@@ -515,6 +538,7 @@ def _plant_profile(home: Path) -> None:
     scripts = home / "scripts"
     scripts.mkdir()
     shutil.copy2(ROOT / "scripts" / "cyberau_cleanup.py", scripts)
+    shutil.copy2(ROOT / "scripts" / LIB, scripts)
     for name in SCRIPTS:
         dest = scripts / name
         dest.write_bytes((ROOT / "scripts" / name).read_bytes())
@@ -529,9 +553,11 @@ def _plant_cli(home: Path, body: str) -> None:
     cli.chmod(0o755)
 
 
-def _run_script(home: Path, name: str) -> subprocess.CompletedProcess[str]:
+def _run_script(home: Path, name: str, **extra: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
+    env.pop("CYBERAU_DATA_DIR", None)
     env["HERMES_HOME"] = str(home)
+    env.update(extra)
     return subprocess.run(
         ["bash", str(home / "scripts" / name)],
         cwd=home,

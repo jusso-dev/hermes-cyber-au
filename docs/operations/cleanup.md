@@ -13,7 +13,7 @@ Weekly maintenance takes an integrity-checked store backup first, then compacts 
 | Downloaded Sigma releases | Keep newest two; delete recognised package files from older releases after 30 days |
 | Pre-migration store backups | Keep newest seven; delete older matching backups after 30 days |
 | Generated public store snapshots | Keep newest seven; delete older matching snapshots after 30 days |
-| Feed-ingest and maintenance cron output | Keep newest seven per job; delete older timestamped output after 30 days |
+| No-agent cron job output (ingest, watch and maintenance status lines) | Keep newest seven per job; delete older timestamped output after 30 days |
 
 Cleanup is restricted to known profile paths and filenames. Sigma directories containing custom files are left alone. Symlinks are refused, and a lock prevents overlapping cleanup runs. Briefings, investigation evidence, analyst observations, custom rules, installed skills, credentials, audit logs and active Python environments are not age-deleted. Shipped skills and generated references use stable paths and are replaced in place during distribution updates; they do not need age-based deletion. Keep locally authored skills outside distribution-owned paths when updating.
 

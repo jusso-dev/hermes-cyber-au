@@ -21,13 +21,16 @@ import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 
 from cyberau_common.secrets import redact
 
-SUPPORTED = ("asd", "kev", "epss", "auscert", "feodo", "custom")
-_LIVE = {"miss", "hit", "direct", "http11"}
+from . import api, db
+from .canonical import utc_now
+from .expiry import reconcile_indicators, reconcile_kev
+
+# Cache states that mean the payload came from upstream within its lifetime.
+_LIVE = {"miss", "hit"}
 _EPSS_BATCH = 100
 
 
@@ -53,7 +56,7 @@ class _Run:
     kev_catalog: dict | None = None
 
 
-def refresh_main(argv: list[str]) -> int:
+def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="cyberau-mcp refresh")
     parser.add_argument("--sources", required=True, help="Comma separated source keys")
     parser.add_argument("--optional-sources", default="", help="Sources whose failure is a warning")
@@ -72,7 +75,7 @@ def refresh_main(argv: list[str]) -> int:
 
     required = _split(args.sources)
     optional = [key for key in _split(args.optional_sources) if key not in required]
-    unknown = [key for key in required + optional if key not in SUPPORTED]
+    unknown = [key for key in required + optional if key not in _ADAPTERS]
     if not required:
         print("refresh failed: --sources is empty", file=sys.stderr)
         return 2
@@ -128,16 +131,13 @@ def _refresh_one(key: str, run: _Run) -> Result:
     return result
 
 
-# ASD ACSC
-
-
 def _asd(result: Result, run: _Run) -> None:
     from cyberau_asd_acsc import source
 
     problems = []
     for feed in source.FEEDS:
-        items, _cache, warning, method = source._items_for_feed(feed)
-        if method not in _LIVE:
+        items, live, warning = source.poll_feed(feed)
+        if not live:
             problems.append(warning or f"{feed} was not fetched live")
             continue
         result.rows.extend(items)
@@ -161,20 +161,14 @@ def _asd(result: Result, run: _Run) -> None:
         )
 
 
-# CISA KEV
-
-
 def _kev(result: Result, run: _Run) -> None:
     catalog = _kev_catalog(run)
     rows = catalog.get("vulnerabilities") or []
     result.items = len(rows)
     result.rows = rows
     if run.store:
-        api, _db = _store_modules()
         result.stored = api.ingest_kev_catalogue(catalog)
         if rows:  # an empty catalogue is a broken fetch, not a withdrawn list
-            from store.expiry import reconcile_kev
-
             result.expired = reconcile_kev(str(row["cveID"]) for row in rows)
 
 
@@ -182,20 +176,18 @@ def _kev_catalog(run: _Run) -> dict:
     if run.kev_catalog is None:
         from cyberau_cisa_kev import source
 
-        catalog, cache = source._catalog()
+        catalog, cache = source.catalogue()
         if cache not in _LIVE:
             raise RuntimeError(f"KEV catalogue was not fetched live (cache {cache})")
         run.kev_catalog = catalog
     return run.kev_catalog
 
 
-# FIRST EPSS, scored for every CVE in KEV
-
-
 def _epss(result: Result, run: _Run) -> None:
+    """Score every CVE in KEV. A separate EPSS job reads the KEV list from the store."""
     from cyberau_first_epss import source
 
-    cves = _stored_kev_cves() if run.store and run.kev_catalog is None else []
+    cves = api.kev_cves() if run.store and run.kev_catalog is None else []
     if not cves:
         try:
             catalog = _kev_catalog(run)
@@ -205,18 +197,13 @@ def _epss(result: Result, run: _Run) -> None:
         cves = sorted({str(row["cveID"]) for row in catalog.get("vulnerabilities") or []})
     for start in range(0, len(cves), _EPSS_BATCH):
         batch = cves[start : start + _EPSS_BATCH]
-        payload, cache, warning = source._fetch({"cve": ",".join(batch)})
-        if warning or payload is None or cache not in _LIVE:
+        rows, cache, warning = source.score_batch(batch)
+        if warning or rows is None or cache not in _LIVE:
             result.fail(warning or f"EPSS batch was not fetched live (cache {cache})")
-            return
-        rows, problems = source._rows(payload, history=False)
-        if problems:
-            result.fail("; ".join(problems))
             return
         result.rows.extend(rows)
     result.items = len(result.rows)
     if run.store:
-        api, db = _store_modules()
         with db.open_store().transaction():
             for row in result.rows:
                 api.upsert_vulnerability(
@@ -228,37 +215,15 @@ def _epss(result: Result, run: _Run) -> None:
         result.stored = len(result.rows)
 
 
-def _stored_kev_cves() -> list[str]:
-    """KEV CVEs already in the store, so a separate EPSS job needs no KEV fetch."""
-    _api, db = _store_modules()
-    conn = db.open_store().connection()
-    rows = conn.execute("SELECT cve_id FROM vulnerabilities WHERE kev_date_added IS NOT NULL")
-    return sorted(row[0] for row in rows)
-
-
-# AusCERT
-
-
 def _auscert(result: Result, run: _Run) -> None:
     from cyberau_auscert import source
 
-    # A fresh cache hit is fine; forcing a fetch trips AusCERT's 30 minute limiter.
-    feed = source._fetch()
-    if feed.text is None or feed.cache not in _LIVE:
-        result.fail("; ".join(feed.warnings) or "AusCERT feed was not fetched live")
+    records, problem = source.poll_bulletins()
+    if problem:
+        result.fail(problem)
         return
-    root, problem = source._root(feed.text)
-    if root is None:
-        result.fail(problem or "AusCERT feed unusable")
-        return
-    records, _skipped = source._records(root)
-    if feed.persist:
-        source._persist(records)
     result.rows = [{**row, "stamp": row["stamp"].isoformat()} for row in records]
     result.items = len(records)
-    if not records:
-        result.fail("AusCERT feed contained no bulletins")
-        return
     if run.store:
         result.stored = _store_advisories(
             "auscert",
@@ -275,10 +240,8 @@ def _auscert(result: Result, run: _Run) -> None:
         )
 
 
-# Custom feeds: the RSS and Atom feeds turned on in watchlists.yaml
-
-
 def _custom(result: Result, run: _Run) -> None:
+    """The RSS and Atom feeds turned on in watchlists.yaml."""
     from cyberau_custom_feeds import source
     from cyberau_custom_feeds.config import load_config
 
@@ -324,10 +287,8 @@ def _feed_summary(item: dict) -> str | None:
     return " ".join(parts) or None
 
 
-# Feodo Tracker, the keyless part of abuse.ch
-
-
 def _feodo(result: Result, run: _Run) -> None:
+    """Feodo Tracker, the keyless part of abuse.ch."""
     from cyberau_abusech import source
 
     envelope = source.feodo_blocklist()
@@ -339,8 +300,7 @@ def _feodo(result: Result, run: _Run) -> None:
     result.rows = rows
     result.items = len(rows)
     if run.store:
-        api, db = _store_modules()
-        now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = utc_now()
         with db.open_store().transaction():
             for row in rows:
                 tags = ["botnet-c2"] + ([row["malware"]] if row.get("malware") else [])
@@ -357,8 +317,6 @@ def _feodo(result: Result, run: _Run) -> None:
         result.stored = len(rows)
         if envelope.get("warnings"):  # only a clean, complete list may expire entries
             return
-        from store.expiry import reconcile_indicators
-
         result.expired = reconcile_indicators(
             "feodo-tracker", [(_ip_type(row["indicator"]), row["indicator"]) for row in rows]
         )
@@ -380,26 +338,10 @@ _ADAPTERS: dict[str, Callable[[Result, _Run], None]] = {
     "feodo": _feodo,
     "custom": _custom,
 }
-
-
-# Intel store
-
-
-def _store_modules():
-    from cyberau_common.cli import _plugin_root
-
-    root = _plugin_root()
-    if root is None:
-        raise RuntimeError("intel store is not installed")
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-    from store import api, db
-
-    return api, db
+SUPPORTED = tuple(_ADAPTERS)
 
 
 def _store_advisories(source_id: str, rows) -> int:
-    api, db = _store_modules()
     count = 0
     with db.open_store().transaction():
         for row in rows:
@@ -415,9 +357,6 @@ def _store_advisories(source_id: str, rows) -> int:
             )
             count += 1
     return count
-
-
-# Output
 
 
 def _headline(results: list[Result], failed: list[Result]) -> str:
@@ -441,7 +380,7 @@ def _write_status(path: Path, results: list[Result]) -> None:
         previous = json.loads(path.read_text(encoding="utf-8")).get("sources", {})
     except (OSError, ValueError, AttributeError):
         previous = {}
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = utc_now()
     sources = dict(previous) if isinstance(previous, dict) else {}
     for result in results:
         entry = dict(sources.get(result.source) or {})

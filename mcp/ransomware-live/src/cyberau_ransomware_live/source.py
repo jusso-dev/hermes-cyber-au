@@ -10,12 +10,10 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 import yaml
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
-from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -226,10 +224,10 @@ def _fetch(
     force_live: bool,
 ) -> tuple[object | None, str, str]:
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if snapshot and not force_live:
         return _load(_snapshot_text()), "snapshot", _PINNED_NOTE
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("ransomlive")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, params, b"", "anonymous")
     cached = cache.get(cache_key)
@@ -240,12 +238,10 @@ def _fetch(
     if offline:
         reason = "offline mode is on and no cached copy is stored"
         return None, "snapshot", unavailable(_LABEL, reason)
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
-    client = HttpClient(
+    client = runtime.http_client(
         "ransomware-live",
-        policy=EgressPolicy(allowlist, "ransomware-live"),
+        directory=data_dir,
         cache=cache,
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=POLL_RATE,
         burst=POLL_BURST,
@@ -454,24 +450,19 @@ def _load_watchlist() -> tuple[dict | None, str]:
 
 
 def _watchlist_candidates() -> list[Path]:
-    override = os.environ.get("CYBERAU_ORG_WATCHLIST")
-    if override:
-        return [Path(override)]
-    data = _data_dir()
-    found = [
-        data / "watchlists" / "org-exposure.yaml",
-        data / "watchlists.yaml",
-    ]
-    if data.name == "cyber-au" and data.parent.name == "plugin-data":
-        found.append(data.parents[1] / "watchlists" / "org-exposure.yaml")
-    return found
+    """The org-exposure watchlist, then the routine ``watchlists.yaml`` in the profile data
+    directory. An explicit override is the only candidate."""
+    path = runtime.org_watchlist_path()
+    if runtime.org_watchlist_override() is not None:
+        return [path]
+    return [path, runtime.profile_data_dir() / "watchlists.yaml"]
 
 
 def _persist(rows: list[dict], cache: str) -> None:
     """Append metadata for claims not stored yet. A snapshot is never real feed history."""
     if not rows or cache == "snapshot":
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("ransomlive")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "ransomlive-metadata.jsonl"
     seen: set[str] = set()
@@ -602,15 +593,10 @@ def _load_bytes(body: bytes):
 
 
 def _snapshot_text() -> str:
-    """Read the operator-supplied snapshot. Nothing is shipped in the package."""
     snapshot = os.environ.get("CYBERAU_RANSOMLIVE_SNAPSHOT")
     if not snapshot:
         return ""
     return Path(snapshot).read_text(encoding="utf-8")
-
-
-def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-ransomlive"))
 
 
 def _safe(exc: Exception) -> str:
@@ -619,10 +605,6 @@ def _safe(exc: Exception) -> str:
     if secret:
         message = message.replace(secret, "[REDACTED]")
     return message
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("ransomware-live", connector)

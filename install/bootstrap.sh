@@ -113,16 +113,18 @@ python311() {
   return 1
 }
 
+# The store, audit log and connector state live in the profile, as render_config
+# tells every server. Set before any migrate run, so both migrate calls below and
+# store init use this profile's store, not one a shell variable or HERMES_HOME names.
+CYBERAU_DATA_DIR=$PROFILE_HOME/plugin-data/cyber-au
+export CYBERAU_DATA_DIR
+
 if [ ! -f "$PROFILE_HOME/mcp/pyproject.toml" ]; then
   PYTHON=$(python311) || die "bootstrap.sh needs Python 3.11 or newer on PATH"
   exec "$PYTHON" "$REPO_ROOT/plugins/cyber-au/cli.py" migrate --profile-home "$PROFILE_HOME"
 fi
 mkdir -p "$PROFILE_HOME/plugin-data/cyber-au/audit"
 chmod 700 "$PROFILE_HOME/plugin-data/cyber-au/audit"
-# The store, audit log and connector state live in the profile, as render_config
-# tells every server. Without this, store init follows HERMES_HOME instead.
-CYBERAU_DATA_DIR=$PROFILE_HOME/plugin-data/cyber-au
-export CYBERAU_DATA_DIR
 
 if [ -f "$PROFILE_HOME/mcp/servers.yaml" ]; then
   SERVERS_YAML=$PROFILE_HOME/mcp/servers.yaml

@@ -62,20 +62,36 @@ def offline(monkeypatch):
     source._CACHES.clear()
 
 
+def _profile(tmp_path: Path, monkeypatch) -> Path:
+    """Lay tmp_path out as a profile home and return its data directory."""
+    data = tmp_path / "plugin-data" / "cyber-au"
+    data.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    return data
+
+
+def _write_org_watchlist(tmp_path: Path, watch: dict) -> None:
+    """Where `cyberau watchlist init --org` writes for the profile at tmp_path."""
+    path = tmp_path / "watchlists" / "org-exposure.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(watch), encoding="utf-8")
+
+
 @pytest.fixture
 def live(tmp_path, monkeypatch):
+    """Yields the profile data directory. The profile home is tmp_path."""
     monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
     monkeypatch.delenv("CYBERAU_GTI_DTM_ALERTS", raising=False)
     monkeypatch.delenv("CYBERAU_GTI_DTM_MONITORS", raising=False)
     monkeypatch.delenv("VIRUSTOTAL_API_KEY", raising=False)
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    data = _profile(tmp_path, monkeypatch)
     monkeypatch.setenv("GTI_API_KEY", TEST_KEY)
     source._CACHES.clear()
     source._TRANSPORT = None
     source._RESOLVER = _resolve
     source._SLEEPER = None
     source._RNG = lambda: 0.0
-    yield tmp_path
+    yield data
     source._TRANSPORT = None
     source._RESOLVER = None
     source._SLEEPER = None
@@ -350,15 +366,10 @@ def test_since_uses_australia_sydney(live):
     assert seen[-1] == "2026-10-17T00:00:00+11:00"
 
 
-def test_findings_are_stored_for_the_watchlist_only(live, monkeypatch):
-    tmp_path = live
-    watch = {
-        "organisation": "Example Pty Ltd",
-        "domains": ["example.com.au"],
-    }
-    path = tmp_path / "watchlists" / "org-exposure.yaml"
-    path.parent.mkdir()
-    path.write_text(yaml.safe_dump(watch), encoding="utf-8")
+def test_findings_are_stored_for_the_watchlist_only(live, tmp_path, monkeypatch):
+    _write_org_watchlist(
+        tmp_path, {"organisation": "Example Pty Ltd", "domains": ["example.com.au"]}
+    )
     secret = "password=hunter2-secret"
     payload = json.loads((FIXTURES / "dtm_alerts_synthetic.json").read_text())
     payload["alerts"][0]["alert_summary"] = secret
@@ -379,7 +390,7 @@ def test_findings_are_stored_for_the_watchlist_only(live, monkeypatch):
     result = gti_dtm_alerts()
     assert result["cache"] == "miss"
     assert "hunter2" not in json.dumps(result)
-    blob = (tmp_path / "intel.sqlite").read_bytes()
+    blob = (live / "intel.sqlite").read_bytes()
     assert b"example.com.au" in blob
     assert b"other.test" not in blob
     assert b"hunter2" not in blob
@@ -476,10 +487,8 @@ def test_cache_hit_keeps_the_link_header(live):
 
 
 def test_operator_snapshot_is_labelled_and_never_stored(offline, tmp_path, monkeypatch):
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
-    path = tmp_path / "watchlists" / "org-exposure.yaml"
-    path.parent.mkdir()
-    path.write_text(yaml.safe_dump({"domains": ["example.com.au"]}), encoding="utf-8")
+    data = _profile(tmp_path, monkeypatch)
+    _write_org_watchlist(tmp_path, {"domains": ["example.com.au"]})
     for result in (gti_dtm_alerts(), gti_dtm_monitors()):
         _assert_envelope(result)
         assert result["cache"] == "snapshot"
@@ -488,7 +497,7 @@ def test_operator_snapshot_is_labelled_and_never_stored(offline, tmp_path, monke
             "operator-supplied snapshot" in item and "not live" in item
             for item in result["warnings"]
         )
-    assert not (tmp_path / "intel.sqlite").exists()
+    assert not (data / "intel.sqlite").exists()
     assert connector().exposure_for(Watchlist(domains=["example.com.au"]), date(2026, 6, 1)) == []
 
 

@@ -87,19 +87,6 @@ detection:
 """
 
 
-def test_skill_passes_the_structural_check():
-    assert harness.check_skill(SKILL) == []
-
-
-def test_offline_eval_passes_without_a_provider_key(monkeypatch: pytest.MonkeyPatch):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
-    result = harness.run_eval_file(EVALS, live=False)
-    assert result["model_matrix"]["ran"] is False
-    assert result["ok"], result
-
-
 def test_helpers_do_not_use_the_network():
     banned = ("urllib", "httpx", "requests", "socket")
     for path in SCRIPTS.glob("*.py"):

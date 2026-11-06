@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
@@ -24,6 +25,11 @@ def load(name):
 cleanup = load("cyberau_cleanup")
 activation = load("cyberau_enable_maintenance")
 NOW = 2_000_000_000
+
+
+@pytest.fixture(autouse=True)
+def _default_data_dir(monkeypatch):
+    monkeypatch.delenv("CYBERAU_DATA_DIR", raising=False)
 
 
 def put(path, age=60):
@@ -59,6 +65,39 @@ def test_rules_backups_and_output_are_bounded_with_dry_run(tmp_path):
     assert not (data / "v2/sigma_core.zip").exists()
     assert all(p.exists() for p in (custom, skill, brief, unknown))
     assert cleanup.cleanup(tmp_path, now=NOW, apply=True)["files"] == 0
+
+
+def test_output_of_every_script_job_is_disposable():
+    """Every no-agent job's output is pruned; agent output (briefings) is kept."""
+    jobs = json.loads((ROOT / "cron/jobs.json").read_text(encoding="utf-8"))["jobs"]
+    assert set(cleanup.SCRIPT_JOBS) == {job["id"] for job in jobs if job.get("no_agent")}
+
+
+def test_data_dir_follows_cyberau_data_dir(tmp_path, monkeypatch):
+    profile = tmp_path / "profile"
+    data = tmp_path / "data"
+    profile.mkdir()
+    for i in range(4):
+        put(data / f"v{i}" / "sigma_core.zip", age=60 + i)
+    put(profile / "plugin-data/cyber-au/v9/sigma_core.zip", age=90)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    assert cleanup.cleanup(profile, now=NOW, apply=True)["files"] == 2
+    assert (data / "v1/sigma_core.zip").exists()
+    assert not (data / "v3/sigma_core.zip").exists()
+    assert (data / ".cleanup.lock").exists()
+    assert (profile / "plugin-data/cyber-au/v9/sigma_core.zip").exists()
+
+
+def test_paused_reason_matches_the_update_path():
+    """Bootstrap resumes only jobs the update path seeded, so the two strings must agree."""
+    tree = ast.parse((ROOT / "plugins/cyber-au/update_path.py").read_text(encoding="utf-8"))
+    reasons = [
+        node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and [getattr(target, "id", None) for target in node.targets] == ["PAUSED_REASON"]
+    ]
+    assert reasons == [activation.SEEDED_REASON]
 
 
 def test_recent_release_is_kept_even_beyond_two(tmp_path):

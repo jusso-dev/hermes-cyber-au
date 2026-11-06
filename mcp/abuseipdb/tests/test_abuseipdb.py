@@ -277,7 +277,7 @@ def test_live_health_validates_the_response_schema(monkeypatch, tmp_path):
     assert "abuseipdb:check" in keys
 
 
-def test_advertised_schema_and_cassettes(vcr_config):
+def test_advertised_schema_and_cassettes():
     import asyncio
 
     listed = asyncio.run(build_server(connector()).list_tools())
@@ -290,9 +290,6 @@ def test_advertised_schema_and_cassettes(vcr_config):
     assert "IPv4 or IPv6 address" in encoded
     assert "maximum" in encoded
     assert block.input_schema["required"] == ["network"]
-    assert len("mcp__abuseipdb__abuseipdb_check_ip") == 34
-    assert len("mcp__abuseipdb__abuseipdb_check_block") == 37
-    assert "key" in vcr_config["filter_headers"]
     for name in ("abuseipdb_check_ip.yaml", "abuseipdb_check_block.yaml"):
         text = (FIXTURES / name).read_text(encoding="utf-8")
         assert "Key:" not in text

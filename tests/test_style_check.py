@@ -28,8 +28,15 @@ class StyleCheckTest(unittest.TestCase):
         errors, _hints = self.mod.check(ROOT)
         self.assertEqual(errors, [])
 
-    def test_main_on_repository(self):
-        self.assertEqual(self.mod.main(["--root", str(ROOT)]), 0)
+    def test_main_exits_nonzero_on_a_style_error(self):
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with _TempTree() as root, contextlib.redirect_stdout(out):
+            (root / "notes.md").write_text("A pause \u2014 then more.\n", encoding="utf-8")
+            self.assertEqual(self.mod.main(["--root", str(root)]), 1)
+        self.assertIn("em dash", out.getvalue())
 
     def test_em_dash_fails(self):
         with _TempTree() as root:
@@ -94,6 +101,12 @@ class StyleCheckTest(unittest.TestCase):
             ("\u2015", "em dash"),
             ("\u2b50", "emoji"),
             ("\u23f0", "emoji"),
+            ("\u2934", "emoji"),
+            ("\u3030", "emoji"),
+            ("\u2302\u200d", "emoji"),
+            ("\U0001f7e2", "emoji"),
+            ("&" + "mdash;", "em dash"),
+            ("&" + "#x2014;", "em dash"),
         ):
             with _TempTree() as root:
                 (root / "notes.md").write_text(f"a {char} b\n", encoding="utf-8")

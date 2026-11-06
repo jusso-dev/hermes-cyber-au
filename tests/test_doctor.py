@@ -83,7 +83,8 @@ def _stamp(root: Path) -> None:
     (venv / ".cyberau-lock-sha256").write_text(digest + "\n", encoding="utf-8")
 
 
-def _store(path: Path, version: int = 1) -> None:
+def _store(path: Path, version: int | None = None) -> None:
+    version = doctor.SCHEMA_VERSION if version is None else version
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.executescript(
@@ -238,7 +239,7 @@ def test_healthy_profile_exits_zero_and_matches_schema(tmp_path: Path):
     assert found["connector.kev"].status == "ok"
     assert "offline probe passed" in found["connector.kev"].detail
     assert "live probe skipped" in found["connector.kev"].detail
-    assert found["store.schema"].detail == "schema version 1"
+    assert found["store.schema"].detail == f"schema version {doctor.SCHEMA_VERSION}"
     assert "observations 1" in found["store.rows"].detail
     assert "cisa-kev 2026-10-16T00:00:00Z" in found["store.ingest"].detail
     assert found["store.wal"].detail == "WAL is 0 bytes"
@@ -362,11 +363,12 @@ def test_store_cron_security_and_snapshot_age(tmp_path: Path):
     assert ids(report)["store.schema"].status == "fail"
     assert "store.rows" not in ids(report)
 
+    _store(db, version=doctor.SCHEMA_VERSION - 1)
+    schema = ids(run(root))["store.schema"]
+    assert f"expected {doctor.SCHEMA_VERSION}" in schema.detail
+    assert "cyberau-mcp store init" in schema.fix
+    db.unlink()
     _store(db)
-    migrations = root / "plugins" / "cyber-au" / "store" / "migrations"
-    migrations.mkdir(parents=True)
-    (migrations / "0002_next.sql").write_text("-- next\n", encoding="utf-8")
-    assert "expected 2" in ids(run(root))["store.schema"].detail
 
     _write(
         root / "mcp" / "asd-ism" / "data" / "releases.json",
@@ -512,27 +514,21 @@ def test_checkout_reports_only_installed_connectors_and_named_gaps(tmp_path: Pat
         hermes_version=lambda: "hermes 0.22.2",
         health=lambda _name, _live: (0, "ok"),
     )
-    checks = doctor.check_connectors(ctx)
-    assert {item.id for item in checks} == {f"connector.{name}" for name in servers}
-    for item in checks:
-        name = item.id.split(".", 1)[1]
-        spec = servers[name]
-        key = spec.get("connector") or name
-        installed = (REPO / "mcp" / key / "pyproject.toml").is_file() or key == "stub"
-        if doctor._is_external(spec):
-            assert "external server" in item.detail
-        elif installed or not doctor._is_enabled(spec):
-            assert item.detail != "not installed"
-        else:
-            assert item.detail == "not installed"
+    checks = {item.id: item for item in doctor.check_connectors(ctx)}
+    assert set(checks) == {f"connector.{name}" for name in servers}
+    # servers.yaml entries with a url, a vendored wrap command or an operator command.
+    external = {"ghsa", "junction", "misp", "virustotal", "recordedfuture_mcp", "flare_mcp"}
+    assert {
+        item.id.split(".", 1)[1] for item in checks.values() if "external server" in item.detail
+    } == external
+    # hibp carries wrap metadata but runs as a native connector.
+    assert "external server" not in checks["connector.hibp"].detail
+    # Every native connector in this checkout is installed.
+    assert all(item.detail != "not installed" for item in checks.values())
 
     snapshots = {item.id: item for item in doctor.check_snapshots(ctx)}
     for name in ("e8", "attack"):
-        installed = (REPO / "mcp" / servers[name]["connector"] / "pyproject.toml").is_file()
-        if installed:
-            assert snapshots[f"snapshot.{name}"].detail != "not installed"
-        else:
-            assert snapshots[f"snapshot.{name}"].detail == "not installed"
+        assert snapshots[f"snapshot.{name}"].detail != "not installed"
     releases = json.loads((REPO / "mcp" / "asd-ism" / "data" / "releases.json").read_text())
     newest = max(releases["releases"], key=lambda row: row["published_at"])
     assert newest["tag_name"] in snapshots["snapshot.ism"].detail

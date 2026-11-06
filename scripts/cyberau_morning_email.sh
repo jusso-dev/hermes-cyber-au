@@ -10,20 +10,13 @@
 # Hermes runs this file from $HERMES_HOME/scripts with a sanitised environment, and
 # delivers stdout verbatim, so every outcome is one line without secrets.
 set -uo pipefail
-unset CDPATH
-script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
-if [[ -n ${HERMES_HOME:-} ]]; then
-  profile=$HERMES_HOME
-else
-  profile=$(cd -- "$script_dir/.." && pwd)
-fi
-data=${CYBERAU_DATA_DIR:-$profile/plugin-data/cyber-au}
-config=$data/email.yaml
+# shellcheck source-path=SCRIPTDIR source=_cyberau_lib.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/_cyberau_lib.sh"
+config=$data_dir/email.yaml
 py=$profile/mcp/.venv/bin/python
-cli=$profile/mcp/.venv/bin/cyberau-mcp
 email=$profile/skills/daily-briefing/scripts/email_brief.py
 prompt=$profile/skills/daily-briefing/references/email-prompt.txt
-for need in "$py" "$cli"; do
+for need in "$py" "$bin"; do
   if [[ ! -x $need ]]; then
     printf 'morning email failed: %s is not installed\n' "${need#"$profile"/}"
     exit 1
@@ -54,7 +47,7 @@ fi
 hours=26
 [[ $(TZ=Australia/Sydney date +%u) == 1 ]] && hours=74
 since=$(date -u -d "-${hours} hours" +%Y-%m-%dT%H:%M:%SZ)
-if ! "$cli" store watchlist hits --since "$since" > "$work/watches.json" 2> /dev/null; then
+if ! "$bin" store watchlist hits --since "$since" > "$work/watches.json" 2> /dev/null; then
   : > "$work/watches.json"
 fi
 

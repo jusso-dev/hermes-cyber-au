@@ -12,10 +12,10 @@ Check spelling and house style:
 
 ```bash
 .venv-docs/bin/codespell docs
-.venv-docs/bin/python tools/docs/style_check.py
+uv run --project mcp python tools/ci/style_check.py
 ```
 
-`codespell` flags American spellings using the Australian list in `tools/docs/en-AU.txt`. Code spans, URLs and vendor product names are skipped. The style check rejects em dashes and emojis. It requires each page to name an owner ticket that exists in `tickets/` and a last-verified date, and it requires a connectors page for every `mcp/*/SOURCE.md`.
+`codespell` flags American spellings using the Australian list in `tools/docs/en-AU.txt`. Code spans, URLs and vendor product names are skipped. The style check is the one CI runs over the whole repository: it rejects em dashes, emojis and banned private names, and prints Australian spelling hints. `tests/test_connector_docs.py` checks that every `mcp/*/SOURCE.md` has a generated connectors page.
 
 `site/` is build output. GitHub Pages is not configured in this checkout.
 

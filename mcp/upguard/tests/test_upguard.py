@@ -228,7 +228,7 @@ def test_429_honours_retry_after(monkeypatch):
     assert result["data"][0]["domain"] == "example.com.au"
 
 
-def test_timeout_falls_back_to_session_cache(monkeypatch):
+def test_timeout_falls_back_to_session_cache(monkeypatch, tmp_path):
     body = (FIXTURES / "breaches_synthetic.json").read_bytes()
     calls = {"n": 0}
 
@@ -241,7 +241,7 @@ def test_timeout_falls_back_to_session_cache(monkeypatch):
     _online(monkeypatch, handler)
     first = upguard_identity_breaches()
     assert first["data"]
-    assert not (Path(source._data_dir()) / "upguard-session.sqlite").exists()
+    assert not (tmp_path / "upguard-session.sqlite").exists()
     item = next(iter(source._SESSION_CACHE._memory.values()))
     item.fetched_at = time.time() - item.ttl - 5
     second = upguard_identity_breaches()
@@ -334,7 +334,7 @@ def test_data_leak_window_and_filters(monkeypatch):
     assert upguard_identity_breaches(limit=0)["warnings"]
 
 
-def test_session_cache_is_not_on_disk_and_typosquats_are(monkeypatch):
+def test_session_cache_is_not_on_disk_and_typosquats_are(monkeypatch, tmp_path):
     def handler(request):
         if request.url.path.endswith("/breaches"):
             return httpx.Response(200, content=(FIXTURES / "breaches_synthetic.json").read_bytes())
@@ -345,7 +345,7 @@ def test_session_cache_is_not_on_disk_and_typosquats_are(monkeypatch):
 
     _online(monkeypatch, handler)
     upguard_identity_breaches()
-    directory = source._data_dir()
+    directory = tmp_path
     assert not (directory / "upguard-session.sqlite").exists()
     upguard_typosquats("example.com.au")
     assert (directory / "upguard-ttl.sqlite").exists()
@@ -424,10 +424,9 @@ def test_docs_quote_terms_and_readme_links_them():
     assert ".post_" not in source_text
 
 
-def test_cassettes_replay_without_secrets(vcr_config):
+def test_cassettes_replay_without_secrets():
     import vcr
 
-    assert "authorization" in vcr_config["filter_headers"]
     uris = {
         "upguard_identity_breaches": (
             "https://cyber-risk.upguard.com/api/public/breaches"

@@ -7,6 +7,7 @@ import sqlite3
 import sys
 
 import pytest
+from cyberau_common.audit import AuditLog
 from cyberau_common.cli import main
 from store.analytics import INSTALL_HINT, export_duckdb
 from store.api import (
@@ -131,7 +132,9 @@ def test_round_trip_keeps_every_table_and_row_at_red(store_path):
     audit = list((store_path.parent / "audit").glob("*.jsonl"))
     assert audit, "an export above GREEN is audited"
     line = json.loads(audit[0].read_text(encoding="utf-8").splitlines()[-1])
-    assert line["format"] == "duckdb" and line["max_tlp"] == "RED"
+    assert line["args_redacted"]["format"] == "duckdb"
+    assert line["args_redacted"]["max_tlp"] == "RED"
+    assert AuditLog(store_path.parent / "audit").verify() == 1
 
 
 def test_default_ceiling_withholds_amber_rows(store_path):
@@ -244,3 +247,18 @@ def test_cli_without_duckdb_names_the_extra(store_path, capsys, monkeypatch):
 def test_help_lists_duckdb(capsys):
     assert main(["store", "export", "--help"]) == 0
     assert "duckdb" in capsys.readouterr().out
+
+
+def test_audited_export_fails_closed_when_the_audit_cannot_be_written(store_path, capsys):
+    pytest.importorskip("duckdb")
+    _seed(store_path)
+    (store_path.parent / "audit").write_text("not a directory", encoding="utf-8")
+    args = ["store", "export", "--format", "duckdb", "--path", str(store_path)]
+    assert main([*args, "--output", "red.duckdb", "--max-tlp", "RED"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.strip() == "audit log is not writable"
+    assert "Traceback" not in captured.err
+    exports = store_path.parent / "exports"
+    assert sorted(path.name for path in exports.iterdir()) == []
+    assert main([*args, "--output", "green.duckdb"]) == 0, "an unaudited ceiling still exports"

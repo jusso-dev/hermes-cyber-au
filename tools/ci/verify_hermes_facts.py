@@ -21,15 +21,18 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
+from cyberau_common.secrets import is_secret_env_name
+
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+from hermes_pin import PinError, redact, shown, validate_tag  # noqa: E402
+
 DEFAULT_FACTS = ROOT / "docs" / "research" / "hermes-structure.md"
 REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
-TAG_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 REF_RE = re.compile(r"`([^`]+)`(?:\s*\(([^)]*)\))?")
-_SECRET = re.compile(r"(?:ghp_|gho_|ghu_|ghs_|github_pat_)[A-Za-z0-9_]+")
-_SECRET_ENV = ("TOKEN", "SECRET", "PASSWORD", "PASSWD")
 
 LABELS = {
     "file": "file exists",
@@ -42,21 +45,7 @@ class VerifyError(Exception):
     """The notes could not be checked."""
 
 
-def redact(text: str) -> str:
-    return _SECRET.sub("[redacted]", text)
-
-
-def _shown(value: str) -> str:
-    text = redact(value.replace("\n", "\\n").replace("\r", "\\r"))
-    if len(text) > 120:
-        return text[:120] + "..."
-    return text
-
-
-def validate_tag(tag: str) -> str:
-    if TAG_RE.fullmatch(tag):
-        return tag
-    raise VerifyError(f"Refusing tag {_shown(tag)!r}. Expected a release like v0.22.2.")
+_shown = partial(shown, limit=120)
 
 
 @dataclass(frozen=True)
@@ -294,14 +283,16 @@ def _clone_env() -> dict[str, str]:
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
     for name in list(env):
-        upper = name.upper()
-        if any(piece in upper for piece in _SECRET_ENV) or upper.endswith("_KEY"):
+        if is_secret_env_name(name):
             env.pop(name, None)
     return env
 
 
 def checkout_tag(tag: str) -> Path:
-    release = validate_tag(tag)
+    try:
+        release = validate_tag(tag)
+    except PinError as exc:
+        raise VerifyError(str(exc)) from None
     dest = Path(tempfile.mkdtemp(prefix="hermes-facts-"))
     proc = subprocess.run(
         [

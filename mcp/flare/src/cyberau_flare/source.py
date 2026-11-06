@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import yaml
+from cyberau_common import runtime
 from cyberau_common.envelope import envelope, untrusted_text
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
@@ -21,7 +22,7 @@ from cyberau_premium.base import (
     clamp_to_terms,
     finding_id,
 )
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_text
@@ -230,9 +231,7 @@ def _profile_file(name: str):
 
 
 def load_watchlist() -> Watchlist:
-    path = _profile_file("org-exposure.yaml")
-    if tuple(data_dir().parts[-2:]) == ("plugin-data", "cyber-au"):
-        path = data_dir().parent.parent / "watchlists" / "org-exposure.yaml"
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return Watchlist()
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -247,17 +246,6 @@ def load_profile_config() -> dict:
         return {}
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return raw if isinstance(raw, dict) else {}
-
-
-def _parse_time(value: str) -> datetime | None:
-    text = value.replace("Z", "+00:00")
-    try:
-        moment = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment
 
 
 def _sydney_start(day: str) -> datetime:
@@ -379,7 +367,7 @@ def _kept(
         if rank < _SEVERITY.index(min_severity):
             return False
     if since:
-        moment = _parse_time(str(metadata.get("estimated_created_at") or ""))
+        moment = runtime.parse_iso(str(metadata.get("estimated_created_at") or ""))
         if moment is None or moment < _sydney_start(since):
             return False
     return True
@@ -394,7 +382,7 @@ def to_finding(item: dict, watchlist: Watchlist) -> ExposureFinding | None:
     kind = _KIND.get(event_type)
     if kind is None:
         return None
-    moment = _parse_time(metadata["estimated_created_at"])
+    moment = runtime.parse_iso(metadata["estimated_created_at"])
     if moment is None:
         return None
     name = identifier["name"]
@@ -610,7 +598,7 @@ def aggregate_credentials(items: list, *, since: str | None) -> list[dict]:
     for item in items:
         if not isinstance(item, dict):
             continue
-        imported = _parse_time(str(item.get("imported_at") or ""))
+        imported = runtime.parse_iso(str(item.get("imported_at") or ""))
         if start is not None and (imported is None or imported < start):
             continue
         day = imported.astimezone(_sydney_zone()).date().isoformat() if imported else "unknown"
@@ -680,10 +668,7 @@ class FlareConnector(PremiumConnector):
             key="flare",
             server_name="flare",
             attribution=spec.terms.attribution,
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
             tools=[
                 ToolSpec(
                     "flare_tenant_exposure",

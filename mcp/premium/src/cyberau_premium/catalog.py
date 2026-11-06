@@ -77,16 +77,23 @@ def vendor_for_tool(tool_name: str) -> VendorSpec | None:
     return None if match is None else match[1]
 
 
+def vendor_fields(spec: VendorSpec) -> dict[str, Any]:
+    """The PremiumConnector fields the vendor catalogue decides."""
+    return {
+        "vendor": spec.server,
+        "licence_env": tuple(spec.licence_env),
+        "terms": spec.terms,
+        "quota": spec.quota,
+    }
+
+
 def bind_vendor(spec: VendorSpec) -> PremiumConnector:
     """Build a connector shell from the catalogue. It does not call the vendor."""
     return PremiumConnector(
         key=spec.server,
         server_name=spec.server,
         attribution=spec.terms.attribution,
-        vendor=spec.server,
-        licence_env=tuple(spec.licence_env),
-        terms=spec.terms,
-        quota=spec.quota,
+        **vendor_fields(spec),
     )
 
 

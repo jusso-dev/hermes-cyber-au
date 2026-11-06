@@ -106,9 +106,6 @@ def truncate(value: object, limit: int) -> str:
     return text[: limit - 3].rstrip() + "..."
 
 
-# --- data loading -------------------------------------------------------------------
-
-
 def load_jobs(profile: Path) -> tuple[list[dict], str | None]:
     """Return (jobs, problem). A missing or broken file gives an empty list and a message."""
     path = profile / "cron" / "jobs.json"
@@ -260,8 +257,6 @@ def load_handoffs(path: Path) -> tuple[list[dict], int]:
     records.reverse()
     return records, bad
 
-
-# --- markdown and HTML --------------------------------------------------------------
 
 _HEADING_RE = re.compile(r"(#{1,6})[ \t]+(.*?)[ \t#]*$")
 _BULLET_RE = re.compile(r"[-*][ \t]+(.*)")
@@ -671,8 +666,6 @@ def render_sources(profile: Path, settings: SourceSettings) -> bytes:
     return page("Sources", "\n".join(parts))
 
 
-# --- host checks --------------------------------------------------------------------
-
 _HOST_NAME_RE = re.compile(r"[a-z0-9._-]+|[0-9a-f:.]+")
 
 
@@ -746,9 +739,6 @@ def render_misdirected() -> bytes:
         "<h1>Host not allowed</h1><p>This dashboard only answers requests addressed to "
         "the host it was started on. Add the name with <code>--allowed-host</code>.</p>",
     )
-
-
-# --- routing ------------------------------------------------------------------------
 
 
 def route(

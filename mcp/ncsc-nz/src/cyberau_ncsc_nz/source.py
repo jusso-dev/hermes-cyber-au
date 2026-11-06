@@ -14,11 +14,10 @@ from typing import Annotated
 from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient
 from cyberau_common.ratelimit import RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -237,7 +236,7 @@ def _validate_list(since: str | None, limit: int) -> str:
 
 def _fetch_list(*, force_live: bool) -> tuple[str | None, str, str]:
     pinned = bool(os.environ.get(_OVERRIDE)) and not force_live
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if pinned:
         return _pinned_list()
     cached = None if force_live else _cached_body(LIST_URL)
@@ -286,7 +285,7 @@ def _fallback_list(warning: str) -> tuple[str | None, str, str]:
 
 def _fetch_item(url: str) -> tuple[dict | None, str, str]:
     pinned = bool(os.environ.get(_OVERRIDE))
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1"
+    offline = runtime.offline()
     if pinned or offline:
         mapped = _mapped_html(url)
         if mapped is not None:
@@ -324,15 +323,15 @@ def _fetch_item(url: str) -> tuple[dict | None, str, str]:
 
 
 def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("ncsc-nz")
     kwargs = {}
     if _RESOLVER is not None:
         kwargs["resolver"] = _RESOLVER
-    client = HttpClient(
+    client = runtime.http_client(
         "ncsc-nz",
-        policy=EgressPolicy(_allowlist(), "ncsc-nz", **kwargs),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        policy=EgressPolicy(runtime.allowlist_path(), "ncsc-nz", **kwargs),
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=4,
         burst=20,
@@ -696,7 +695,6 @@ def _public_page(page: dict) -> dict:
 
 
 def _read_list_snapshot() -> str | None:
-    # Only the operator override is read. Nothing shipped in the package is served.
     override = os.environ.get(_OVERRIDE)
     if not override:
         return None
@@ -728,7 +726,7 @@ def _mapped_html(url: str) -> str | None:
 
 
 def _cached_body(url: str) -> tuple[str, bool] | None:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("ncsc-nz") / "http_cache.sqlite")
     key = cache.key("GET", url, None, b"", "anonymous")
     item = cache.get(key)
     if item is None:
@@ -823,7 +821,7 @@ def _item_id(link: str) -> str:
 
 
 def _limit(key: str, *, rate: float, burst: int) -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("ncsc-nz") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         key,
         rate=rate,
         burst=burst,
@@ -858,15 +856,9 @@ def _envelope(
     )
 
 
-def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-ncsc-nz"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 @contextmanager
 def _db():
-    conn = sqlite3.connect(_data_dir() / "ncsc_alerts.sqlite")
+    conn = sqlite3.connect(runtime.data_dir("ncsc-nz") / "ncsc_alerts.sqlite")
     conn.row_factory = sqlite3.Row
     conn.execute(
         """
@@ -886,13 +878,6 @@ def _db():
         conn.commit()
     finally:
         conn.close()
-
-
-def _allowlist() -> Path:
-    override = os.environ.get("CYBERAU_EGRESS_ALLOWLIST")
-    if override:
-        return Path(override)
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("ncsc-nz", connector)

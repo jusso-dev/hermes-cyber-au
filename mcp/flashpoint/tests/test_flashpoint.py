@@ -296,7 +296,7 @@ def test_offline_without_an_operator_snapshot_reports_unavailable(tmp_path, monk
     assert missing["warnings"]
 
 
-def test_terms_registration_and_no_credential_tool(vcr_config):
+def test_terms_registration_and_no_credential_tool():
     item = connector()
     assert isinstance(item, PremiumConnector)
     assert item.vendor == "flashpoint"
@@ -332,7 +332,6 @@ def test_terms_registration_and_no_credential_tool(vcr_config):
     assert allow["connectors"]["flashpoint"]["hosts"] == ["api.flashpoint.io"]
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     assert "docs/connectors/flashpoint.md" in readme
-    assert "authorization" in vcr_config["filter_headers"]
 
     for path in FIXTURES.iterdir():
         fixture = path.read_text(encoding="utf-8").lower()

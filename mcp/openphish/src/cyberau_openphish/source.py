@@ -5,17 +5,16 @@ import json
 import os
 import sqlite3
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import httpx
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -159,11 +158,11 @@ def _public_feed_path(path: str) -> bool:
 
 
 def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     pinned = bool(os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT")) and not force_live
     if pinned:
         return _from_snapshot()
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("openphish") / "http_cache.sqlite")
     key = cache.key("GET", FEED_URL, None, b"", "anonymous")
     previous = cache.get(key)
     if not force_live and not offline and previous and cache.fresh(previous):
@@ -222,12 +221,11 @@ def _fetch_feed(*, force_live: bool) -> tuple[str | None, str, str]:
 
 
 def _http(*, force_live: bool):
-    data_dir = _data_dir()
-    client = HttpClient(
+    data_dir = runtime.data_dir("openphish")
+    client = runtime.http_client(
         "openphish",
-        policy=EgressPolicy(_allowlist(), "openphish"),
-        cache=HttpCache(data_dir / "http_cache.sqlite"),
-        limiter=RateLimiter(data_dir / "rate_limit.sqlite", sleeper=_SLEEP),
+        directory=data_dir,
+        limiter_sleeper=_SLEEP,
         user_agent=USER_AGENT,
         rate=1 / 30,
         burst=4,
@@ -245,7 +243,7 @@ def _http(*, force_live: bool):
 
 def _limit_feed() -> None:
     """One logical feed fetch per hour. Hops inside that fetch use the HTTP client."""
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("openphish") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         "openphish:feed",
         rate=1 / 3600,
         burst=1,
@@ -260,7 +258,6 @@ def _feed_transport() -> httpx.BaseTransport:
 
 
 def _from_snapshot() -> tuple[str | None, str, str]:
-    """Serve the operator's pinned file. Nothing is shipped in the package."""
     text = _snapshot_text()
     if text is None:
         reason = "the pinned snapshot file named by CYBERAU_OPENPHISH_SNAPSHOT was not found"
@@ -288,7 +285,7 @@ def _local_copy() -> tuple[str | None, str]:
     if os.environ.get("CYBERAU_OPENPHISH_SNAPSHOT"):
         text = _snapshot_text()
         return text, "pinned" if text is not None else "missing"
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("openphish") / "http_cache.sqlite")
     previous = cache.get(cache.key("GET", FEED_URL, None, b"", "anonymous"))
     if previous is None:
         return None, "none"
@@ -372,7 +369,7 @@ def _sibling_path(name: str) -> Path | None:
         return None
     if override:
         return Path(override)
-    return _data_dir() / relative
+    return runtime.data_dir("openphish") / relative
 
 
 def _urls_from_document(text: str) -> tuple[list[str] | None, str]:
@@ -430,8 +427,8 @@ def _urls_from_json(payload) -> list[str] | None:
 def _persist(source: str, urls: list[str]) -> None:
     if not urls:
         return
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    with sqlite3.connect(_data_dir() / "openphish.sqlite") as conn:
+    now = runtime.utc_now_iso()
+    with sqlite3.connect(runtime.data_dir("openphish") / "openphish.sqlite") as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS indicators (
@@ -566,16 +563,6 @@ def _envelope(data, cache: str, warnings: tuple[str, ...] = ()) -> dict:
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-openphish"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("openphish", connector)

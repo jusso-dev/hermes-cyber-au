@@ -18,11 +18,10 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
-from cyberau_common.ratelimit import RateLimiter
+from cyberau_common.http import HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import unavailable
@@ -36,7 +35,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.present import finding_payload
 from cyberau_premium.store import ExposureStore
 from pydantic import Field
@@ -141,8 +140,8 @@ def upguard_data_leaks(
     records, _findings = _leak_records(
         payload or {},
         watchlist=None,
-        since=_parse_time(since) if since else None,
-        until=_parse_time(until) if until else None,
+        since=runtime.parse_iso(since) if since else None,
+        until=runtime.parse_iso(until) if until else None,
         statuses=statuses,
     )
     return _envelope(records, cache, (DISCLOSURES_URL,), _served(cache))
@@ -200,14 +199,11 @@ class _UpGuardConnector(PremiumConnector):
                     upguard_typosquats,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
-        if not _offline() and lookup("UPGUARD_API_KEY") is None:
+        if not runtime.offline() and lookup("UPGUARD_API_KEY") is None:
             raise ValueError("UPGUARD_API_KEY is not set")
         findings: list[ExposureFinding] = []
         payload, _cache, warning = _load_breaches(1000)
@@ -344,9 +340,9 @@ def _validate_domain(domain: str) -> str:
 
 
 def _validate_leaks(since: str | None, until: str | None, statuses: list[str] | None) -> str:
-    if since and _parse_time(since) is None:
+    if since and runtime.parse_iso(since) is None:
         return "since must be a date-time"
-    if until and _parse_time(until) is None:
+    if until and runtime.parse_iso(until) is None:
         return "until must be a date-time"
     if statuses:
         unknown = [item for item in statuses if item not in _STATUSES]
@@ -361,7 +357,7 @@ def _load_breaches(limit: int) -> tuple[dict | None, str, str]:
         "sort_by": "date_last_breach",
         "sort_desc": "true",
     }
-    if _offline():
+    if runtime.offline():
         return _fetch(BREACHES_URL, params, kind="breaches")
     identities: list[dict] = []
     breaches: list[dict] = []
@@ -395,7 +391,7 @@ def _fetch(
     kind: str,
     force_live: bool = False,
 ) -> tuple[dict | None, str, str]:
-    offline = _offline() and not force_live
+    offline = runtime.offline() and not force_live
     if offline:
         # Offline mode only serves files the operator pointed at. Nothing shipped
         # in the package is served as UpGuard data.
@@ -411,18 +407,17 @@ def _fetch(
             return None, "snapshot", f"the {_FIXTURES_ENV} snapshot for this call is not usable"
     if lookup("UPGUARD_API_KEY") is None:
         return None, "snapshot", "UPGUARD_API_KEY is not set"
-    directory = _data_dir()
+    directory = runtime.data_dir("upguard")
     disk = kind in {"typosquat", "typosquat_details"}
     cache = _ttl_cache(directory) if disk else _session_cache(directory)
     scope = _scope()
     cache_key = cache.key("GET", url, params, b"", scope)
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
     kwargs = {"resolver": _RESOLVER} if _RESOLVER is not None else {}
-    client = HttpClient(
+    client = runtime.http_client(
         "upguard",
-        policy=EgressPolicy(allowlist, "upguard", **kwargs),
+        directory=directory,
+        policy=EgressPolicy(runtime.allowlist_path(), "upguard", **kwargs),
         cache=cache,
-        limiter=RateLimiter(directory / "rate_limit.sqlite"),
         user_agent=USER_AGENT,
         rate=RATE,
         burst=BURST,
@@ -507,7 +502,7 @@ def _breach_records(
     for slot in rows:
         if len(records) >= limit:
             break
-        observed = _parse_time(slot["when"])
+        observed = runtime.parse_iso(slot["when"])
         if observed is None:
             continue
         if since is not None and observed.astimezone(UTC).date() < since:
@@ -561,7 +556,7 @@ def _leak_records(
         status = str(item.get("status") or "")
         if allowed and status not in allowed:
             continue
-        observed = _parse_time(str(item.get("date_disclosed") or ""))
+        observed = runtime.parse_iso(str(item.get("date_disclosed") or ""))
         if observed is None:
             continue
         if since is not None and observed < since:
@@ -615,7 +610,7 @@ def _typosquat_rows(payload: dict):
         for item in payload.get(state) or []:
             hostname = str(item.get("hostname") or "").strip().rstrip(".")
             if hostname:
-                observed = _parse_time(str(item.get("date_detected") or ""))
+                observed = runtime.parse_iso(str(item.get("date_detected") or ""))
                 yield state, hostname, item, observed
 
 
@@ -704,9 +699,10 @@ def _finding(
 
 
 def _persist(findings: list[ExposureFinding], watchlist: Watchlist) -> None:
-    if not findings or not os.environ.get("CYBERAU_DATA_DIR"):
+    data = runtime.configured_data_dir()
+    if not findings or data is None:
         return
-    store = ExposureStore(Path(os.environ["CYBERAU_DATA_DIR"]) / "intel.sqlite")
+    store = ExposureStore(data / "intel.sqlite")
     terms = get_vendor("upguard").terms
     for finding in findings:
         store.write(finding, terms=terms, watchlist=watchlist)
@@ -758,29 +754,6 @@ def _text(value: str) -> str:
     if not value.strip():
         return ""
     return untrusted_text(value, "upguard")
-
-
-def _parse_time(value: str | None) -> datetime | None:
-    if not value or not isinstance(value, str):
-        return None
-    text = value.strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed
-
-
-def _offline() -> bool:
-    return os.environ.get("CYBERAU_OFFLINE") == "1"
-
-
-def _data_dir() -> Path:
-    return Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-upguard"))
 
 
 def _scope() -> str:
@@ -836,10 +809,6 @@ def _load_body(body: bytes) -> dict | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
-
-
-def _allowlist() -> Path:
-    return _PACKAGE.parent / "egress-allowlist.yaml"
 
 
 register_connector("upguard", connector)

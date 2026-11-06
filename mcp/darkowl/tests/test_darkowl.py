@@ -17,7 +17,7 @@ from cyberau_darkowl.source import (
     sign_request,
 )
 from cyberau_premium.base import Watchlist
-from cyberau_premium.samples import SCHEMA as FINDING_SCHEMA
+from cyberau_premium.paths import finding_schema
 from cyberau_premium.status import load_servers, render_premium_servers
 from jsonschema import Draft202012Validator
 
@@ -30,7 +30,7 @@ RESPONSE = json.loads(
 )
 VALIDATOR = Draft202012Validator(RESPONSE)
 FINDING_VALIDATOR = Draft202012Validator(
-    FINDING_SCHEMA,
+    finding_schema(),
     format_checker=Draft202012Validator.FORMAT_CHECKER,
 )
 PUBLIC = "public-example"
@@ -505,10 +505,6 @@ def test_cassette_replays_without_an_authorization_header():
         played = httpx.get("https://api.darkowl.com/api/v1/search?q=example.com.au&count=0")
     assert played.status_code == 200
     assert played.json()["total"] == 0
-
-
-def test_vcr_config_filters_authorization(vcr_config):
-    assert "authorization" in vcr_config["filter_headers"]
 
 
 _FIXTURE_VALUES = (

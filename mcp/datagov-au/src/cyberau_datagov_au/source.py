@@ -8,6 +8,7 @@ from typing import Annotated
 
 import jsonschema
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
+from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import EgressDenied, EgressPolicy
 from cyberau_common.envelope import envelope, untrusted_text
@@ -107,7 +108,7 @@ class _DatagovConnector(Connector):
             text = _snapshot_text()
             if text is None:
                 return Probe(self.key, True, "no local copy to check")
-            payload = _load(text)
+            payload = runtime.load_json_object(text)
             problem = schema_drift(payload or {})
             if problem:
                 return Probe(self.key, False, problem)
@@ -173,7 +174,7 @@ class _JsonCache(HttpCache):
 
     def put(self, key, *, status, headers, body, ttl):
         try:
-            decoded = _load(body.decode("utf-8"))
+            decoded = runtime.load_json_object(body.decode("utf-8"))
         except UnicodeDecodeError:
             return
         if decoded is None or decoded.get("success") is False:
@@ -183,13 +184,13 @@ class _JsonCache(HttpCache):
 
 def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_DATAGOV_SNAPSHOT")
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if snapshot and not force_live:
         path = Path(snapshot)
         if not path.is_file():
             return None, "snapshot", _gone("the CYBERAU_DATAGOV_SNAPSHOT file is missing")
         return _parsed(path.read_text(encoding="utf-8"), "snapshot")
-    data_dir = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-datagov-au"))
+    data_dir = runtime.data_dir("datagov-au")
     cache = _JsonCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", url, params, b"", "anonymous")
     cached = cache.get(key)
@@ -198,7 +199,7 @@ def _fetch(url: str, params: dict, *, force_live: bool = False) -> tuple[dict | 
         return _parsed(cached.body.decode("utf-8"), state)
     if offline:
         return None, "snapshot", _gone("offline mode, and nothing is cached")
-    allowlist = Path(os.environ.get("CYBERAU_EGRESS_ALLOWLIST", str(_allowlist())))
+    allowlist = runtime.allowlist_path()
     client = _client(data_dir, allowlist, cache)
     try:
         response = client.get(url, params=params, ttl=24 * 3600, skip_cache=force_live)
@@ -235,7 +236,7 @@ def _gone(reason: str) -> str:
 
 
 def _parsed(text: str, cache: str) -> tuple[dict | None, str, str]:
-    payload = _load(text)
+    payload = runtime.load_json_object(text)
     if payload is None:
         return None, cache, _UNUSABLE
     return payload, cache, ""
@@ -249,7 +250,7 @@ def _client(data_dir: Path, allowlist: Path, cache: HttpCache) -> HttpClient:
         client_kwargs["sleeper"] = _SLEEP
     if _CLOCK is not None:
         limiter_kwargs["clock"] = _CLOCK
-    return HttpClient(
+    return runtime.http_client(
         "datagov-au",
         policy=EgressPolicy(allowlist, "datagov-au"),
         cache=cache,
@@ -431,7 +432,7 @@ def _validate_search(query: str, limit: int) -> str:
 def _persist(rows: list[dict], cache: str) -> None:
     if not rows or cache == "snapshot":
         return
-    directory = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-datagov-au"))
+    directory = runtime.data_dir("datagov-au")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "datagov-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
@@ -517,23 +518,11 @@ def _as_of(data) -> str | None:
     return None
 
 
-def _load(text: str) -> dict | None:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
 def _decode(body: bytes) -> str | None:
     try:
         return body.decode("utf-8")
     except UnicodeDecodeError:
         return None
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("datagov-au", connector)

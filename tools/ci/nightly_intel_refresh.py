@@ -21,16 +21,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from cyberau_common.secrets import distribution_env_names, is_plain_config_name, redact
+from cyberau_common.secrets import redact, secret_values
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Every public source with a refresh adapter in cyberau_common.refresh.
+# Every public source with a refresh adapter in the plugin's store.refresh.
 PUBLIC_SOURCES = "asd,kev,epss,auscert,feodo"
 
-ABSENT_MARKER = "is not part of the shared library yet"
-REFRESH_ABSENT = f"cyberau-mcp refresh {ABSENT_MARKER}."
-ROOT_USAGE = "usage: cyberau-mcp [-h]"
 REFUSAL_PREFIX = "Refusing paths outside the data directories:"
 
 _EXACT_PATHS = frozenset({"PR_BODY.md", "feeds"})
@@ -119,15 +116,6 @@ def git_changes(root: Path) -> list[str]:
     return parse_porcelain_z(proc.stdout)
 
 
-def is_absent(result: CommandResult) -> bool:
-    """True only when the shared library has no such command (exit 2)."""
-    if result.code != 2:
-        return False
-    if ABSENT_MARKER in result.stderr:
-        return True
-    return "unrecognized arguments" in result.stderr and ROOT_USAGE in result.stderr
-
-
 def status_signature(path: Path) -> dict[str, str]:
     """Each source's ok/fail status, without timestamps or counts."""
     try:
@@ -146,13 +134,8 @@ def status_signature(path: Path) -> dict[str, str]:
 
 def scrub(text: str, env: Mapping[str, str]) -> str:
     cleaned = redact(text)
-    names = set(distribution_env_names()) | {
-        name for name in env if re.search(r"KEY|TOKEN|SECRET|PASSWORD", name, re.IGNORECASE)
-    }
-    for name in names:
-        value = env.get(name, "")
-        if not is_plain_config_name(name) and len(value) >= 8:
-            cleaned = cleaned.replace(value, "[REDACTED]")
+    for value in secret_values(env):
+        cleaned = cleaned.replace(value, "[REDACTED]")
     return cleaned
 
 
@@ -171,7 +154,7 @@ def refresh_args(sources: str, catalogue: str, summary: str) -> list[str]:
 def run_cyberau(args: Sequence[str], env: Mapping[str, str]) -> CommandResult:
     exe = shutil.which("cyberau-mcp")
     if exe is None:
-        return CommandResult(2, "", f"cyberau-mcp {ABSENT_MARKER}")
+        return CommandResult(127, "", "cyberau-mcp is not on PATH")
     proc = subprocess.run(
         [exe, *args],
         capture_output=True,
@@ -215,10 +198,6 @@ def execute(
     before = status_signature(status_path)
 
     result = call(refresh_args(sources, catalogue, summary))
-    if is_absent(result):
-        print(f"::error title=Intel refresh not run::{REFRESH_ABSENT}")
-        set_output("open_pr", "false")
-        return 1
     if result.stdout.strip():
         print(scrub(result.stdout.strip(), current))
     if result.code != 0:

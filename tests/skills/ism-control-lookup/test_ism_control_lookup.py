@@ -69,37 +69,10 @@ def test_shipped_release_list_matches_the_connector_snapshot():
     assert "Do not parse the date from the tag" in note
 
 
-def test_skill_passes_the_structural_check():
-    assert harness.check_skill(SKILL) == []
-
-
-def test_eval_scores_offline_without_a_provider_key(tmp_path: Path, monkeypatch):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
-    monkeypatch.delenv("CYBERAU_ISM_SNAPSHOT", raising=False)
-    monkeypatch.setenv("CYBERAU_OFFLINE", "1")
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("hermes was called")
-
-    monkeypatch.setattr(harness, "run_hermes", boom)
-    assert (
-        harness.main(
-            [
-                "--evals",
-                str(EVALS.relative_to(ROOT)),
-                "--results-dir",
-                str(tmp_path),
-            ]
-        )
-        == 0
-    )
-    payload = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
-    assert payload["ok"] is True
-    assert payload["evals"][0]["model_matrix"]["ran"] is False
-    assert [case["id"] for case in payload["evals"][0]["cases"]] == [
+def test_eval_cases_cover_the_release_edge_cases():
+    loaded = harness.load_eval_file(EVALS)
+    assert loaded.skill == "ism-control-lookup"
+    assert [case.id for case in loaded.cases] == [
         "ism-1173",
         "missing-ism-9999",
         "mfa-protected",

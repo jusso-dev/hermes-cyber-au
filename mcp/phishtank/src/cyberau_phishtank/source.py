@@ -20,11 +20,11 @@ from urllib.parse import urlsplit
 
 import idna
 import jsonschema
-from cyberau_common import USER_AGENT
+from cyberau_common import USER_AGENT, runtime
 from cyberau_common.cache import HttpCache
-from cyberau_common.egress import EgressDenied, EgressPolicy
+from cyberau_common.egress import EgressDenied
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError
+from cyberau_common.http import HttpError
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
@@ -104,7 +104,7 @@ class _PhishtankConnector(Connector):
             text = _snapshot_text() or _cached_text()
             if text is None:
                 return Probe(self.key, True, "schema ok, no local copy to check")
-            problem = schema_drift(_loads(text))
+            problem = schema_drift(runtime.load_json(text))
             if problem:
                 return Probe(self.key, False, problem)
             return Probe(self.key, True, "schema ok")
@@ -143,10 +143,10 @@ def schema_drift(payload) -> str | None:
 
 def _feed(*, force_live: bool) -> tuple[list | None, str, str]:
     pinned = bool(os.environ.get("CYBERAU_PHISHTANK_SNAPSHOT")) and not force_live
-    offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live
+    offline = runtime.offline() and not force_live
     if pinned:
         return _snapshot()
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("phishtank")
     http_cache = HttpCache(data_dir / "http_cache.sqlite")
     target = _request_target()
     cached = None
@@ -232,9 +232,8 @@ def _download(url: str, scope: str, http_cache: HttpCache):
         # HttpClient stores every response under a key derived from the nonce URL.
         # Give it a throwaway cache so those entries never pile up in the real one.
         with tempfile.TemporaryDirectory(prefix="phishtank-") as scratch:
-            client = HttpClient(
+            client = runtime.http_client(
                 "phishtank",
-                policy=EgressPolicy(_allowlist(), "phishtank"),
                 cache=HttpCache(Path(scratch) / "scratch.sqlite"),
                 limiter=_limiter(),
                 user_agent=_USER_AGENT,
@@ -333,7 +332,7 @@ def _limiter() -> RateLimiter:
         kwargs["clock"] = _CLOCK
     if _SLEEP is not None:
         kwargs["sleeper"] = _SLEEP
-    return RateLimiter(_data_dir() / "rate_limit.sqlite", **kwargs)
+    return RateLimiter(runtime.data_dir("phishtank") / "rate_limit.sqlite", **kwargs)
 
 
 def _from_body(body: bytes, cache: str) -> tuple[list | None, str, str]:
@@ -360,7 +359,7 @@ def _from_text(text: str, cache: str, *, persist: bool = True) -> tuple[list | N
 
 
 def _parse(text: str) -> tuple[list, str]:
-    payload = _loads(text)
+    payload = runtime.load_json(text)
     if payload is None and text.strip():
         return [], "PhishTank payload was not usable"
     problem = schema_drift(payload)
@@ -379,15 +378,6 @@ def _entries(payload) -> list | None:
             if isinstance(rows, list):
                 return rows
     return None
-
-
-def _loads(text: str | None):
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
 
 
 def _match(rows: list, url: str) -> list[dict]:
@@ -512,7 +502,7 @@ def _as_of(rows: list) -> str | None:
 def _persist(rows: list, digest: str) -> None:
     if digest in _STORED:
         return
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = runtime.utc_now_iso()
     chosen: dict[str, tuple] = {}
     for row in rows:
         if not isinstance(row, dict):
@@ -534,7 +524,7 @@ def _persist(rows: list, digest: str) -> None:
             now,
         )
     if chosen:
-        with sqlite3.connect(_data_dir() / "phishtank.sqlite") as conn:
+        with sqlite3.connect(runtime.data_dir("phishtank") / "phishtank.sqlite") as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS phish (
@@ -581,7 +571,6 @@ def _response_problem(record: dict) -> str | None:
 
 
 def _snapshot_text() -> str | None:
-    """Read the operator snapshot file. Nothing shipped in the repo is ever read."""
     override = os.environ.get("CYBERAU_PHISHTANK_SNAPSHOT")
     if not override:
         return None
@@ -596,7 +585,7 @@ def _cached_text() -> str | None:
     if target is None:
         return None
     url, scope = target
-    http_cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    http_cache = HttpCache(runtime.data_dir("phishtank") / "http_cache.sqlite")
     cached = http_cache.get(http_cache.key("GET", url, None, b"", scope))
     if cached is None:
         return None
@@ -629,16 +618,6 @@ def _clean_text(message: str) -> str:
     if secret:
         text = text.replace(secret, "[REDACTED]")
     return _URL_QUERY.sub(r"\1?[REDACTED]", text)
-
-
-def _data_dir() -> Path:
-    path = Path(os.environ.get("CYBERAU_DATA_DIR", "/tmp/cyberau-phishtank"))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def _allowlist() -> Path:
-    return Path(__file__).resolve().parents[3] / "egress-allowlist.yaml"
 
 
 register_connector("phishtank", connector)
