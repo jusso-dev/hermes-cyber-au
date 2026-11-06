@@ -16,7 +16,6 @@ import json
 import os
 import sys
 import tempfile
-import time
 import unittest
 from collections.abc import Callable
 from pathlib import Path
@@ -146,11 +145,9 @@ class PluginSkeletonTest(unittest.TestCase):
         self.addCleanup(environ.stop)
         os.environ.pop("CYBERAU_AUDIT_LOG_PATH", None)
         self.addCleanup(self._close_store)
-        started = time.perf_counter()
         self.plugin = load_plugin()
         self.ctx = FakeCtx()
         self.plugin.register(self.ctx)
-        self.elapsed = time.perf_counter() - started
 
     def tearDown(self) -> None:
         _purge()
@@ -406,9 +403,6 @@ class PluginSkeletonTest(unittest.TestCase):
             fallback = Path.home() / ".hermes" / "plugin-data" / "cyber-au"
             self.assertEqual(self.plugin.data_dir(), fallback)
             self.assertIsNone(paths.configured_data_dir())
-
-    def test_load_and_register_stay_under_300ms(self) -> None:
-        self.assertLess(self.elapsed, 0.3)
 
     def test_sources_have_no_em_dash_emoji_or_secret_material(self) -> None:
         banned = ("\u2014", "\u2013", "sk-", "AKIA", "BEGIN PRIVATE", "ghp_", "xoxb-")

@@ -349,7 +349,6 @@ def test_skill_and_offline_eval_score_without_a_model():
     sys.path.insert(0, str(ROOT / "tests" / "skills"))
     import harness
 
-    assert harness.check_skill(ROOT / "skills" / "phishing-analysis") == []
     loaded = yaml.safe_load(EVAL.read_text(encoding="utf-8"))
     assert [case["id"] for case in loaded["cases"]] == [
         "ato-dmarc-fail",

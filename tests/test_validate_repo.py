@@ -26,8 +26,14 @@ class ValidateRepoTest(unittest.TestCase):
     def test_repository_passes(self):
         self.assertEqual(self.mod.validate(ROOT), [])
 
-    def test_main_on_repository(self):
-        self.assertEqual(self.mod.main(["--root", str(ROOT)]), 0)
+    def test_main_exits_nonzero_on_a_broken_tree(self):
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with self._tree() as root, contextlib.redirect_stdout(out):
+            self.assertEqual(self.mod.main(["--root", str(root)]), 1)
+        self.assertIn("distribution.yaml: file is missing", out.getvalue())
 
     def test_workflow_pins_actions_and_has_no_secret(self):
         text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

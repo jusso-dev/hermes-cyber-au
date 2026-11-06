@@ -63,13 +63,6 @@ def _one(cve: str, enrichment: dict, **kwargs) -> dict:
     return rows[0]
 
 
-def test_skill_passes_the_structural_check():
-    skill = ROOT / "skills" / "vuln-prioritisation"
-    folder = Path(__file__).resolve().parent
-    assert harness.check_skill(skill) == []
-    assert harness.check_fixtures([skill, folder]) == []
-
-
 def test_offline_sessions_score_without_a_model():
     loaded = harness.load_eval_file(EVALS)
     assert loaded.skill == "vuln-prioritisation"

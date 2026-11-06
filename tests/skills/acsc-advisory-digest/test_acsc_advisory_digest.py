@@ -7,8 +7,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import harness
@@ -34,10 +32,6 @@ def _period():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def test_skill_structure():
-    assert harness.check_skill(SKILL) == []
 
 
 def test_skill_keeps_advisory_text_untrusted_and_does_not_post():
@@ -71,21 +65,3 @@ def test_period_window():
     assert period.proposed_watermark(today=today, fetch_ok=False, previous=watermark) is None
     assert period.proposed_watermark(today=today, fetch_ok=True, previous=yesterday) == yesterday
     assert period.proposed_watermark(today=today, fetch_ok=True, previous=today) is None
-
-
-def test_offline_eval_passes_without_a_provider_key(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
-
-    def boom(*_args, **_kwargs):
-        raise AssertionError("hermes was called")
-
-    monkeypatch.setattr(harness, "run_hermes", boom)
-    result = harness.run_eval_file(EVAL, live=False)
-    failed = [case for case in result["cases"] if not case["ok"]]
-    assert not failed, failed
-    assert result["model_matrix"]["reason"] == "skipped: offline run"

@@ -78,17 +78,6 @@ def test_catalogue_matches_its_schema(catalogue):
     assert errors == []
 
 
-def test_repository_validator_accepts_the_catalogue():
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location(
-        "validate_repo", ROOT / "tools" / "ci" / "validate_repo.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    assert module.check_catalogue(ROOT) == []
-
-
 def test_ids_are_unique(feeds):
     ids = [feed["id"] for feed in feeds]
     assert len(ids) == len(set(ids))

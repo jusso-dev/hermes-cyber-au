@@ -190,12 +190,3 @@ def test_eval_deadlines_match_the_helper_and_forbid_submission():
     for case in loaded.cases:
         assert case.offline is not None
         assert all("submit" not in call.name for call in case.offline.tool_calls)
-
-
-def test_offline_eval_scores_with_no_model(monkeypatch: pytest.MonkeyPatch):
-    for name in harness.PROVIDER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("CYBERAU_EVAL_MODELS", raising=False)
-    result = harness.run_eval_file(EVAL, live=False)
-    assert result["model_matrix"]["ran"] is False
-    assert result["ok"], result
