@@ -311,9 +311,8 @@ def test_docs_quote_the_terms_and_readme_links():
     assert "docs/connectors/flare.md" in readme
 
 
-def test_cassettes_redact_the_key(vcr_config):
+def test_cassettes_redact_the_key():
     text = (Path(__file__).parent / "cassettes" / "token_generate.yaml").read_text(encoding="utf-8")
-    assert "authorization" in vcr_config["filter_headers"]
     assert "REDACTED" in text
     assert KEY not in text
     assert TOKEN not in text

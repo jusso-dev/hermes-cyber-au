@@ -512,8 +512,7 @@ def test_shared_watchlist_does_not_carry_suppliers(tmp_path, monkeypatch):
     assert result["data"][0]["own_organisation"] is False
 
 
-def test_vcr_and_fixtures_do_not_keep_secrets(vcr_config):
-    assert "x-rftoken" in vcr_config["filter_headers"]
+def test_vcr_and_fixtures_do_not_keep_secrets():
     for path in FIXTURES.iterdir():
         text = path.read_text(encoding="utf-8")
         assert TOKEN not in text
@@ -784,6 +783,5 @@ def test_failed_live_fetch_is_unavailable_for_every_tool(monkeypatch):
 
 def test_schema_samples_live_only_in_tests(monkeypatch):
     assert not (Path(rf.__file__).resolve().parent / "data").exists()
-    assert rf._SAMPLES == FIXTURES / "schema_samples.json"
     monkeypatch.delenv("CYBERAU_RF_SCHEMA_FIXTURE", raising=False)
     assert load_schema_samples(allow_fixture=False) is None

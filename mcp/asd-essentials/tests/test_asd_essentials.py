@@ -248,14 +248,11 @@ def test_tool_schemas_match_the_ticket():
     assert tools["e8_requirements"].input_schema["required"] == ["strategy", "maturity_level"]
     assert "patch_applications" in json.dumps(tools["e8_requirements"].input_schema)
     assert tools["essentials_chapter"].annotations.read_only_hint is True
-    assert len("mcp__e8__essentials_transition") == 30
 
 
-def test_shipped_snapshot_when_present():
+def test_shipped_snapshot():
     maturity = DATA / "e8-maturity-v2026.09.4.json"
     essentials = DATA / "essentials-2026-10-17.json"
-    if not maturity.is_file() or not essentials.is_file():
-        pytest.skip("shipped snapshot is built by rebuild_shipped_snapshot")
     document = json.loads(maturity.read_text(encoding="utf-8"))
     assigned = {(row["control_id"], row["strategy"]) for row in document["controls"]}
     assert ("ism-0843", "application_control") in assigned
@@ -276,8 +273,7 @@ def test_shipped_snapshot_when_present():
 
 def _shipped_day(pattern: str) -> date:
     found = sorted(DATA.glob(pattern))
-    if not found:
-        pytest.skip("shipped snapshot is built by rebuild_shipped_snapshot")
+    assert found, f"no shipped snapshot matches {pattern}"
     return date.fromisoformat(json.loads(found[-1].read_text(encoding="utf-8"))["retrieved_on"])
 
 

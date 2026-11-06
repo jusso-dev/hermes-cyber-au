@@ -275,7 +275,6 @@ def test_workflow_skips_missing_sources_and_pins_actions():
     assert "parser-check" not in text
     assert "tools/build_skill_references.py --write PR_BODY.md" in text
     assert "uv run --project mcp pytest -q tests/skills tests/data --block-network" in text
-    assert WORKFLOW == ROOT / ".github" / "workflows" / "skill-data-regen.yml"
     assert "${{ github.token }}" not in text
     for banned in (
         "ghp_",

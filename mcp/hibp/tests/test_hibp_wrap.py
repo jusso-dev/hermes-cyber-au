@@ -651,7 +651,3 @@ def test_fixtures_carry_no_secrets_or_real_addresses():
     assert emails <= {ACCOUNT, MULTIPLE}
     for path in (PACKAGE / "src").rglob("*.py"):
         assert chr(0x2014) not in path.read_text(encoding="utf-8")
-
-
-def test_hibp_vcr_config_filters_credentials(vcr_config):
-    assert "authorization" in vcr_config["filter_headers"]

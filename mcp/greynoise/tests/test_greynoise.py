@@ -75,7 +75,6 @@ def test_noise_riot_and_schemas(tmp_path, monkeypatch):
     tool = {item.name: item for item in listed}["greynoise_ip"]
     assert tool.annotations.read_only_hint is True
     assert tool.annotations.open_world_hint is True
-    assert len("mcp__greynoise__greynoise_ip") == 28
     incoming = _schema("greynoise_ip.input.json")
     jsonschema.Draft202012Validator.check_schema(incoming)
     jsonschema.validate({"ip": "203.0.113.50"}, incoming)
@@ -318,10 +317,6 @@ def test_cassette_replays_without_auth_header():
         played = httpx.get(f"{COMMUNITY_API}/1.1.1.1")
     assert played.status_code == 200
     assert played.json()["riot"] is True
-
-
-def test_vcr_config_filters_key(vcr_config):
-    assert "key" in vcr_config["filter_headers"]
 
 
 def test_upstream_free_text_is_wrapped(monkeypatch):

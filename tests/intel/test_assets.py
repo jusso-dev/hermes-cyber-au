@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import yaml
 from store import assets
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,7 +106,6 @@ def test_written_inventory_is_read_by_the_daily_briefing(tmp_path: Path) -> None
     loaded = briefing.load_assets(path.read_text(encoding="utf-8"))
     assert [item.name for item in loaded] == [item.name for item in combined]
     assert assets.read_inventory(path)[0].get("cpe").startswith("cpe:2.3:a:examplevendor")
-    yaml = pytest.importorskip("yaml")
     parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert parsed["assets"][2]["version"] == "7.2"  # stays a string
 

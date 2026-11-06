@@ -157,10 +157,6 @@ def test_v3_severity_is_not_hidden_by_v4(tmp_path, monkeypatch):
     assert nvd_search(cvss_v3_severity="LOW")["data"] == []
 
 
-def test_nvd_vcr_config_filters_api_key(vcr_config):
-    assert "apikey" in {name.lower() for name in vcr_config["filter_headers"]}
-
-
 FIXTURE_VALUES = ("CVE-2024-3400", "trimmed fixture", "Initial Analysis", "2026-10-16T00:00:00")
 
 

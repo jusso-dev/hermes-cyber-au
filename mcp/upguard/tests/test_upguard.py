@@ -424,10 +424,9 @@ def test_docs_quote_terms_and_readme_links_them():
     assert ".post_" not in source_text
 
 
-def test_cassettes_replay_without_secrets(vcr_config):
+def test_cassettes_replay_without_secrets():
     import vcr
 
-    assert "authorization" in vcr_config["filter_headers"]
     uris = {
         "upguard_identity_breaches": (
             "https://cyber-risk.upguard.com/api/public/breaches"

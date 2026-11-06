@@ -323,8 +323,6 @@ def test_live_health_and_advertised_tools(monkeypatch):
     jsonschema.Draft202012Validator.check_schema(result_schema)
     assert submit_schema["required"] == ["url", "approval_token"]
     assert result_schema["required"] == ["scan_id"]
-    assert len("mcp__cfscan__urlscan_submit_unlisted") == 36
-    assert len("mcp__cfscan__urlscan_get_result") == 31
 
 
 def test_default_stays_off_and_docs_quote_the_terms(monkeypatch):

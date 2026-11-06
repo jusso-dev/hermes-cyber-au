@@ -608,7 +608,7 @@ def test_poll_limit_and_live_health(tmp_path, monkeypatch):
     assert "TAXII_API_ROOT" in missing.detail
 
 
-def test_offline_without_an_operator_snapshot_is_unavailable_and_cassettes_replay(vcr_config):
+def test_offline_without_an_operator_snapshot_is_unavailable_and_cassettes_replay():
     os.environ.pop("CYBERAU_TAXII_SNAPSHOT", None)
     os.environ["CYBERAU_OFFLINE"] = "1"
     os.environ.pop("TAXII_API_ROOT", None)
@@ -616,7 +616,6 @@ def test_offline_without_an_operator_snapshot_is_unavailable_and_cassettes_repla
     assert listed["cache"] == "snapshot"
     assert listed["data"] == []
     assert "unavailable" in listed["warnings"][0].lower()
-    assert "authorization" in vcr_config["filter_headers"]
     import vcr
     from vcr.serialize import deserialize
     from vcr.serializers import yamlserializer

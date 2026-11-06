@@ -310,12 +310,11 @@ def test_offline_uses_cache_then_snapshot(tmp_path, monkeypatch):
     assert any("is unavailable" in item for item in fallback["warnings"])
 
 
-def test_cassettes_are_redacted(vcr_config):
+def test_cassettes_are_redacted():
     import vcr
     from vcr.serialize import deserialize
     from vcr.serializers import yamlserializer
 
-    assert "authorization" in vcr_config["filter_headers"]
     player = vcr.VCR(record_mode="none")
     for name in READ_TOOLS:
         path = FIXTURES / f"{name}.yaml"

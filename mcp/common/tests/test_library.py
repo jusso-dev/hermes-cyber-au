@@ -17,7 +17,7 @@ from cyberau_common import USER_AGENT
 from cyberau_common.cache import HttpCache
 from cyberau_common.egress import FAKE_IP_ENV, EgressDenied, EgressPolicy, EgressUnresolved
 from cyberau_common.envelope import envelope, untrusted_text
-from cyberau_common.http import HttpClient, HttpError, _EgressBackend, egress_transport
+from cyberau_common.http import HttpClient, HttpError, egress_transport
 from cyberau_common.ratelimit import RateLimited, RateLimiter
 from cyberau_common.secrets import RedactFilter, redact
 from cyberau_common.server import Connector, ToolSpec, build_server, get_connector
@@ -370,44 +370,67 @@ class TestConnectTimeEgress:
         with pytest.raises(EgressDenied, match="blocked"):
             EgressPolicy(path, "demo").check("https://198.18.0.1/", resolve=False)
 
+    @staticmethod
+    def _default_client(tmp_path: Path, policy: EgressPolicy) -> HttpClient:
+        """A client with no transport override, so it builds its own wiring."""
+        return HttpClient(
+            "demo",
+            policy=policy,
+            cache=HttpCache(tmp_path / "cache.sqlite"),
+            limiter=RateLimiter(tmp_path / "limit.sqlite"),
+            user_agent=USER_AGENT,
+            retries=0,
+        )
+
+    @staticmethod
+    def _record_sockets(monkeypatch) -> list[str]:
+        """Replace the real socket layer. Every connect is recorded and refused."""
+        hosts: list[str] = []
+
+        def connect_tcp(self, host, port, **kwargs):
+            hosts.append(host)
+            raise httpcore.ConnectError("no sockets in tests")
+
+        monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", connect_tcp)
+        return hosts
+
     def test_proxy_requests_do_not_resolve_locally(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
         monkeypatch.setenv("NO_PROXY", "direct.example")
+        sockets = self._record_sockets(monkeypatch)
+        resolved: list[str] = []
 
         def resolver(host):
-            raise AssertionError("resolved locally")
+            resolved.append(host)
+            return [_ip("1.1.1.1")]
 
         path = tmp_path / "allow.yaml"
         path.write_text(
             "connectors:\n  demo:\n    hosts: [example.com, direct.example]\n",
             encoding="utf-8",
         )
-        policy = EgressPolicy(path, "demo", resolver=resolver)
-        client = HttpClient(
-            "demo",
-            policy=policy,
-            cache=HttpCache(tmp_path / "cache.sqlite"),
-            limiter=RateLimiter(tmp_path / "limit.sqlite"),
-            user_agent=USER_AGENT,
-        )
-        proxied = client._client._transport_for_url(httpx.URL("https://example.com/a"))
-        assert isinstance(proxied._pool, httpcore.HTTPProxy)
-        direct = client._client._transport_for_url(httpx.URL("https://direct.example/a"))
-        assert isinstance(direct._pool._network_backend, _EgressBackend)
-        policy.check("https://example.com/a", resolve=False)
+        client = self._default_client(tmp_path, EgressPolicy(path, "demo", resolver=resolver))
+        with pytest.raises(HttpError):
+            client.get("https://example.com/a", ttl=5)
+        assert resolved == []
+        assert sockets == ["proxy.example"]
+        # NO_PROXY hosts connect directly, to the address the policy vetted.
+        with pytest.raises(HttpError):
+            client.get("https://direct.example/a", ttl=5)
+        assert resolved == ["direct.example"]
+        assert sockets == ["proxy.example", "1.1.1.1"]
         client.close()
 
-    def test_direct_requests_use_the_egress_transport(self, tmp_path: Path, monkeypatch):
+    def test_direct_requests_are_vetted_at_connect_time(self, tmp_path: Path, monkeypatch):
         monkeypatch.setattr("cyberau_common.http.get_environment_proxies", dict)
-        client = HttpClient(
-            "demo",
-            policy=_policy(tmp_path, self.ALLOW),
-            cache=HttpCache(tmp_path / "cache.sqlite"),
-            limiter=RateLimiter(tmp_path / "limit.sqlite"),
-            user_agent=USER_AGENT,
-        )
-        transport = client._client._transport_for_url(httpx.URL("https://example.com/a"))
-        assert isinstance(transport._pool._network_backend, _EgressBackend)
+        sockets = self._record_sockets(monkeypatch)
+        path = tmp_path / "allow.yaml"
+        path.write_text(self.ALLOW, encoding="utf-8")
+        policy = EgressPolicy(path, "demo", resolver=lambda host: [_ip("10.0.0.1")])
+        client = self._default_client(tmp_path, policy)
+        with pytest.raises(EgressDenied, match="blocked"):
+            client.get("https://example.com/a", ttl=5)
+        assert sockets == []
         client.close()
 
 

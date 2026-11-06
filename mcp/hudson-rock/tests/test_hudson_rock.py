@@ -418,8 +418,7 @@ def test_missing_key_and_docs(monkeypatch):
     assert "cavalier.hudsonrock.com" not in source.SEARCH_URL
 
 
-def test_fixtures_are_synthetic(vcr_config):
-    assert "api-key" in vcr_config["filter_headers"]
+def test_fixtures_are_synthetic():
     for path in FIXTURES.iterdir():
         text = path.read_text(encoding="utf-8")
         assert SECRET not in text

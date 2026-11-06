@@ -536,8 +536,6 @@ def test_default_state_and_registration(tmp_path):
 def test_tools_are_read_only_and_fixtures_are_clean():
     listed = __import__("asyncio").run(build_server(connector()).list_tools())
     tools = {tool.name: tool for tool in listed}
-    assert len("mcp__spycloud__spycloud_watchlist_exposure") == 42
-    assert len("mcp__spycloud__spycloud_breach_info") == 35
     for name, tool in tools.items():
         assert tool.annotations.read_only_hint is True
         assert tool.annotations.open_world_hint is True
@@ -551,10 +549,6 @@ def test_tools_are_read_only_and_fixtures_are_clean():
         assert KEY not in text
         for match in EMAIL.finditer(text):
             assert match.group(1).lower() in allowed
-
-
-def test_vcr_filters_the_api_key_header(vcr_config):
-    assert "x-api-key" in vcr_config["filter_headers"]
 
 
 def test_snapshot_is_labelled_and_not_stored_or_used_as_exposure(monkeypatch, tmp_path):

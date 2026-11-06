@@ -46,7 +46,9 @@ def test_vcr_filter_headers_match_any_casing(vcr_config):
     from vcr.filters import replace_headers
     from vcr.request import Request
 
-    headers = {name: SEEDED for name in TICKET_HEADERS + ("X-RFToken", "X-Api-Key")}
+    # Every secret header a connector sends, in the casing it sends it.
+    sent = ("X-RFToken", "X-API-KEY", "Api-Key", "api-key", "x-apikey")
+    headers = {name: SEEDED for name in TICKET_HEADERS + sent}
     request = Request("GET", "https://example.com/", b"", headers)
     replacements = [(name, None) for name in vcr_config["filter_headers"]]
     assert dict(replace_headers(request, replacements).headers) == {}

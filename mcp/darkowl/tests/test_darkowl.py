@@ -507,10 +507,6 @@ def test_cassette_replays_without_an_authorization_header():
     assert played.json()["total"] == 0
 
 
-def test_vcr_config_filters_authorization(vcr_config):
-    assert "authorization" in vcr_config["filter_headers"]
-
-
 _FIXTURE_VALUES = (
     "synthetic-1",
     "synthetic-2",
