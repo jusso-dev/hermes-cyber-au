@@ -4,9 +4,7 @@
 # Hermes runs this file from $HERMES_HOME/scripts with a sanitised environment.
 # Do not read the profile .env. stdout is delivered verbatim.
 #
-# Commands, in order: `store backup`, then `store compact` (retention
-# compaction), then `store vacuum`. Backup runs first so a failed compaction
-# still leaves a copy.
+# Backup runs first so a failed compaction still leaves a copy.
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=_cyberau_lib.sh
 source "$(dirname -- "${BASH_SOURCE[0]}")/_cyberau_lib.sh"
