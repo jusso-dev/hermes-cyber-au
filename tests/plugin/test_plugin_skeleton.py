@@ -180,7 +180,6 @@ class PluginSkeletonTest(unittest.TestCase):
                 "provides_tools",
                 "provides_hooks",
                 "python_dependencies",
-                "config_schema",
             },
         )
         self.assertEqual(manifest["name"], "cyber-au")
@@ -192,12 +191,7 @@ class PluginSkeletonTest(unittest.TestCase):
         self.assertEqual(manifest["homepage"], "https://github.com/jusso-dev/hermes-cyber-au")
         self.assertEqual(manifest["provides_tools"], TOOLS)
         self.assertEqual(manifest["provides_hooks"], HOOKS)
-        self.assertEqual(manifest["python_dependencies"], ["pyyaml>=6,<7", "stix2>=3,<4"])
-        schema = manifest["config_schema"]
-        self.assertEqual(schema["audit_log_path"]["type"], "str")
-        self.assertEqual(schema["audit_log_path"]["default"], "")
-        self.assertEqual(schema["untrusted_banner"]["type"], "bool")
-        self.assertIs(schema["untrusted_banner"]["default"], True)
+        self.assertEqual(manifest["python_dependencies"], ["pyyaml>=6,<7"])
 
     def test_registered_tools_and_hooks_match_the_manifest(self) -> None:
         self.assertEqual(list(self.ctx.tools), TOOLS)

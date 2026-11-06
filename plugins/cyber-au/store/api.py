@@ -155,9 +155,7 @@ def upsert_indicator(
                     digest,
                 ),
             )
-            body = _indicator_body(
-                original, value_norm, indicator_type, merged_verdict, stored_tags
-            )
+            body = indicator_body(original, value_norm, indicator_type, merged_verdict, stored_tags)
             upsert_fts(conn, "indicator", record_id, indicator_type, body, replace=False)
             return record_id
 
@@ -197,14 +195,12 @@ def upsert_indicator(
             """,
             (first_seen, last_seen, merged_verdict, merged_confidence, merged_tlp, existing["id"]),
         )
-        extras = _observation_index_text(conn, existing["id"])
-        body = _indicator_body(
-            existing["value"], value_norm, indicator_type, merged_verdict, extras
-        )
+        extras = observation_index_text(conn, existing["id"])
+        body = indicator_body(existing["value"], value_norm, indicator_type, merged_verdict, extras)
         upsert_fts(conn, "indicator", existing["id"], indicator_type, body)
         return existing["id"]
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def upsert_vulnerability(cve_id: str, path: str | Path | None = None, **fields: object) -> None:
@@ -290,7 +286,7 @@ def upsert_vulnerability(cve_id: str, path: str | Path | None = None, **fields: 
         )
         upsert_fts(conn, "vulnerability", cve, cve, body, replace=existing is not None)
 
-    _run(path, write)
+    run_write(path, write)
 
 
 def upsert_advisory(
@@ -366,7 +362,7 @@ def upsert_advisory(
         )
         return not existed
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def ensure_source(
@@ -424,7 +420,7 @@ def ensure_source(
             )
         store.remember_source(checked)
 
-    _run(path, write)
+    run_write(path, write)
 
 
 def ingest_kev_catalogue(
@@ -468,7 +464,7 @@ def ingest_kev_catalogue(
             )
         return len(rows)
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def search(
@@ -611,7 +607,8 @@ def table_counts(path: str | Path | None = None) -> dict[str, int]:
     return {name: conn.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0] for name in TABLES}
 
 
-def _run(path: str | Path | None, fn: Callable[[Store], object]) -> object:
+def run_write(path: str | Path | None, fn: Callable[[Store], object]) -> object:
+    """Run ``fn`` in one write transaction, joining an outer one when it is open."""
     store = open_store(path)
     if store.in_transaction():
         return fn(store)
@@ -694,8 +691,8 @@ def rescore_indicator(conn: sqlite3.Connection, indicator_id: str) -> None:
         "UPDATE indicators SET verdict = ?, confidence = ? WHERE id = ?",
         (merged_verdict, merged_confidence, indicator_id),
     )
-    extras = _observation_index_text(conn, indicator_id)
-    body = _indicator_body(row["value"], row["value_norm"], row["type"], merged_verdict, extras)
+    extras = observation_index_text(conn, indicator_id)
+    body = indicator_body(row["value"], row["value_norm"], row["type"], merged_verdict, extras)
     upsert_fts(conn, "indicator", indicator_id, row["type"], body)
 
 
@@ -724,13 +721,14 @@ def _score_for_indicator(conn: sqlite3.Connection, indicator_id: str) -> tuple[s
     return score(observations, counters)
 
 
-def _indicator_body(
+def indicator_body(
     value: str,
     value_norm: str,
     indicator_type: str,
     verdict: str | None,
     extras: Sequence[str],
 ) -> str:
+    """Full-text body for an indicator row."""
     parts = [value_norm, value, indicator_type]
     if verdict:
         parts.append(verdict)
@@ -738,7 +736,8 @@ def _indicator_body(
     return " ".join(parts)
 
 
-def _observation_index_text(conn: sqlite3.Connection, indicator: str) -> list[str]:
+def observation_index_text(conn: sqlite3.Connection, indicator: str) -> list[str]:
+    """Observation tags that feed an indicator's full-text row."""
     texts: list[str] = []
     for row in conn.execute("SELECT tags FROM observations WHERE indicator_id = ?", (indicator,)):
         try:
@@ -1028,12 +1027,18 @@ def _normalise_vuln_field(key: str, value: object) -> object:
 
 
 __all__ = [
+    "KINDS",
+    "SEARCH_LIMIT_MAX",
     "close_store",
     "ensure_source",
     "export_records",
+    "indicator_body",
     "ingest_kev_catalogue",
     "lookup",
+    "observation_index_text",
     "open_store",
+    "rescore_indicator",
+    "run_write",
     "search",
     "table_counts",
     "upsert_advisory",
