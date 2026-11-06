@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
+
+from cyberau_common import runtime
 
 
 def package_root() -> Path:
@@ -22,8 +23,7 @@ def repo_root() -> Path:
 
 
 def data_dir() -> Path:
-    """Profile data directory. `CYBERAU_DATA_DIR` overrides the default."""
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    path = Path(raw) if raw else Path("plugin-data") / "cyber-au"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    """State for the premium connectors: budget ledger, terms audit, caches and stores.
+    The profile sets CYBERAU_DATA_DIR; without it this is /tmp/cyberau-premium, like every
+    other connector's fallback, never a directory relative to the working directory."""
+    return runtime.data_dir("premium")

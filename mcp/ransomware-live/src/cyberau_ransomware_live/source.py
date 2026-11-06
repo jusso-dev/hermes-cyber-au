@@ -227,7 +227,7 @@ def _fetch(
     offline = runtime.offline() and not force_live
     if snapshot and not force_live:
         return _load(_snapshot_text()), "snapshot", _PINNED_NOTE
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("ransomlive")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     cache_key = cache.key("GET", url, params, b"", "anonymous")
     cached = cache.get(cache_key)
@@ -453,7 +453,7 @@ def _watchlist_candidates() -> list[Path]:
     override = os.environ.get("CYBERAU_ORG_WATCHLIST")
     if override:
         return [Path(override)]
-    data = _data_dir()
+    data = runtime.data_dir("ransomlive")
     found = [
         data / "watchlists" / "org-exposure.yaml",
         data / "watchlists.yaml",
@@ -467,7 +467,7 @@ def _persist(rows: list[dict], cache: str) -> None:
     """Append metadata for claims not stored yet. A snapshot is never real feed history."""
     if not rows or cache == "snapshot":
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("ransomlive")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "ransomlive-metadata.jsonl"
     seen: set[str] = set()
@@ -602,10 +602,6 @@ def _snapshot_text() -> str:
     if not snapshot:
         return ""
     return Path(snapshot).read_text(encoding="utf-8")
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("ransomlive")
 
 
 def _safe(exc: Exception) -> str:

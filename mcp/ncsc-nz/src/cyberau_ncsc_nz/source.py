@@ -323,7 +323,7 @@ def _fetch_item(url: str) -> tuple[dict | None, str, str]:
 
 
 def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("ncsc-nz")
     kwargs = {}
     if _RESOLVER is not None:
         kwargs["resolver"] = _RESOLVER
@@ -726,7 +726,7 @@ def _mapped_html(url: str) -> str | None:
 
 
 def _cached_body(url: str) -> tuple[str, bool] | None:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("ncsc-nz") / "http_cache.sqlite")
     key = cache.key("GET", url, None, b"", "anonymous")
     item = cache.get(key)
     if item is None:
@@ -821,7 +821,7 @@ def _item_id(link: str) -> str:
 
 
 def _limit(key: str, *, rate: float, burst: int) -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("ncsc-nz") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         key,
         rate=rate,
         burst=burst,
@@ -856,13 +856,9 @@ def _envelope(
     )
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("ncsc-nz")
-
-
 @contextmanager
 def _db():
-    conn = sqlite3.connect(_data_dir() / "ncsc_alerts.sqlite")
+    conn = sqlite3.connect(runtime.data_dir("ncsc-nz") / "ncsc_alerts.sqlite")
     conn.row_factory = sqlite3.Row
     conn.execute(
         """

@@ -351,7 +351,7 @@ def _failure(result: tuple[str | None, str, str]) -> str:
 def _http(
     url: str, headers: dict, *, ttl: int, skip_cache: bool, retries: int
 ) -> tuple[str | None, str, str]:
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("pspf")
     client = runtime.http_client(
         "pspf",
         directory=data_dir,
@@ -713,7 +713,7 @@ def _like(value: str) -> str:
 
 
 def _has_records() -> bool:
-    if not (_data_dir() / "pspf.sqlite").is_file():
+    if not (runtime.data_dir("pspf") / "pspf.sqlite").is_file():
         return False
     with _db() as conn:
         row = conn.execute("SELECT 1 FROM records LIMIT 1").fetchone()
@@ -721,7 +721,7 @@ def _has_records() -> bool:
 
 
 def _has_live_records() -> bool:
-    if not (_data_dir() / "pspf.sqlite").is_file():
+    if not (runtime.data_dir("pspf") / "pspf.sqlite").is_file():
         return False
     with _db() as conn:
         row = conn.execute("SELECT 1 FROM records WHERE origin = 'live' LIMIT 1").fetchone()
@@ -785,7 +785,7 @@ def _read_json(path: Path) -> dict | None:
 
 
 def _cached_body(url: str) -> str | None:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("pspf") / "http_cache.sqlite")
     key = cache.key("GET", url, None, b"", "anonymous")
     cached = cache.get(key)
     if cached is None:
@@ -821,13 +821,13 @@ def _as_of(payload: dict) -> str | None:
 
 
 def _fresh_cached(url: str) -> bool:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("pspf") / "http_cache.sqlite")
     cached = cache.get(cache.key("GET", url, None, b"", "anonymous"))
     return cached is not None and cache.fresh(cached)
 
 
 def _retrieved(urls: list[str]) -> str:
-    cache = HttpCache(_data_dir() / "http_cache.sqlite")
+    cache = HttpCache(runtime.data_dir("pspf") / "http_cache.sqlite")
     times = []
     for url in urls:
         cached = cache.get(cache.key("GET", url, None, b"", "anonymous"))
@@ -835,11 +835,11 @@ def _retrieved(urls: list[str]) -> str:
             times.append(cached.fetched_at)
     if not times:
         return runtime.utc_now_iso()
-    return datetime.fromtimestamp(min(times), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(datetime.fromtimestamp(min(times), UTC))
 
 
 def _limit(key: str, *, rate: float, burst: int) -> None:
-    RateLimiter(_data_dir() / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
+    RateLimiter(runtime.data_dir("pspf") / "rate_limit.sqlite", sleeper=_SLEEP).acquire(
         key,
         rate=rate,
         burst=burst,
@@ -860,13 +860,9 @@ def _envelope(data, cache: str, data_as_of: str | None = None, warnings=()):
     )
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("pspf")
-
-
 @contextmanager
 def _db():
-    conn = sqlite3.connect(_data_dir() / "pspf.sqlite")
+    conn = sqlite3.connect(runtime.data_dir("pspf") / "pspf.sqlite")
     conn.row_factory = sqlite3.Row
     conn.execute(
         """

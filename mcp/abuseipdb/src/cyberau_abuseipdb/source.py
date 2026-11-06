@@ -272,7 +272,7 @@ def _fetch(
 ) -> tuple[dict | None, str, str]:
     offline = runtime.offline() and not force_live
     snapshot_env = os.environ.get("CYBERAU_ABUSEIPDB_SNAPSHOT")
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("abuseipdb")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", url, params, b"", "anonymous")
     if not force_live and not snapshot_env:
@@ -428,7 +428,7 @@ def _history(ip: str, score: int, reports: int, country: str | None) -> dict:
 def _persist(rows: list[dict]) -> None:
     if not rows:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("abuseipdb")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "abuseipdb-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
@@ -584,10 +584,6 @@ def _safe(message: str, secret: str | None) -> str:
 def _snapshot_text(endpoint: str) -> str:
     del endpoint
     return Path(os.environ["CYBERAU_ABUSEIPDB_SNAPSHOT"]).read_text(encoding="utf-8")
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("abuseipdb")
 
 
 def _envelope(

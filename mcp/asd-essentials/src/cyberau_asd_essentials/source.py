@@ -1227,7 +1227,7 @@ def _latest(root: Path, pattern: str) -> Path | None:
 def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
     if runtime.offline():
         return None, "snapshot", "offline"
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("e8")
     client = runtime.http_client(
         "asd-essentials",
         directory=data_dir,
@@ -1279,10 +1279,6 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("e8")
 
 
 def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:

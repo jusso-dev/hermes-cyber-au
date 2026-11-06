@@ -189,10 +189,7 @@ def _strip_guid(text: str, guid: str) -> str:
 def data_dir() -> Path:
     """Profile data directory. Routine state, the ledger and the audit log live here, so it
     must be the same on every run. Tests point CYBERAU_DATA_DIR at a temporary directory."""
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw)
-    return profile_home() / "plugin-data" / "cyber-au"
+    return runtime.configured_data_dir() or profile_home() / "plugin-data" / "cyber-au"
 
 
 def profile_home() -> Path:

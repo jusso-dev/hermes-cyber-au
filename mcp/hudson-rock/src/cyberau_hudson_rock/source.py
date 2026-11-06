@@ -12,7 +12,7 @@ import json
 import os
 import random
 import re
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -365,9 +365,9 @@ def _watchlist_path() -> Path:
     override = os.environ.get("CYBERAU_ORG_WATCHLIST")
     if override:
         return Path(override)
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        return Path(raw).resolve().parent.parent / "watchlists" / "org-exposure.yaml"
+    data = runtime.configured_data_dir()
+    if data is not None:
+        return data.resolve().parent.parent / "watchlists" / "org-exposure.yaml"
     return Path("watchlists") / "org-exposure.yaml"
 
 
@@ -820,7 +820,7 @@ def _latest(findings: list[ExposureFinding]) -> str | None:
     if not findings:
         return None
     latest = max(item.observed_at for item in findings)
-    return latest.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(latest)
 
 
 def _schema_problem(url: str, payload: object) -> str | None:

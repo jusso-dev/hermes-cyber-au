@@ -270,7 +270,7 @@ def _load() -> tuple[dict | None, str, str, tuple[str, ...]]:
         return payload, cache, warning, (_override_note(as_of), _AMENDMENTS)
     note = ""
     if runtime.offline():
-        current = _data_dir() / "obligations-current.json"
+        current = runtime.data_dir("aureg") / "obligations-current.json"
         if current.is_file():
             payload, _cache, warning = _read(current, "stale")
             if not warning:
@@ -435,7 +435,7 @@ def _persist(rows: list[dict]) -> str:
     if not rows:
         return ""
     try:
-        path = _data_dir() / "aureg-obligations.jsonl"
+        path = runtime.data_dir("aureg") / "aureg-obligations.jsonl"
         with path.open("a", encoding="utf-8") as handle:
             for row in rows:
                 handle.write(json.dumps(row, sort_keys=True) + "\n")
@@ -446,7 +446,7 @@ def _persist(rows: list[dict]) -> str:
 
 def _fetch_page(url: str, *, force: bool, ttl: int = _WEEK) -> tuple[str | None, str, str]:
     offline = runtime.offline() and not force
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("aureg")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", url, None, b"", "anonymous")
     if offline:
@@ -519,7 +519,7 @@ def _missing_markers(text: str, markers: tuple[str, ...]) -> list[str]:
 def _limit(host: str) -> None:
     # Binding ceiling: one fetch every five seconds. Regeneration is weekly.
     RateLimiter(
-        _data_dir() / "rate_limit.sqlite",
+        runtime.data_dir("aureg") / "rate_limit.sqlite",
         clock=_clock(),
         sleeper=_sleeper(),
     ).acquire(
@@ -536,7 +536,7 @@ def _client(cache: HttpCache) -> HttpClient:
     policy = EgressPolicy(allowlist, "au-regulatory", resolver=_RESOLVER)
     return runtime.http_client(
         "au-regulatory",
-        directory=_data_dir(),
+        directory=runtime.data_dir("aureg"),
         policy=policy,
         cache=cache,
         limiter_clock=_clock(),
@@ -608,10 +608,6 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
 def _snapshot_path() -> Path | None:
     found = sorted((_PACKAGE / "data").glob("obligations-*.json"))
     return found[-1] if found else None
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("aureg")
 
 
 register_connector("au-regulatory", connector)

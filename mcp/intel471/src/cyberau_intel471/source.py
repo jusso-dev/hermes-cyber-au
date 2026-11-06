@@ -601,7 +601,7 @@ def _remember(finding: ExposureFinding, watchlist: Watchlist) -> None:
     if _snapshot_active():
         # A snapshot is a fixture, not an observation. It never becomes history.
         return
-    store = ExposureStore(_data_root() / "intel.sqlite")
+    store = ExposureStore(data_dir() / "intel.sqlite")
     store.write(finding, terms=_terms(), watchlist=watchlist)
 
 
@@ -627,7 +627,7 @@ def _fetch(
     if not _configured():
         reason = "it is not configured. Set INTEL471_EMAIL and INTEL471_API_KEY"
         return None, "snapshot", _failed(reason, force_live)
-    root = _data_root()
+    root = data_dir()
     cache = _cache_for(root, kind)
     cache_key = cache.key("GET", url, params, b"", _scope())
     offline = runtime.offline() and not force_live
@@ -850,10 +850,10 @@ def _load_watchlist() -> tuple[Watchlist | None, str]:
     if raw:
         path = Path(raw)
     else:
-        base = os.environ.get("CYBERAU_DATA_DIR")
-        if not base:
+        base = runtime.configured_data_dir()
+        if base is None:
             return None, ""
-        path = Path(base) / "watchlists" / "org-exposure.yaml"
+        path = base / "watchlists" / "org-exposure.yaml"
     if not path.is_file():
         return None, ""
     try:
@@ -1225,15 +1225,6 @@ def _envelope(data, cache: str, urls: tuple[str, ...], warnings: tuple[str, ...]
         warnings=cleaned,
         attribution=_terms().attribution,
     )
-
-
-def _data_root() -> Path:
-    raw = os.environ.get("CYBERAU_DATA_DIR")
-    if raw:
-        path = Path(raw)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-    return data_dir()
 
 
 def _scope() -> str:

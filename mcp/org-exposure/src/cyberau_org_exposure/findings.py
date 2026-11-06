@@ -9,6 +9,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from cyberau_common import runtime
 from cyberau_common.secrets import redact
 
 from cyberau_org_exposure.abn import data_dir
@@ -254,7 +255,7 @@ def _finding_id(vendor: str, kind: str, subject_value: str, source_ref: str) -> 
 
 def _expires(observed_at: str) -> str:
     parsed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
-    return (parsed + timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(parsed + timedelta(days=90))
 
 
 def _connect(path: Path) -> sqlite3.Connection:

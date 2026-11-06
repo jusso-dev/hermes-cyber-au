@@ -355,7 +355,7 @@ def _stored_corpus(notes: tuple[str, ...], *, offline: bool = False) -> _Loaded:
 
 
 def _newest_saved() -> tuple[str, list[tuple[str, bytes]]] | None:
-    root = _data_dir()
+    root = runtime.data_dir("sigma")
     best: tuple[float, str, list[tuple[str, bytes]]] | None = None
     for folder in root.iterdir():
         if not folder.is_dir() or _safe_tag(folder.name) != folder.name:
@@ -475,7 +475,7 @@ def _packages(
             warnings.append(warning or f"{name} download failed")
             continue
         if tag:
-            path = _data_dir() / tag / name
+            path = runtime.data_dir("sigma") / tag / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(body)
         blobs.append((package, body))
@@ -494,7 +494,7 @@ def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[bytes | None, str, s
     headers = {"accept": "application/vnd.github+json"} if is_api else {}
     if secret:
         headers["authorization"] = f"Bearer {secret}"
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("sigma")
     client = runtime.http_client(
         "sigma",
         directory=data_dir,
@@ -659,7 +659,7 @@ def _private_pysigma_cache() -> None:
     from sigma.data import mitre_attack, mitre_d3fend
 
     for module in (mitre_attack, mitre_d3fend):
-        path = _data_dir() / "pysigma-cache" / module.__name__.rsplit(".", 1)[-1]
+        path = runtime.data_dir("sigma") / "pysigma-cache" / module.__name__.rsplit(".", 1)[-1]
         path.mkdir(parents=True, exist_ok=True)
         for folder in (path.parent, path):
             os.chmod(folder, 0o700)
@@ -774,7 +774,7 @@ def _urls(payload) -> list[str]:
 
 
 def _saved_zip(tag: str, name: str) -> bytes | None:
-    path = _data_dir() / tag / name
+    path = runtime.data_dir("sigma") / tag / name
     if not path.is_file():
         return None
     blob = path.read_bytes()
@@ -835,10 +835,6 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("sigma")
 
 
 register_connector("sigma", connector)

@@ -161,7 +161,7 @@ def schema_drift(payload) -> str | None:
 def _fetch(params: dict, *, force_live: bool = False) -> tuple[list | None, str, str]:
     snapshot = os.environ.get("CYBERAU_CRTSH_SNAPSHOT")
     offline = runtime.offline() and not force_live
-    data_dir = _data_dir()
+    data_dir = runtime.data_dir("crtsh")
     cache = HttpCache(data_dir / "http_cache.sqlite")
     key = cache.key("GET", API, params, b"", "anonymous")
     if not force_live and not snapshot:
@@ -383,18 +383,17 @@ def _is_expired(value: str, now: datetime) -> bool | None:
 
 
 def _now() -> datetime:
-    override = os.environ.get("CYBERAU_TODAY")
-    if override:
-        parsed = runtime.parse_iso(override)
-        if parsed is not None:
-            return parsed
+    """Midnight UTC on CYBERAU_TODAY when it is pinned, else the current time."""
+    pinned = runtime.pinned_day()
+    if pinned is not None:
+        return datetime.combine(pinned, datetime.min.time(), UTC)
     return datetime.now(UTC)
 
 
 def _persist(domain: str, rows: list[dict]) -> None:
     if not rows:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("crtsh")
     path = directory / "crtsh-observations.jsonl"
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
@@ -479,10 +478,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("crtsh")
 
 
 register_connector("crtsh", connector)

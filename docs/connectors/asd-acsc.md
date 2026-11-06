@@ -23,8 +23,8 @@ No credential variable is declared for this connector.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
-| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
-| `CYBERAU_OFFLINE` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
+| `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 
 ## Rate limits
 
@@ -35,7 +35,7 @@ Limiter arguments in the connector source:
 | Function | Call | Key | Rate | Burst | Window |
 |---|---|---|---|---|---|
 | `_fetch_xml` | `_limit` | `f'asd:feed:{feed}'` | `2 / 600` | `2` |  |
-| `_http` | `HttpClient` |  | `4` | `20` | `rolling` |
+| `_http` | `http_client` |  | `4` | `20` | `rolling` |
 | `_page` | `_limit` | `'asd:item'` | `1 / 5` | `1` |  |
 
 ## Cache

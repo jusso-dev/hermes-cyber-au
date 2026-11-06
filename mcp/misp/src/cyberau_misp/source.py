@@ -266,7 +266,7 @@ def schema_drift(payload: dict) -> str | None:
 
 def tool_request(server: str = "misp") -> None:
     """Budget for one tool call, keyed by server name."""
-    RateLimiter(_data_dir() / "rate_limit.sqlite").acquire(
+    RateLimiter(runtime.data_dir("misp", mode=0o700) / "rate_limit.sqlite").acquire(
         server,
         rate=RATE,
         burst=BURST,
@@ -337,7 +337,7 @@ def _live(path: str, body: dict, *, offline: bool) -> tuple[dict | None, str, st
     host = urlsplit(base).hostname or ""
     client = runtime.http_client(
         "misp",
-        directory=_data_dir(),
+        directory=runtime.data_dir("misp", mode=0o700),
         policy=EgressPolicy(_runtime_allowlist(host), "misp", resolver=_RESOLVER),
         user_agent=USER_AGENT,
         rate=RATE,
@@ -721,7 +721,7 @@ def _parse_base(raw: str) -> tuple[str | None, str]:
 
 
 def _runtime_allowlist(host: str) -> Path:
-    directory = _data_dir()
+    directory = runtime.data_dir("misp", mode=0o700)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / "misp-egress.yaml"
     hosts: list[str] = []
@@ -764,7 +764,7 @@ def _as_of(events: list[dict]) -> str | None:
     if not digits:
         return None
     newest = max(digits, key=int)
-    return datetime.fromtimestamp(int(newest), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(datetime.fromtimestamp(int(newest), UTC))
 
 
 def _key_scope(secret: str) -> str:
@@ -773,11 +773,11 @@ def _key_scope(secret: str) -> str:
 
 
 def _persist(records: list[dict]) -> None:
-    if "CYBERAU_DATA_DIR" not in os.environ:
+    if runtime.configured_data_dir() is None:
         records = [item for item in records if not _restricted(item)]
     if not records:
         return
-    directory = _data_dir()
+    directory = runtime.data_dir("misp", mode=0o700)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = directory / "misp-events.jsonl"
     descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
@@ -823,10 +823,6 @@ def _envelope(
         warnings=warnings,
         attribution=ATTRIBUTION,
     )
-
-
-def _data_dir() -> Path:
-    return runtime.data_dir("misp", mode=0o700)
 
 
 register_connector("misp", connector)

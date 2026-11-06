@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+from cyberau_common import runtime
 from cyberau_premium.budget import SYDNEY
 from cyberau_premium.catalog import vendor_config
 from cyberau_premium.paths import data_dir
@@ -53,7 +54,7 @@ def record_global_search(remaining: int | None, *, now: datetime | None = None) 
     by_day[day] = int(by_day.get(day) or 0) + 1
     if remaining is not None:
         state["remaining"] = remaining
-        state["recorded_at"] = moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        state["recorded_at"] = runtime.iso(moment)
     _write(state)
 
 

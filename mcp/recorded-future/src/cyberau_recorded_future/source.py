@@ -126,10 +126,6 @@ def _attribution() -> str:
     return _terms().attribution
 
 
-def _data_dir() -> Path:
-    return runtime.data_dir("recorded-future")
-
-
 def _token() -> str | None:
     return lookup("RECORDED_FUTURE_API_TOKEN")
 
@@ -140,7 +136,7 @@ def _org_id() -> str | None:
 
 def _cache():
     global _CACHE, _CACHE_PATH
-    path = _data_dir() / "http_cache.sqlite"
+    path = runtime.data_dir("recorded-future") / "http_cache.sqlite"
     if _CACHE is None or _CACHE_PATH != path:
         _CACHE = cache_for_terms(path, _terms())
         _CACHE_PATH = path
@@ -187,10 +183,10 @@ def _config() -> dict | None:
     """Profile config.yaml, found from CYBERAU_DATA_DIR. No file means no `enabled: true`."""
     if _CONFIG is not None:
         return _CONFIG
-    data = os.environ.get("CYBERAU_DATA_DIR")
-    if not data:
+    data = runtime.configured_data_dir()
+    if data is None:
         return None
-    path = Path(data).resolve().parent.parent / "config.yaml"
+    path = data.resolve().parent.parent / "config.yaml"
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
@@ -219,7 +215,7 @@ def _client() -> HttpClient:
         policy_kwargs["resolver"] = _RESOLVER
     return runtime.http_client(
         "recorded-future",
-        directory=_data_dir(),
+        directory=runtime.data_dir("recorded-future"),
         policy=EgressPolicy(runtime.allowlist_path(), "recorded-future", **policy_kwargs),
         cache=_cache(),
         user_agent=USER_AGENT,
@@ -261,15 +257,7 @@ def _request(
         if method == "POST":
             response = client.post_json(url, body or {}, headers=headers, ttl=ttl)
         elif method == "HEAD":
-            response = client._fetch(
-                "HEAD",
-                url,
-                params=params,
-                headers=headers,
-                content=None,
-                ttl=ttl,
-                stale_if_error=86400,
-            )
+            response = client.head(url, params=params, headers=headers, ttl=ttl)
         else:
             response = client.get(url, params=params, headers=headers, ttl=ttl)
     except (HttpError, Exception) as exc:
@@ -312,7 +300,7 @@ def _cache_state(state: str) -> str:
 
 def _since_iso(day: date) -> str:
     start = datetime(day.year, day.month, day.day, tzinfo=SYDNEY)
-    return start.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return runtime.iso(start)
 
 
 def _parse_day(value: str | None) -> date | None:
@@ -434,10 +422,10 @@ def _watchlist_path() -> Path | None:
     override = os.environ.get("CYBERAU_WATCHLIST")
     if override:
         return Path(override)
-    data = os.environ.get("CYBERAU_DATA_DIR")
-    if not data:
+    data = runtime.configured_data_dir()
+    if data is None:
         return None
-    return Path(data).resolve().parent.parent / "watchlists" / "org-exposure.yaml"
+    return data.resolve().parent.parent / "watchlists" / "org-exposure.yaml"
 
 
 def _watch_file() -> dict:
@@ -1091,7 +1079,7 @@ def rf_risklist_status(entity_type: str, risk_rule: str | None = None) -> dict:
 
 
 def _risk_seen() -> dict:
-    path = _data_dir() / _RISK_SEEN_NAME
+    path = runtime.data_dir("recorded-future") / _RISK_SEEN_NAME
     if not path.is_file():
         return {}
     try:
@@ -1102,7 +1090,7 @@ def _risk_seen() -> dict:
 
 
 def _save_risk_seen(seen: dict) -> None:
-    path = _data_dir() / _RISK_SEEN_NAME
+    path = runtime.data_dir("recorded-future") / _RISK_SEEN_NAME
     path.write_text(json.dumps(seen), encoding="utf-8")
 
 
