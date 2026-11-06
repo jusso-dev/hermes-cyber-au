@@ -247,3 +247,18 @@ def test_cli_without_duckdb_names_the_extra(store_path, capsys, monkeypatch):
 def test_help_lists_duckdb(capsys):
     assert main(["store", "export", "--help"]) == 0
     assert "duckdb" in capsys.readouterr().out
+
+
+def test_audited_export_fails_closed_when_the_audit_cannot_be_written(store_path, capsys):
+    pytest.importorskip("duckdb")
+    _seed(store_path)
+    (store_path.parent / "audit").write_text("not a directory", encoding="utf-8")
+    args = ["store", "export", "--format", "duckdb", "--path", str(store_path)]
+    assert main([*args, "--output", "red.duckdb", "--max-tlp", "RED"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.strip() == "audit log is not writable"
+    assert "Traceback" not in captured.err
+    exports = store_path.parent / "exports"
+    assert sorted(path.name for path in exports.iterdir()) == []
+    assert main([*args, "--output", "green.duckdb"]) == 0, "an unaudited ceiling still exports"

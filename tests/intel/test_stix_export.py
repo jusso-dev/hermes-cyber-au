@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from cyberau_common.audit import AuditLog
+from cyberau_common.audit import AuditError, AuditLog
 from cyberau_common.cli import main
 from store.api import (
     ensure_source,
@@ -17,7 +17,7 @@ from store.api import (
     upsert_vulnerability,
 )
 from store.canonical import STIX_NAMESPACE, indicator_id
-from store.db import open_store
+from store.db import close_store, open_store
 from store.stix import (
     EXPORT_TYPES,
     SDO_NAMESPACE,
@@ -528,3 +528,45 @@ def test_cli_stix21_export_and_import(store_path, capsys, monkeypatch):
     records = json.loads(capsys.readouterr().out)
     assert records["max_tlp"] == "GREEN"
     assert records["explicit_max_tlp"] is False
+
+
+def _stix_cli(store, *extra):
+    return ["store", "export", "--format", "stix21", "--path", str(store), *extra]
+
+
+def test_amber_export_fails_closed_when_the_audit_cannot_be_written(store_path, capsys):
+    _seed(store_path)
+    (store_path.parent / "audit").write_text("not a directory", encoding="utf-8")
+    with pytest.raises(AuditError):
+        export_stix(max_tlp="AMBER", output="direct.json", store=store_path)
+    code = main(_stix_cli(store_path, "--output", "cli.json", "--max-tlp", "AMBER"))
+    captured = capsys.readouterr()
+    assert code == 1
+    assert captured.out == ""
+    error = captured.err.strip()
+    assert error == "audit log is not writable"
+    assert "Traceback" not in captured.err
+    exports = store_path.parent / "exports"
+    assert not exports.exists() or sorted(path.name for path in exports.iterdir()) == []
+
+
+def test_amber_audit_sits_beside_the_named_store(store_path, tmp_path, monkeypatch):
+    monkeypatch.delenv("CYBERAU_AUDIT_LOG_PATH", raising=False)
+    other = tmp_path / "other" / "intel.sqlite"
+    other.parent.mkdir()
+    _seed(other)
+    try:
+        assert main(_stix_cli(other, "--output", "x.json", "--max-tlp", "AMBER")) == 0
+    finally:
+        close_store(other)
+    assert AuditLog(other.parent / "audit").verify() == 1
+    assert not (store_path.parent / "audit").exists()
+
+
+def test_audit_log_path_override_wins_for_exports(store_path, tmp_path, monkeypatch):
+    custom = tmp_path / "custom-audit"
+    monkeypatch.setenv("CYBERAU_AUDIT_LOG_PATH", str(custom))
+    _seed(store_path)
+    export_stix(max_tlp="AMBER", store=store_path)
+    assert AuditLog(custom).verify() == 1
+    assert not (store_path.parent / "audit").exists()

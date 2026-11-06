@@ -9,6 +9,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from cyberau_common.audit import AuditError
+
 from .analytics import DuckDBUnavailable, export_duckdb
 from .api import (
     KINDS,
@@ -50,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2 if code is None else int(code)
     try:
         return args.func(args)
-    except (OSError, ValueError, sqlite3.Error) as exc:
+    except (AuditError, OSError, ValueError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 

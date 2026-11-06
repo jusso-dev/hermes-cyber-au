@@ -17,7 +17,7 @@ import uuid
 from collections.abc import Sequence
 from pathlib import Path
 
-from cyberau_common.audit import AuditLog
+from cyberau_common.audit import AuditLog, default_audit_dir
 
 from .api import (
     KINDS,
@@ -145,10 +145,12 @@ def export_stix(
     text = json.dumps(bundle, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     relative = None
     if destination is not None:
-        _write_export(destination, text)
-        relative = destination.resolve().relative_to(store_data_dir(store).resolve()).as_posix()
+        relative = destination.relative_to(store_data_dir(store).resolve()).as_posix()
     if ceiling == "AMBER":
-        _audit_amber(explicit, len(objects), relative)
+        # Fail closed: an AMBER bundle is not written unless the audit record is.
+        _audit_amber(store, explicit, len(objects), relative)
+    if destination is not None:
+        _write_export(destination, text)
     return {
         "bundle": bundle,
         "explicit_max_tlp": explicit,
@@ -790,8 +792,21 @@ def _cve_of(item: dict) -> str | None:
     return name if isinstance(name, str) and name.upper().startswith("CVE-") else None
 
 
-def _audit_amber(explicit: bool, count: int, output: str | None) -> None:
-    AuditLog().record(
+def export_audit_log(store: str | Path | None = None) -> AuditLog:
+    """The audit log for exports from ``store``.
+
+    ``CYBERAU_AUDIT_LOG_PATH`` wins, as it does for the hook chain. Otherwise
+    the log sits in ``audit`` next to the store file, so an export from
+    ``--path /other/intel.sqlite`` is audited beside that store. For the
+    default store this is the same directory the hooks use.
+    """
+    if os.environ.get("CYBERAU_AUDIT_LOG_PATH"):
+        return AuditLog(default_audit_dir())
+    return AuditLog(store_data_dir(store) / "audit")
+
+
+def _audit_amber(store: str | Path | None, explicit: bool, count: int, output: str | None) -> None:
+    export_audit_log(store).record(
         "export",
         tool="intel_export_stix",
         args={
