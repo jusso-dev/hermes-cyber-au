@@ -305,37 +305,29 @@ def _is_secret_key(name: str) -> bool:
     return "authorization" in norm
 
 
-def redact_text(text: str, secrets: tuple[str, ...] | None = None) -> str:
-    """Redact header, query and known environment secrets in a string."""
+def redact_text(text: str) -> str:
+    """Redact header, query, known environment secrets and secret-shaped values."""
     cleaned = redact(text)
     for pattern in _SECRET_VALUE_PATTERNS:
         cleaned = pattern.sub("[REDACTED]", cleaned)
-    for secret in secrets if secrets is not None else secret_values():
-        if secret in cleaned:
-            cleaned = cleaned.replace(secret, "[REDACTED]")
     return cleaned
 
 
-def redact_value(value: object, secrets: tuple[str, ...] | None = None) -> object:
+def redact_value(value: object) -> object:
     """Redact secret-shaped keys and values in a JSON structure."""
-    known = secrets if secrets is not None else secret_values()
-    return _redact(value, known)
-
-
-def _redact(value: object, secrets: tuple[str, ...]) -> object:
     if isinstance(value, dict):
         cleaned: dict[str, object] = {}
         for key, item in value.items():
             name = str(key)
             if _is_secret_key(name):
-                cleaned[redact_text(name, secrets)] = "[REDACTED]"
+                cleaned[redact_text(name)] = "[REDACTED]"
             else:
-                cleaned[redact_text(name, secrets)] = _redact(item, secrets)
+                cleaned[redact_text(name)] = redact_value(item)
         return cleaned
     if isinstance(value, list):
-        return [_redact(item, secrets) for item in value]
+        return [redact_value(item) for item in value]
     if isinstance(value, str):
-        return redact_text(value, secrets)
+        return redact_text(value)
     return value
 
 
@@ -446,24 +438,24 @@ class AuditLog:
                     "ts": self._timestamp(),
                 }
                 if session_id:
-                    body["session_id"] = redact_text(session_id, secrets)
+                    body["session_id"] = redact_text(session_id)
                 if task_id:
-                    body["task_id"] = redact_text(task_id, secrets)
+                    body["task_id"] = redact_text(task_id)
                 if tool:
-                    body["tool"] = redact_text(tool, secrets)
+                    body["tool"] = redact_text(tool)
                 if args is not None:
                     ready = _json_ready(args)
                     body["args_sha256"] = hashlib.sha256(
                         canonical_json(ready).encode("utf-8")
                     ).hexdigest()
-                    body["args_redacted"] = redact_value(ready, secrets)
+                    body["args_redacted"] = redact_value(ready)
                 digested = _result_digest(result)
                 if digested is not None:
                     body["result_sha256"], body["result_bytes"] = digested
                 if duration_ms is not None:
                     body["duration_ms"] = duration_ms
                 if flags:
-                    body["flags"] = [redact_text(str(flag), secrets) for flag in flags]
+                    body["flags"] = [redact_text(str(flag)) for flag in flags]
                 self._refuse_secrets(body, secrets)
                 digest = chain_hash(prev_hash, body)
                 stored = dict(body)

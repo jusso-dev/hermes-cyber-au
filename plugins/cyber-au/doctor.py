@@ -598,16 +598,29 @@ def default_health(root: Path, environ: Mapping[str, str]) -> Health:
 
 
 def redact(text: str, environ: Mapping[str, str]) -> str:
+    """Withhold credential values from doctor output.
+
+    The rule is ``cyberau_common.secrets.secret_values``. Doctor also runs before
+    ``mcp/.venv`` exists, when that package cannot be imported. Then every value
+    other than a plain setting is withheld, which errs towards hiding too much.
+    """
+    try:
+        from cyberau_common.secrets import secret_values
+    except ImportError:
+        values = tuple(
+            sorted(
+                {
+                    value
+                    for key, value in environ.items()
+                    if isinstance(value, str) and len(value) >= 8 and not _plain_setting(key)
+                },
+                key=len,
+                reverse=True,
+            )
+        )
+    else:
+        values = secret_values(environ)
     cleaned = text
-    values = sorted(
-        {
-            value
-            for key, value in environ.items()
-            if isinstance(value, str) and len(value) >= 8 and not _plain_setting(key)
-        },
-        key=len,
-        reverse=True,
-    )
     for value in values:
         if value in cleaned:
             cleaned = cleaned.replace(value, "[redacted]")

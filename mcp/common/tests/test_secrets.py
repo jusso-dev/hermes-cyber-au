@@ -20,7 +20,9 @@ from cyberau_common.secrets import (
     RedactFilter,
     cassette_findings,
     check_env_mode,
+    distribution_env_names,
     install_cassette_scrubber,
+    is_secret_env_name,
     redact,
     redact_data,
     redact_headers,
@@ -64,6 +66,79 @@ def test_envelopes_redact_what_the_audit_log_redacts(monkeypatch, tmp_path):
     assert "https://plain.example/value" not in secret_values()
     assert SEEDED not in redact(f"upstream said {SEEDED}")
     assert redact_text(f"upstream said {SEEDED}") == redact(f"upstream said {SEEDED}")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "NVD_API_KEY",
+        "ABUSECH_AUTH_KEY",
+        "DARKOWL_PRIVATE_KEY",
+        "CYBERAU_APPROVAL_KEY",
+        "GITHUB_TOKEN",
+        "FALCON_CLIENT_SECRET",
+        "TAXII_PASSWORD",
+        "LEGACY_PASSWD",
+        "VENDOR_CREDENTIAL",
+        "VENDORAPIKEY",
+        "TOKEN",
+        "secret",
+        "github_token",
+    ],
+)
+def test_credential_names_are_secret(name):
+    assert is_secret_env_name(name, declared=())
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "UV_KEYRING_PROVIDER",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "SSL_KEY_FILE",
+        "API_KEY_PATH",
+        "TOKEN_DIR",
+        "SECRET_PROVIDER",
+        "TOKEN_URL",
+        "KEYBOARD_LAYOUT",
+        "MONKEY",
+        "PASSWORDLESS",
+    ],
+)
+def test_names_that_only_mention_a_credential_word_are_not_secret(name):
+    assert not is_secret_env_name(name, declared=())
+
+
+def test_plain_settings_stay_readable_in_redacted_text(monkeypatch, tmp_path):
+    empty = tmp_path / "distribution.yaml"
+    empty.write_text("env_requires: []\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_DISTRIBUTION", str(empty))
+    monkeypatch.setenv("UV_KEYRING_PROVIDER", "subprocess")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/srv/gcp/service-account.json")
+    text = "keyring subprocess, credentials at /srv/gcp/service-account.json"
+    assert redact(text) == text
+
+
+def test_every_declared_credential_is_secret():
+    declared = distribution_env_names(ROOT / "distribution.yaml")
+    template = ROOT / ".env.template"
+    names = set(declared) | set(
+        re.findall(r"(?m)^#?\s*([A-Z][A-Z0-9_]+)=", template.read_text(encoding="utf-8"))
+    )
+    credential = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|PASSWD)$")
+    for name in names:
+        if credential.search(name):
+            assert is_secret_env_name(name, declared=()), name
+        if name in declared and not name.endswith(("_URL", "_API_ROOT", "_COLLECTION_ID")):
+            assert is_secret_env_name(name, declared=declared), name
+
+
+def test_explicit_environment_is_used_instead_of_os_environ(monkeypatch, tmp_path):
+    empty = tmp_path / "distribution.yaml"
+    empty.write_text("env_requires: []\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERAU_DISTRIBUTION", str(empty))
+    values = secret_values({"OTX_API_KEY": SEEDED, "UV_KEYRING_PROVIDER": "subprocess-x"})
+    assert values == (SEEDED,)
 
 
 def test_distribution_env_values_are_redacted(monkeypatch):

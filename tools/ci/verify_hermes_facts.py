@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
+from cyberau_common.secrets import is_secret_env_name
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 from hermes_pin import PinError, redact, shown, validate_tag  # noqa: E402
@@ -31,7 +33,6 @@ from hermes_pin import PinError, redact, shown, validate_tag  # noqa: E402
 DEFAULT_FACTS = ROOT / "docs" / "research" / "hermes-structure.md"
 REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
 REF_RE = re.compile(r"`([^`]+)`(?:\s*\(([^)]*)\))?")
-_SECRET_ENV = ("TOKEN", "SECRET", "PASSWORD", "PASSWD")
 
 LABELS = {
     "file": "file exists",
@@ -282,8 +283,7 @@ def _clone_env() -> dict[str, str]:
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
     for name in list(env):
-        upper = name.upper()
-        if any(piece in upper for piece in _SECRET_ENV) or upper.endswith("_KEY"):
+        if is_secret_env_name(name):
             env.pop(name, None)
     return env
 

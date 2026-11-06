@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from cyberau_common.secrets import distribution_env_names, is_plain_config_name, redact
+from cyberau_common.secrets import redact, secret_values
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -146,13 +146,8 @@ def status_signature(path: Path) -> dict[str, str]:
 
 def scrub(text: str, env: Mapping[str, str]) -> str:
     cleaned = redact(text)
-    names = set(distribution_env_names()) | {
-        name for name in env if re.search(r"KEY|TOKEN|SECRET|PASSWORD", name, re.IGNORECASE)
-    }
-    for name in names:
-        value = env.get(name, "")
-        if not is_plain_config_name(name) and len(value) >= 8:
-            cleaned = cleaned.replace(value, "[REDACTED]")
+    for value in secret_values(env):
+        cleaned = cleaned.replace(value, "[REDACTED]")
     return cleaned
 
 

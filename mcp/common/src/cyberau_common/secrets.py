@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 
 import yaml
@@ -44,9 +45,15 @@ _HEADER_RE = re.compile(
     r"\b[\"']?\s*[:=]\s*[\"']?)"
     r"(?P<value>(?:(?:bearer|basic|token|digest)\s+)?[^\"'\s,}&]+)"
 )
-# An environment variable with one of these in its name holds a credential,
-# whether or not distribution.yaml declares it.
-_SECRET_ENV = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PASSWD)", re.IGNORECASE)
+# An environment variable whose last name segment is one of these holds a
+# credential, whether or not distribution.yaml declares it: ``NVD_API_KEY``,
+# ``GITHUB_TOKEN``, ``TAXII_PASSWORD``, or a bare ``TOKEN``. A word in the middle
+# does not count, so ``UV_KEYRING_PROVIDER`` and ``CA_KEY_FILE`` stay readable.
+# ``*_CREDENTIALS`` (plural) is left out on purpose: by convention it names a
+# credentials file, as ``GOOGLE_APPLICATION_CREDENTIALS`` does, not the secret.
+_SECRET_ENV = re.compile(
+    r"(?:^|_)(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL)$|APIKEY$", re.IGNORECASE
+)
 _NAME_CACHE: tuple[str, float, tuple[str, ...]] | None = None
 _VALUE_CACHE: tuple[tuple, tuple[str, ...]] | None = None
 # Values shorter than this collide with ordinary words, so they are not
@@ -76,6 +83,19 @@ def is_plain_config_name(name: str) -> bool:
     return name.upper().endswith(_PLAIN_CONFIG_SUFFIXES)
 
 
+def is_secret_env_name(name: str, declared: tuple[str, ...] | None = None) -> bool:
+    """True when an environment variable holds a credential.
+
+    That is a credential-shaped name, or a name declared in distribution.yaml
+    that is not plain configuration such as a URL. ``declared`` defaults to
+    :func:`distribution_env_names`.
+    """
+    if _SECRET_ENV.search(name) is not None:
+        return True
+    names = distribution_env_names() if declared is None else declared
+    return name in names and not is_plain_config_name(name)
+
+
 def distribution_env_names(path: Path | None = None) -> tuple[str, ...]:
     """Names declared in distribution.yaml. Values are not read."""
     global _NAME_CACHE
@@ -101,21 +121,21 @@ def distribution_env_names(path: Path | None = None) -> tuple[str, ...]:
     return loaded
 
 
-def secret_values() -> tuple[str, ...]:
+def secret_values(environ: Mapping[str, str] | None = None) -> tuple[str, ...]:
     """Environment values that must never be logged, returned or exported, longest first.
 
     A value counts when its name is declared in distribution.yaml (other than a
-    plain configuration name such as a URL) or looks like a credential name.
+    plain configuration name such as a URL) or :func:`is_secret_env_name` says
+    it is a credential. ``environ`` defaults to ``os.environ``.
     """
     global _VALUE_CACHE
     declared = distribution_env_names()
-    environ = tuple(os.environ.items())
-    if _VALUE_CACHE is not None and _VALUE_CACHE[0] == (declared, environ):
+    pairs = tuple((os.environ if environ is None else environ).items())
+    if _VALUE_CACHE is not None and _VALUE_CACHE[0] == (declared, pairs):
         return _VALUE_CACHE[1]
     found: set[str] = set()
-    for name, value in environ:
-        credential = _SECRET_ENV.search(name) is not None
-        if not credential and (name not in declared or is_plain_config_name(name)):
+    for name, value in pairs:
+        if not is_secret_env_name(name, declared):
             continue
         if len(value) < _MIN_SECRET_LEN or value in _PLACEHOLDER_VALUES:
             continue
@@ -123,7 +143,7 @@ def secret_values() -> tuple[str, ...]:
             continue
         found.add(value)
     values = tuple(sorted(found, key=len, reverse=True))
-    _VALUE_CACHE = ((declared, environ), values)
+    _VALUE_CACHE = ((declared, pairs), values)
     return values
 
 
