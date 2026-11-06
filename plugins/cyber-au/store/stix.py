@@ -17,6 +17,8 @@ import uuid
 from collections.abc import Sequence
 from pathlib import Path
 
+from cyberau_common.audit import AuditLog
+
 from .api import (
     ensure_source,
     lookup,
@@ -31,7 +33,6 @@ from .canonical import (
     canonical_timestamp,
     more_restrictive,
     tlp_allows,
-    utc_now,
 )
 from .db import open_store, resolve_db_path
 from .text import clean_untrusted, unwrap_untrusted
@@ -145,7 +146,7 @@ def export_stix(
         _write_export(destination, text)
         relative = destination.resolve().relative_to(_data_dir(store).resolve()).as_posix()
     if ceiling == "AMBER":
-        _audit_amber(store, explicit, len(objects), relative)
+        _audit_amber(explicit, len(objects), relative)
     return {
         "bundle": bundle,
         "explicit_max_tlp": explicit,
@@ -787,23 +788,18 @@ def _cve_of(item: dict) -> str | None:
     return name if isinstance(name, str) and name.upper().startswith("CVE-") else None
 
 
-def _audit_amber(store: str | Path | None, explicit: bool, count: int, output: str | None) -> None:
-    moment = utc_now()
-    directory = _data_dir(store) / "audit"
-    directory.mkdir(parents=True, exist_ok=True)
-    record = {
-        "event": "export",
-        "explicit_max_tlp": explicit,
-        "format": "stix21",
-        "max_tlp": "AMBER",
-        "object_count": count,
-        "output": output,
-        "tool": "intel_export_stix",
-        "ts": moment,
-    }
-    line = json.dumps(record, ensure_ascii=False, sort_keys=True)
-    with (directory / f"{moment[:10]}.jsonl").open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+def _audit_amber(explicit: bool, count: int, output: str | None) -> None:
+    AuditLog().record(
+        "export",
+        tool="intel_export_stix",
+        args={
+            "explicit_max_tlp": explicit,
+            "format": "stix21",
+            "max_tlp": "AMBER",
+            "object_count": count,
+            "output": output,
+        },
+    )
 
 
 def _write_export(destination: Path, text: str) -> None:

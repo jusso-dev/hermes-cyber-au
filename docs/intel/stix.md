@@ -28,7 +28,7 @@ Timestamps in the bundle come from stored fields (`first_seen`, `last_seen`, `ob
 
 ## TLP
 
-The STIX ceiling defaults to `CLEAR`. `GREEN` and `AMBER` are included only when `max_tlp` is set to that marking or a more permissive one in the allowed set. The allowed set is `CLEAR`, `GREEN` and `AMBER`. `AMBER` is therefore an explicit request. That request is appended to `plugin-data/cyber-au/audit/YYYY-MM-DD.jsonl` as an `export` event. The line records the ceiling, the object count and the relative output path. It does not record indicator values. The tamper-evident hash chain is separate work.
+The STIX ceiling defaults to `CLEAR`. `GREEN` and `AMBER` are included only when `max_tlp` is set to that marking or a more permissive one in the allowed set. The allowed set is `CLEAR`, `GREEN` and `AMBER`. `AMBER` is therefore an explicit request. That request is recorded in the hash-chained audit log (`plugin-data/cyber-au/audit/YYYY-MM-DD.jsonl`) as an `export` event, so `cyber-au audit verify` covers it. The record's arguments hold the ceiling, the object count and the relative output path. It does not record indicator values.
 
 Marking definitions are the TLP 2.0 objects published by the OASIS CTI TC in [cti-stix-common-objects](https://github.com/oasis-open/cti-stix-common-objects/tree/main/extension-definition-specifications/tlp-2.0), copied from `extension-definition-specifications/tlp-2.0/examples/`. A bundle includes a definition only when an exported object references it, plus the TLP 2.0 extension definition `extension-definition--60a3c5c5-0d10-413e-aab3-9e08dde9e88d`.
 

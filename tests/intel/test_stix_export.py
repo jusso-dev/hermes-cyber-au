@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from cyberau_common.audit import AuditLog
 from cyberau_common.cli import main
 from store.api import (
     ensure_source,
@@ -325,9 +326,10 @@ def test_amber_is_explicit_audited_and_round_trips(store_path, monkeypatch):
     event = json.loads(audit[0].read_text(encoding="utf-8").splitlines()[-1])
     assert event["event"] == "export"
     assert event["tool"] == "intel_export_stix"
-    assert event["max_tlp"] == "AMBER"
-    assert event["explicit_max_tlp"] is True
+    assert event["args_redacted"]["max_tlp"] == "AMBER"
+    assert event["args_redacted"]["explicit_max_tlp"] is True
     assert "203.0.113" not in audit[0].read_text(encoding="utf-8")
+    assert AuditLog(store_path.parent / "audit").verify() == 2
 
     other = store_path.parent / "imported.sqlite"
     import_stix(exported["bundle"], path=other)

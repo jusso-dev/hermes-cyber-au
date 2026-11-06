@@ -7,6 +7,7 @@ import sqlite3
 import sys
 
 import pytest
+from cyberau_common.audit import AuditLog
 from cyberau_common.cli import main
 from store.analytics import INSTALL_HINT, export_duckdb
 from store.api import (
@@ -131,7 +132,9 @@ def test_round_trip_keeps_every_table_and_row_at_red(store_path):
     audit = list((store_path.parent / "audit").glob("*.jsonl"))
     assert audit, "an export above GREEN is audited"
     line = json.loads(audit[0].read_text(encoding="utf-8").splitlines()[-1])
-    assert line["format"] == "duckdb" and line["max_tlp"] == "RED"
+    assert line["args_redacted"]["format"] == "duckdb"
+    assert line["args_redacted"]["max_tlp"] == "RED"
+    assert AuditLog(store_path.parent / "audit").verify() == 1
 
 
 def test_default_ceiling_withholds_amber_rows(store_path):
