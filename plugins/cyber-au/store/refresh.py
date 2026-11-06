@@ -21,12 +21,12 @@ import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 
 from cyberau_common.secrets import redact
 
 from . import api, db
+from .canonical import utc_now
 from .expiry import reconcile_indicators, reconcile_kev
 
 # Cache states that mean the payload came from upstream within its lifetime.
@@ -300,7 +300,7 @@ def _feodo(result: Result, run: _Run) -> None:
     result.rows = rows
     result.items = len(rows)
     if run.store:
-        now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = utc_now()
         with db.open_store().transaction():
             for row in rows:
                 tags = ["botnet-c2"] + ([row["malware"]] if row.get("malware") else [])
@@ -380,7 +380,7 @@ def _write_status(path: Path, results: list[Result]) -> None:
         previous = json.loads(path.read_text(encoding="utf-8")).get("sources", {})
     except (OSError, ValueError, AttributeError):
         previous = {}
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = utc_now()
     sources = dict(previous) if isinstance(previous, dict) else {}
     for result in results:
         entry = dict(sources.get(result.source) or {})

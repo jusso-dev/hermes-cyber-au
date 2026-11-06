@@ -1261,10 +1261,7 @@ def _external_check(ctx: Context, check_id: str, name: str, spec: dict) -> Check
 
 
 def _connector_installed(root: Path, key: str) -> bool:
-    if (root / "mcp" / key / "pyproject.toml").is_file():
-        return True
-    stub = root / "mcp" / "common" / "src" / "cyberau_common" / "stub.py"
-    return key == "stub" and stub.is_file()
+    return (root / "mcp" / key / "pyproject.toml").is_file()
 
 
 def _snapshot_dir(root: Path, names: tuple[str, ...]) -> Path | None:

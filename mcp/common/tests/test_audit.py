@@ -483,10 +483,14 @@ class TestHooks:
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        assert module.pre_tool_call("intel_search", {"q": "a"}, task_id="t") is None
-        module.post_tool_call("intel_search", {"q": "a"}, result="{}", task_id="t", duration_ms=1)
-        module.on_session_start("plugin-sess", model="local", platform="cli")
-        module.on_session_end("plugin-sess", completed=True, platform="cli")
+        plugin_ctx = Ctx()
+        module.register(plugin_ctx)
+        assert plugin_ctx.hooks["pre_tool_call"]("intel_search", {"q": "a"}, task_id="t") is None
+        plugin_ctx.hooks["post_tool_call"](
+            "intel_search", {"q": "a"}, result="{}", task_id="t", duration_ms=1
+        )
+        plugin_ctx.hooks["on_session_start"]("plugin-sess", model="local", platform="cli")
+        plugin_ctx.hooks["on_session_end"]("plugin-sess", completed=True, platform="cli")
         plugin_log = AuditLog()
         assert plugin_log.verify() == 3
 
