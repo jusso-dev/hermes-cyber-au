@@ -13,11 +13,12 @@ from zoneinfo import ZoneInfo
 import zstandard
 
 from .api import (
-    _indicator_body,
-    _observation_index_text,
-    _run,
+    indicator_body,
+    observation_index_text,
     rescore_indicator,
+    run_write,
 )
+from .canonical import utc_stamp
 from .db import SCHEMA_VERSION, close_store, open_store, resolve_db_path, upsert_fts
 from .policy import configured_zone, distribution_root, require_retention_days, retention_days
 from .scoring import score
@@ -86,7 +87,7 @@ def apply_retention(
     """
     moment = _aware(now or datetime.now(UTC))
     window = retention_days() if days is None else require_retention_days(days)
-    cutoff = (moment - timedelta(days=window)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = utc_stamp(moment - timedelta(days=window))
 
     def write(store) -> int:
         conn = store.connection()
@@ -129,7 +130,7 @@ def apply_retention(
             rescore_indicator(conn, row["indicator_id"])
         return int(deleted)
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def backup_store(
@@ -516,8 +517,8 @@ def _rollup(observations: list, counters: list) -> tuple[str, int, str, str]:
 
 def _rebuild_fts(conn: sqlite3.Connection) -> None:
     for row in conn.execute("SELECT id, type, value, value_norm, verdict FROM indicators"):
-        extras = _observation_index_text(conn, row["id"])
-        body = _indicator_body(row["value"], row["value_norm"], row["type"], row["verdict"], extras)
+        extras = observation_index_text(conn, row["id"])
+        body = indicator_body(row["value"], row["value_norm"], row["type"], row["verdict"], extras)
         upsert_fts(conn, "indicator", row["id"], row["type"], body, replace=False)
     for row in conn.execute("SELECT id, title, summary FROM advisories"):
         summary = indexable_text(row["summary"] or "")

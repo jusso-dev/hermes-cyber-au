@@ -17,9 +17,13 @@ import uuid
 from collections.abc import Sequence
 from pathlib import Path
 
+from cyberau_common.audit import AuditLog
+
 from .api import (
+    KINDS,
     ensure_source,
     lookup,
+    require_kinds,
     upsert_advisory,
     upsert_indicator,
     upsert_vulnerability,
@@ -31,9 +35,8 @@ from .canonical import (
     canonical_timestamp,
     more_restrictive,
     tlp_allows,
-    utc_now,
 )
-from .db import open_store, resolve_db_path
+from .db import open_store, store_data_dir
 from .text import clean_untrusted, unwrap_untrusted
 
 # RFC 4122 URL namespace. Domain objects must not use the SCO namespace.
@@ -126,7 +129,7 @@ def export_stix(
     store: str | Path | None = None,
 ) -> dict:
     """Build a deterministic STIX 2.1 bundle and optionally write it."""
-    chosen = _require_kinds(kinds)
+    chosen = KINDS if kinds is None else require_kinds(kinds)
     ceiling, explicit = _require_stix_tlp(max_tlp)
     earliest = None if since is None else canonical_timestamp(canonical_date(since))
     destination = None if output is None else resolve_export_path(output, store)
@@ -143,9 +146,9 @@ def export_stix(
     relative = None
     if destination is not None:
         _write_export(destination, text)
-        relative = destination.resolve().relative_to(_data_dir(store).resolve()).as_posix()
+        relative = destination.resolve().relative_to(store_data_dir(store).resolve()).as_posix()
     if ceiling == "AMBER":
-        _audit_amber(store, explicit, len(objects), relative)
+        _audit_amber(explicit, len(objects), relative)
     return {
         "bundle": bundle,
         "explicit_max_tlp": explicit,
@@ -214,7 +217,7 @@ def resolve_export_path(
     """
     if not isinstance(requested, str) or not requested.strip() or "\x00" in requested:
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
-    unresolved = _data_dir(store) / "exports"
+    unresolved = store_data_dir(store) / "exports"
     if unresolved.is_symlink():
         raise ValueError("export path must stay under plugin-data/cyber-au/exports")
     root = unresolved.resolve()
@@ -787,23 +790,18 @@ def _cve_of(item: dict) -> str | None:
     return name if isinstance(name, str) and name.upper().startswith("CVE-") else None
 
 
-def _audit_amber(store: str | Path | None, explicit: bool, count: int, output: str | None) -> None:
-    moment = utc_now()
-    directory = _data_dir(store) / "audit"
-    directory.mkdir(parents=True, exist_ok=True)
-    record = {
-        "event": "export",
-        "explicit_max_tlp": explicit,
-        "format": "stix21",
-        "max_tlp": "AMBER",
-        "object_count": count,
-        "output": output,
-        "tool": "intel_export_stix",
-        "ts": moment,
-    }
-    line = json.dumps(record, ensure_ascii=False, sort_keys=True)
-    with (directory / f"{moment[:10]}.jsonl").open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+def _audit_amber(explicit: bool, count: int, output: str | None) -> None:
+    AuditLog().record(
+        "export",
+        tool="intel_export_stix",
+        args={
+            "explicit_max_tlp": explicit,
+            "format": "stix21",
+            "max_tlp": "AMBER",
+            "object_count": count,
+            "output": output,
+        },
+    )
 
 
 def _write_export(destination: Path, text: str) -> None:
@@ -815,10 +813,6 @@ def _write_export(destination: Path, text: str) -> None:
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
-
-
-def _data_dir(store: str | Path | None) -> Path:
-    return resolve_db_path(store).parent
 
 
 def _config_paths() -> list[Path]:
@@ -861,18 +855,6 @@ def _clean_org(value: str) -> str:
     if not text:
         raise ValueError("organisation name is empty")
     return text
-
-
-def _require_kinds(kinds: Sequence[str] | None) -> tuple[str, ...]:
-    if kinds is None:
-        return ("indicator", "vulnerability", "advisory")
-    if isinstance(kinds, str) or not kinds:
-        raise ValueError("kinds must be a list")
-    chosen = tuple(kinds)
-    allowed = {"indicator", "vulnerability", "advisory"}
-    if any(kind not in allowed for kind in chosen):
-        raise ValueError("kinds must be indicator, vulnerability or advisory")
-    return chosen
 
 
 def _require_stix_tlp(value: str | None) -> tuple[str, bool]:

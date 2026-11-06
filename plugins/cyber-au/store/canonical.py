@@ -107,7 +107,7 @@ def canonical_timestamp(value: str) -> str:
         moment = moment.astimezone(UTC).replace(microsecond=0)
     except OverflowError as exc:
         raise ValueError("invalid timestamp") from exc
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return utc_stamp(moment)
 
 
 def canonical_date(value: str | None) -> str | None:
@@ -176,8 +176,15 @@ def indicator_id(indicator_type: str, value_norm: str) -> str:
     return f"{sco_type}--{uuid.uuid5(namespace, name)}"
 
 
+def utc_stamp(moment: datetime) -> str:
+    """Format as ``YYYY-MM-DDTHH:MM:SSZ``. A naive time is taken to be UTC already."""
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(UTC)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def utc_now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return utc_stamp(datetime.now(UTC))
 
 
 def remove_dot_segments(path: str) -> str:

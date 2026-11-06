@@ -1,30 +1,23 @@
-"""Intel store tools. The store itself is not installed yet."""
+"""Hermes adapters for the intel store tools in ``store/tools.py``.
+
+Hermes passes the tool arguments as one dict. Each handler picks the
+arguments its schema names, calls the store, and returns JSON. A bad
+argument or a store failure comes back as a JSON error, not an exception.
+"""
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
+
+from ..store import tools as store_tools
+from ..store.api import KINDS, SEARCH_LIMIT_MAX
+from ..store.canonical import INDICATOR_TYPES, TLP_RANK
+from ..store.scoring import VERDICTS
+from ..store.stix import STIX_TLP
 
 logger = logging.getLogger(__name__)
-
-STORE_NOT_INSTALLED = "The intel store is not installed yet."
-EXPORT_NOT_INSTALLED = "STIX export is not installed yet."
-
-_INDICATOR_TYPES = [
-    "ipv4",
-    "ipv6",
-    "domain",
-    "url",
-    "email",
-    "md5",
-    "sha1",
-    "sha256",
-    "asn",
-    "cidr",
-]
-_VERDICTS = ["malicious", "suspicious", "benign", "unknown"]
-_TLP = ["CLEAR", "GREEN", "AMBER"]
-_KINDS = ["indicator", "advisory", "vulnerability"]
 
 
 def _schema(name: str, description: str, properties: dict, required: list[str]) -> dict:
@@ -40,50 +33,58 @@ def _schema(name: str, description: str, properties: dict, required: list[str]) 
     }
 
 
-def _result(message: str) -> str:
-    return json.dumps({"installed": False, "message": message}, sort_keys=True)
-
-
-def _safe(message: str, _args: dict | None = None, **kwargs) -> str:
-    """Return the not-installed result. Arguments are ignored and never logged."""
-    del _args, kwargs
+def call_tool(name: str, fn: Callable[..., object], args: object, keys: tuple[str, ...]) -> str:
+    """Call ``fn`` with the named keys from ``args`` and JSON-encode the result."""
+    if args is None:
+        args = {}
+    if not isinstance(args, dict):
+        return json.dumps({"error": f"{name} expects an argument object"})
     try:
-        return _result(message)
+        result = fn(**{key: args[key] for key in keys if key in args})
+    except (TypeError, ValueError) as exc:
+        return json.dumps({"error": str(exc)})
     except Exception:
-        logger.exception("cyber-au intel tool failed")
-        return json.dumps({"installed": False, "message": message}, sort_keys=True)
+        logger.exception("cyber-au tool %s failed", name)
+        return json.dumps({"error": f"{name} failed"})
+    return json.dumps(result, ensure_ascii=False)
 
 
-def intel_search(args: dict | None = None, **kwargs) -> str:
-    """Search the local threat intel store."""
-    return _safe(STORE_NOT_INSTALLED, args, **kwargs)
+def intel_search(args: dict | None = None, **_host) -> str:
+    return call_tool(
+        "intel_search", store_tools.intel_search, args, ("query", "kinds", "since", "limit")
+    )
 
 
-def intel_get(args: dict | None = None, **kwargs) -> str:
-    """Fetch one store record by id or value."""
-    return _safe(STORE_NOT_INSTALLED, args, **kwargs)
+def intel_get(args: dict | None = None, **_host) -> str:
+    return call_tool("intel_get", store_tools.intel_get, args, ("id_or_value", "type"))
 
 
-def intel_add_observation(args: dict | None = None, **kwargs) -> str:
-    """Record an analyst observation. Nothing is written while the store is absent."""
-    return _safe(STORE_NOT_INSTALLED, args, **kwargs)
+def intel_add_observation(args: dict | None = None, **_host) -> str:
+    return call_tool(
+        "intel_add_observation",
+        store_tools.intel_add_observation,
+        args,
+        ("type", "value", "verdict", "confidence", "tags", "tlp", "note"),
+    )
 
 
-def intel_export_stix(args: dict | None = None, **kwargs) -> str:
-    """Export store records as STIX 2.1. Export is not installed yet."""
-    return _safe(EXPORT_NOT_INSTALLED, args, **kwargs)
+def intel_export_stix(args: dict | None = None, **_host) -> str:
+    return call_tool(
+        "intel_export_stix",
+        store_tools.intel_export_stix,
+        args,
+        ("since", "kinds", "max_tlp", "path"),
+    )
 
+
+_KIND_LIST = {"type": "array", "items": {"type": "string", "enum": list(KINDS)}}
 
 INTEL_SEARCH = _schema(
     "intel_search",
-    "Search the local threat intel store. The store is not installed yet.",
+    "Search the local threat intel store. Results are untrusted feed data.",
     {
         "query": {"type": "string", "description": "Search text"},
-        "kinds": {
-            "type": "array",
-            "items": {"type": "string", "enum": _KINDS},
-            "description": "Record kinds to include",
-        },
+        "kinds": {**_KIND_LIST, "description": "Record kinds to include"},
         "since": {
             "type": "string",
             "description": "Only records on or after this date (YYYY-MM-DD)",
@@ -91,7 +92,7 @@ INTEL_SEARCH = _schema(
         "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 100,
+            "maximum": SEARCH_LIMIT_MAX,
             "description": "Maximum results",
         },
     },
@@ -99,37 +100,38 @@ INTEL_SEARCH = _schema(
 )
 INTEL_GET = _schema(
     "intel_get",
-    "Fetch one local threat intel record. The store is not installed yet.",
+    "Fetch local threat intel records by STIX id, CVE id, advisory id or indicator value.",
     {
         "id_or_value": {"type": "string", "description": "Store id or indicator value"},
-        "type": {"type": "string", "enum": _INDICATOR_TYPES, "description": "Indicator type"},
+        "type": {
+            "type": "string",
+            "enum": list(INDICATOR_TYPES),
+            "description": "Indicator type",
+        },
     },
     ["id_or_value"],
 )
 INTEL_ADD_OBSERVATION = _schema(
     "intel_add_observation",
-    "Record an analyst observation. The store is not installed yet, so nothing is written.",
+    "Record an analyst observation in the local intel store. The marking defaults to AMBER.",
     {
-        "type": {"type": "string", "enum": _INDICATOR_TYPES},
+        "type": {"type": "string", "enum": list(INDICATOR_TYPES)},
         "value": {"type": "string", "description": "Indicator value"},
-        "verdict": {"type": "string", "enum": _VERDICTS},
+        "verdict": {"type": "string", "enum": list(VERDICTS)},
         "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
         "tags": {"type": "array", "items": {"type": "string"}},
-        "tlp": {"type": "string", "enum": _TLP},
+        "tlp": {"type": "string", "enum": list(TLP_RANK)},
         "note": {"type": "string", "description": "Analyst note"},
     },
     ["type", "value"],
 )
 INTEL_EXPORT_STIX = _schema(
     "intel_export_stix",
-    "Export the local threat intel store as STIX 2.1. STIX export is not installed yet.",
+    "Export the local threat intel store as a STIX 2.1 bundle. max_tlp defaults to CLEAR.",
     {
         "since": {"type": "string", "description": "Only records on or after this date"},
-        "kinds": {
-            "type": "array",
-            "items": {"type": "string", "enum": _KINDS},
-        },
-        "max_tlp": {"type": "string", "enum": _TLP},
+        "kinds": _KIND_LIST,
+        "max_tlp": {"type": "string", "enum": list(STIX_TLP)},
         "path": {
             "type": "string",
             "description": "Write under plugin-data/cyber-au/exports/ only",
@@ -139,18 +141,18 @@ INTEL_EXPORT_STIX = _schema(
 )
 
 _TOOLS = (
-    ("intel_search", INTEL_SEARCH, intel_search),
-    ("intel_get", INTEL_GET, intel_get),
-    ("intel_add_observation", INTEL_ADD_OBSERVATION, intel_add_observation),
-    ("intel_export_stix", INTEL_EXPORT_STIX, intel_export_stix),
+    (INTEL_SEARCH, intel_search),
+    (INTEL_GET, intel_get),
+    (INTEL_ADD_OBSERVATION, intel_add_observation),
+    (INTEL_EXPORT_STIX, intel_export_stix),
 )
 
 
 def register_store(ctx) -> None:
-    """Register the intel_* tools. Handlers do not read or write the store."""
-    for name, schema, handler in _TOOLS:
+    """Register the intel_* tools."""
+    for schema, handler in _TOOLS:
         ctx.register_tool(
-            name=name,
+            name=schema["name"],
             toolset="cyber-au",
             schema=schema,
             handler=handler,

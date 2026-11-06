@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from .canonical import canonical_cve, canonical_value
+from .canonical import canonical_cve, canonical_value, utc_stamp
 from .db import fts_rowid, open_store
 from .policy import load_config, require_retention_days
 
@@ -109,7 +109,7 @@ def expire_by_age(
     """Delete aged feed rows, retaining shared or linked indicator evidence."""
     window = feed_retention_days() if days is None else require_retention_days(days)
     moment = (now or datetime.now(UTC)).astimezone(UTC)
-    cutoff = (moment - timedelta(days=window)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = utc_stamp(moment - timedelta(days=window))
     store = open_store(path)
     with store.transaction():
         conn = store.connection()

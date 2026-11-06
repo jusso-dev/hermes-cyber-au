@@ -7,7 +7,7 @@ import sqlite3
 
 from store.api import table_counts, upsert_indicator
 from store.db import close_store, open_store
-from store.workers import open_fresh, write_distinct, write_same
+from store_workers import open_fresh, write_distinct, write_same
 
 
 def _intact(path):

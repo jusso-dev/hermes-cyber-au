@@ -39,6 +39,7 @@ from .text import (
 )
 
 KINDS = ("indicator", "advisory", "vulnerability")
+SEARCH_LIMIT_MAX = 100
 _TOKEN = re.compile(r"[0-9A-Za-z]{1,128}")
 _VULN_FIELDS = (
     "kev_date_added",
@@ -154,9 +155,7 @@ def upsert_indicator(
                     digest,
                 ),
             )
-            body = _indicator_body(
-                original, value_norm, indicator_type, merged_verdict, stored_tags
-            )
+            body = indicator_body(original, value_norm, indicator_type, merged_verdict, stored_tags)
             upsert_fts(conn, "indicator", record_id, indicator_type, body, replace=False)
             return record_id
 
@@ -196,14 +195,12 @@ def upsert_indicator(
             """,
             (first_seen, last_seen, merged_verdict, merged_confidence, merged_tlp, existing["id"]),
         )
-        extras = _observation_index_text(conn, existing["id"])
-        body = _indicator_body(
-            existing["value"], value_norm, indicator_type, merged_verdict, extras
-        )
+        extras = observation_index_text(conn, existing["id"])
+        body = indicator_body(existing["value"], value_norm, indicator_type, merged_verdict, extras)
         upsert_fts(conn, "indicator", existing["id"], indicator_type, body)
         return existing["id"]
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def upsert_vulnerability(cve_id: str, path: str | Path | None = None, **fields: object) -> None:
@@ -289,7 +286,7 @@ def upsert_vulnerability(cve_id: str, path: str | Path | None = None, **fields: 
         )
         upsert_fts(conn, "vulnerability", cve, cve, body, replace=existing is not None)
 
-    _run(path, write)
+    run_write(path, write)
 
 
 def upsert_advisory(
@@ -365,7 +362,7 @@ def upsert_advisory(
         )
         return not existed
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def ensure_source(
@@ -423,7 +420,7 @@ def ensure_source(
             )
         store.remember_source(checked)
 
-    _run(path, write)
+    run_write(path, write)
 
 
 def ingest_kev_catalogue(
@@ -467,7 +464,7 @@ def ingest_kev_catalogue(
             )
         return len(rows)
 
-    return _run(path, write)
+    return run_write(path, write)
 
 
 def search(
@@ -483,8 +480,8 @@ def search(
     Local search returns every TLP marking. Export is the path that withholds
     ``AMBER`` and above unless ``max_tlp`` is set.
     """
-    chosen = _require_kinds(kinds)
-    capped = _require_limit(limit, maximum=100)
+    chosen = require_kinds(kinds)
+    capped = _require_limit(limit, maximum=SEARCH_LIMIT_MAX)
     earliest = None if since is None else canonical_timestamp(since)
     match = _match_query(query, chosen)
     store = open_store(path)
@@ -575,7 +572,7 @@ def export_records(
     the DuckDB analytics export, which uses the same default ceiling, is in
     ``analytics.py``.
     """
-    chosen = _require_kinds(kinds)
+    chosen = require_kinds(kinds)
     ceiling = EXPORT_DEFAULT_TLP if max_tlp is None else require_tlp(max_tlp)
     store = open_store(path)
     conn = store.connection()
@@ -617,7 +614,8 @@ def kev_cves(path: str | Path | None = None) -> list[str]:
     return sorted(row[0] for row in rows)
 
 
-def _run(path: str | Path | None, fn: Callable[[Store], object]) -> object:
+def run_write(path: str | Path | None, fn: Callable[[Store], object]) -> object:
+    """Run ``fn`` in one write transaction, joining an outer one when it is open."""
     store = open_store(path)
     if store.in_transaction():
         return fn(store)
@@ -700,8 +698,8 @@ def rescore_indicator(conn: sqlite3.Connection, indicator_id: str) -> None:
         "UPDATE indicators SET verdict = ?, confidence = ? WHERE id = ?",
         (merged_verdict, merged_confidence, indicator_id),
     )
-    extras = _observation_index_text(conn, indicator_id)
-    body = _indicator_body(row["value"], row["value_norm"], row["type"], merged_verdict, extras)
+    extras = observation_index_text(conn, indicator_id)
+    body = indicator_body(row["value"], row["value_norm"], row["type"], merged_verdict, extras)
     upsert_fts(conn, "indicator", indicator_id, row["type"], body)
 
 
@@ -730,13 +728,14 @@ def _score_for_indicator(conn: sqlite3.Connection, indicator_id: str) -> tuple[s
     return score(observations, counters)
 
 
-def _indicator_body(
+def indicator_body(
     value: str,
     value_norm: str,
     indicator_type: str,
     verdict: str | None,
     extras: Sequence[str],
 ) -> str:
+    """Full-text body for an indicator row."""
     parts = [value_norm, value, indicator_type]
     if verdict:
         parts.append(verdict)
@@ -744,7 +743,8 @@ def _indicator_body(
     return " ".join(parts)
 
 
-def _observation_index_text(conn: sqlite3.Connection, indicator: str) -> list[str]:
+def observation_index_text(conn: sqlite3.Connection, indicator: str) -> list[str]:
+    """Observation tags that feed an indicator's full-text row."""
     texts: list[str] = []
     for row in conn.execute("SELECT tags FROM observations WHERE indicator_id = ?", (indicator,)):
         try:
@@ -944,7 +944,8 @@ def _match_query(query: str, kinds: tuple[str, ...]) -> str:
     return f"({kind_clause}) AND {terms}"
 
 
-def _require_kinds(kinds: Sequence[str]) -> tuple[str, ...]:
+def require_kinds(kinds: Sequence[str]) -> tuple[str, ...]:
+    """Check a non-empty list of record kinds drawn from ``KINDS``."""
     if isinstance(kinds, str) or kinds is None:
         raise ValueError("kinds must be a list")
     chosen = tuple(kinds)
@@ -1034,13 +1035,20 @@ def _normalise_vuln_field(key: str, value: object) -> object:
 
 
 __all__ = [
+    "KINDS",
+    "SEARCH_LIMIT_MAX",
     "close_store",
     "ensure_source",
     "export_records",
+    "indicator_body",
     "ingest_kev_catalogue",
     "kev_cves",
     "lookup",
+    "observation_index_text",
     "open_store",
+    "require_kinds",
+    "rescore_indicator",
+    "run_write",
     "search",
     "table_counts",
     "upsert_advisory",

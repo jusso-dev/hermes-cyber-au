@@ -7,9 +7,9 @@ FROM nousresearch/hermes-agent:v0.22.2@sha256:36099926da316742423544e055d4734777
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-# The cyber-au plugin imports PyYAML and stix2 inside the Hermes interpreter.
+# The cyber-au plugin imports PyYAML inside the Hermes interpreter.
 # docker/Dockerfile does the same. Versions match plugins/cyber-au/plugin.yaml.
-RUN uv pip install --python /opt/hermes/.venv/bin/python 'pyyaml>=6,<7' 'stix2>=3,<4'
+RUN uv pip install --python /opt/hermes/.venv/bin/python 'pyyaml>=6,<7'
 
 # The upstream entrypoint starts s6 and Hermes. A dev container only needs a
 # shell, so clear it. The user is the image's own hermes user (UID 10000,

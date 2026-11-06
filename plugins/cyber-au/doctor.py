@@ -24,6 +24,11 @@ from urllib.parse import quote
 
 import yaml
 
+if __package__:
+    from .store.db import SCHEMA_VERSION
+else:
+    from store.db import SCHEMA_VERSION
+
 SNAPSHOT_MAX_AGE_DAYS = 7
 WAL_WARN_BYTES = 64 * 1024 * 1024
 _VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)")
@@ -614,8 +619,7 @@ def _connector_check(
 ) -> Check:
     check_id = f"connector.{name}"
     key = _connector_key(spec, name)
-    enabled = _is_enabled(spec)
-    if not enabled:
+    if not _is_enabled(spec):
         reason = str(spec.get("off_reason") or "disabled in profile")
         detail = f"off: {reason}; probes skipped"
         if external:
@@ -630,32 +634,30 @@ def _connector_check(
             "not installed",
             f"Install the {key} connector.",
         )
-    enabled = _is_enabled(spec)
-    parts = ["enabled" if enabled else "disabled"]
-    statuses = ["ok" if enabled else "warn"]
-    findings = _env_findings(spec, ctx.environ, enabled=enabled)
+    parts = ["enabled"]
+    statuses = ["ok"]
+    findings = _env_findings(spec, ctx.environ)
     for status, detail in findings:
         statuses.append(status)
         parts.append(detail)
-    probe_status, probe_detail = _probe(ctx, _health_target(spec, key), enabled=enabled)
+    probe_status, probe_detail = _probe(ctx, _health_target(spec, key))
     statuses.append(probe_status)
     parts.append(probe_detail)
     if not from_config:
         parts.append("read from mcp/servers.yaml")
     status = _worst(statuses)
-    fix = _connector_fix(name, findings, probe_status, enabled)
+    fix = _connector_fix(name, findings, probe_status)
     return _item(check_id, status, "; ".join(parts), fix)
 
 
-def _probe(ctx: Context, target: str, *, enabled: bool) -> tuple[str, str]:
+def _probe(ctx: Context, target: str) -> tuple[str, str]:
     code, output = ctx.health(target, False)
     offline_ok = code == 0
     if not offline_ok:
         detail = _short(output) or "offline probe failed"
         return "fail", f"offline probe failed: {detail}"
-    if ctx.offline or not enabled:
-        why = "doctor --offline" if ctx.offline else "server is disabled"
-        return "ok", f"offline probe passed; live probe skipped ({why})"
+    if ctx.offline:
+        return "ok", "offline probe passed; live probe skipped (doctor --offline)"
     live_code, live_output = ctx.health(target, True)
     if live_code != 0:
         detail = _short(live_output) or "live probe failed"
@@ -668,9 +670,7 @@ def _probe(ctx: Context, target: str, *, enabled: bool) -> tuple[str, str]:
 _INSTALL_PATH_ENV = frozenset({"CYBERAU_DATA_DIR", "CYBERAU_EGRESS_ALLOWLIST"})
 
 
-def _env_findings(
-    spec: dict, environ: Mapping[str, str], *, enabled: bool
-) -> list[tuple[str, str]]:
+def _env_findings(spec: dict, environ: Mapping[str, str]) -> list[tuple[str, str]]:
     required = {item for item in (spec.get("required_env") or []) if isinstance(item, str)}
     findings: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -689,9 +689,7 @@ def _env_findings(
                 if name in seen:
                     continue
                 seen.add(name)
-                findings.extend(
-                    _presence(name, required=name in required, enabled=enabled, environ=environ)
-                )
+                findings.extend(_presence(name, required=name in required, environ=environ))
     elif isinstance(env_field, list):
         for item in env_field:
             if not isinstance(item, str):
@@ -707,31 +705,22 @@ def _env_findings(
                 if name in seen:
                     continue
                 seen.add(name)
-                findings.extend(
-                    _presence(name, required=name in required, enabled=enabled, environ=environ)
-                )
+                findings.extend(_presence(name, required=name in required, environ=environ))
     for name in required:
         if name not in seen:
-            findings.extend(_presence(name, required=True, enabled=enabled, environ=environ))
+            findings.extend(_presence(name, required=True, environ=environ))
     return [item for item in findings if item[0] != "ok"]
 
 
-def _presence(
-    name: str, *, required: bool, enabled: bool, environ: Mapping[str, str]
-) -> list[tuple[str, str]]:
+def _presence(name: str, *, required: bool, environ: Mapping[str, str]) -> list[tuple[str, str]]:
     if _env_present(name, environ):
         return [("ok", f"{name} is set")]
-    if required and enabled:
+    if required:
         return [("fail", f"{name} is not set")]
     return [("warn", f"{name} is not set")]
 
 
-def _connector_fix(
-    name: str,
-    findings: list[tuple[str, str]],
-    probe_status: str,
-    enabled: bool,
-) -> str:
+def _connector_fix(name: str, findings: list[tuple[str, str]], probe_status: str) -> str:
     if probe_status == "fail":
         return f"Run cyberau-mcp health for {name} and install/bootstrap.sh if the venv is missing."
     literals = [detail for status, detail in findings if "literal" in detail and status == "fail"]
@@ -746,8 +735,6 @@ def _connector_fix(
             f"Export {names} in the profile environment. "
             "hermes -p cyber-au loads .env without printing the value."
         )
-    if not enabled:
-        return f"Set mcp_servers.{name}.enabled to true when this source should run."
     return ""
 
 
@@ -780,7 +767,7 @@ def _schema_check(ctx: Context, connection: sqlite3.Connection) -> Check:
             "store.schema",
             "fail",
             "intel store is missing " + ", ".join(missing),
-            "Run the store migrations in plugins/cyber-au/store/migrations.",
+            "Run cyberau-mcp store init to apply the store migrations.",
         )
     try:
         row = connection.execute("SELECT MAX(version) FROM schema_version").fetchone()
@@ -789,7 +776,7 @@ def _schema_check(ctx: Context, connection: sqlite3.Connection) -> Check:
             "store.schema",
             "fail",
             "schema version could not be read",
-            "Run the store migrations in plugins/cyber-au/store/migrations.",
+            "Run cyberau-mcp store init to apply the store migrations.",
         )
     version = None if row is None else row[0]
     if not isinstance(version, int):
@@ -797,15 +784,14 @@ def _schema_check(ctx: Context, connection: sqlite3.Connection) -> Check:
             "store.schema",
             "fail",
             "schema version is missing",
-            "Run the store migrations in plugins/cyber-au/store/migrations.",
+            "Run cyberau-mcp store init to apply the store migrations.",
         )
-    expected = _expected_schema(ctx.root)
-    if expected is not None and version != expected:
+    if version != SCHEMA_VERSION:
         return _item(
             "store.schema",
             "fail",
-            f"schema version {version}, expected {expected}",
-            "Run the store migrations in plugins/cyber-au/store/migrations.",
+            f"schema version {version}, expected {SCHEMA_VERSION}",
+            "Run cyberau-mcp store init to apply the store migrations.",
         )
     return _item("store.schema", "ok", f"schema version {version}")
 
@@ -821,7 +807,7 @@ def _row_check(connection: sqlite3.Connection) -> Check:
             "store.rows",
             "fail",
             "row counts could not be read",
-            "Run the store migrations in plugins/cyber-au/store/migrations.",
+            "Run cyberau-mcp store init to apply the store migrations.",
         )
     return _item("store.rows", "ok", ", ".join(counts))
 
@@ -836,7 +822,7 @@ def _ingest_check(connection: sqlite3.Connection) -> Check:
             "store.ingest",
             "fail",
             "last ingest could not be read",
-            "Run the store migrations in plugins/cyber-au/store/migrations.",
+            "Run cyberau-mcp store init to apply the store migrations.",
         )
     if not rows:
         return _item(
@@ -1264,15 +1250,14 @@ def _is_external(spec: object) -> bool:
 
 def _external_check(ctx: Context, check_id: str, name: str, spec: dict) -> Check:
     """External servers have no package to install or offline probe to run."""
-    enabled = _is_enabled(spec)
-    parts = ["enabled" if enabled else "disabled", "external server"]
-    statuses = ["ok" if enabled else "warn"]
-    findings = _env_findings(spec, ctx.environ, enabled=enabled)
+    parts = ["enabled", "external server"]
+    statuses = ["ok"]
+    findings = _env_findings(spec, ctx.environ)
     for status, detail in findings:
         statuses.append(status)
         parts.append(detail)
     status = _worst(statuses)
-    return _item(check_id, status, "; ".join(parts), _connector_fix(name, findings, "ok", enabled))
+    return _item(check_id, status, "; ".join(parts), _connector_fix(name, findings, "ok"))
 
 
 def _connector_installed(root: Path, key: str) -> bool:
@@ -1379,18 +1364,6 @@ def _load_count() -> int:
     global _LOADS
     _LOADS += 1
     return _LOADS
-
-
-def _expected_schema(root: Path) -> int | None:
-    directory = root / "plugins" / "cyber-au" / "store" / "migrations"
-    if not directory.is_dir():
-        return None
-    numbers = []
-    for path in directory.glob("*.sql"):
-        match = re.match(r"(\d+)", path.name)
-        if match:
-            numbers.append(int(match.group(1)))
-    return max(numbers) if numbers else None
 
 
 def _jobs_path(ctx: Context) -> Path | None:

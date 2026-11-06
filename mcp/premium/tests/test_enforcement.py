@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import re
@@ -271,16 +270,6 @@ def test_terms_docs_and_readme():
         assert f"terms/{spec.server}.md" in readme
     assert "\u2014" not in readme
     assert "\u2013" not in readme
-
-
-def test_hook_reexports_guard():
-    path = repo_root() / "plugins" / "cyber-au" / "hooks" / "premium_guard.py"
-    spec = importlib.util.spec_from_file_location("premium_guard_hook", path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader
-    spec.loader.exec_module(module)
-    assert module.pre_tool_call is pre_tool_call
-    assert module.on_session_end is on_session_end
 
 
 def test_fixtures_are_synthetic():

@@ -10,22 +10,9 @@ import os
 import site
 from pathlib import Path
 
+from .store.paths import data_dir
+
 __all__ = ["data_dir", "main", "org_exposure", "register"]
-
-
-def data_dir() -> Path:
-    """Return the directory for cyber-au plugin state.
-
-    ``CYBERAU_DATA_DIR`` overrides the path. Otherwise state lives under
-    ``$HERMES_HOME/plugin-data/cyber-au``, or ``~/.hermes/plugin-data/cyber-au``
-    when ``HERMES_HOME`` is unset. This function does not create the directory.
-    """
-    override = os.environ.get("CYBERAU_DATA_DIR", "").strip()
-    if override:
-        return Path(override).expanduser()
-    home = os.environ.get("HERMES_HOME", "").strip()
-    root = Path(home).expanduser() if home else Path.home() / ".hermes"
-    return root / "plugin-data" / "cyber-au"
 
 
 def _profile_homes() -> list[Path]:

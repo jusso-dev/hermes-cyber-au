@@ -8,7 +8,7 @@ import traceback
 def write_distinct(path: str, prefix: str, count: int) -> None:
     """Insert ``count`` distinct domains for one writer."""
     try:
-        from .api import upsert_indicator
+        from store.api import upsert_indicator
 
         for index in range(count):
             upsert_indicator(
@@ -29,7 +29,7 @@ def write_distinct(path: str, prefix: str, count: int) -> None:
 def write_same(path: str, prefix: str, count: int) -> None:
     """Append observations to one shared address."""
     try:
-        from .api import upsert_indicator
+        from store.api import upsert_indicator
 
         for index in range(count):
             day = (index % 27) + 1
@@ -50,7 +50,7 @@ def write_same(path: str, prefix: str, count: int) -> None:
 
 def open_fresh(path: str, barrier, results) -> None:
     """Open a new database at the same moment as the other writers."""
-    from .db import open_store
+    from store.db import open_store
 
     barrier.wait(30)
     try:
