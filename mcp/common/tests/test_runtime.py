@@ -128,3 +128,49 @@ def test_http_client_wires_policy_cache_and_limiter(tmp_path, monkeypatch):
 def test_http_client_needs_a_directory_for_default_storage():
     with pytest.raises(ValueError, match="directory"):
         runtime.http_client("demo", user_agent="test", rate=1, burst=1)
+
+
+def test_configured_data_dir_expands_the_user_home(monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", "~/cyberau-data")
+    assert runtime.configured_data_dir() == Path.home() / "cyberau-data"
+
+
+def test_profile_data_dir_order(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    assert runtime.profile_data_dir() == tmp_path / "data"
+    monkeypatch.delenv("CYBERAU_DATA_DIR")
+    assert runtime.profile_data_dir() == tmp_path / "home" / "plugin-data" / "cyber-au"
+    monkeypatch.delenv("HERMES_HOME")
+    assert runtime.profile_data_dir() == Path.home() / ".hermes" / "plugin-data" / "cyber-au"
+    assert not (tmp_path / "data").exists()
+
+
+def _clear_org_watchlist_env(monkeypatch):
+    for name in ("CYBERAU_ORG_WATCHLIST", "CYBERAU_WATCHLIST", "CYBERAU_DATA_DIR", "HERMES_HOME"):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_org_watchlist_override_prefers_the_documented_name(tmp_path, monkeypatch):
+    _clear_org_watchlist_env(monkeypatch)
+    monkeypatch.setenv("CYBERAU_WATCHLIST", str(tmp_path / "old.yaml"))
+    assert runtime.org_watchlist_path() == tmp_path / "old.yaml"
+    monkeypatch.setenv("CYBERAU_ORG_WATCHLIST", str(tmp_path / "new.yaml"))
+    assert runtime.org_watchlist_path() == tmp_path / "new.yaml"
+    assert runtime.org_watchlist_override() == tmp_path / "new.yaml"
+
+
+def test_org_watchlist_follows_hermes_home_then_the_profile_above_the_data_dir(
+    tmp_path, monkeypatch
+):
+    _clear_org_watchlist_env(monkeypatch)
+    profile = tmp_path / "profile"
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(profile / "plugin-data" / "cyber-au"))
+    assert runtime.org_watchlist_path() == profile / "watchlists" / "org-exposure.yaml"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    assert runtime.org_watchlist_path() == tmp_path / "home" / "watchlists" / "org-exposure.yaml"
+    _clear_org_watchlist_env(monkeypatch)
+    assert runtime.org_watchlist_override() is None
+    assert runtime.org_watchlist_path() == Path.home() / ".hermes" / "watchlists" / (
+        "org-exposure.yaml"
+    )

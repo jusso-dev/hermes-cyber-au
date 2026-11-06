@@ -675,8 +675,7 @@ def _domains(item: dict) -> list[str]:
 
 
 def _load_watchlist() -> Watchlist | None:
-    raw = os.environ.get("CYBERAU_WATCHLIST")
-    path = Path(raw) if raw else data_dir() / "watchlists" / "org-exposure.yaml"
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return None
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

@@ -27,7 +27,7 @@ Do not use this skill to investigate an organisation that is not on the watchlis
 - Tool: `cyber_au_org_exposure` (read only, watchlist subjects only).
 - Routine command: `cyberau exposure-watch`.
 - Create the watchlist: `cyberau watchlist init --org`.
-- Watchlist path: `<profile>/watchlists/org-exposure.yaml`. The file is user-owned. It is not shipped and it is not committed.
+- Watchlist path: `<profile>/watchlists/org-exposure.yaml`, or the file named by `CYBERAU_ORG_WATCHLIST`. Premium connectors read the same file. The file is user-owned. It is not shipped and it is not committed.
 - Shared list: domains and brands are also read from `plugin-data/cyber-au/watchlists.yaml` when that file exists, so the user can keep one list.
 - ABN names: `ABR_GUID` in the profile `.env` (`${ABR_GUID}`). Free registration at the ABN Lookup web services page. The tool calls `https://abr.business.gov.au/json/AbnDetails.aspx` and sends only `EntityName` and `BusinessName`. Do not call that URL yourself and do not print the GUID.
 - Related skills: `incident-triage`, `ndb-breach-notification`, `executive-briefing`.

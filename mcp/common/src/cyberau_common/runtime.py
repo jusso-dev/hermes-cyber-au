@@ -2,6 +2,9 @@
 
 - ``CYBERAU_DATA_DIR``: where a connector keeps its HTTP cache, rate limiter and local
   stores. The profile sets it. Without it each connector uses its own ``/tmp/cyberau-<name>``.
+  State that must stay in the profile uses ``profile_data_dir()`` instead.
+- ``CYBERAU_ORG_WATCHLIST`` (older name ``CYBERAU_WATCHLIST``): the org-exposure watchlist
+  file. Without it, ``org_watchlist_path()`` finds it in the profile.
 - ``CYBERAU_EGRESS_ALLOWLIST``: the egress allowlist. The rendered MCP config sets it for
   every server. Without it the ``mcp/egress-allowlist.yaml`` next to the code is used.
 - ``CYBERAU_OFFLINE=1``: answer from caches and operator snapshots only.
@@ -39,7 +42,61 @@ def configured_data_dir() -> Path | None:
     """CYBERAU_DATA_DIR as the profile set it, or None. Not created. For state that belongs
     in the profile or nowhere: restricted records, the watchlist, the profile config."""
     raw = _env("CYBERAU_DATA_DIR")
-    return Path(raw) if raw else None
+    return Path(raw).expanduser() if raw else None
+
+
+PROFILE_DATA_SUBDIR = Path("plugin-data") / "cyber-au"
+
+
+def profile_home() -> Path:
+    """The Hermes profile directory: HERMES_HOME, else ~/.hermes. Not created."""
+    raw = _env("HERMES_HOME")
+    return Path(raw).expanduser() if raw else Path.home() / ".hermes"
+
+
+def profile_data_dir() -> Path:
+    """The profile's cyber-au data directory, the same on every run. Not created.
+
+    CYBERAU_DATA_DIR, else ``$HERMES_HOME/plugin-data/cyber-au``, else
+    ``~/.hermes/plugin-data/cyber-au``. The plugin's ``store/paths.py`` resolves the same
+    directory without importing this package; a parity test keeps them in step.
+    """
+    return configured_data_dir() or profile_home() / PROFILE_DATA_SUBDIR
+
+
+# The org-exposure watchlist override. CYBERAU_ORG_WATCHLIST is the documented name.
+# CYBERAU_WATCHLIST is the older name some premium connectors read, kept for compatibility.
+ORG_WATCHLIST_ENV = ("CYBERAU_ORG_WATCHLIST", "CYBERAU_WATCHLIST")
+ORG_WATCHLIST_FILE = Path("watchlists") / "org-exposure.yaml"
+
+
+def org_watchlist_override() -> Path | None:
+    """The org-exposure watchlist file named in the environment, or None."""
+    for name in ORG_WATCHLIST_ENV:
+        raw = _env(name)
+        if raw:
+            return Path(raw).expanduser()
+    return None
+
+
+def org_watchlist_path() -> Path:
+    """The user-owned org-exposure watchlist, written by ``cyberau watchlist init --org``
+    and read by org-exposure and every premium connector. Not created.
+
+    CYBERAU_ORG_WATCHLIST (or CYBERAU_WATCHLIST), else
+    ``$HERMES_HOME/watchlists/org-exposure.yaml``, else the profile above
+    CYBERAU_DATA_DIR (``<profile>/plugin-data/cyber-au`` -> ``<profile>/watchlists/...``),
+    else ``~/.hermes/watchlists/org-exposure.yaml``.
+    """
+    override = org_watchlist_override()
+    if override is not None:
+        return override
+    if _env("HERMES_HOME"):
+        return profile_home() / ORG_WATCHLIST_FILE
+    data = configured_data_dir()
+    if data is not None:
+        return data.absolute().parent.parent / ORG_WATCHLIST_FILE
+    return profile_home() / ORG_WATCHLIST_FILE
 
 
 def data_dir(default_name: str, *, mode: int = 0o777) -> Path:

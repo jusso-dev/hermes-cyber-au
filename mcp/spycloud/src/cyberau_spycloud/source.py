@@ -610,10 +610,7 @@ def _finding(record: dict, *, requested: str | None, watchlist_type: str | None)
 
 def local_watchlist() -> Watchlist | None:
     """Load the user-owned org-exposure watchlist. Nothing is shipped with the connector."""
-    raw = os.environ.get("CYBERAU_ORG_WATCHLIST")
-    if not raw:
-        return None
-    path = Path(raw)
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return None
     loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

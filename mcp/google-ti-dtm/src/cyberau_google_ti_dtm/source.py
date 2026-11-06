@@ -678,10 +678,7 @@ def _remember(findings: list[ExposureFinding], watchlist: Watchlist) -> None:
 
 
 def _load_watchlist() -> Watchlist | None:
-    data = runtime.configured_data_dir()
-    if data is None:
-        return None
-    path = data / "watchlists" / "org-exposure.yaml"
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return None
     loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

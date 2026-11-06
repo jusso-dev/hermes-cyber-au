@@ -361,18 +361,8 @@ def _clean_since(value: object) -> tuple[str | None, str]:
     return value, ""
 
 
-def _watchlist_path() -> Path:
-    override = os.environ.get("CYBERAU_ORG_WATCHLIST")
-    if override:
-        return Path(override)
-    data = runtime.configured_data_dir()
-    if data is not None:
-        return data.resolve().parent.parent / "watchlists" / "org-exposure.yaml"
-    return Path("watchlists") / "org-exposure.yaml"
-
-
 def _load_watchlist() -> tuple[Watchlist | None, str]:
-    path = _watchlist_path()
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return Watchlist(), ""
     try:

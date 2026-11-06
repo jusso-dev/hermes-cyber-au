@@ -846,14 +846,7 @@ def _check_records(name: str, records: list[dict]) -> str:
 
 
 def _load_watchlist() -> tuple[Watchlist | None, str]:
-    raw = os.environ.get("CYBERAU_WATCHLIST")
-    if raw:
-        path = Path(raw)
-    else:
-        base = runtime.configured_data_dir()
-        if base is None:
-            return None, ""
-        path = base / "watchlists" / "org-exposure.yaml"
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return None, ""
     try:

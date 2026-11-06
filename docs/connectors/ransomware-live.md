@@ -25,12 +25,13 @@ Server manifest `env` entry: `RANSOMWARE_LIVE_API_KEY=${RANSOMWARE_LIVE_API_KEY}
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `RANSOMWARE_LIVE_API_KEY` | credential | yes | no | `lookup` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir, runtime.org_watchlist_path, runtime.profile_data_dir` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.http_client` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
-| `CYBERAU_ORG_WATCHLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_ORG_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_override, runtime.org_watchlist_path` |
 | `CYBERAU_RANSOMLIVE_SNAPSHOT` | runtime | no | no | `os.environ.get` |
 | `CYBERAU_RANSOMLIVE_TODAY` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_override, runtime.org_watchlist_path` |
 
 ## Rate limits
 

@@ -7,7 +7,6 @@ registered name and business names, and only those names are sent.
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
@@ -189,12 +188,4 @@ def _strip_guid(text: str, guid: str) -> str:
 def data_dir() -> Path:
     """Profile data directory. Routine state, the ledger and the audit log live here, so it
     must be the same on every run. Tests point CYBERAU_DATA_DIR at a temporary directory."""
-    return runtime.configured_data_dir() or profile_home() / "plugin-data" / "cyber-au"
-
-
-def profile_home() -> Path:
-    """Hermes profile directory: HERMES_HOME, otherwise ~/.hermes."""
-    raw = os.environ.get("HERMES_HOME")
-    if raw:
-        return Path(raw)
-    return Path.home() / ".hermes"
+    return runtime.profile_data_dir()

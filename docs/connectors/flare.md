@@ -30,7 +30,10 @@ Server manifest `required_env`: `FLARE_API_KEY`.
 |---|---|---|---|---|
 | `FLARE_API_KEY` | credential | yes | yes | not read in connector source |
 | `FLARE_TENANT_ID` | credential | yes | no | not read in connector source |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.org_watchlist_path` |
 | `CYBERAU_FLARE_SCHEMA_FIXTURE` | runtime | no | no | `lookup` |
+| `CYBERAU_ORG_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_path` |
+| `CYBERAU_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_path` |
 
 `FLARE_API_KEY` is optional in `SOURCE.md`. `mcp/servers.yaml` lists it under `required_env`.
 

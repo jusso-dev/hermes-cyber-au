@@ -231,9 +231,7 @@ def _profile_file(name: str):
 
 
 def load_watchlist() -> Watchlist:
-    path = _profile_file("org-exposure.yaml")
-    if tuple(data_dir().parts[-2:]) == ("plugin-data", "cyber-au"):
-        path = data_dir().parent.parent / "watchlists" / "org-exposure.yaml"
+    path = runtime.org_watchlist_path()
     if not path.is_file():
         return Watchlist()
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

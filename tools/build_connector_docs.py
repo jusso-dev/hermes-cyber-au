@@ -243,10 +243,10 @@ class _Extractor(ast.NodeVisitor):
                 self._env(env_name, "os.environ.get")
         keywords = {item.arg: item.value for item in node.keywords if item.arg}
         if _is_runtime_call(node):
-            env_name = RUNTIME_ENV_READS.get(name)
+            env_names = RUNTIME_ENV_READS.get(name, ())
             if name == "http_client" and "policy" in keywords:
-                env_name = None
-            if env_name:
+                env_names = ()
+            for env_name in env_names:
                 self._env(env_name, f"runtime.{name}")
         if self.server_name is None and "server_name" in keywords:
             self.server_name = const_str(keywords["server_name"])
@@ -289,15 +289,19 @@ class _Extractor(ast.NodeVisitor):
         )
 
 
-# cyberau_common.runtime helpers and the variable each one reads.
-RUNTIME_ENV_READS = {
-    "data_dir": "CYBERAU_DATA_DIR",
-    "configured_data_dir": "CYBERAU_DATA_DIR",
-    "allowlist_path": "CYBERAU_EGRESS_ALLOWLIST",
-    "http_client": "CYBERAU_EGRESS_ALLOWLIST",
-    "offline": "CYBERAU_OFFLINE",
-    "today": "CYBERAU_TODAY",
-    "pinned_day": "CYBERAU_TODAY",
+# cyberau_common.runtime helpers and the CYBERAU_* variables each one reads.
+_ORG_WATCHLIST_ENV = ("CYBERAU_ORG_WATCHLIST", "CYBERAU_WATCHLIST")
+RUNTIME_ENV_READS: dict[str, tuple[str, ...]] = {
+    "data_dir": ("CYBERAU_DATA_DIR",),
+    "configured_data_dir": ("CYBERAU_DATA_DIR",),
+    "profile_data_dir": ("CYBERAU_DATA_DIR",),
+    "org_watchlist_override": _ORG_WATCHLIST_ENV,
+    "org_watchlist_path": (*_ORG_WATCHLIST_ENV, "CYBERAU_DATA_DIR"),
+    "allowlist_path": ("CYBERAU_EGRESS_ALLOWLIST",),
+    "http_client": ("CYBERAU_EGRESS_ALLOWLIST",),
+    "offline": ("CYBERAU_OFFLINE",),
+    "today": ("CYBERAU_TODAY",),
+    "pinned_day": ("CYBERAU_TODAY",),
 }
 
 

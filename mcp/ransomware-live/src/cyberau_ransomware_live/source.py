@@ -450,17 +450,12 @@ def _load_watchlist() -> tuple[dict | None, str]:
 
 
 def _watchlist_candidates() -> list[Path]:
-    override = os.environ.get("CYBERAU_ORG_WATCHLIST")
-    if override:
-        return [Path(override)]
-    data = runtime.data_dir("ransomlive")
-    found = [
-        data / "watchlists" / "org-exposure.yaml",
-        data / "watchlists.yaml",
-    ]
-    if data.name == "cyber-au" and data.parent.name == "plugin-data":
-        found.append(data.parents[1] / "watchlists" / "org-exposure.yaml")
-    return found
+    """The org-exposure watchlist, then the routine ``watchlists.yaml`` in the profile data
+    directory. An explicit override is the only candidate."""
+    path = runtime.org_watchlist_path()
+    if runtime.org_watchlist_override() is not None:
+        return [path]
+    return [path, runtime.profile_data_dir() / "watchlists.yaml"]
 
 
 def _persist(rows: list[dict], cache: str) -> None:

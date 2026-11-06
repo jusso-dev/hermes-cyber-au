@@ -5,14 +5,14 @@ The file is created on the user's machine. It is not shipped.
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from cyberau_common import runtime
 
-from cyberau_org_exposure.abn import checksum_ok, normalise_abn, profile_home
+from cyberau_org_exposure.abn import checksum_ok, normalise_abn
 
 CONFIDENCE = ("vendor_confirmed", "vendor_reported", "unverified_claim")
 ALERT_KINDS = (
@@ -216,10 +216,9 @@ def init_org_watchlist(path: Path) -> Path:
 
 
 def default_watchlist_path() -> Path:
-    override = os.environ.get("CYBERAU_ORG_WATCHLIST")
-    if override:
-        return Path(override)
-    return profile_home() / "watchlists" / "org-exposure.yaml"
+    """Where ``cyberau watchlist init --org`` writes and every reader looks. See
+    ``cyberau_common.runtime.org_watchlist_path``."""
+    return runtime.org_watchlist_path()
 
 
 def load_profile(path: Path, *, routine_path: Path | None = None) -> OrgProfile:

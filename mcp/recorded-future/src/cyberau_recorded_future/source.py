@@ -418,19 +418,9 @@ def _matched_subject(text: str, watchlist: Watchlist) -> tuple[str, str] | None:
     return None
 
 
-def _watchlist_path() -> Path | None:
-    override = os.environ.get("CYBERAU_WATCHLIST")
-    if override:
-        return Path(override)
-    data = runtime.configured_data_dir()
-    if data is None:
-        return None
-    return data.resolve().parent.parent / "watchlists" / "org-exposure.yaml"
-
-
 def _watch_file() -> dict:
-    path = _watchlist_path()
-    if path is None or not path.is_file():
+    path = runtime.org_watchlist_path()
+    if not path.is_file():
         return {}
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return raw if isinstance(raw, dict) else {}

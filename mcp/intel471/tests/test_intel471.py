@@ -36,6 +36,7 @@ def setup_function():
     os.environ.pop("CYBERAU_INTEL471_SNAPSHOT", None)
     os.environ.pop("CYBERAU_OFFLINE", None)
     os.environ.pop("CYBERAU_WATCHLIST", None)
+    os.environ.pop("CYBERAU_ORG_WATCHLIST", None)
     source._TRANSPORT = None
     source._SLEEPER = None
     source._RNG = None
@@ -43,11 +44,25 @@ def setup_function():
     source._CACHE_PATH = None
 
 
+def _data(tmp_path):
+    """The profile data directory, laid out as on an install: <profile>/plugin-data/cyber-au."""
+    return tmp_path / "plugin-data" / "cyber-au"
+
+
+def _watch_path(tmp_path):
+    """Where `cyberau watchlist init --org` writes for that profile."""
+    return tmp_path / "watchlists" / "org-exposure.yaml"
+
+
 def _watch(tmp_path, monkeypatch):
-    path = tmp_path / "org-exposure.yaml"
+    data = _data(tmp_path)
+    data.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    monkeypatch.delenv("CYBERAU_WATCHLIST", raising=False)
+    monkeypatch.delenv("CYBERAU_ORG_WATCHLIST", raising=False)
+    path = _watch_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(WATCHLIST), encoding="utf-8")
-    monkeypatch.setenv("CYBERAU_WATCHLIST", str(path))
-    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     return path
 
 
@@ -176,7 +191,7 @@ def test_auth_errors_retry_after_timeout_and_redirect(tmp_path, monkeypatch):
     assert found["data"][0]["uid"] == "alert-synthetic-1"
     assert 0.0 in delays
     assert SECRET not in json.dumps(found)
-    assert not (tmp_path / "http_cache.sqlite").exists()
+    assert not (_data(tmp_path) / "http_cache.sqlite").exists()
 
     def denied(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, content=(FIXTURES / "intel471_401.json").read_bytes())
@@ -252,7 +267,7 @@ def test_passwords_are_not_returned(tmp_path, monkeypatch):
     assert SECRET not in rendered
     assert "not-a-login" not in rendered
     assert found["data"][0]["counts"]["occurrences"] == 2
-    assert not (tmp_path / "intel.sqlite").exists()
+    assert not (_data(tmp_path) / "intel.sqlite").exists()
 
 
 def test_default_state_stays_off_until_the_user_enables_it():
@@ -378,9 +393,9 @@ def test_live_path_keeps_victims_out_of_the_store_and_stix(tmp_path, monkeypatch
     intel471_credential_exposure("example.com.au", since="2024-07-01")
     assert breaches["cache"] == "miss"
     assert VICTIM in breaches["data"][0]["victim"]
-    store = ExposureStore(tmp_path / "intel.sqlite")
+    store = ExposureStore(_data(tmp_path) / "intel.sqlite")
     assert len(store.rows()) == 3
-    blob = (tmp_path / "intel.sqlite").read_bytes()
+    blob = (_data(tmp_path) / "intel.sqlite").read_bytes()
     assert VICTIM.encode() not in blob
     assert b"Other Corp" not in blob
     report = export_stix(store)
@@ -397,14 +412,14 @@ def test_a_victim_named_like_a_brand_is_not_written_to_the_store(tmp_path, monke
         return httpx.Response(200, content=json.dumps(body).encode())
 
     _live_env(tmp_path, monkeypatch, handler)
-    path = tmp_path / "org-exposure.yaml"
+    path = _watch_path(tmp_path)
     path.write_text(
         yaml.safe_dump({**WATCHLIST, "brands": ["Acme Holdings"]}),
         encoding="utf-8",
     )
     found = intel471_breach_alerts("Acme Holdings")
     assert found["data"][0]["uid"] == "breach-synthetic-1"
-    store = tmp_path / "intel.sqlite"
+    store = _data(tmp_path) / "intel.sqlite"
     assert not store.exists() or b"Acme Holdings" not in store.read_bytes()
 
 
@@ -415,7 +430,7 @@ def test_snapshot_is_labelled_and_never_stored(tmp_path, monkeypatch):
     assert found["cache"] == "snapshot"
     assert found["data"]
     assert any("snapshot" in item.lower() for item in found["warnings"])
-    assert not (tmp_path / "intel.sqlite").exists()
+    assert not (_data(tmp_path) / "intel.sqlite").exists()
     nothing = tmp_path / "nothing.json"
     nothing.write_text('{"alertTotalCount":0,"alerts":[]}', encoding="utf-8")
     monkeypatch.setenv("CYBERAU_INTEL471_SNAPSHOT", str(nothing))
@@ -478,7 +493,7 @@ def test_live_health_is_not_satisfied_by_cache_failure_or_missing_key(tmp_path, 
 
 def test_live_health_says_when_only_alerts_were_probed(tmp_path, monkeypatch):
     _live_env(tmp_path, monkeypatch, _fixture_handler)
-    (tmp_path / "org-exposure.yaml").write_text(
+    _watch_path(tmp_path).write_text(
         yaml.safe_dump({"organisation": "Example Pty Ltd"}), encoding="utf-8"
     )
     probe = connector().health(live=True)
@@ -535,7 +550,7 @@ def test_credential_rows_are_not_cached(tmp_path, monkeypatch):
     assert found["data"][0]["counts"]["occurrences"] == 2
     cached = source._CACHE._memory.values() if source._CACHE is not None else []
     assert all(SECRET.encode() not in item.body for item in cached)
-    assert not (tmp_path / "http_cache.sqlite").exists()
+    assert not (_data(tmp_path) / "http_cache.sqlite").exists()
     monkeypatch.setenv("CYBERAU_OFFLINE", "1")
     offline = intel471_credential_exposure("example.com.au")
     assert offline["data"] == []

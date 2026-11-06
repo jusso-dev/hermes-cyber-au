@@ -9,6 +9,7 @@ from datetime import date
 from pathlib import Path
 
 import httpx
+import pytest
 from cyberau_common.server import build_server
 from cyberau_flare import client as flare_client
 from cyberau_flare.client import (
@@ -75,8 +76,23 @@ def _clock():
     return state, sleeps
 
 
+@pytest.fixture(autouse=True)
+def _profile(tmp_path, monkeypatch):
+    """Lay tmp_path out as a profile home: state in plugin-data/cyber-au, config.yaml and
+    watchlists/ at the profile root, as on an install."""
+    data = _data(tmp_path)
+    data.mkdir(parents=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+
+
+def _data(tmp_path: Path) -> Path:
+    return tmp_path / "plugin-data" / "cyber-au"
+
+
 def _watchlist(tmp_path: Path) -> None:
-    (tmp_path / "org-exposure.yaml").write_text(
+    path = tmp_path / "watchlists" / "org-exposure.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         "organisation: Example Pty Ltd\n"
         "domains:\n"
         "  - example.com.au\n"
@@ -124,12 +140,12 @@ def test_exposure_for_watchlist_end_to_end(monkeypatch, tmp_path):
     assert kinds == ["infostealer_credential", "leak_site_claim", "leak_site_claim"]
     assert all(item.vendor == "flare" for item in findings)
     assert all(item.stix_exportable is False for item in findings)
-    store = ExposureStore(tmp_path / "intel.sqlite")
+    store = ExposureStore(_data(tmp_path) / "intel.sqlite")
     stored = [store.get(item.finding_id) for item in findings]
     assert all(row is not None for row in stored)
     ransom = next(item for item in findings if item.source_ref.startswith("ransomleak"))
     assert store.get(ransom.finding_id)["confidence"] == "unverified_claim"
-    blob = (tmp_path / "intel.sqlite").read_bytes()
+    blob = (_data(tmp_path) / "intel.sqlite").read_bytes()
     assert b"hunter2" not in blob
     assert TOKEN.encode() not in blob
 
@@ -621,8 +637,8 @@ def test_highlight_password_is_redacted(monkeypatch, tmp_path):
     assert "hunter2" not in blob
     assert "<<untrusted source=flare>>" in blob
     assert (
-        not (tmp_path / "intel.sqlite").exists()
-        or b"hunter2" not in (tmp_path / "intel.sqlite").read_bytes()
+        not (_data(tmp_path) / "intel.sqlite").exists()
+        or b"hunter2" not in (_data(tmp_path) / "intel.sqlite").read_bytes()
     )
 
 

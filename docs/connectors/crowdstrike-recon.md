@@ -33,9 +33,11 @@ Server manifest `required_env`: `FALCON_CLIENT_ID`, `FALCON_CLIENT_SECRET`.
 | `FALCON_BASE_URL` | credential | yes | no | `lookup` |
 | `FALCON_CLIENT_ID` | credential | yes | yes | `lookup` |
 | `FALCON_CLIENT_SECRET` | credential | yes | yes | `lookup` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.org_watchlist_path` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
-| `CYBERAU_WATCHLIST` | runtime | no | no | `os.environ.get` |
+| `CYBERAU_ORG_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_path` |
+| `CYBERAU_WATCHLIST` | runtime | no | no | `runtime.org_watchlist_path` |
 
 `FALCON_CLIENT_ID` is optional in `SOURCE.md`. `mcp/servers.yaml` lists it under `required_env`.
 `FALCON_CLIENT_SECRET` is optional in `SOURCE.md`. `mcp/servers.yaml` lists it under `required_env`.
