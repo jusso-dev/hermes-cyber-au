@@ -285,9 +285,13 @@ def _compose(
 
 
 def default_assets_path() -> Path:
-    home = os.environ.get("HERMES_HOME")
-    base = Path(home) if home else Path()
-    return base / "plugin-data" / "cyber-au" / "assets.yaml"
+    """assets.yaml in the plugin data directory, resolved as the cyber-au plugin does."""
+    override = os.environ.get("CYBERAU_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser() / "assets.yaml"
+    home = os.environ.get("HERMES_HOME", "").strip()
+    root = Path(home).expanduser() if home else Path.home() / ".hermes"
+    return root / "plugin-data" / "cyber-au" / "assets.yaml"
 
 
 def main(argv: list[str] | None = None) -> int:

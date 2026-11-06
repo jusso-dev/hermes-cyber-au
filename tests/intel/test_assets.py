@@ -322,6 +322,20 @@ def test_default_path_uses_the_profile_data_dir(monkeypatch, tmp_path: Path) -> 
     assert assets.default_path() == tmp_path / "assets.yaml"
 
 
+def test_briefing_default_assets_path_matches_the_plugin(monkeypatch, tmp_path: Path) -> None:
+    briefing = _briefing()
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+    assert briefing.default_assets_path() == tmp_path / "data" / "assets.yaml"
+    monkeypatch.delenv("CYBERAU_DATA_DIR")
+    expected = tmp_path / "home" / "plugin-data" / "cyber-au" / "assets.yaml"
+    assert briefing.default_assets_path() == expected
+    monkeypatch.delenv("HERMES_HOME")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    expected = tmp_path / ".hermes" / "plugin-data" / "cyber-au" / "assets.yaml"
+    assert briefing.default_assets_path() == expected
+
+
 def test_inventory_module_has_no_network_imports() -> None:
     tree = ast.parse(Path(assets.__file__).read_text(encoding="utf-8"))
     imported: set[str] = set()
