@@ -13,11 +13,25 @@ from pathlib import Path
 _SUBDIR = Path("plugin-data") / "cyber-au"
 
 
+def _override() -> Path | None:
+    value = os.environ.get("CYBERAU_DATA_DIR", "").strip()
+    return Path(value).expanduser() if value else None
+
+
+def profile_data_dir(profile: Path) -> Path:
+    """The data directory for a named profile home.
+
+    ``CYBERAU_DATA_DIR`` wins. Otherwise it is ``<profile>/plugin-data/cyber-au``,
+    whatever ``HERMES_HOME`` says, because the caller named the profile.
+    """
+    return _override() or Path(profile) / _SUBDIR
+
+
 def configured_data_dir() -> Path | None:
     """The data directory named by the environment, or ``None`` when neither variable is set."""
-    override = os.environ.get("CYBERAU_DATA_DIR", "").strip()
-    if override:
-        return Path(override).expanduser()
+    override = _override()
+    if override is not None:
+        return override
     home = os.environ.get("HERMES_HOME", "").strip()
     if home:
         return Path(home).expanduser() / _SUBDIR

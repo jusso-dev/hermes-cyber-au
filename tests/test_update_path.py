@@ -25,6 +25,12 @@ BAD_SQL = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _profile_data_dir(monkeypatch):
+    # The store follows CYBERAU_DATA_DIR when it is set. These tests use the profile default.
+    monkeypatch.delenv("CYBERAU_DATA_DIR", raising=False)
+
+
 def _load():
     path = ROOT / "plugins" / "cyber-au" / "update_path.py"
     spec = importlib.util.spec_from_file_location("cyberau_update_path", path)
@@ -642,3 +648,34 @@ def test_bootstrap_refuses_python_older_than_3_11(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "Python 3.11 or newer" in result.stderr
     assert not (profile / "plugin-data").exists()
+
+
+def test_store_and_backups_follow_the_named_profile_not_hermes_home(tmp_path, monkeypatch):
+    mod = _load()
+    profile = tmp_path / "profile"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "elsewhere"))
+    data = profile / "plugin-data" / "cyber-au"
+    assert mod.intel_store_path(profile) == data / "intel.sqlite"
+    assert mod.backup_dir(profile) == data / "backups"
+
+
+def test_migration_uses_cyberau_data_dir(tmp_path, monkeypatch):
+    mod = _load()
+    profile = tmp_path / "profile"
+    _prepare_profile(profile)
+    data = tmp_path / "data"
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    assert mod.intel_store_path(profile) == data / "intel.sqlite"
+    assert mod.backup_dir(profile) == data / "backups"
+    migrations = tmp_path / "migrations"
+    migrations.mkdir()
+    origin = ROOT / "plugins" / "cyber-au" / "store" / "migrations" / "0001_schema.sql"
+    shutil.copy(origin, migrations)
+    mod.migrate(profile, migrations)
+    assert (data / "intel.sqlite").is_file()
+    assert [path.name for path in (data / "backups").iterdir()][0].endswith(
+        "-pre-migrate-intel.sqlite"
+    )
+    assert _stats(profile) == (1000, 499500), "the profile default store is left alone"
+    assert not (profile / "plugin-data" / "cyber-au" / "backups").exists()
+    assert mod.applied_schema_ids(profile) == {"0001"}
