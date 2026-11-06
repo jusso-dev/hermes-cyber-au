@@ -10,6 +10,7 @@ import os
 import sys
 from pathlib import Path
 
+from cyberau_common import runtime
 from cyberau_common.health import collect_connector_health, run_health
 from cyberau_common.secrets import (
     RedactFilter,
@@ -114,12 +115,11 @@ def main(argv: list[str] | None = None) -> int:
 def _health_all(args) -> int:
     live = bool(args.live) and not args.offline
     fixtures = os.environ.get("CYBERAU_HEALTH_FIXTURES")
-    data_dir = os.environ.get("CYBERAU_DATA_DIR")
     report = collect_connector_health(
         live=live,
         check_schema=bool(args.schema_drift),
         fixtures=Path(fixtures) if fixtures else None,
-        state_path=Path(data_dir) / "connector-health-state.json" if data_dir else None,
+        state_path=runtime.profile_data_dir() / "connector-health-state.json",
     )
     if args.json_path:
         Path(args.json_path).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

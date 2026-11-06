@@ -269,12 +269,10 @@ def default_audit_dir() -> Path:
     override = os.environ.get("CYBERAU_AUDIT_LOG_PATH")
     if override:
         return Path(override)
-    data = os.environ.get("CYBERAU_DATA_DIR")
-    if data:
-        return Path(data) / "audit"
-    hermes = os.environ.get("HERMES_HOME")
-    home = Path(hermes) if hermes else Path.home() / ".hermes"
-    return home / "plugin-data" / "cyber-au" / "audit"
+    # Imported here: runtime pulls in the HTTP stack, which the audit hooks do not need.
+    from cyberau_common import runtime
+
+    return runtime.profile_data_dir() / "audit"
 
 
 def tool_writes(tool_name: str, **kwargs: object) -> bool:

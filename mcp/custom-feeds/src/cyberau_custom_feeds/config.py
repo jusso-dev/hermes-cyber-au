@@ -92,13 +92,7 @@ class Config:
 
 
 def data_dir() -> Path:
-    configured = runtime.configured_data_dir()
-    if configured is not None:
-        return configured.expanduser()
-    hermes = os.environ.get("HERMES_HOME")
-    if hermes:
-        return Path(hermes).expanduser() / "plugin-data" / "cyber-au"
-    raise ConfigError("set CYBERAU_DATA_DIR or HERMES_HOME")
+    return runtime.profile_data_dir()
 
 
 def config_path(path: str | Path | None = None) -> Path:
