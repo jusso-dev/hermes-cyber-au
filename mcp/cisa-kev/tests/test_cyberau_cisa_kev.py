@@ -108,3 +108,11 @@ def test_failed_live_fetch_serves_no_shipped_data(tmp_path, monkeypatch):
     results = _tools()
     _assert_unavailable(results)
     assert "503" in results["kev_lookup"]["warnings"][0]
+
+
+def test_catalogue_returns_the_catalogue_and_cache_state():
+    from cyberau_cisa_kev.source import catalogue
+
+    catalog, cache = catalogue()
+    assert cache == "snapshot"
+    assert catalog == json.loads(SNAPSHOT.read_text(encoding="utf-8"))

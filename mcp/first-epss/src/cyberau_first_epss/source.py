@@ -159,6 +159,18 @@ def schema_drift(payload: dict) -> str | None:
     return None
 
 
+def score_batch(cve_ids: list[str]) -> tuple[list[dict] | None, str, str]:
+    """Current scores for these CVE IDs in one request.
+
+    Returns the rows (None when there is no usable payload), the cache state and a warning.
+    """
+    payload, cache, warning = _fetch({"cve": ",".join(cve_ids)})
+    if warning or payload is None:
+        return None, cache, warning
+    rows, problems = _rows(payload, history=False)
+    return (None if problems else rows), cache, "; ".join(problems)
+
+
 def _fetch(params: dict, *, force_live: bool = False) -> tuple[dict | None, str, str]:
     snapshot = os.environ.get("CYBERAU_EPSS_SNAPSHOT")
     offline = os.environ.get("CYBERAU_OFFLINE") == "1" and not force_live

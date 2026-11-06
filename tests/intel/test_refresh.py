@@ -1,12 +1,15 @@
+"""cyberau-mcp refresh: keyless public feeds into the intel store."""
+
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+import yaml
 from cyberau_common.cli import main
 
-ROOT = Path(__file__).resolve().parents[3]
-AUSCERT_XML = ROOT / "mcp" / "auscert" / "tests" / "fixtures" / "bulletins.xml"
+ROOT = Path(__file__).resolve().parents[2]
 
 KEV = {
     "catalogVersion": "2026.10.17",
@@ -41,6 +44,27 @@ ASD_ITEM = {
     "attack_ids": [],
 }
 
+AUSCERT_RECORDS = [
+    {
+        "bulletin_id": f"ESB-2026.900{n}",
+        "kind": "ESB",
+        "title": f"Bulletin {n}",
+        "link": f"https://portal.auscert.org.au/bulletins/ESB-2026.900{n}",
+        "stamp": datetime(2026, 10, 10 + n, tzinfo=UTC),
+        "summary": "Patch now.",
+        "cvss_max": None,
+        "cves": [],
+    }
+    for n in (1, 2)
+]
+
+
+@pytest.fixture(autouse=True)
+def isolated(tmp_path, monkeypatch):
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("CYBERAU_HOME", raising=False)
+
 
 @pytest.fixture
 def feeds(monkeypatch):
@@ -51,20 +75,19 @@ def feeds(monkeypatch):
     from cyberau_cisa_kev import source as kev
     from cyberau_first_epss import source as epss
 
-    state = {"asd_method": "direct", "epss_calls": []}
+    state = {"asd_live": True, "epss_calls": []}
 
-    def items_for_feed(feed):
-        if feed != "alerts":
-            return [], "miss", "", state["asd_method"]
-        return [dict(ASD_ITEM)], "miss", "", state["asd_method"]
+    def poll_feed(feed):
+        warning = "" if state["asd_live"] else f"{feed} served from the last stored poll"
+        return ([dict(ASD_ITEM)] if feed == "alerts" else []), state["asd_live"], warning
 
-    def epss_fetch(params, *, force_live=False):
-        state["epss_calls"].append(params)
-        data = [
-            {"cve": cve, "epss": "0.5", "percentile": "0.9", "date": "2026-10-17"}
-            for cve in params["cve"].split(",")
+    def score_batch(cve_ids):
+        state["epss_calls"].append(list(cve_ids))
+        rows = [
+            {"cve": cve, "epss": 0.5, "percentile": 0.9, "date": "2026-10-17", "model": "v1"}
+            for cve in cve_ids
         ]
-        return {"version": "v2025.03.14", "data": data}, "miss", ""
+        return rows, "miss", ""
 
     def feodo_blocklist(country=None):
         return {
@@ -81,34 +104,19 @@ def feeds(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr(asd, "_items_for_feed", items_for_feed)
-    monkeypatch.setattr(kev, "_catalog", lambda: (KEV, "miss"))
-    monkeypatch.setattr(epss, "_fetch", epss_fetch)
-
-    def auscert_fetch(*, force_live=False):
-        assert not force_live, "refresh must not bypass the AusCERT cache and rate limit"
-        return auscert._Feed(AUSCERT_XML.read_text(encoding="utf-8"), "miss")
-
-    monkeypatch.setattr(auscert, "_fetch", auscert_fetch)
+    monkeypatch.setattr(asd, "poll_feed", poll_feed)
+    monkeypatch.setattr(kev, "catalogue", lambda: (KEV, "miss"))
+    monkeypatch.setattr(epss, "score_batch", score_batch)
+    monkeypatch.setattr(auscert, "poll_bulletins", lambda: ([dict(r) for r in AUSCERT_RECORDS], ""))
     monkeypatch.setattr(abusech, "feodo_blocklist", feodo_blocklist)
     return state
-
-
-@pytest.fixture
-def store_path(tmp_path, monkeypatch):
-    monkeypatch.syspath_prepend(str(ROOT / "plugins" / "cyber-au"))
-    yield tmp_path / "intel.sqlite"
-    from store.db import close_store
-
-    close_store(tmp_path / "intel.sqlite")
 
 
 def test_ingest_arguments_parse_and_load_the_store(feeds, store_path, capsys):
     code = main(["refresh", "--sources", "asd,kev,epss,auscert,feodo", "--store"])
     out = capsys.readouterr().out.splitlines()
     assert code == 0, out
-    assert out[0].startswith("refresh ok: asd 1, kev 2, epss 2, auscert ")
-    assert "feodo 1" in out[0]
+    assert out[0] == "refresh ok: asd 1, kev 2, epss 2, auscert 2, feodo 1"
     assert "kev ok 2 items, stored 2" in out
 
     from store.api import table_counts
@@ -126,15 +134,15 @@ def test_store_is_untouched_without_the_flag(feeds, store_path, capsys):
 
 
 def test_epss_scores_every_kev_cve_in_batches(feeds, monkeypatch, capsys):
-    from cyberau_common import refresh
+    from store import refresh
 
     monkeypatch.setattr(refresh, "_EPSS_BATCH", 1)
     assert main(["refresh", "--sources", "epss"]) == 0
-    assert [call["cve"] for call in feeds["epss_calls"]] == ["CVE-2026-0001", "CVE-2026-0002"]
+    assert feeds["epss_calls"] == [["CVE-2026-0001"], ["CVE-2026-0002"]]
 
 
 def test_a_stale_source_fails_first_and_the_rest_still_run(feeds, capsys):
-    feeds["asd_method"] = "snapshot"
+    feeds["asd_live"] = False
     code = main(["refresh", "--sources", "asd,kev"])
     out = capsys.readouterr().out.splitlines()
     assert code == 1
@@ -143,7 +151,7 @@ def test_a_stale_source_fails_first_and_the_rest_still_run(feeds, capsys):
 
 
 def test_optional_sources_do_not_fail(feeds, capsys):
-    feeds["asd_method"] = "stale"
+    feeds["asd_live"] = False
     code = main(["refresh", "--sources", "kev", "--optional-sources", "asd"])
     out = capsys.readouterr().out.splitlines()
     assert code == 0
@@ -180,7 +188,7 @@ def test_failed_kev_refresh_does_not_replace_the_last_snapshot(feeds, tmp_path, 
 
     snapshot = tmp_path / "kev.json"
     snapshot.write_text('{"last":"known-good"}\n', encoding="utf-8")
-    monkeypatch.setattr(kev, "_catalog", lambda: (KEV, "snapshot"))
+    monkeypatch.setattr(kev, "catalogue", lambda: (KEV, "snapshot"))
     assert main(["refresh", "--sources", "kev", "--kev-snapshot", str(snapshot)]) == 1
     assert json.loads(snapshot.read_text(encoding="utf-8")) == {"last": "known-good"}
 
@@ -208,7 +216,7 @@ def test_nightly_outputs_status_and_summary_but_no_feed_rows(feeds, tmp_path, ca
     ]
     assert "| kev | ok | 2 |" in summary.read_text(encoding="utf-8")
 
-    feeds["asd_method"] = "snapshot"
+    feeds["asd_live"] = False
     assert main(args) == 1
     status = json.loads((feeds_dir / "status.json").read_text(encoding="utf-8"))
     assert status["sources"]["asd"]["status"] == "fail"
@@ -216,12 +224,28 @@ def test_nightly_outputs_status_and_summary_but_no_feed_rows(feeds, tmp_path, ca
     assert status["sources"]["asd"]["last_error"]
 
 
-def test_store_modules_come_from_the_checkout():
-    from cyberau_common.refresh import _store_modules
+def test_refresh_runs_from_the_checkout_plugin(capsys):
+    assert main(["refresh", "--sources", "nope"]) == 2
+    capsys.readouterr()
+    assert (
+        Path(sys.modules["store.refresh"].__file__).parent.parent == ROOT / "plugins" / "cyber-au"
+    )
 
-    api, db = _store_modules()
-    assert Path(api.__file__).parent.parent == ROOT / "plugins" / "cyber-au"
-    assert "store" in sys.modules
+
+def test_refresh_keys_match_the_feed_catalogue():
+    from store import refresh
+
+    feeds = yaml.safe_load((ROOT / "feeds" / "catalogue.yaml").read_text(encoding="utf-8"))["feeds"]
+    keyed = {feed["refresh"]: feed for feed in feeds if "refresh" in feed}
+    assert len(keyed) == len([feed for feed in feeds if "refresh" in feed])
+    assert sorted(key for key, feed in keyed.items() if feed["refresh_supported"]) == sorted(
+        refresh.SUPPORTED
+    )
+    for key, feed in keyed.items():
+        assert feed["refresh_supported"] is (key in refresh.SUPPORTED), key
+    for feed in feeds:
+        if "refresh" not in feed:
+            assert "refresh_supported" not in feed, feed["id"]
 
 
 def test_a_second_refresh_expires_what_the_feeds_withdrew(feeds, store_path, monkeypatch, capsys):
@@ -232,7 +256,7 @@ def test_a_second_refresh_expires_what_the_feeds_withdrew(feeds, store_path, mon
     capsys.readouterr()
 
     shrunk = {**KEV, "vulnerabilities": KEV["vulnerabilities"][:1]}
-    monkeypatch.setattr(kev, "_catalog", lambda: (shrunk, "miss"))
+    monkeypatch.setattr(kev, "catalogue", lambda: (shrunk, "miss"))
     monkeypatch.setattr(
         abusech,
         "feodo_blocklist",
@@ -274,10 +298,10 @@ def test_epss_alone_scores_the_stored_kev_list(feeds, store_path, monkeypatch, c
     def no_fetch():
         raise AssertionError("EPSS must not fetch KEV when the store has it")
 
-    monkeypatch.setattr(kev, "_catalog", no_fetch)
+    monkeypatch.setattr(kev, "catalogue", no_fetch)
     feeds["epss_calls"].clear()
     assert main(["refresh", "--sources", "epss", "--store"]) == 0
-    assert feeds["epss_calls"] == [{"cve": "CVE-2026-0001,CVE-2026-0002"}]
+    assert feeds["epss_calls"] == [["CVE-2026-0001", "CVE-2026-0002"]]
 
 
 def test_custom_feeds_load_items_and_one_failure_does_not_fail_the_rest(

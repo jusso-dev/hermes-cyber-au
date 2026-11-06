@@ -86,11 +86,8 @@ def connector() -> Connector:
     )
 
 
-def _catalog() -> tuple[dict | None, str]:
-    """Return the catalogue and its cache state. The catalogue is None when unavailable.
-
-    cyberau_common.refresh calls this, so keep the shape.
-    """
+def catalogue() -> tuple[dict | None, str]:
+    """Return the catalogue and its cache state. The catalogue is None when unavailable."""
     catalog, cache, _notes = _load_catalog()
     return catalog, cache
 

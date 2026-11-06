@@ -166,6 +166,27 @@ def _collect(
     )
 
 
+def poll_bulletins() -> tuple[list[dict], str]:
+    """Fetch, parse and record the bulletin feed for an intel refresh.
+
+    Returns the bulletins and a problem. Only a live answer or a fresh cache hit
+    counts; anything else is a problem and nothing is recorded. A fresh cache hit
+    is used as is, because forcing a fetch trips AusCERT's 30 minute limiter.
+    """
+    feed = _fetch()
+    if feed.text is None or feed.cache not in {"hit", "miss"}:
+        return [], "; ".join(feed.warnings) or "AusCERT feed was not fetched live"
+    root, problem = _root(feed.text)
+    if root is None:
+        return [], problem or "AusCERT feed unusable"
+    records, _skipped = _records(root)
+    if feed.persist:
+        _persist(records)
+    if not records:
+        return [], "AusCERT feed contained no bulletins"
+    return records, ""
+
+
 def _fetch(*, force_live: bool = False) -> _Feed:
     snapshot = os.environ.get("CYBERAU_AUSCERT_SNAPSHOT")
     if snapshot and not force_live:

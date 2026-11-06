@@ -222,3 +222,12 @@ def test_offline_schema_check_without_override_reads_no_shipped_file(monkeypatch
     probe = connector().health(live=False, check_schema=True)
     assert probe.ok is True
     assert "no local copy" in probe.detail
+
+
+def test_score_batch_returns_rows_and_cache_state():
+    rows, cache, warning = source.score_batch(["CVE-2024-3400"])
+    assert (cache, warning) == ("snapshot", "")
+    assert rows[0]["cve"] == "CVE-2024-3400"
+    os.environ["CYBERAU_EPSS_SNAPSHOT"] = str(FIXTURES / "epss_drift.json")
+    rows, _cache, warning = source.score_batch(["CVE-2024-3400"])
+    assert rows is None and "drift" in warning

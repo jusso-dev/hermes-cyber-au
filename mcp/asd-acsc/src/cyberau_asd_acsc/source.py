@@ -290,6 +290,13 @@ def schema_drift(text: str) -> str | None:
     return None
 
 
+def poll_feed(feed: str) -> tuple[list[dict], bool, str]:
+    """Poll one feed and record it. Returns the items, whether they came from a live
+    fetch (not a stored poll, cache or snapshot), and any warning."""
+    items, _cache, warning, method = _items_for_feed(feed)
+    return items, method in {"direct", "http11"}, warning
+
+
 def _items_for_feed(feed: str) -> tuple[list[dict], str, str, str]:
     text, cache, warning, method = _fetch_xml(feed, force_live=False)
     if text is None and method in {"stored", "stale"} and _has_poll(feed):

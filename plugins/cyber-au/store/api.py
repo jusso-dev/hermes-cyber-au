@@ -610,6 +610,13 @@ def table_counts(path: str | Path | None = None) -> dict[str, int]:
     return {name: conn.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0] for name in TABLES}
 
 
+def kev_cves(path: str | Path | None = None) -> list[str]:
+    """CVE IDs the store currently holds as listed in CISA KEV, sorted."""
+    conn = open_store(path).connection()
+    rows = conn.execute("SELECT cve_id FROM vulnerabilities WHERE kev_date_added IS NOT NULL")
+    return sorted(row[0] for row in rows)
+
+
 def _run(path: str | Path | None, fn: Callable[[Store], object]) -> object:
     store = open_store(path)
     if store.in_transaction():
@@ -1031,6 +1038,7 @@ __all__ = [
     "ensure_source",
     "export_records",
     "ingest_kev_catalogue",
+    "kev_cves",
     "lookup",
     "open_store",
     "search",

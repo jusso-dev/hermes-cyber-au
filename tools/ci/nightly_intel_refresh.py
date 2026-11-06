@@ -25,7 +25,7 @@ from cyberau_common.secrets import distribution_env_names, is_plain_config_name,
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Every public source with a refresh adapter in cyberau_common.refresh.
+# Every public source with a refresh adapter in the plugin's store.refresh.
 PUBLIC_SOURCES = "asd,kev,epss,auscert,feodo"
 
 ABSENT_MARKER = "is not part of the shared library yet"

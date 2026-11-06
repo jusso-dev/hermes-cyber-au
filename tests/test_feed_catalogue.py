@@ -9,7 +9,6 @@ from urllib.parse import urlsplit
 
 import pytest
 import yaml
-from cyberau_common import refresh
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -161,19 +160,6 @@ def test_url_hosts_are_allowlisted_for_the_connector(feeds, allowlist):
             parts = urlsplit(url)
             assert parts.scheme == "https", f"{feed['id']}: {url}"
             assert parts.hostname in hosts, f"{feed['id']}: {parts.hostname} not in {connector}"
-
-
-def test_refresh_keys_match_cyberau_mcp_refresh(feeds):
-    keyed = {feed["refresh"]: feed for feed in feeds if "refresh" in feed}
-    assert len(keyed) == len([feed for feed in feeds if "refresh" in feed])
-    assert sorted(key for key, feed in keyed.items() if feed["refresh_supported"]) == sorted(
-        refresh.SUPPORTED
-    )
-    for key, feed in keyed.items():
-        assert feed["refresh_supported"] is (key in refresh.SUPPORTED), key
-    for feed in feeds:
-        if "refresh" not in feed:
-            assert "refresh_supported" not in feed, feed["id"]
 
 
 def test_supported_refresh_sources_are_keyless(feeds):
