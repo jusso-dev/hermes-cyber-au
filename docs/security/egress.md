@@ -116,6 +116,6 @@ For a container deployment, give the agent no direct route to the network. The o
 
 ## CI
 
-`tools/ci/check_allowlist.py` compares `mcp/egress-allowlist.yaml` with the connector inventory (`tools/tickets/inventory.py`, `inventory_added.py`, and `inventory_premium.py`). It fails when a host is added or removed on only one side. Connectors whose inventory host is supplied by the operator must have an empty host list until a real host is reviewed in. The in-library `stub` connector is the only extra key, and its only host is `example.com`.
+`tools/ci/check_allowlist.py` compares `mcp/egress-allowlist.yaml` with the connector inventory (`tools/tickets/inventory.py`, `inventory_added.py`, and `inventory_premium.py`). It fails when a host is added or removed on only one side. Connectors whose inventory host is supplied by the operator must have an empty host list until a real host is reviewed in.
 
 The same script fails when `global_deny_cidrs` no longer contains every floor network. Adding a network is allowed. Removing one is not.

@@ -133,7 +133,7 @@ class ValidateRepoTest(unittest.TestCase):
             findings = self.mod.check_allowlist(root)
         self.assertTrue(any("evil.example" in item for item in findings))
 
-    def test_stub_allowlist_entry_does_not_need_a_package(self):
+    def test_allowlist_entry_without_a_package_is_accepted(self):
         with self._tree() as root:
             mcp = root / "mcp"
             mcp.mkdir()
