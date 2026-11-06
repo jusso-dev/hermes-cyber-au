@@ -38,7 +38,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.present import finding_payload
 from cyberau_premium.store import ExposureStore
@@ -211,10 +211,7 @@ class _HudsonRock(PremiumConnector):
                 ToolSpec("hudsonrock_domain_exposure", exposure, hudsonrock_domain_exposure),
                 ToolSpec("hudsonrock_domain_overview", overview, hudsonrock_domain_overview),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:

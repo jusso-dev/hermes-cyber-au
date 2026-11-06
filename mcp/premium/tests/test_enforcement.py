@@ -9,17 +9,21 @@ import re
 from datetime import UTC, datetime, timedelta
 
 from cyberau_premium.base import TermsProfile, Watchlist
-from cyberau_premium.briefing import filter_for_delivery
 from cyberau_premium.budget import BudgetLedger
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import TermsRejected, apply_terms, get_vendor, load_vendors
-from cyberau_premium.docs import render_vendor_terms, terms_dir
+from cyberau_premium.catalog import (
+    TermsRejected,
+    VendorSpec,
+    apply_terms,
+    get_vendor,
+    load_vendors,
+)
 from cyberau_premium.guard import on_session_end, pre_tool_call
 from cyberau_premium.paths import repo_root
-from cyberau_premium.samples import OBSERVED, sample_finding
 from cyberau_premium.status import format_premium_doctor, load_servers, render_premium_servers
 from cyberau_premium.stix import export_stix
 from cyberau_premium.store import ExposureStore
+from premium_samples import OBSERVED, sample_finding
 
 _EMAIL = re.compile(r"(?i)\b[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})\b")
 _HOST = re.compile(r"(?i)\b(?:[a-z0-9-]+\.)+(?:[a-z]{2,})\b")
@@ -221,25 +225,6 @@ def test_stix_exports_only_allowed_findings(tmp_path):
     assert hidden.finding_id not in dumped
 
 
-def test_briefing_drops_unshared_findings():
-    spec = get_vendor("recordedfuture")
-    finding = sample_finding("recordedfuture", spec.terms)
-    kept = filter_for_delivery(
-        [finding],
-        {"recordedfuture": spec.terms},
-        target="owner",
-        owner="owner",
-    )
-    assert kept == [finding]
-    dropped = filter_for_delivery(
-        [finding],
-        {"recordedfuture": spec.terms},
-        target="team-channel",
-        owner="owner",
-    )
-    assert dropped == []
-
-
 def test_session_cache_clears_and_ttl_is_capped(tmp_path):
     session_terms = TermsProfile(cache="session", store="metadata", attribution="Session only.")
     path = tmp_path / "session.sqlite"
@@ -264,7 +249,7 @@ def test_session_cache_clears_and_ttl_is_capped(tmp_path):
 
 def test_terms_docs_and_readme():
     for spec in load_vendors():
-        path = terms_dir() / f"{spec.server}.md"
+        path = repo_root() / "docs" / "premium" / "terms" / f"{spec.server}.md"
         assert path.read_text(encoding="utf-8") == render_vendor_terms(spec)
     readme = (repo_root() / "docs" / "premium" / "README.md").read_text(encoding="utf-8")
     for phrase in (
@@ -328,3 +313,67 @@ def test_guard_blocks_when_the_server_is_off(tmp_path):
     assert ledger.usage("flare").calls_today == 0
     ignored = pre_tool_call(tool_name="kev_lookup", ledger=ledger)
     assert ignored["decision"] == "allow"
+
+
+def render_vendor_terms(spec: VendorSpec) -> str:
+    if spec.paid:
+        standing = "Paid, bring your own licence. The server ships disabled."
+    else:
+        standing = "Free feed. It still ships disabled because it handles victim claims."
+    lines = [
+        f"# {spec.name}",
+        "",
+        f"Server `{spec.server}`. {standing}",
+        "",
+        "Generated from `mcp/premium/vendors.yaml`. Not legal advice.",
+        "",
+        "## Terms",
+        "",
+        "| Flag | Default |",
+        "| --- | --- |",
+        f"| `cache` | `{spec.terms.cache}` |",
+        f"| `cache_ttl_max_s` | `{spec.terms.cache_ttl_max_s}` |",
+        f"| `store` | `{spec.terms.store}` |",
+        f"| `stix_export` | `{str(spec.terms.stix_export).lower()}` |",
+        f"| `share_outside_profile` | `{str(spec.terms.share_outside_profile).lower()}` |",
+        f"| `redistribution` | `{spec.terms.redistribution}` |",
+        "",
+        "## Licence environment",
+        "",
+        "Names only. Put values in the profile `.env`. Do not commit them.",
+        "",
+    ]
+    if spec.licence_env:
+        lines.extend(f"- `{name}` (required)" for name in spec.licence_env)
+    else:
+        lines.append("- No required licence variable.")
+    lines.extend(f"- `{name}` (optional)" for name in spec.optional_env)
+    lines.extend(
+        [
+            "",
+            "## Quota defaults",
+            "",
+            f"- Calls per day: {_quota(spec.quota.calls_per_day)}",
+            f"- Calls per month: {_quota(spec.quota.calls_per_month)}",
+            f"- Cost units per call: {_quota(spec.quota.cost_units_per_call)}",
+            f"- Monthly budget units: {_quota(spec.quota.monthly_budget_units)} (you set this)",
+            f"- Approval above units: {_quota(spec.quota.approval_above_units)}",
+            f"- Hard stop: {str(spec.quota.hard_stop).lower()}",
+            f"- Routine share: {spec.routine_share}",
+            f"- Max pages: {spec.max_pages}",
+            "",
+            "## Attribution",
+            "",
+            spec.terms.attribution,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _quota(value) -> str:
+    if value is None:
+        return "not set"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)

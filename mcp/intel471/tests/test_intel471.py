@@ -16,7 +16,6 @@ from cyberau_intel471.source import (
     schema_drift,
 )
 from cyberau_premium.base import PremiumConnector, Watchlist
-from cyberau_premium.briefing import filter_for_delivery
 from cyberau_premium.status import load_servers, render_premium_servers
 from cyberau_premium.stix import export_stix
 from cyberau_premium.store import ExposureStore
@@ -89,12 +88,7 @@ def test_happy_path_normalises_and_keeps_victims_in_profile(tmp_path, monkeypatc
     text = json.dumps(breaches)
     assert "Other Corp" not in text
 
-    terms = connector().terms
-    findings = [source.ExposureFinding.model_validate(breaches["data"][0]["finding"])]
-    outside = filter_for_delivery(findings, {"intel471": terms}, target="channel", owner="owner")
-    inside = filter_for_delivery(findings, {"intel471": terms}, target="owner", owner="owner")
-    assert outside == []
-    assert inside
+    assert connector().terms.share_outside_profile is False
 
 
 def test_empty_malformed_and_filtered_dates(tmp_path, monkeypatch):

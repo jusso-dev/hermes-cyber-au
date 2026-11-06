@@ -30,7 +30,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.store import ExposureStore
 from jsonschema import Draft202012Validator
@@ -203,10 +203,7 @@ class Intel471Connector(PremiumConnector):
                     intel471_credential_exposure,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:

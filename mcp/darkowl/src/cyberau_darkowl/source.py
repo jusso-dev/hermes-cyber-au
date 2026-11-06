@@ -35,8 +35,8 @@ from cyberau_premium.base import (
     clamp_to_terms,
     finding_id,
 )
-from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.caching import cache_once
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.redact import redact_text
 from cyberau_premium.store import ExposureStore
@@ -150,10 +150,7 @@ class _DarkOwlConnector(PremiumConnector):
                     darkowl_search_watchlist,
                 )
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(self, watchlist: Watchlist, since: date) -> list[ExposureFinding]:
@@ -447,12 +444,7 @@ def _from_session(url: str, public_key: str) -> tuple[dict | None, str]:
 
 def _session_cache():
     path = data_dir() / "http_cache.sqlite"
-    key = str(path)
-    cache = _CACHES.get(key)
-    if cache is None:
-        cache = cache_for_terms(path, get_vendor("darkowl").terms)
-        _CACHES[key] = cache
-    return cache
+    return cache_once(_CACHES, str(path), path, get_vendor("darkowl").terms)
 
 
 def _pairs(

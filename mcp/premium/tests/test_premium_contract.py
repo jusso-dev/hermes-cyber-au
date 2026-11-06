@@ -13,11 +13,11 @@ from cyberau_premium.caching import cache_for_terms
 from cyberau_premium.catalog import load_vendors
 from cyberau_premium.guard import pre_tool_call
 from cyberau_premium.redact import redact_text
-from cyberau_premium.samples import SCHEMA, sample_finding
 from cyberau_premium.status import load_servers, render_premium_servers
 from cyberau_premium.stix import export_stix
 from cyberau_premium.store import ExposureStore
 from jsonschema import Draft202012Validator
+from premium_samples import SCHEMA, sample_finding
 
 VALIDATOR = Draft202012Validator(SCHEMA, format_checker=Draft202012Validator.FORMAT_CHECKER)
 SECRET = "hunter2-secret"

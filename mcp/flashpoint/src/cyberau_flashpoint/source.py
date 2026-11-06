@@ -23,8 +23,8 @@ from cyberau_common.http import HttpClient, HttpError
 from cyberau_common.secrets import lookup, redact
 from cyberau_common.server import Probe, ToolSpec, register_connector
 from cyberau_premium.base import ExposureFinding, PremiumConnector, Watchlist
-from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.caching import cache_once
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.redact import redact_text
 from pydantic import Field
 
@@ -140,10 +140,7 @@ def connector() -> FlashpointConnector:
         key="flashpoint",
         server_name="flashpoint",
         attribution=spec.terms.attribution,
-        vendor=spec.server,
-        licence_env=tuple(spec.licence_env),
-        terms=spec.terms,
-        quota=spec.quota,
+        **vendor_fields(spec),
         tools=[
             ToolSpec(
                 "flashpoint_indicator",
@@ -270,16 +267,10 @@ def _persist(rows: list[dict]) -> None:
 
 
 def _cache():
-    directory = str(_data_dir())
-    cached = _CACHES.get(directory)
-    if cached is not None:
-        return cached
-    created = cache_for_terms(
-        Path(directory) / "http_cache.sqlite",
-        get_vendor("flashpoint").terms,
+    directory = _data_dir()
+    return cache_once(
+        _CACHES, str(directory), directory / "http_cache.sqlite", get_vendor("flashpoint").terms
     )
-    _CACHES[directory] = created
-    return created
 
 
 def _client(cache) -> HttpClient:

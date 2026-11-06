@@ -28,8 +28,8 @@ from cyberau_premium.base import (
     Watchlist,
     finding_id,
 )
-from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.caching import cache_once
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_text
 from cyberau_premium.store import ExposureStore
@@ -130,10 +130,7 @@ def connector() -> PremiumConnector:
                 fn=gti_dtm_monitors,
             ),
         ],
-        vendor=spec.server,
-        licence_env=tuple(spec.licence_env),
-        terms=spec.terms,
-        quota=spec.quota,
+        **vendor_fields(spec),
     )
 
 
@@ -728,12 +725,7 @@ def _scope() -> str:
 
 def _session_cache():
     root = _root()
-    identity = f"{root}|{_scope()}"
-    cache = _CACHES.get(identity)
-    if cache is None:
-        cache = cache_for_terms(root / "http_cache.sqlite", _spec().terms)
-        _CACHES[identity] = cache
-    return cache
+    return cache_once(_CACHES, f"{root}|{_scope()}", root / "http_cache.sqlite", _spec().terms)
 
 
 def _root() -> Path:

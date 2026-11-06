@@ -1,16 +1,13 @@
-"""Synthetic findings for tests. No real victims or credentials."""
+"""Synthetic findings for the premium tests. No real victims or credentials."""
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 
 from cyberau_premium.base import ExposureFinding, Subject, TermsProfile, finding_id
-from cyberau_premium.paths import package_root
+from cyberau_premium.paths import finding_schema
 
-SCHEMA = json.loads(
-    (package_root() / "schema" / "exposure_finding.json").read_text(encoding="utf-8")
-)
+SCHEMA = finding_schema()
 OBSERVED = datetime(2026, 6, 1, 0, 0, tzinfo=UTC)
 
 

@@ -22,7 +22,7 @@ from cyberau_premium.base import (
     clamp_to_terms,
     finding_id,
 )
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.paths import data_dir
 from cyberau_premium.present import finding_payload
 from cyberau_premium.redact import redact_text
@@ -670,10 +670,7 @@ class FlareConnector(PremiumConnector):
             key="flare",
             server_name="flare",
             attribution=spec.terms.attribution,
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
             tools=[
                 ToolSpec(
                     "flare_tenant_exposure",

@@ -29,7 +29,7 @@ from cyberau_premium.base import (
     finding_id,
 )
 from cyberau_premium.caching import cache_for_terms
-from cyberau_premium.catalog import get_vendor
+from cyberau_premium.catalog import get_vendor, vendor_fields
 from cyberau_premium.guard import pre_tool_call
 from cyberau_premium.redact import redact_obj, redact_text
 from cyberau_premium.store import ExposureStore
@@ -1222,10 +1222,7 @@ class RecordedFutureConnector(PremiumConnector):
                     rf_risklist_status,
                 ),
             ],
-            vendor=spec.server,
-            licence_env=tuple(spec.licence_env),
-            terms=spec.terms,
-            quota=spec.quota,
+            **vendor_fields(spec),
         )
 
     def exposure_for(
