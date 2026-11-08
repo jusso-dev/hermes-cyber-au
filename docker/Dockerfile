@@ -1,6 +1,6 @@
 # Hermes Agent image with the cyber-au distribution preinstalled.
 # Runtime user and data volume checked against NousResearch/hermes-agent
-# Dockerfile at d923a5e (v0.22.2):
+# Dockerfile at 2bd378e (v0.23.0):
 #   useradd -u 10000 -m -d /opt/data hermes
 #   ENV HERMES_HOME=/opt/data
 #   VOLUME ["/opt/data"]
@@ -10,12 +10,12 @@
 
 # Base and tool images are pinned by digest. A tag can be moved; a digest
 # cannot. HERMES_DIGEST is the multi-arch index digest of
-# nousresearch/hermes-agent:v0.22.2. When HERMES_VERSION changes, update
+# nousresearch/hermes-agent:v0.23.0. When HERMES_VERSION changes, update
 # HERMES_DIGEST in the same commit (tests/test_docker_pins.py checks the
 # version named on the next line matches HERMES_VERSION).
-# HERMES_DIGEST version: v0.22.2
-ARG HERMES_VERSION=v0.22.2
-ARG HERMES_DIGEST=sha256:36099926da316742423544e055d4734777105ffe6341873af5459b957d0c2919
+# HERMES_DIGEST version: v0.23.0
+ARG HERMES_VERSION=v0.23.0
+ARG HERMES_DIGEST=sha256:adb7890916de63245523492be8f68f9d2095fecbec4e2a6dab7960381f0fc002
 
 # uv 0.13.1 from Astral's published image, pinned by index digest. This
 # replaces piping https://astral.sh/uv/install.sh into a shell.

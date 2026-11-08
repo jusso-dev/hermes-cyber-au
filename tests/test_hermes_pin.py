@@ -72,13 +72,22 @@ def _fixture(
     return tmp_path
 
 
-def test_repository_pin_is_the_current_release():
-    assert pin.read_pin(ROOT) == "v0.22.2"
+def test_repository_pins_agree():
+    tag = pin.read_pin(ROOT)
     distribution = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert 'hermes_requires: ">=0.22.2"\n' in distribution
+    docker = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
+    devcontainer = (ROOT / ".devcontainer" / "Dockerfile").read_text(encoding="utf-8")
+    installer = (ROOT / "install" / "install.sh").read_text(encoding="utf-8")
+    assert f'hermes_requires: ">={tag[1:]}"\n' in distribution
     assert "tools/hermes_pin.py image" in ci
-    assert pin.image(ROOT) == "nousresearch/hermes-agent:v0.22.2"
+    assert pin.image(ROOT) == f"nousresearch/hermes-agent:{tag}"
+    assert f"ARG HERMES_VERSION={tag}\n" in docker
+    assert f"# HERMES_DIGEST version: {tag}\n" in docker
+    assert f"nousresearch/hermes-agent:{tag}@sha256:" in devcontainer
+    assert f"\nHERMES_PIN_VERSION={tag}\n" in installer
+    digest = re.search(r"^ARG HERMES_DIGEST=(sha256:[0-9a-f]{64})$", docker, re.MULTILINE)
+    assert digest and f"{tag}@{digest.group(1)}" in devcontainer
     pin.check_ci(ROOT)
 
 
