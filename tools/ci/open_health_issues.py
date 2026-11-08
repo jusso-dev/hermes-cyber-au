@@ -191,7 +191,8 @@ def _last_good(issue: dict | None) -> str | None:
 
 
 def _preferred(issues: list[dict], state: str) -> dict | None:
-    chosen = [item for item in issues if item.get("state") == state]
+    # gh issue list returns "OPEN"/"CLOSED"; compare without case.
+    chosen = [item for item in issues if str(item.get("state", "")).lower() == state]
     if not chosen:
         return None
     return min(chosen, key=lambda item: int(item["number"]))

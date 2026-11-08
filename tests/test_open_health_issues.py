@@ -186,6 +186,27 @@ def test_recovery_closes_and_a_later_failure_reopens():
     assert SECRET not in github.calls[-1][2]
 
 
+def test_uppercase_gh_states_are_matched():
+    """gh issue list returns OPEN and CLOSED. A repeat must comment, recovery must close."""
+    module = load()
+    github = FakeGitHub()
+    github.issues.append(
+        {
+            "number": 9,
+            "title": "Connector health: first-epss failing",
+            "state": "OPEN",
+            "body": "Last good: 2026-09-01\n",
+        }
+    )
+    module.sync(_report(), github, close_recovered=True)
+    epss = [call for call in github.calls if call[1] in (9, "Connector health: first-epss failing")]
+    assert [call[0] for call in epss] == ["comment"]
+
+    recovered = {"connectors": [{"key": "first-epss", "status": "ok", "status_code": 200}]}
+    module.sync(recovered, github, close_recovered=True)
+    assert github.calls[-1][:2] == ("close", 9)
+
+
 def test_not_checked_does_not_close_an_existing_issue():
     module = load()
     github = FakeGitHub()
