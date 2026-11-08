@@ -19,7 +19,7 @@ ARG HERMES_DIGEST=sha256:adb7890916de63245523492be8f68f9d2095fecbec4e2a6dab79603
 
 # uv 0.13.1 from Astral's published image, pinned by index digest. This
 # replaces piping https://astral.sh/uv/install.sh into a shell.
-FROM ghcr.io/astral-sh/uv:0.13.3@sha256:bee0a2a458fd956c5df7b8b4c5fed2257b0af34866e3da7b51db0be3acb375d1 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
 
 FROM nousresearch/hermes-agent:${HERMES_VERSION}@${HERMES_DIGEST}
 
