@@ -11,7 +11,7 @@ Try the profile without installing anything on your own machine. The repository 
 
 The container is built from `.devcontainer/Dockerfile`:
 
-- Base image `nousresearch/hermes-agent:v0.22.2`, pinned by digest. Hermes is already installed.
+- Base image `nousresearch/hermes-agent:v0.23.0`, pinned by digest. Hermes is already installed.
 - `uv` 0.13.1 copied from `ghcr.io/astral-sh/uv`, pinned by digest.
 - PyYAML installed into the Hermes interpreter for the cyber-au plugin.
 - You work as the image's `hermes` user. `HERMES_HOME` is `/opt/data`.

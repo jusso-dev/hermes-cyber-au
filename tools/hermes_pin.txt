@@ -1,4 +1,4 @@
 # Pinned Hermes release. tools/hermes_pin.py is the only writer.
 # Consumers: distribution.yaml hermes_requires and docker/Dockerfile HERMES_VERSION.
 # CI reads the image at run time with tools/hermes_pin.py image.
-v0.22.2
+v0.23.0

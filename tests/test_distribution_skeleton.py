@@ -64,7 +64,8 @@ class DistributionSkeletonTest(unittest.TestCase):
         text = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
         self.assertIn("name: cyber-au\n", text)
         self.assertIn("version: 0.1.0\n", text)
-        self.assertIn('hermes_requires: ">=0.22.2"\n', text)
+        pinned = (ROOT / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").split()[-1]
+        self.assertIn(f'hermes_requires: ">={pinned[1:]}"\n', text)
         self.assertIn('license: "Apache-2.0"\n', text)
         for rel in OWNED:
             self.assertIn(f"  - {rel}\n", text)

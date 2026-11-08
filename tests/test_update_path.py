@@ -466,7 +466,8 @@ def test_docs_and_manifest_state_the_version_policy() -> None:
     assert "arrives paused" in text
     assert "\u2014" not in text
     manifest = mod.read_manifest(ROOT / "distribution.yaml")
-    assert manifest.hermes_requires == ">=0.22.2"
+    pinned = (ROOT / "tools" / "hermes_pin.txt").read_text(encoding="utf-8").split()[-1]
+    assert manifest.hermes_requires == f">={pinned[1:]}"
     assert "install/bootstrap.sh" in manifest.distribution_owned
     assert "cron/jobs.json" in manifest.distribution_owned
 

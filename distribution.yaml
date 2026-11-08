@@ -1,7 +1,7 @@
 name: cyber-au
 version: 0.1.0
 description: "Hermes Agent distribution for Australian cyber security teams: ASD guidance, AU and global threat intel, triage and reporting skills."
-hermes_requires: ">=0.22.2"
+hermes_requires: ">=0.23.0"
 author: "Justin Middler"
 license: "Apache-2.0"
 distribution_owned:
