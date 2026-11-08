@@ -11,3 +11,10 @@ d0455c5295d57644a5e5983f65a53e113554a3a8:mcp/intel471/SOURCE.md:generic-api-key:
 47b22549e8957766419de444ef7466abef0af49f:docs/connectors/intel471.md:generic-api-key:27
 b3cf4c058f399d4c3ffeafc76ef8420a41147d49:tests/skills/test_harness.py:aws-access-token:269
 4e348bf8ce7edf25e56892bbe904c060960ebfc8:mcp/abusech/tests/test_abusech.py:generic-api-key:27
+# Reviewed for #206: public Intel 471 API hostname in docs, and a ticket slug
+# (the premium-intel471 key in ticket frontmatter) from before the ticket allowlist.
+a16e73d91325c3d433cc299c0aca1806158512b5:docs/connectors/intel471.md:generic-api-key:334
+a16e73d91325c3d433cc299c0aca1806158512b5:mcp/intel471/SOURCE.md:generic-api-key:40
+868a86980877d8b9008dcaf52e3a2684435b5728:docs/connectors/intel471.md:generic-api-key:334
+868a86980877d8b9008dcaf52e3a2684435b5728:mcp/intel471/SOURCE.md:generic-api-key:40
+9893ff74af9d8d618913cda19737793a5f1b7ef4:tickets/109-premium-intel471.md:generic-api-key:2

@@ -1224,7 +1224,9 @@ def _latest(root: Path, pattern: str) -> Path | None:
     return found[-1] if found else None
 
 
-def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str]:
+def _http(
+    url: str, *, ttl: int, skip_cache: bool, timeout: float = 60, retries: int = 1
+) -> tuple[str | None, str, str]:
     if runtime.offline():
         return None, "snapshot", "offline"
     data_dir = runtime.data_dir("e8")
@@ -1236,8 +1238,8 @@ def _http(url: str, *, ttl: int, skip_cache: bool) -> tuple[str | None, str, str
         rate=1 / 5,
         burst=2,
         window="rolling",
-        timeout=60,
-        retries=1,
+        timeout=timeout,
+        retries=retries,
         transport=_TRANSPORT,
         sleeper=_SLEEP,
     )
@@ -1281,6 +1283,11 @@ def _envelope(data, cache: str, urls=None, data_as_of: str | None = None, warnin
     )
 
 
+# The scheduled regen job fetches from GitHub runners, where cyber.gov.au sometimes
+# stalls for a minute. Retry more than the interactive tools do (#232).
+_REGEN_FETCH = {"timeout": 60, "retries": 3}
+
+
 def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     """Download the pinned public sources and write the shipped JSON snapshot."""
     destination = destination or (_PACKAGE / "data")
@@ -1288,7 +1295,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
     retrieved_on = runtime.today(UTC).isoformat()
     chapters = {}
     for key, url in CHAPTERS.items():
-        text, _cache, warning = _http(url, ttl=86400, skip_cache=True)
+        text, _cache, warning = _http(url, ttl=86400, skip_cache=True, **_REGEN_FETCH)
         if not text or warning:
             raise RuntimeError(warning or f"{key} page was empty")
         page = parse_chapter(text, key, url)
@@ -1296,10 +1303,14 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
         if problem:
             raise RuntimeError(f"{key}: {problem}")
         chapters[key] = page
-    transition_html, _cache, warning = _http(TRANSITION_URL, ttl=86400, skip_cache=True)
+    transition_html, _cache, warning = _http(
+        TRANSITION_URL, ttl=86400, skip_cache=True, **_REGEN_FETCH
+    )
     if not transition_html or warning:
         raise RuntimeError(warning or "transition page was empty")
-    launch_html, _cache, launch_warning = _http(LAUNCH_URL, ttl=86400, skip_cache=True)
+    launch_html, _cache, launch_warning = _http(
+        LAUNCH_URL, ttl=86400, skip_cache=True, **_REGEN_FETCH
+    )
     controls = []
     unassigned_rows = []
     hashes = {}
@@ -1308,7 +1319,7 @@ def rebuild_shipped_snapshot(destination: Path | None = None) -> dict:
         filename = f"ISM_E8_ML{level}-baseline-resolved-profile_catalog.json"
         url = f"{RAW_ROOT}/{ISM_RELEASE}/{filename}"
         urls.append(url)
-        text, _cache, warning = _http(url, ttl=7 * 86400, skip_cache=True)
+        text, _cache, warning = _http(url, ttl=7 * 86400, skip_cache=True, **_REGEN_FETCH)
         if not text or warning:
             raise RuntimeError(warning or f"{filename} was empty")
         hashes[filename] = hashlib.sha256(text.encode()).hexdigest()

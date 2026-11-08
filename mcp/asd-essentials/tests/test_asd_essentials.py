@@ -412,3 +412,22 @@ def _write_fixture_snapshot(snapshot: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def test_regen_fetch_retries_past_two_timeouts(monkeypatch):
+    """#232: the scheduled regen gave up after one retry on a slow cyber.gov.au."""
+    monkeypatch.delenv("CYBERAU_OFFLINE")
+    source._SLEEP = lambda _seconds: None
+    calls = {"count": 0}
+
+    def slow_then_ok(_request: httpx.Request) -> httpx.Response:
+        calls["count"] += 1
+        if calls["count"] <= 2:
+            raise httpx.ReadTimeout("The read operation timed out")
+        return httpx.Response(200, content=b"<html>essentials priority phase</html>")
+
+    source._TRANSPORT = httpx.MockTransport(slow_then_ok)
+    text, _cache, warning = source._http(ENTERPRISE, ttl=60, skip_cache=True, **source._REGEN_FETCH)
+    assert text
+    assert warning == ""
+    assert calls["count"] == 3
