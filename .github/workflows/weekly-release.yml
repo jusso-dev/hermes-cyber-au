@@ -66,8 +66,14 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           image="ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}"
           docker build -f docker/Dockerfile -t "$image" .
-          push_log=$(docker push "$image" 2>&1)
-          printf '%s\n' "$push_log"
+          # Guard the assignment: bash -e otherwise exits before logging the error.
+          if push_log=$(docker push "$image" 2>&1); then
+            printf '%s\n' "$push_log"
+          else
+            status=$?
+            printf '%s\n' "$push_log" >&2
+            exit "$status"
+          fi
           digest=$(printf '%s\n' "$push_log" | sed -n 's/.*digest: \(sha256:[0-9a-f]*\).*/\1/p' | tail -n 1)
           if [ -z "$digest" ]; then
             echo "image push did not return a digest" >&2
