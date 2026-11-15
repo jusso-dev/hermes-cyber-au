@@ -2927,7 +2927,7 @@ wheels = [
 
 [[package]]
 name = "stix2-validator"
-version = "3.3.1"
+version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama" },
@@ -2938,9 +2938,9 @@ dependencies = [
     { name = "simplejson" },
     { name = "stix2-patterns" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/be/10be24a40489373cc8c55ef6e8856449c20c59eea5a177890a48182b0246/stix2_validator-3.3.1.tar.gz", hash = "sha256:90484bfd8f5e216a4587bb26500bb4503e320b266e3d250281e04db47cb1e441", size = 779713, upload-time = "2026-05-12T15:21:29.441Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/6f/b6e819856691a163bc34f82b9363cb625bac8bb14e2cb53ba3a39a33d9cb/stix2_validator-3.3.2.tar.gz", hash = "sha256:34c77d298a32333ee02a8eb404e29c8ab6036631d994066dc542031cac95a4ac", size = 885161, upload-time = "2026-11-06T15:07:34.409Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/9a/cc17955af85bec43fdba381b4e4c07cc63172c9038b585fd4c25f55cc80f/stix2_validator-3.3.1-py2.py3-none-any.whl", hash = "sha256:9dd5615524e34b15f98d565b17f33974c420b7a69350597a4f2ba955e3f489ab", size = 791235, upload-time = "2026-05-12T15:21:27.559Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/ca/d2da6e83d80b8db5bfd34fcc27bd8e027e247a57aea21846c942390258ff/stix2_validator-3.3.2-py2.py3-none-any.whl", hash = "sha256:114c1de273566153dbc0583292727ef9b697a8fe13199b5689e65fcaf3a91376", size = 967063, upload-time = "2026-11-06T15:07:32.644Z" },
 ]
 
 [[package]]
