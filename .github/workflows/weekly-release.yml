@@ -4,50 +4,28 @@ on:
 permissions:
   contents: read
 jobs:
-  package:
+  cleanup:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       packages: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Diagnose image push for issue 295
+      - name: Remove disposable package
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          image="ghcr.io/${{ github.repository }}-issue-295:${{ github.run_id }}"
-          docker version
-          docker build -f docker/Dockerfile -t "$image" .
-          if push_log=$(docker push "$image" 2>&1); then
-            printf '%s\n' "$push_log"
-          else
-            status=$?
-            printf '%s\n' "$push_log" >&2
-            exit "$status"
-          fi
-      - name: Remove disposable issue 295 images
-        if: always()
+        run: gh api --method DELETE users/jusso-dev/packages/container/hermes-cyber-au-issue-295
+      - name: Inspect temporary version removal options
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PYTHON'
-          import json
-          import subprocess
-          def api(*args):
-              return subprocess.check_output(["gh", "api", *args], text=True)
-          base = "users/jusso-dev/packages/container/"
-          original = base + "hermes-cyber-au"
-          disposable = {
-              "sha256:0b99ed39f4ff0a805bec40003199338d5ca464d8c766744f132015ca4bf2f09b",
-              "sha256:98853d41b54beae337fa4014df001bcba2b990bd9be85e9d6d0dc65fd65423a8",
-              "sha256:1369288af2b2c684f0d7ff6f0ede7ff71568692f3113fec478f5ae6400a7cf44",
-          }
-          versions = json.loads(api(original + "/versions?per_page=100"))
-          for version in versions:
-              if version["name"] in disposable:
-                  api("--method", "DELETE", original + "/versions/" + str(version["id"]))
-                  print("Removed diagnostic version", version["name"])
-          api("--method", "DELETE", base + "hermes-cyber-au-issue-295")
-          print("Removed disposable package hermes-cyber-au-issue-295")
+          import base64, json, os, urllib.request, urllib.error
+          basic = base64.b64encode(("${{ github.actor }}:" + os.environ["GH_TOKEN"]).encode()).decode()
+          request = urllib.request.Request("https://ghcr.io/token?service=ghcr.io&scope=repository:jusso-dev/hermes-cyber-au:pull,push,delete", headers={"Authorization": "Basic " + basic})
+          token = json.load(urllib.request.urlopen(request))["token"]
+          request = urllib.request.Request("https://ghcr.io/v2/jusso-dev/hermes-cyber-au/manifests/issue-295-43656525625", method="DELETE", headers={"Authorization": "Bearer " + token})
+          try:
+              with urllib.request.urlopen(request) as response:
+                  print("Remove temporary tag:", response.status)
+          except urllib.error.HTTPError as error:
+              print("Remove temporary tag:", error.code, error.read().decode())
           PYTHON
