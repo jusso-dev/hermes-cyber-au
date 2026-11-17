@@ -2,11 +2,11 @@
 
 The image is `nousresearch/hermes-agent` with this distribution installed as the named profile `cyber-au`. It does not rewrite the default profile's `config.yaml`, `SOUL.md` or `.env`.
 
-Checked against NousResearch/hermes-agent at `2bd378e` (v0.23.0):
+Checked against NousResearch/hermes-agent at `ae2a81c` (v0.23.2):
 
 | Fact | Value |
 |---|---|
-| Base tag | `v0.23.0` (`ARG HERMES_VERSION`), pinned by digest (`ARG HERMES_DIGEST`) |
+| Base tag | `v0.23.2` (`ARG HERMES_VERSION`), pinned by digest (`ARG HERMES_DIGEST`) |
 | Runtime user | `hermes`, UID 10000, home `/opt/data` |
 | Data volume | `/opt/data` (`HERMES_HOME`) |
 | Process model | PID 1 is root so s6-overlay can start. The agent then runs as `hermes`. |
