@@ -51,6 +51,24 @@ def test_writes_a_reference_when_the_skill_directory_exists(tmp_path):
     assert "ignore previous" not in body.lower()
 
 
+def test_copies_the_connector_release_list_into_the_skill(tmp_path):
+    data = tmp_path / "mcp" / "asd-ism" / "data"
+    _catalog(data / "v2026.09.4", "ism-1173")
+    connector = {
+        "retrieved_on": "2026-11-17",
+        "releases": [{"tag_name": "v2026.09.4", "published_at": "2026-09-03T23:39:10Z"}],
+    }
+    (data / "releases.json").write_text(json.dumps(connector, indent=2) + "\n", encoding="utf-8")
+    references = tmp_path / "skills" / "ism-control-lookup" / "references"
+    references.mkdir(parents=True)
+    stale = dict(connector, retrieved_on="2026-10-18")
+    (references / "releases.json").write_text(json.dumps(stale), encoding="utf-8")
+    text = render_report(tmp_path)
+    shipped = references / "releases.json"
+    assert shipped.read_bytes() == (data / "releases.json").read_bytes()
+    assert "Skill references: copied skills/ism-control-lookup/references/releases.json" in text
+
+
 def test_checkout_report_does_not_create_skill_directories(tmp_path):
     before = sorted(path.name for path in (ROOT / "skills").iterdir())
     regen = ROOT / "mcp" / "asd-ism" / "data" / "regen.json"

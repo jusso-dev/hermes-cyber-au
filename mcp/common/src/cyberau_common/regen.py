@@ -256,6 +256,9 @@ def render_report(root: Path) -> str:
             continue
         reference = _write_reference(source, directory, skill_dir)
         lines.append(f"- Skill references: wrote {_relative(root, reference)}")
+        copied = _copy_release_list(source, directory, skill_dir)
+        if copied is not None:
+            lines.append(f"- Skill references: copied {_relative(root, copied)}")
     lines.append("")
     return "\n".join(lines)
 
@@ -370,6 +373,23 @@ def _write_reference(source: str, directory: Path, skill_dir: Path) -> Path:
     filename = "ism-releases.md" if source == "ism" else f"{source}.md"
     destination = references / filename
     destination.write_text(_reference_text(source, directory), encoding="utf-8")
+    return destination
+
+
+def _copy_release_list(source: str, directory: Path, skill_dir: Path) -> Path | None:
+    """Ship the connector's ISM release list with the skill, byte for byte.
+
+    The skill picks the release in force from this file, so its retrieval date
+    and rows must match the connector snapshot the regen step just refreshed.
+    """
+    if source != "ism":
+        return None
+    release_list = directory / "releases.json"
+    if not release_list.is_file() or not _within(directory, release_list):
+        return None
+    destination = skill_dir / "references" / "releases.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(release_list, destination)
     return destination
 
 
