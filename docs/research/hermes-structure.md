@@ -6,6 +6,10 @@ NousResearch/hermes-agent source and docs at commit `43faacfb8de7b29548547a7fbde
 Paths are relative to https://github.com/NousResearch/hermes-agent. Re-check them when
 the pinned Hermes version moves (see the Hermes bump workflow ticket).
 
+Automated structure checks re-run on 22 November 2026 against `v0.23.3`
+(commit `caafe5389ae585ef77387a962aee05b1bcf17029`): 72 checks passed, none failed.
+This checks referenced paths, symbols and strings, rather than every runtime behaviour.
+
 If a ticket says "verify", the behaviour was not confirmed in source and must be tested
 before code depends on it.
 
