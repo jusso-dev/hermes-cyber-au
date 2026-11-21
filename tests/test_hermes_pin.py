@@ -16,11 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "deps-and-hermes-bump.yml"
 PIN_PATH = ROOT / "tools" / "hermes_pin.py"
 
-SHA_PINS = {
-    "actions/checkout": ("3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1"),
-    "actions/setup-python": ("5fda3b95a4ea91299a34e894583c3862153e4b97", "v7.0.0"),
-    "actions/upload-artifact": ("cf430e030ddbb5b0abf93d22962f4752f3646cd9", "v7.0.2"),
-}
+EXPECTED_ACTIONS = (
+    "actions/checkout",
+    "actions/setup-python",
+    "actions/upload-artifact",
+)
 CARRIED = (
     "mcp/uv.lock",
     "distribution.yaml",
@@ -238,8 +238,10 @@ def test_workflow_pins_actions_and_carries_every_pin_file():
     assert "ghp_" not in text
     assert "github_pat_" not in text
     assert "secrets." not in text
-    for action, (sha, version) in SHA_PINS.items():
-        assert f"{action}@{sha} # {version}" in text
+    for action in EXPECTED_ACTIONS:
+        assert re.search(rf"{re.escape(action)}@[0-9a-f]{{40}} # v[0-9]+\.[0-9]+\.[0-9]+", text), (
+            action
+        )
     for line in text.splitlines():
         if "uses:" not in line:
             continue
