@@ -8,6 +8,20 @@ updates:
       time: "09:00"
       timezone: "Australia/Sydney"
     open-pull-requests-limit: 5
+    groups:
+      dev-minor-and-patch:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      production-patch:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+      production-minor:
+        dependency-type: "production"
+        update-types:
+          - "minor"
     ignore:
       # pysigma-backend-elasticsearch requires pysigma<2, so a pysigma 2.x
       # bump cannot resolve until the backends support it.
@@ -20,6 +34,13 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Australia/Sydney"
+    groups:
+      actions-patch:
+        update-types:
+          - "patch"
+      actions-minor:
+        update-types:
+          - "minor"
   - package-ecosystem: "docker"
     directory: "/docker"
     schedule:
@@ -27,6 +48,13 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Australia/Sydney"
+    groups:
+      docker-patch:
+        update-types:
+          - "patch"
+      docker-minor:
+        update-types:
+          - "minor"
   - package-ecosystem: "docker"
     directory: "/dashboard"
     schedule:
@@ -34,3 +62,10 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Australia/Sydney"
+    groups:
+      docker-patch:
+        update-types:
+          - "patch"
+      docker-minor:
+        update-types:
+          - "minor"

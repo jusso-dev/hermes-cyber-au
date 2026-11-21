@@ -37,15 +37,9 @@ class ValidateRepoTest(unittest.TestCase):
 
     def test_workflow_pins_actions_and_has_no_secret(self):
         text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7", text)
-        self.assertIn(
-            "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
-            text,
-        )
-        self.assertIn(
-            "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2",
-            text,
-        )
+        self.assertRegex(text, r"actions/checkout@[0-9a-f]{40} # v\d+")
+        self.assertRegex(text, r"actions/setup-python@[0-9a-f]{40} # v\d+")
+        self.assertRegex(text, r"actions/upload-artifact@[0-9a-f]{40} # v\d+")
         self.assertNotIn("secrets.", text)
         self.assertIn("tools/ci/validate_repo.py", text)
         self.assertIn("tools/ci/style_check.py", text)
