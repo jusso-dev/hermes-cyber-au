@@ -58,6 +58,9 @@ SOURCES: dict[str, Source] = {
 
 _SKIP_FILES = {"regen.json", ".DS_Store"}
 _DATE_KEYS = {"retrieved_on", "retrieved_at", "as_of", "data_as_of"}
+# Raw HTML page digests (such as cyber.gov.au and asd.gov.au responses) can vary
+# across fetches due to dynamic page chrome even when parsed guidance is unchanged.
+_VOLATILE_HTML_HASH_KEYS = {"launch_sha256"}
 _DATE_IN_NAME = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -161,8 +164,8 @@ def _fetch(source: str, directory: Path, *, keep: int, today: date | None) -> st
 
 
 def content_signature(directory: Path) -> str:
-    """Hash of the data with retrieval dates removed, so a re-fetch of the same
-    upstream content compares equal."""
+    """Hash of the data with retrieval dates and volatile HTML page hashes removed,
+    so a re-fetch of the same upstream content compares equal."""
     digest = hashlib.sha256()
     for path in sorted(directory.rglob("*")):
         if not path.is_file() or path.name in _SKIP_FILES:
@@ -207,7 +210,13 @@ def _without_dates(path: Path) -> bytes:
 
 def _strip(value):
     if isinstance(value, dict):
-        return {key: _strip(item) for key, item in value.items() if key not in _DATE_KEYS}
+        return {
+            key: _strip(item)
+            for key, item in value.items()
+            if key not in _DATE_KEYS
+            and key not in _VOLATILE_HTML_HASH_KEYS
+            and not (key == "source_sha256" and isinstance(item, str))
+        }
     if isinstance(value, list):
         return [_strip(item) for item in value]
     return value

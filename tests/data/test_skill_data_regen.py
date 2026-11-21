@@ -201,6 +201,49 @@ def test_fetch_restamps_unchanged_data_before_it_expires(tmp_path, capsys, monke
     assert [p.name for p in data.glob("obligations-*.json")] == ["obligations-2026-10-18.json"]
 
 
+def test_fetch_ignores_volatile_html_hashes_when_parsed_content_is_unchanged(
+    tmp_path, capsys, monkeypatch
+):
+    data = tmp_path / "mcp" / "au-regulatory" / "data"
+    data.mkdir(parents=True)
+
+    def write_snapshot(
+        directory: Path, day: str, page_hash: str, launch_hash: str, action: str
+    ) -> None:
+        for old in directory.glob("essentials-*.json"):
+            old.unlink()
+        payload = {
+            "retrieved_on": day,
+            "launch_sha256": launch_hash,
+            "chapters": {
+                "enterprise-it": {
+                    "source_sha256": page_hash,
+                    "actions": [{"action": action}],
+                }
+            },
+        }
+        (directory / f"essentials-{day}.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    write_snapshot(data, "2026-11-20", "a" * 64, "b" * 64, "Enable MFA")
+    _fake_connector(
+        monkeypatch,
+        lambda d: write_snapshot(d, "2026-11-21", "c" * 64, "d" * 64, "Enable MFA"),
+    )
+    assert regen.regenerate(tmp_path, "aureg", fetch=True, today=date(2026, 11, 21)) == 0
+    assert "upstream is unchanged" in capsys.readouterr().out
+    assert [p.name for p in data.glob("essentials-*.json")] == ["essentials-2026-11-20.json"]
+
+    _fake_connector(
+        monkeypatch,
+        lambda d: write_snapshot(
+            d, "2026-11-21", "c" * 64, "d" * 64, "Enable phishing-resistant MFA"
+        ),
+    )
+    assert regen.regenerate(tmp_path, "aureg", fetch=True, today=date(2026, 11, 21)) == 0
+    assert "upstream changed" in capsys.readouterr().out
+    assert [p.name for p in data.glob("essentials-*.json")] == ["essentials-2026-11-21.json"]
+
+
 def test_failed_fetch_leaves_the_shipped_data_alone(tmp_path, capsys, monkeypatch):
     data = tmp_path / "mcp" / "au-regulatory" / "data"
     data.mkdir(parents=True)
