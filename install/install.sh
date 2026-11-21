@@ -17,12 +17,12 @@ ALLOW_ROOT=0
 
 HERMES_INSTALL_URL=https://hermes-agent.nousresearch.com/install.sh
 # Pinned Hermes installer: the upstream scripts/install.sh at the commit the
-# v0.23.0 tag points to, checked against this SHA-256 before it runs. Keep
+# v0.23.2 tag points to, checked against this SHA-256 before it runs. Keep
 # HERMES_PIN_VERSION in step with tools/hermes_pin.txt. To refresh, download
 # the script at the new tag's commit and record its sha256sum here.
-HERMES_PIN_VERSION=v0.23.0
-HERMES_PIN_COMMIT=2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19
-HERMES_PIN_SHA256=abf338605dae6dd28d101673ac6aed7995c955745db46d47676bc591a7957209
+HERMES_PIN_VERSION=v0.23.2
+HERMES_PIN_COMMIT=ae2a81ccc00e9b7c06301523e5bb09608397149c
+HERMES_PIN_SHA256=c73dad4dcf7c9ecadb98578e28cc763d23d7be3fa1b513545319038795493214
 HERMES_PINNED_URL=https://raw.githubusercontent.com/NousResearch/hermes-agent/$HERMES_PIN_COMMIT/scripts/install.sh
 REPO_URL=https://github.com/jusso-dev/hermes-cyber-au.git
 
