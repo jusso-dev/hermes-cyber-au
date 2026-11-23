@@ -255,3 +255,101 @@ def test_dry_run_checks_the_key_but_does_not_send(tmp_path, capsys):
     (tmp_path / "secrets" / "email-api-key").chmod(0o644)
     assert email.main([*argv, "--dry-run"]) == 1
     assert "chmod 600" in capsys.readouterr().out
+
+
+OBLIGATIONS = ROOT / "mcp" / "au-regulatory" / "data"
+
+
+def _obligations() -> str:
+    return str(sorted(OBLIGATIONS.glob("obligations-*.json"))[-1])
+
+
+def test_marking_follows_the_email_protective_marking_standard(tmp_path):
+    config = _settings(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8") + "protective_marking: OFFICIAL:Sensitive\n",
+        encoding="utf-8",
+    )
+    settings = email.load_settings(config)
+    assert settings["marking"] == "OFFICIAL:Sensitive"
+    assert settings["origin"] == "briefing@example.com"
+    assert (
+        email.marking_header(settings["marking"], settings["origin"])
+        == "VER=2025.1, NS=gov.au, SEC=OFFICIAL:Sensitive, ORIGIN=briefing@example.com"
+    )
+    assert email.marked_subject("Brief", "OFFICIAL:Sensitive") == "Brief [SEC=OFFICIAL:Sensitive]"
+    # The body form has a space after the colon.
+    assert email.body_marking("OFFICIAL:Sensitive") == "OFFICIAL: Sensitive"
+    seen = {}
+
+    def post(url, body, headers):
+        seen.update(body=body)
+        return 200, '{"id": "m"}'
+
+    email.send(settings, "s", "h", "t", "id", post)
+    assert seen["body"]["headers"] == {
+        "X-Protective-Marking": "VER=2025.1, NS=gov.au, SEC=OFFICIAL:Sensitive,"
+        " ORIGIN=briefing@example.com"
+    }
+
+
+def test_classified_markings_are_refused(tmp_path):
+    config = _settings(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8") + "protective_marking: PROTECTED\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="protective_marking"):
+        email.load_settings(config)
+
+
+def test_no_marking_by_default(tmp_path):
+    settings = email.load_settings(_settings(tmp_path))
+    assert settings["marking"] is None
+    seen = {}
+    email.send(settings, "s", "h", "t", "id", lambda _u, b, _h: (seen.update(b=b), (200, "{}"))[1])
+    assert "headers" not in seen["b"]
+
+
+def test_render_marks_top_and_bottom_and_adds_reporting_clocks(tmp_path):
+    data = {
+        **BRIEF,
+        "act_today": {
+            "items": [
+                {
+                    "title": "Edge VPN",
+                    "ids": ["CVE-2026-0001"],
+                    "tag": "KEV due 21 Oct",
+                    "e8": "ML2: within 48 hours if an exploit exists",
+                    "audience": ["Commonwealth entities"],
+                    "summary": "Patch it [1].",
+                }
+            ]
+        },
+        "coverage": [{"name": "AusCERT", "status": "unavailable", "detail": "down"}],
+    }
+    page, text = email.render(
+        data,
+        "Tuesday 20 October 2026",
+        marking="OFFICIAL",
+        obligations=email.load_obligations(_obligations()),
+    )
+    lines = [line for line in text.splitlines() if line.strip()]
+    assert lines[0] == "OFFICIAL" and lines[-1] == "OFFICIAL"
+    assert page.count(">OFFICIAL</td>") == 2
+    assert "E8: ML2: within 48 hours" in page
+    assert "For: Commonwealth entities" in page
+    assert "AusCERT (unavailable)" in text
+    assert "1300 CYBER1" in text
+    # A zero count is shown, not left blank.
+    assert 'color:#6d28d9;">0</div>' in page
+    assert "12 hours: SOCI critical cyber incident" in text
+    assert "72 hours: Ransomware payment report" in text
+    # Act today comes before the ACSC section.
+    assert text.index("ACT TODAY") < text.index("ASD'S ACSC")
+
+
+def test_subject_counts_the_actions():
+    assert email.subject_line("Mon", BRIEF) == (
+        "Australian cyber briefing - Mon: nothing to act on, 1 new from ASD's ACSC"
+    )
+    assert email.subject_line("Mon", None) == "Australian cyber briefing - Mon"

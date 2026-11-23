@@ -53,6 +53,9 @@ fi
 
 args=(send "$work/out.txt" --date-label "$label" --day "$day" --config "$config"
   --watches "$work/watches.json")
+# Reporting clocks come from the reviewed au-regulatory snapshot, never from the model.
+obligations=$(ls "$profile"/mcp/au-regulatory/data/obligations-*.json 2> /dev/null | sort | tail -n 1)
+[[ -n $obligations ]] && args+=(--obligations "$obligations")
 [[ -n $failed ]] && args+=(--failed "$failed")
 # CYBERAU_EMAIL_DRY_RUN=1 runs everything except the send.
 [[ ${CYBERAU_EMAIL_DRY_RUN:-0} == 1 ]] && args+=(--dry-run)

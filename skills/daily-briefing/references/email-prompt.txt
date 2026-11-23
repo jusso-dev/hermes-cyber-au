@@ -8,7 +8,7 @@ Return ONLY one JSON object, no prose before or after, with exactly these keys:
   "headline": "1 to 2 sentences, with [n] source refs",
   "act_today": {
     "intro": "Proposal: ... (one sentence) or empty",
-    "items": [{"title": "product or issue", "ids": ["CVE-..."], "tag": "short tag e.g. KEV due 21 Oct", "summary": "one sentence with [n]"}],
+    "items": [{"title": "product or issue", "ids": ["CVE-..."], "tag": "short tag e.g. KEV due 21 Oct", "e8": "Essential Eight patch timeframe, or empty", "audience": ["who should read it"], "summary": "one sentence with [n]"}],
     "notes": ["short paragraphs, e.g. vendor action, what was not checked"]
   },
   "acsc": [{"feed": "alerts|advisories|threats|publications|news", "title": "item title", "published": "YYYY-MM-DD", "url": "https://www.cyber.gov.au/...", "summary": "one plain sentence on what it is and who should read it"}],
@@ -19,4 +19,10 @@ Return ONLY one JSON object, no prose before or after, with exactly these keys:
   "coverage": [{"name": "source name", "status": "checked|stale|partial|unavailable|not checked", "detail": "short detail"}],
   "sources": [{"n": 1, "text": "source name, version, retrieved date time", "links": [{"label": "short label", "url": "https://..."}]}]
 }
+Order act_today items most urgent first: ACSC alerts, then KEV, then the rest.
+
+For "e8": if mcp__e8__e8_requirements is available, call it once with strategy patch_applications and maturity_level 2 and give the timeframe its text states for an exploited vulnerability or the asset type, quoted briefly with the maturity level, e.g. "ML2: within 48 hours if an exploit exists". If the tool is not available or gives no timeframe, leave "e8" empty. Never type a timeframe from memory. A CISA KEV due date is a US federal date, not an Australian deadline: keep it in "tag" only.
+
+For "audience", choose from: "Commonwealth entities", "State and local government", "Critical infrastructure (SOCI)", "Businesses", "Individuals". Pick only those the source names or the affected product makes plain. Leave it empty when unsure.
+
 Use Australian English. No em dashes. Only cite facts a tool returned.

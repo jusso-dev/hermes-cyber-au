@@ -30,6 +30,8 @@ The gateway `email` target is a two-way mailbox channel and sends plain text. To
 2. Reads new watch hits from the intel store (`cyberau-mcp store watchlist hits`), 26 hours back or 74 on a Monday. Watch items come from the store, not the model.
 3. Renders HTML and text with `scripts/email_brief.py` and posts one message to a Resend-compatible API.
 
+The email opens with counts (items to act on, new ACSC items, watch hits, sources checked), names any stale or unreachable source, puts Act today first, and ends with SOCI, ransomware payment and NDB reporting clocks from the reviewed `au-regulatory` snapshot and the ASD reporting channel. Act today items carry an Essential Eight patch timeframe only when the `e8` connector returned one.
+
 If generation fails, it sends a short failure notice instead and the run is marked failed. Stdout is one line, such as `morning email sent (structured): <id>`. Set `CYBERAU_EMAIL_DRY_RUN=1` to run everything except the send.
 
 Setup on the profile:
@@ -43,4 +45,4 @@ hermes -p cyber-au cron create "30 7 * * *" --name "Morning cyber briefing email
   --script cyberau_morning_email.sh --no-agent --deliver local
 ```
 
-`email.yaml` holds `api_url` (https), `from`, `to` (one address or a list) and `key_file`. The key file must be readable by its owner only, or the send is refused. The key is sent once in a header and never printed. Keep the shipped `cyberau-morning-brief` agent job paused when this job delivers the briefing, so it does not run twice.
+`email.yaml` holds `api_url` (https), `from`, `to` (one address or a list) and `key_file`. Optional: `reply_to`, and `protective_marking` (`UNOFFICIAL`, `OFFICIAL` or `OFFICIAL:Sensitive`) for Australian Government recipients. A marking adds the EPMS 2025.1 subject suffix and `X-Protective-Marking` header, and shows the marking at the top and bottom of the body. PROTECTED and above are refused. The key file must be readable by its owner only, or the send is refused. The key is sent once in a header and never printed. Keep the shipped `cyberau-morning-brief` agent job paused when this job delivers the briefing, so it does not run twice.

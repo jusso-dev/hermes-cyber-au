@@ -75,10 +75,14 @@ class RateLimiter:
         finally:
             conn.close()
 
+    # The default clock is monotonic, which restarts at boot while this file persists.
+    # A stamp later than now is from before a restart, so it is dropped, not waited on.
     def _rolling(self, conn: sqlite3.Connection, key: str, *, rate: float, burst: int) -> float:
         now = self._clock()
         span = burst / rate
-        conn.execute("DELETE FROM rolling WHERE key = ? AND ts <= ?", (key, now - span))
+        conn.execute(
+            "DELETE FROM rolling WHERE key = ? AND (ts <= ? OR ts > ?)", (key, now - span, now)
+        )
         rows = conn.execute(
             "SELECT ts FROM rolling WHERE key = ? ORDER BY ts",
             (key,),
@@ -94,7 +98,7 @@ class RateLimiter:
             "SELECT tokens, updated FROM bucket WHERE key = ?",
             (key,),
         ).fetchone()
-        if row is None:
+        if row is None or row[1] > now:
             tokens, updated = float(burst), now
         else:
             tokens, updated = row

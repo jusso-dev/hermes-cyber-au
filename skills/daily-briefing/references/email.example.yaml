@@ -9,3 +9,16 @@ to:
   - security-team@example.com
 # The API key file, relative to this file. Keep it chmod 600.
 key_file: secrets/email-api-key
+# Optional. Where replies go (one address or a list).
+# reply_to: soc@example.com
+#
+# Optional. Australian Government Email Protective Marking Standard 2025 (EPMS).
+# One of UNOFFICIAL, OFFICIAL or OFFICIAL:Sensitive. When set, the subject ends with
+# [SEC=<marking>], an X-Protective-Marking header is added (VER=2025.1, NS=gov.au), and
+# the marking is shown at the top and bottom of the body. PROTECTED and above are refused:
+# they must not be sent through a commercial email API. Leave unset outside government.
+# The briefing is built from public sources, so OFFICIAL usually fits. Your entity's
+# security adviser decides.
+# protective_marking: OFFICIAL
+# ORIGIN in the header. Defaults to the address in `from`.
+# marking_origin: briefing@example.com

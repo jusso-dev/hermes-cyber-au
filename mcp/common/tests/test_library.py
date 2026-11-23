@@ -475,6 +475,21 @@ class TestLimiter:
         clock["t"] = 1.1
         limiter.acquire("nvd", rate=2, burst=2, window="rolling", timeout=0)
 
+    def test_clock_restart_does_not_block_forever(self, tmp_path: Path):
+        # time.monotonic restarts at boot; the sqlite file keeps the old, larger stamps.
+        clock = {"t": 500_000.0}
+        path = tmp_path / "r.sqlite"
+        limiter = RateLimiter(path, clock=lambda: clock["t"], sleeper=lambda _s: None)
+        for window in ("rolling", "bucket"):
+            limiter.acquire("asd", rate=1 / 3600, burst=1, window=window, timeout=0)
+            with pytest.raises(RateLimited):
+                limiter.acquire("asd", rate=1 / 3600, burst=1, window=window, timeout=0)
+        clock["t"] = 100.0
+        for window in ("rolling", "bucket"):
+            limiter.acquire("asd", rate=1 / 3600, burst=1, window=window, timeout=0)
+            with pytest.raises(RateLimited):
+                limiter.acquire("asd", rate=1 / 3600, burst=1, window=window, timeout=0)
+
     def test_two_processes_share_a_bucket(self, tmp_path: Path):
         path = tmp_path / "shared.sqlite"
         limiter = RateLimiter(path)
