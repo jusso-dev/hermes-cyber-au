@@ -14,6 +14,7 @@ distribution_owned:
   - scripts
   - plugins/cyber-au
   - install/bootstrap.sh
+  - install/render_config.py
   - mcp
   - feeds
   - playbooks

@@ -60,6 +60,13 @@ class DistributionSkeletonTest(unittest.TestCase):
         missing = [rel for rel in OWNED if not (ROOT / rel).exists()]
         self.assertEqual(missing, [])
 
+    def test_every_file_bootstrap_copies_is_distribution_owned(self):
+        # bootstrap.sh copies these from the profile's install/ directory. A profile update
+        # only refreshes owned paths, so an unowned helper is missing and bootstrap fails.
+        manifest = (ROOT / "distribution.yaml").read_text(encoding="utf-8").splitlines()
+        for name in ("bootstrap.sh", "render_config.py"):
+            self.assertIn(f"  - install/{name}", manifest)
+
     def test_manifest_declares_name_version_and_optional_keys(self):
         text = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
         self.assertIn("name: cyber-au\n", text)
