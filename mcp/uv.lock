@@ -63,6 +63,7 @@ members = [
     "cyberau-taxii-ctis",
     "cyberau-threatsieve",
     "cyberau-upguard",
+    "cyberau-vuln-feeds",
     "cyberau-workspace",
 ]
 
@@ -1315,6 +1316,17 @@ requires-dist = [
     { name = "cyberau-common", editable = "common" },
     { name = "cyberau-premium", editable = "premium" },
 ]
+
+[[package]]
+name = "cyberau-vuln-feeds"
+version = "0.1.0"
+source = { editable = "vuln-feeds" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
 
 [[package]]
 name = "cyberau-workspace"

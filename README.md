@@ -130,6 +130,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` | off: requires local setup | [docs/connectors/threatsieve.md](docs/connectors/threatsieve.md) |
 | UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [docs/connectors/upguard.md](docs/connectors/upguard.md) |
 | virustotal | `virustotal` | `VTAI_TOKEN` | off: licence terms | [docs/connectors/virustotal.md](docs/connectors/virustotal.md) |
+| Daily public vulnerability feeds: OSV, GitHub advisories, the CVE List, Exploit-DB, Metasploit | `vuln_feeds` | `GITHUB_DEPENDABOT_TOKEN` (optional) | on | [docs/connectors/vuln-feeds.md](docs/connectors/vuln-feeds.md) |
 <!-- connectors:end -->
 
 Full detail, including what was verified and when: [docs/research/connectors.md](docs/research/connectors.md).

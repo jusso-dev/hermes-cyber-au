@@ -257,13 +257,14 @@ feeds:
     enabled_by_default: true
     poll: PT1H
     refresh: nvd
-    refresh_supported: false
+    refresh_supported: true
     licence: Public domain (17 USC). NVD API terms of use notice required.
     region: global
     notes: >-
       Search is cached for 1 hour, CVE and history lookups for 1 day. The
       connector works without a key, but servers.yaml lists NVD_API_KEY in
       required_env, so render_config disables the server when it is unset.
+      The daily refresh reads CVEs NVD scores Critical or High and sends no key.
 
   - id: cve-program
     name: CVE Program records
@@ -566,6 +567,160 @@ feeds:
     licence: Each feed's publisher terms. The shipped microsoft-security pack is Microsoft content under the Microsoft Terms of Use.
     region: global
     notes: Generic reader for the feeds turned on in watchlists.yaml. Nothing is fetched until a pack or feed is listed there. URLs are the shipped microsoft-security pack.
+
+  - id: osv-recent
+    name: OSV malicious packages and dependency scan
+    connector: vuln-feeds
+    server: vuln_feeds
+    url: https://osv-vulnerabilities.storage.googleapis.com/npm/modified_id.csv
+    urls:
+      - https://osv-vulnerabilities.storage.googleapis.com/npm/modified_id.csv
+      - https://osv-vulnerabilities.storage.googleapis.com/PyPI/modified_id.csv
+      - https://osv-vulnerabilities.storage.googleapis.com/crates.io/modified_id.csv
+      - https://osv-vulnerabilities.storage.googleapis.com/RubyGems/modified_id.csv
+      - https://api.osv.dev/v1/vulns
+      - https://api.osv.dev/v1/querybatch
+    format: csv
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    refresh: osv
+    refresh_supported: true
+    licence: Per record. Each record's database_specific source and licence fields are kept.
+    region: global
+    notes: >-
+      MAL- records from the OSV bucket index (newest first, read with a byte
+      range), plus an OSV-Scanner style scan of the asset inventory purls.
+      Only ecosystem, package name and version are sent to api.osv.dev.
+
+  - id: ghsa-public
+    name: GitHub Advisory Database (public REST)
+    connector: vuln-feeds
+    server: vuln_feeds
+    url: https://api.github.com/advisories
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    refresh: ghsa
+    refresh_supported: true
+    licence: CC BY 4.0. Attribute the GitHub Advisory Database.
+    region: global
+    notes: >-
+      Reviewed and malware advisories published in the window, unauthenticated
+      (60 requests an hour, two to six used per run). The github-advisories entry is
+      the keyed MCP wrap.
+
+  - id: cvelist-recent
+    name: CVE List (cvelistV5) new records
+    connector: vuln-feeds
+    server: vuln_feeds
+    url: https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/deltaLog.json
+    urls:
+      - https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/deltaLog.json
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: P1D
+    refresh: cvelist
+    refresh_supported: true
+    licence: CVE Terms of Use. Keep MITRE's copyright designation.
+    region: global
+    notes: >-
+      Reads the start of the delta log with a byte range, then up to 150 new
+      record files from raw.githubusercontent.com.
+
+  - id: exploit-db
+    name: Exploit-DB
+    connector: vuln-feeds
+    server: vuln_feeds
+    url: https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv
+    format: csv
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT6H
+    refresh: exploitdb
+    refresh_supported: true
+    licence: GPL-2.0 for the exploitdb repository (its README). Each exploit keeps its author's rights.
+    region: global
+    notes: >-
+      Reads the exploit index CSV and keeps rows added in the window. Only
+      index rows are read, never exploit files.
+
+  - id: metasploit
+    name: Metasploit module metadata
+    connector: vuln-feeds
+    server: vuln_feeds
+    url: https://raw.githubusercontent.com/rapid7/metasploit-framework/master/db/modules_metadata_base.json
+    format: json
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: true
+    poll: PT6H
+    refresh: metasploit
+    refresh_supported: true
+    licence: BSD 3-clause (Metasploit Framework, Rapid7).
+    region: global
+    notes: Module metadata only. Exploit modules, and modules naming a CVE, changed in the window.
+
+  - id: github-dependabot
+    name: Dependabot alerts on the owner's repositories
+    connector: vuln-feeds
+    server: null
+    url: https://api.github.com/repos/{owner}/{repo}/dependabot/alerts
+    format: json
+    auth: {type: bearer, env: GITHUB_DEPENDABOT_TOKEN}
+    keyed: true
+    enabled_by_default: false
+    poll: P1D
+    licence: The owner's own data. GitHub Terms of Service apply.
+    region: global
+    notes: >-
+      Opt-in. Repositories and a chmod 600 token file are named in
+      dependabot.yaml in the profile data directory. Run with
+      `cyberau-mcp refresh --sources dependabot --store`. Answers are never
+      cached. GITHUB_DEPENDABOT_TOKEN is not in .env.template.
+
+  - id: cve-now
+    name: cve.now critical vulnerabilities
+    connector: custom-feeds
+    server: null
+    url: https://cve.now/feed?filter=critical
+    format: rss
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: false
+    poll: PT1H
+    refresh: vulnfeeds
+    refresh_supported: true
+    licence: Summaries CC BY 4.0. Uses NVD data, not endorsed by NVD.
+    region: global
+    notes: >-
+      Read through the shipped vuln-feeds pack of the custom-feeds connector,
+      with no watchlists.yaml entry needed. The critical filter is KEV,
+      CERT-rated critical, or CVSS 9 and above in widely used software.
+      Summaries are model written.
+
+  - id: pwn-watch
+    name: pwn.watch live security incidents
+    connector: custom-feeds
+    server: null
+    url: https://pwn.watch/feed.xml
+    format: rss
+    auth: {type: none}
+    keyed: false
+    enabled_by_default: false
+    poll: PT1H
+    licence: Not stated. The site says its endpoints need no auth and set no rate limits.
+    region: global
+    notes: >-
+      Read through the shipped vuln-feeds pack. One item per incident, latest
+      50. An incident's item keeps its id when the incident changes, so a
+      change does not repeat in the digest.
 
   - id: cloudflare-radar
     name: Cloudflare Radar API

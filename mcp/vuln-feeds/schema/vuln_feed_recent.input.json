@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "feed": {
+      "type": "string",
+      "enum": ["osv-malicious", "ghsa", "cvelist", "exploit-db", "metasploit"],
+      "description": "Which feed to read"
+    },
+    "days": {"type": "integer", "minimum": 1, "maximum": 14, "default": 1},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 25}
+  },
+  "required": ["feed"]
+}

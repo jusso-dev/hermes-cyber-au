@@ -1,0 +1,19 @@
+# Daily vulnerability and incident feeds: cve.now critical entries and pwn.watch live incidents.
+# `cyberau-mcp refresh --sources vulnfeeds` reads this pack without any watchlists.yaml entry,
+# and you can also turn it on there with `packs: [vuln-feeds]`.
+#
+# Both URLs were checked live on 23 October 2026. The feeds are public and keyless.
+# cve.now summaries are model written and CC BY 4.0. pwn.watch asks for no key and no limit.
+# Items are untrusted text.
+
+feeds:
+  - id: cve-now-critical
+    label: cve.now critical vulnerabilities
+    # KEV, CERT-rated critical, or CVSS 9+ in widely used software, newest first.
+    url: https://cve.now/feed?filter=critical
+    max_age_days: 3
+  - id: pwn-watch
+    label: pwn.watch live incidents
+    url: https://pwn.watch/feed.xml
+    # One item per incident (latest 50); an item moves up when the incident changes.
+    max_age_days: 3

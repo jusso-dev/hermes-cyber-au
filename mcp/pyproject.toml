@@ -10,7 +10,7 @@ dependencies = ["cyberau-common", "cyberau-premium", "cyberau-crowdstrike-recon"
 analytics = ["duckdb>=1.1,<3"]
 
 [tool.uv.workspace]
-members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "asd-essentials", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert", "cloudflare-radar", "cloudflare-urlscanner", "custom-feeds", "crtsh", "github-advisories", "greynoise", "hibp", "irap", "misp", "mitre-attack", "ncsc-nz", "opencti", "openphish", "osv", "phishtank", "pspf", "ransomware-live", "scamwatch", "shodan-internetdb", "sigma", "spamhaus-drop", "taxii-ctis", "threatsieve", "hindsight", "premium", "crowdstrike-recon", "darkowl", "flare", "flashpoint", "google-ti-dtm", "hudson-rock", "intel471", "recorded-future", "socradar", "spycloud", "upguard", "cve-program"]
+members = ["common", "cisa-kev", "first-epss", "nvd", "asd-acsc", "asd-ism", "asd-essentials", "datagov-au", "org-exposure", "abusech", "abuseipdb", "otx", "asd-blueprint", "au-regulatory", "auscert", "cloudflare-radar", "cloudflare-urlscanner", "custom-feeds", "crtsh", "github-advisories", "greynoise", "hibp", "irap", "misp", "mitre-attack", "ncsc-nz", "opencti", "openphish", "osv", "phishtank", "pspf", "ransomware-live", "scamwatch", "shodan-internetdb", "sigma", "spamhaus-drop", "taxii-ctis", "threatsieve", "hindsight", "premium", "crowdstrike-recon", "darkowl", "flare", "flashpoint", "google-ti-dtm", "hudson-rock", "intel471", "recorded-future", "socradar", "spycloud", "upguard", "cve-program", "vuln-feeds"]
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
@@ -50,6 +50,7 @@ testpaths = [
   "auscert/tests",
   "cloudflare-urlscanner/tests",
   "custom-feeds/tests",
+  "vuln-feeds/tests",
   "crtsh/tests",
   "github-advisories/tests",
   "greynoise/tests",

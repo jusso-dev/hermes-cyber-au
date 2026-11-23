@@ -1,0 +1,4 @@
+[
+  {"number":7,"state":"open","html_url":"https://github.com/example/app/security/dependabot/7","created_at":"2026-10-22T05:00:00Z","security_advisory":{"ghsa_id":"GHSA-aaaa-bbbb-cccc","cve_id":"CVE-2026-1111","summary":"Path traversal in example-web","severity":"high"},"security_vulnerability":{"package":{"ecosystem":"npm","name":"example-web"},"first_patched_version":{"identifier":"2.0.1"}}},
+  {"number":8,"state":"dismissed","html_url":"https://github.com/example/app/security/dependabot/8","created_at":"2026-10-22T05:00:00Z","security_advisory":{"ghsa_id":"GHSA-zzzz-zzzz-zzzz","summary":"Dismissed","severity":"high"},"security_vulnerability":{"package":{"name":"other"}}}
+]

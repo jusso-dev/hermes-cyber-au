@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["feeds"],
+  "properties": {
+    "feeds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["feed", "source"],
+        "properties": {
+          "feed": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      }
+    }
+  }
+}

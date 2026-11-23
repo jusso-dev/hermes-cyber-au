@@ -7,8 +7,9 @@
 # is delivered verbatim, so a credential printed by a fault would leave the
 # machine. Keyed sources stay on agent jobs, where each MCP server receives
 # its keys from mcp_servers.*.env. This script refreshes keyless sources only
-# (asd, kev, epss, auscert, the public Feodo list, and the public custom feeds
-# turned on in watchlists.yaml).
+# (asd, kev, epss, auscert, the public Feodo list, the public custom feeds turned
+# on in watchlists.yaml, and the daily vulnerability feeds: osv, ghsa, cvelist, nvd,
+# exploitdb, metasploit and vulnfeeds).
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=_cyberau_lib.sh
 source "$(dirname -- "${BASH_SOURCE[0]}")/_cyberau_lib.sh"

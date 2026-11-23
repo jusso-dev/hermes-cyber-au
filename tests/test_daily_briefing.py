@@ -240,6 +240,35 @@ class DailyBriefingTest(unittest.TestCase):
         self.assertIn("Microsoft security changes: 1 new item.", external)
         self.assertNotIn("updates.example", external)
 
+    def test_vulnerability_digest_rows_follow_their_rank(self):
+        pack = json.loads(json.dumps(self.pack))
+        hits = pack["connectors"]["intel-store"]["envelope"]["data"]["hits"]
+        for ident, value, published, rank in (
+            ("vuln-a", "Newest but ranked last", "2026-10-19T08:00:00Z", 2),
+            ("vuln-b", "Oldest but ranked first", "2026-10-18T08:00:00Z", 1),
+        ):
+            hits.append(
+                {
+                    "id": ident,
+                    "kind": "advisory digest",
+                    "value": value,
+                    "seen": "2026-10-19T18:00:00Z",
+                    "watch": "Critical and high vulnerabilities",
+                    "source": "nvd",
+                    "url": "https://nvd.example/x",
+                    "published": published,
+                    "rank": rank,
+                }
+            )
+        text = briefing.render(
+            pack,
+            self.assets,
+            datetime.fromisoformat(TUESDAY),
+            "full",
+            inventory_configured=True,
+        )
+        self.assertLess(text.index("Oldest but ranked first"), text.index("Newest but ranked last"))
+
     def test_brief_stays_under_600_words_when_the_window_is_busy(self):
         title = " ".join(["synthetic"] * 30)
         alerts = [

@@ -812,6 +812,9 @@ def _watch_bullets(watched: dict[str, list[dict]], channel: str, limit: int | No
     bullets: list[Bullet] = []
     for title in sorted(watched):
         rows = sorted(watched[title], key=lambda row: str(row.get("published") or ""), reverse=True)
+        # The vulnerability digest ranks its rows, most urgent first. Rows with no rank keep
+        # their date order, because the sort is stable.
+        rows.sort(key=lambda row: row["rank"] if isinstance(row.get("rank"), int) else 10**6)
         if channel != "owner":
             noun = "item" if len(rows) == 1 else "items"
             bullets.append(Bullet(f"watch-{title}", f"{title}: {len(rows)} new {noun}."))

@@ -154,7 +154,9 @@ def test_url_hosts_are_allowlisted_for_the_connector(feeds, allowlist):
 def test_supported_refresh_sources_are_keyless(feeds):
     for feed in feeds:
         if feed.get("refresh_supported"):
-            assert feed["auth"]["type"] == "none", feed["id"]
+            auth = feed["auth"]
+            # A key that only raises a limit may be optional. The refresh never sends one.
+            assert auth["type"] == "none" or auth.get("optional"), feed["id"]
 
 
 def test_catalogue_holds_no_secret_values():

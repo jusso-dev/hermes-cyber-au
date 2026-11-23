@@ -28,6 +28,7 @@ from pathlib import Path
 
 import idna
 
+from . import vuln_digest
 from .canonical import canonical_timestamp, utc_now, utc_stamp
 from .db import fts_rowid, open_store, resolve_db_path
 from .paths import configured_data_dir
@@ -1030,7 +1031,11 @@ def _watch_details(store: str | Path | None, refs: list[str]) -> dict[str, dict]
 
 
 def hits(*, store: str | Path | None = None, since: str) -> dict:
-    """Matches since ``since`` in the daily-briefing intel-store ``hits`` shape."""
+    """Matches since ``since`` in the daily-briefing intel-store ``hits`` shape.
+
+    The new vulnerability feed items (see ``vuln_digest``) are listed after the matches, each
+    under its group name as a ``watch``.
+    """
     rows = list_matches(store=store, since=since)
     details = _watch_details(store, [row["ref"] for row in rows if row["list"] == WATCH_LIST])
     out = []
@@ -1052,6 +1057,7 @@ def hits(*, store: str | Path | None = None, since: str) -> dict:
             hit["watch"] = row["value"]
             hit.update(details.get(row["ref"], {}))
         out.append(hit)
+    out.extend(vuln_digest.hits(store=store, since=since))
     out.sort(key=lambda item: (item["seen"], item["id"]))
     return {
         "source": "intel-store",

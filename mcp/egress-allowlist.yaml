@@ -60,8 +60,19 @@ connectors:
   custom-feeds:
     hosts:
     - api.msrc.microsoft.com
+    - cve.now
+    - pwn.watch
     - techcommunity.microsoft.com
     - www.microsoft.com
+    allow_ip_literals: false
+    allow_http_loopback: false
+  vuln-feeds:
+    hosts:
+    - api.github.com
+    - api.osv.dev
+    - gitlab.com
+    - osv-vulnerabilities.storage.googleapis.com
+    - raw.githubusercontent.com
     allow_ip_literals: false
     allow_http_loopback: false
   cloudflare-radar:

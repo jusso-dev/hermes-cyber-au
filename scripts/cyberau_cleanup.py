@@ -22,6 +22,7 @@ SCRIPT_JOBS = (
     "cyberau-ingest-kev",
     "cyberau-ingest-epss",
     "cyberau-ingest-custom",
+    "cyberau-ingest-vuln",
     "cyberau-software-watch-local",
     "cyberau-store-expire",
     "cyberau-watchlist",

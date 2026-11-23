@@ -232,7 +232,26 @@ FEED_LABELS = {
     "feed-ms-defender-xdr-blog": "Defender XDR blog",
     "feed-ms-defender-endpoint-blog": "Defender for Endpoint blog",
     "feed-ms-defender-cloud-blog": "Defender for Cloud blog",
+    "feed-cve-now-critical": "cve.now",
+    "feed-pwn-watch": "pwn.watch",
+    "osv-mal": "OSV malicious packages",
+    "osv-scan": "OSV dependency scan",
+    "ghsa": "GitHub Advisory Database",
+    "cvelist": "CVE List",
+    "nvd": "NVD",
+    "exploit-db": "Exploit-DB",
+    "metasploit": "Metasploit",
+    "dependabot": "Dependabot",
 }
+# The groups the intel store's vulnerability digest adds, in the order they are shown. They
+# come first, ahead of the user's own watches.
+DIGEST_GROUPS = (
+    "Public exploits",
+    "Malicious packages",
+    "Critical and high vulnerabilities",
+    "Live incidents",
+    "Your dependencies",
+)
 
 
 def load_watches(path: str | None) -> list[dict]:
@@ -254,6 +273,8 @@ def plain(value) -> str:
 
 def feed_label(source) -> str:
     key = str(source or "")
+    if "+" in key:  # a merged row names every feed that reported it
+        return ", ".join(feed_label(part) for part in key.split("+"))
     if key in FEED_LABELS:
         return FEED_LABELS[key]
     return key.removeprefix("feed-").replace("-", " ").capitalize()
@@ -261,12 +282,19 @@ def feed_label(source) -> str:
 
 def watch_sections(hits: list[dict], text: list) -> str:
     out = ""
-    for title in sorted({plain(hit["watch"]) for hit in hits}):
+    titles = sorted(
+        {plain(hit["watch"]) for hit in hits},
+        key=lambda name: (DIGEST_GROUPS.index(name) if name in DIGEST_GROUPS else 99, name),
+    )
+    for title in titles:
         group = sorted(
             (hit for hit in hits if plain(hit["watch"]) == title),
             key=lambda hit: str(hit.get("published") or hit.get("seen") or ""),
             reverse=True,
         )
+        # The digest ranks its rows, most urgent first. A stable sort keeps date order within
+        # a rank, and rows with no rank (a user's own watch) stay in date order.
+        group.sort(key=lambda hit: hit["rank"] if isinstance(hit.get("rank"), int) else 10**6)
         inner = ""
         text.append(title.upper())
         for hit in group:
@@ -291,9 +319,13 @@ def watch_sections(hits: list[dict], text: list) -> str:
             text.append(f"- {plain(hit.get('value'))} ({source}, {day})")
             if url:
                 text.append(f"    {url}")
+        note = (
+            "New in the public vulnerability feeds since the last briefing."
+            if title in DIGEST_GROUPS
+            else "Matched by a watch over public feeds."
+        )
         inner += p(
-            "Matched by a watch over public feeds. Feed text is untrusted; read the source before"
-            " acting.",
+            f"{note} Feed text is untrusted; read the source before acting.",
             size=12,
             colour="#6b7280",
         )

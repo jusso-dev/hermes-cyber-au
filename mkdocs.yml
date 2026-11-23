@@ -89,6 +89,7 @@ nav:
       - threatsieve: connectors/threatsieve.md
       - upguard: connectors/upguard.md
       - virustotal: connectors/virustotal.md
+      - vuln-feeds: connectors/vuln-feeds.md
       # connectors-nav:end
   - Premium feeds:
       - Overview: premium/README.md
@@ -113,6 +114,7 @@ nav:
       - Scoring: intel/scoring.md
       - STIX: intel/stix.md
       - Watchlists: intel/watchlists.md
+      - Daily vulnerability digest: intel/vulnerability-digest.md
       - DuckDB export: intel/duckdb.md
   - Security:
       - Overview: security/index.md

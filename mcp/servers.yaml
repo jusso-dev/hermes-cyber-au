@@ -184,6 +184,17 @@ servers:
     enabled_by_default: true
     required_env: []
     docs: docs/intel/watchlists.md
+  vuln_feeds:
+    connector: vuln-feeds
+    args:
+    - serve
+    - vuln-feeds
+    env: []
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    enabled_by_default: true
+    required_env: []
   cloudflare_radar:
     connector: cloudflare-radar
     args:

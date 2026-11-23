@@ -125,7 +125,9 @@ def _script_job(job_id: str, name: str, feed: str, schedule: dict) -> dict:
     }
 
 
-FEEDS = ("asd", "auscert", "feodo", "kev", "epss", "custom")
+FEEDS = ("asd", "auscert", "feodo", "kev", "epss", "custom", "vuln")
+# The daily vulnerability job refreshes several keyless sources in one run.
+FEED_SOURCES = {"vuln": "osv,ghsa,cvelist,nvd,exploitdb,metasploit,vulnfeeds"}
 SCRIPTS = (
     "cyberau_ingest.sh",
     *(f"cyberau_ingest_{feed}.sh" for feed in FEEDS),
@@ -154,6 +156,12 @@ EXPECTED = [
     _script_job("cyberau-ingest-epss", "Ingest EPSS for KEV CVEs", "epss", _interval(720)),
     _script_job(
         "cyberau-ingest-custom", "Ingest custom feeds for watches", "custom", _interval(360)
+    ),
+    _script_job(
+        "cyberau-ingest-vuln",
+        "Ingest the daily vulnerability feeds",
+        "vuln",
+        _cron("30 6 * * *"),
     ),
     {
         "id": "cyberau-morning-brief",
@@ -499,8 +507,9 @@ class RoutineCronJobsTest(unittest.TestCase):
                 _plant_cli(home, 'printf \'%s\\n\' "$*" >> "$HERMES_HOME/calls"\nexit 0\n')
                 result = _run_script(home, f"cyberau_ingest_{feed}.sh")
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, f"ingest ok: {feed}\n")
-                expected = f"refresh --sources {feed} --store"
+                sources = FEED_SOURCES.get(feed, feed)
+                self.assertEqual(result.stdout, f"ingest ok: {sources}\n")
+                expected = f"refresh --sources {sources} --store"
                 if feed == "kev":
                     expected += f" --kev-snapshot {home}/plugin-data/cyber-au/snapshots/kev.json"
                 self.assertEqual((home / "calls").read_text(encoding="utf-8"), expected + "\n")

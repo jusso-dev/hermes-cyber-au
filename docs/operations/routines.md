@@ -1,6 +1,6 @@
 # Shipped routines
 
-Installing this distribution adds thirteen cron jobs: five feed refreshes that run all day, three agent routines, a local software check, two nightly store jobs, the weekly maintenance job and the premium exposure watch. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
+Installing this distribution adds fourteen cron jobs: five feed refreshes that run all day, a daily vulnerability feed refresh, three agent routines, a local software check, two nightly store jobs, the weekly maintenance job and the premium exposure watch. `cron/jobs.json` holds the definition of each job (name, schedule, prompt or script, skills, delivery). It does not set `enabled`, `state`, `paused_at`, or `paused_reason`.
 
 On a new install, Hermes stores every new job id as paused. Bootstrap then enables the two local maintenance jobs once: `cyberau-store-expire` and `cyberau-store-maintenance`. They need no model or API key. Other jobs stay paused. On an update, Hermes refreshes definitions and preserves pause choices. See [automatic cleanup](cleanup.md) for retention defaults and protected data.
 
@@ -14,6 +14,7 @@ Times follow `timezone: Australia/Sydney` in `config.yaml`.
 | `cyberau-ingest-feodo` | Ingest Feodo Tracker C2 list | every 60 minutes | `local` |
 | `cyberau-ingest-kev` | Ingest CISA KEV | every 360 minutes | `local` |
 | `cyberau-ingest-epss` | Ingest EPSS for KEV CVEs | every 720 minutes | `local` |
+| `cyberau-ingest-vuln` | Ingest the daily vulnerability feeds | 06:30 every day (`30 6 * * *`) | `local` |
 | `cyberau-morning-brief` | Morning cyber briefing (AU) | 07:30 every day (`30 7 * * *`) | `origin` |
 | `cyberau-kev-watch` | Software vulnerability watch | every 360 minutes | `origin` |
 | `cyberau-software-watch-local` | Local software KEV candidate check | every 360 minutes | `local` |

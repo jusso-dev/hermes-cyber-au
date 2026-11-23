@@ -1,0 +1,6 @@
+{
+  "exploit_multi_http_example_rce": {"name":"Example Gateway Auth Bypass RCE","fullname":"exploit/multi/http/example_rce","rank":600,"disclosure_date":"2026-10-20","type":"exploit","references":["CVE-2026-2222","URL-https://example.com"],"mod_time":"2026-10-22 17:52:59 +0000","path":"/modules/exploits/multi/http/example_rce.rb"},
+  "auxiliary_scanner_example_check": {"name":"Example Scanner","fullname":"auxiliary/scanner/example_check","rank":300,"disclosure_date":"2026-10-20","type":"auxiliary","references":["CVE-2026-2222"],"mod_time":"2026-10-22 18:00:00 +0000"},
+  "auxiliary_scanner_no_cve": {"name":"No CVE Scanner","fullname":"auxiliary/scanner/no_cve","rank":300,"type":"auxiliary","references":[],"mod_time":"2026-10-22 18:00:00 +0000"},
+  "exploit_old_module": {"name":"Old Module","fullname":"exploit/old/module","rank":300,"type":"exploit","references":["CVE-2010-0001"],"mod_time":"2026-10-01 00:00:00 +0000"}
+}

@@ -127,7 +127,7 @@ Source: https://services.nvd.nist.gov/rest/json/cves/2.0
 
 Terms: Public domain (17 USC). NVD API terms of use notice required.
 
-Search is cached for 1 hour, CVE and history lookups for 1 day. The connector works without a key, but servers.yaml lists NVD_API_KEY in required_env, so render_config disables the server when it is unset.
+Search is cached for 1 hour, CVE and history lookups for 1 day. The connector works without a key, but servers.yaml lists NVD_API_KEY in required_env, so render_config disables the server when it is unset. The daily refresh reads CVEs NVD scores Critical or High and sends no key.
 
 ## CVE Program records (cve-program)
 
@@ -294,6 +294,86 @@ Source: https://api.msrc.microsoft.com/update-guide/rss
 Terms: Each feed's publisher terms. The shipped microsoft-security pack is Microsoft content under the Microsoft Terms of Use.
 
 Generic reader for the feeds turned on in watchlists.yaml. Nothing is fetched until a pack or feed is listed there. URLs are the shipped microsoft-security pack.
+
+## OSV malicious packages and dependency scan (osv-recent)
+
+Connector: `vuln-feeds`. Default: on.
+
+Source: https://osv-vulnerabilities.storage.googleapis.com/npm/modified_id.csv
+
+Terms: Per record. Each record's database_specific source and licence fields are kept.
+
+MAL- records from the OSV bucket index (newest first, read with a byte range), plus an OSV-Scanner style scan of the asset inventory purls. Only ecosystem, package name and version are sent to api.osv.dev.
+
+## GitHub Advisory Database (public REST) (ghsa-public)
+
+Connector: `vuln-feeds`. Default: on.
+
+Source: https://api.github.com/advisories
+
+Terms: CC BY 4.0. Attribute the GitHub Advisory Database.
+
+Reviewed and malware advisories published in the window, unauthenticated (60 requests an hour, two to six used per run). The github-advisories entry is the keyed MCP wrap.
+
+## CVE List (cvelistV5) new records (cvelist-recent)
+
+Connector: `vuln-feeds`. Default: on.
+
+Source: https://raw.githubusercontent.com/CVEProject/cvelistV5/main/cves/deltaLog.json
+
+Terms: CVE Terms of Use. Keep MITRE's copyright designation.
+
+Reads the start of the delta log with a byte range, then up to 150 new record files from raw.githubusercontent.com.
+
+## Exploit-DB (exploit-db)
+
+Connector: `vuln-feeds`. Default: on.
+
+Source: https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv
+
+Terms: GPL-2.0 for the exploitdb repository (its README). Each exploit keeps its author's rights.
+
+Reads the exploit index CSV and keeps rows added in the window. Only index rows are read, never exploit files.
+
+## Metasploit module metadata (metasploit)
+
+Connector: `vuln-feeds`. Default: on.
+
+Source: https://raw.githubusercontent.com/rapid7/metasploit-framework/master/db/modules_metadata_base.json
+
+Terms: BSD 3-clause (Metasploit Framework, Rapid7).
+
+Module metadata only. Exploit modules, and modules naming a CVE, changed in the window.
+
+## Dependabot alerts on the owner's repositories (github-dependabot)
+
+Connector: `vuln-feeds`. Default: off.
+
+Source: https://api.github.com/repos/{owner}/{repo}/dependabot/alerts
+
+Terms: The owner's own data. GitHub Terms of Service apply.
+
+Opt-in. Repositories and a chmod 600 token file are named in dependabot.yaml in the profile data directory. Run with `cyberau-mcp refresh --sources dependabot --store`. Answers are never cached. GITHUB_DEPENDABOT_TOKEN is not in .env.template.
+
+## cve.now critical vulnerabilities (cve-now)
+
+Connector: `custom-feeds`. Default: off.
+
+Source: https://cve.now/feed?filter=critical
+
+Terms: Summaries CC BY 4.0. Uses NVD data, not endorsed by NVD.
+
+Read through the shipped vuln-feeds pack of the custom-feeds connector, with no watchlists.yaml entry needed. The critical filter is KEV, CERT-rated critical, or CVSS 9 and above in widely used software. Summaries are model written.
+
+## pwn.watch live security incidents (pwn-watch)
+
+Connector: `custom-feeds`. Default: off.
+
+Source: https://pwn.watch/feed.xml
+
+Terms: Not stated. The site says its endpoints need no auth and set no rate limits.
+
+Read through the shipped vuln-feeds pack. One item per incident, latest 50. An incident's item keeps its id when the incident changes, so a change does not repeat in the digest.
 
 ## Cloudflare Radar API (cloudflare-radar)
 

@@ -1,0 +1,5 @@
+[
+  {"ghsa_id":"GHSA-aaaa-bbbb-cccc","cve_id":"CVE-2026-1111","html_url":"https://github.com/advisories/GHSA-aaaa-bbbb-cccc","summary":"Path traversal in example-web","type":"reviewed","severity":"high","published_at":"2026-10-22T20:00:00Z","withdrawn_at":null,"cvss":{"score":8.1},"epss":{"percentage":0.0123},"vulnerabilities":[{"package":{"ecosystem":"npm","name":"example-web"}}]},
+  {"ghsa_id":"GHSA-dddd-eeee-ffff","cve_id":null,"html_url":"https://github.com/advisories/GHSA-dddd-eeee-ffff","summary":"Withdrawn thing","type":"reviewed","severity":"low","published_at":"2026-10-22T19:00:00Z","withdrawn_at":"2026-10-22T21:00:00Z","vulnerabilities":[]},
+  {"ghsa_id":"GHSA-old1-old2-old3","cve_id":"CVE-2026-0001","html_url":"https://github.com/advisories/GHSA-old1-old2-old3","summary":"Published before the window","type":"reviewed","severity":"critical","published_at":"2026-10-20T01:00:00Z","withdrawn_at":null,"vulnerabilities":[]}
+]

@@ -113,6 +113,19 @@ def available_packs() -> list[str]:
     return sorted(path.stem for path in folder.glob("*.yaml") if _ID.fullmatch(path.stem))
 
 
+def shipped_pack_feeds(name: str) -> tuple[list[Feed], list[str]]:
+    """The feeds of one shipped pack, whether or not watchlists.yaml turns it on."""
+    warnings: list[str] = []
+    pack_file = packs_dir() / f"{name}.yaml"
+    if not _ID.fullmatch(name) or not pack_file.is_file():
+        return [], [f"pack {name} is not available"]
+    try:
+        pack = _read(pack_file, f"pack {name}")
+    except ConfigError as exc:
+        return [], [str(exc)]
+    return _feeds(pack.get("feeds"), f"pack {name} feeds", warnings, name), warnings
+
+
 def load_config(path: str | Path | None = None) -> Config:
     """Read feeds and watches. A missing file is an empty config."""
     file = config_path(path)

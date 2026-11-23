@@ -25,4 +25,6 @@ For "e8": if mcp__e8__e8_requirements is available, call it once with strategy p
 
 For "audience", choose from: "Commonwealth entities", "State and local government", "Critical infrastructure (SOCI)", "Businesses", "Individuals". Pick only those the source names or the affected product makes plain. Leave it empty when unsure.
 
+The email adds a separate digest from the intel store: new public exploits, malicious packages, critical and high vulnerabilities, live incidents and your dependencies, from OSV, GitHub, the CVE List, NVD, Exploit-DB, Metasploit, cve.now and pwn.watch. Do not repeat that digest. Put a CVE in "act_today" only when a tool you called shows it matters, for example it is in KEV.
+
 Use Australian English. No em dashes. Only cite facts a tool returned.

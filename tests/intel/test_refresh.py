@@ -159,7 +159,7 @@ def test_optional_sources_do_not_fail(feeds, capsys):
 
 
 def test_sources_without_an_adapter_are_refused_not_skipped(capsys):
-    for name in ("attack", "nvd", "abusech", "otx", "radar"):
+    for name in ("attack", "abusech", "otx", "radar"):
         assert main(["refresh", "--sources", "kev", "--optional-sources", name]) == 2
         assert f"unknown sources: {name}" in capsys.readouterr().err
 
@@ -359,3 +359,280 @@ def test_custom_feeds_without_config_do_nothing(store_path, monkeypatch, capsys)
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(store_path.parent))
     assert main(["refresh", "--sources", "custom"]) == 0
     assert "custom ok 0 items" in capsys.readouterr().out
+
+
+# Daily vulnerability feeds
+
+
+def _vuln_row(source_id: str, ident: str, title: str, **extra) -> dict:
+    return {
+        "id": f"{source_id}:{ident}",
+        "source": source_id,
+        "title": title,
+        "url": f"https://example.com/{ident}",
+        "published_at": "2026-10-22T20:00:00Z",
+        "summary": extra.pop("summary", "Severity: high. A synthetic row."),
+        "cves": [],
+        "severity": "high",
+        "kind": "vulnerability",
+        **extra,
+    }
+
+
+def _stored(store_path):
+    from store.db import open_store
+
+    rows = open_store(store_path).connection().execute("SELECT id, source_id FROM advisories")
+    return sorted((row["source_id"], row["id"]) for row in rows)
+
+
+@pytest.mark.parametrize(
+    ("key", "function", "source_id"),
+    [
+        ("ghsa", "fetch_ghsa", "ghsa"),
+        ("cvelist", "fetch_cvelist", "cvelist"),
+        ("exploitdb", "fetch_exploitdb", "exploit-db"),
+        ("metasploit", "fetch_metasploit", "metasploit"),
+    ],
+)
+def test_vulnerability_feeds_load_advisories(
+    key, function, source_id, store_path, monkeypatch, capsys
+):
+    from cyberau_vuln_feeds import source
+
+    seen = []
+
+    def fetch(since, **_kwargs):
+        seen.append(since)
+        return source.Fetched(rows=[_vuln_row(source_id, "1", "CVE-2026-1111: thing")])
+
+    monkeypatch.setattr(source, function, fetch)
+    assert main(["refresh", "--sources", key, "--store"]) == 0
+    assert f"{key} ok 1 items, stored 1" in capsys.readouterr().out
+    assert _stored(store_path) == [(source_id, f"{source_id}:1")]
+    assert seen and seen[0].tzinfo is not None
+
+
+def test_the_lookback_window_is_set_by_the_environment(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from store import refresh
+
+    monkeypatch.setenv("CYBERAU_FEED_LOOKBACK_HOURS", "6")
+    gap = datetime.now(UTC) - refresh._lookback()
+    assert timedelta(hours=5, minutes=59) < gap < timedelta(hours=6, minutes=1)
+    monkeypatch.setenv("CYBERAU_FEED_LOOKBACK_HOURS", "nonsense")
+    assert datetime.now(UTC) - refresh._lookback() > timedelta(hours=47)
+
+
+def test_a_vulnerability_feed_that_is_not_live_or_has_a_problem_fails(monkeypatch, capsys):
+    from cyberau_vuln_feeds import source
+
+    monkeypatch.setattr(
+        source, "fetch_ghsa", lambda since, **_k: source.Fetched(rows=[], live=False)
+    )
+    assert main(["refresh", "--sources", "ghsa"]) == 1
+    assert "stale cache" in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        source,
+        "fetch_exploitdb",
+        lambda since, **_k: source.Fetched(rows=[], problems=["Exploit-DB index is empty"]),
+    )
+    assert main(["refresh", "--sources", "exploitdb"]) == 1
+    assert "Exploit-DB index is empty" in capsys.readouterr().out
+
+
+def test_a_partial_vulnerability_feed_keeps_its_rows_and_names_the_gap(
+    store_path, monkeypatch, capsys
+):
+    from cyberau_vuln_feeds import source
+
+    monkeypatch.setattr(
+        source,
+        "fetch_ghsa",
+        lambda since, **_k: source.Fetched(
+            rows=[_vuln_row("ghsa", "1", "GHSA-1: x")],
+            problems=["GitHub advisories (malware) down"],
+        ),
+    )
+    assert main(["refresh", "--sources", "ghsa", "--store"]) == 0
+    out = capsys.readouterr().out
+    assert "ghsa ok 1 items, stored 1 (partial: GitHub advisories (malware) down)" in out
+
+
+def test_osv_adds_the_inventory_scan_to_the_malicious_package_feed(
+    store_path, tmp_path, monkeypatch, capsys
+):
+    from cyberau_vuln_feeds import source
+
+    data = store_path.parent
+    data.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    (data / "assets.yaml").write_text(
+        "assets:\n"
+        "  - name: Billing API\n    vendor: example\n    product: billing\n"
+        "    purl: pkg:npm/left-pad@1.0.0\n",
+        encoding="utf-8",
+    )
+    scanned = []
+
+    def scan(packages, **_kwargs):
+        scanned.extend(packages)
+        return source.Fetched(
+            rows=[
+                _vuln_row("osv-scan", "billing-api-abc123:GHSA-1", "GHSA-1: bad (in Billing API)")
+            ]
+        )
+
+    monkeypatch.setattr(
+        source,
+        "fetch_osv_malicious",
+        lambda since, **_k: source.Fetched(rows=[_vuln_row("osv-mal", "MAL-1", "MAL-1: bad")]),
+    )
+    monkeypatch.setattr(source, "fetch_osv_scan", scan)
+    assert main(["refresh", "--sources", "osv", "--store"]) == 0
+    assert "osv ok 2 items, stored 2" in capsys.readouterr().out
+    assert scanned == [{"asset": "Billing API", "purl": "pkg:npm/left-pad@1.0.0"}]
+    assert [source_id for source_id, _ in _stored(store_path)] == ["osv-mal", "osv-scan"]
+
+
+def test_osv_without_an_inventory_skips_the_scan(store_path, monkeypatch, capsys):
+    from cyberau_vuln_feeds import source
+
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(store_path.parent))
+    monkeypatch.setattr(source, "fetch_osv_malicious", lambda since, **_k: source.Fetched(rows=[]))
+    monkeypatch.setattr(
+        source,
+        "fetch_osv_scan",
+        lambda *_a, **_k: pytest.fail("no inventory, so no scan and no request"),
+    )
+    assert main(["refresh", "--sources", "osv"]) == 0
+
+
+def test_nvd_stores_the_score_and_one_advisory_per_cve(store_path, monkeypatch, capsys):
+    from cyberau_nvd import source
+
+    def search(published_from=None, cvss_v3_severity=None, limit=20, **_k):
+        row = {
+            "cve_id": "CVE-2026-1111" if cvss_v3_severity == "CRITICAL" else "CVE-2026-2222",
+            "description": "<<untrusted source=nvd>> Remote code execution. <<end untrusted>>",
+            "cvss": {
+                "version": "cvssMetricV31",
+                "score": 9.8 if cvss_v3_severity == "CRITICAL" else 7.5,
+                "severity": cvss_v3_severity,
+            },
+            "cwes": ["CWE-94"],
+            "references": [],
+        }
+        return {"cache": "miss", "data": [row], "warnings": []}
+
+    monkeypatch.setattr(source, "nvd_search", search)
+    assert main(["refresh", "--sources", "nvd", "--store"]) == 0
+    assert "nvd ok 2 items, stored 2" in capsys.readouterr().out
+
+    from store.db import open_store
+
+    conn = open_store(store_path).connection()
+    scores = {
+        row["cve_id"]: (row["cvss_v3"], row["cwe"])
+        for row in conn.execute("SELECT cve_id, cvss_v3, cwe FROM vulnerabilities")
+    }
+    assert scores == {"CVE-2026-1111": (9.8, "CWE-94"), "CVE-2026-2222": (7.5, "CWE-94")}
+    row = conn.execute("SELECT title, summary FROM advisories WHERE id = 'nvd:CVE-2026-1111'")
+    row = row.fetchone()
+    assert row["title"] == "CVE-2026-1111: Remote code execution."
+    assert "Severity: critical. CVSS 9.8." in row["summary"]
+
+
+def test_nvd_that_answers_from_a_snapshot_fails(monkeypatch, capsys):
+    from cyberau_nvd import source
+
+    monkeypatch.setattr(
+        source,
+        "nvd_search",
+        lambda **_k: {"cache": "snapshot", "data": [], "warnings": ["NVD is unavailable"]},
+    )
+    assert main(["refresh", "--sources", "nvd"]) == 1
+    assert "NVD is unavailable" in capsys.readouterr().out
+
+
+def test_nvd_empty_answer_with_a_warning_is_a_failure_not_a_quiet_day(monkeypatch, capsys):
+    from cyberau_nvd import source
+
+    seen = []
+
+    def search(**kwargs):
+        seen.append(kwargs)
+        return {"cache": "miss", "data": [], "warnings": ["NVD search payload was not usable"]}
+
+    monkeypatch.setattr(source, "nvd_search", search)
+    assert main(["refresh", "--sources", "nvd"]) == 1
+    assert "not usable" in capsys.readouterr().out
+    # NVD refuses a start date without an end date.
+    assert all(call["published_from"] and call["published_to"] for call in seen)
+
+
+def test_vulnfeeds_reads_the_shipped_pack_without_any_watchlist(store_path, monkeypatch, capsys):
+    from cyberau_custom_feeds import source
+
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(store_path.parent))
+    fetched = []
+
+    def fetch_items(feed, **_kwargs):
+        fetched.append(feed.id)
+        item = {
+            "id": "0123456789abcdef",
+            "title": f"{feed.id} item",
+            "url": "https://example.com/a",
+            "guid": "a",
+            "published": "2026-10-22T08:00:00Z",
+            "categories": ["critical"],
+            "summary": "Text.",
+        }
+        return [item], "miss", ""
+
+    monkeypatch.setattr(source, "fetch_items", fetch_items)
+    assert main(["refresh", "--sources", "vulnfeeds", "--store"]) == 0
+    assert fetched == ["cve-now-critical", "pwn-watch"]
+    assert "vulnfeeds ok 2 items, stored 2" in capsys.readouterr().out
+    assert _stored(store_path) == [
+        ("feed-cve-now-critical", "feed-cve-now-critical:0123456789abcdef"),
+        ("feed-pwn-watch", "feed-pwn-watch:0123456789abcdef"),
+    ]
+
+
+def test_dependabot_is_opt_in_and_needs_a_private_token_file(
+    store_path, tmp_path, monkeypatch, capsys
+):
+    from cyberau_vuln_feeds import source
+
+    data = store_path.parent
+    data.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(data))
+    monkeypatch.delenv("GITHUB_DEPENDABOT_TOKEN", raising=False)
+    assert main(["refresh", "--sources", "dependabot"]) == 0
+    assert "no dependabot.yaml" in capsys.readouterr().out
+
+    token = tmp_path / "token"
+    token.write_text("ghp_" + "a" * 36 + "\n", encoding="utf-8")
+    token.chmod(0o644)
+    (data / "dependabot.yaml").write_text(
+        f"repos:\n  - example/app\n  - not a repo\ntoken_file: {token}\n", encoding="utf-8"
+    )
+    assert main(["refresh", "--sources", "dependabot"]) == 1
+    assert "chmod 600" in capsys.readouterr().out
+
+    token.chmod(0o600)
+    calls = []
+
+    def fetch(repos, secret):
+        calls.append((repos, secret))
+        return source.Fetched(rows=[_vuln_row("dependabot", "example/app#7", "GHSA-1: x")])
+
+    monkeypatch.setattr(source, "fetch_dependabot", fetch)
+    assert main(["refresh", "--sources", "dependabot", "--store"]) == 0
+    out = capsys.readouterr().out
+    assert calls == [(["example/app"], "ghp_" + "a" * 36)]
+    assert "dependabot ok 1 items, stored 1" in out
+    assert "ghp_" not in out

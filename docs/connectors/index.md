@@ -58,3 +58,4 @@ Every connector with a `SOURCE.md` in this checkout. Planned sources without a c
 | Assessments from a ThreatSieve instance the operator already runs | `threatsieve` | `THREATSIEVE_API_KEY` | off: requires local setup | [threatsieve](threatsieve.md) |
 | UpGuard CyberRisk connector | `upguard` | `UPGUARD_API_KEY` | off | [upguard](upguard.md) |
 | virustotal | `virustotal` | `VTAI_TOKEN` | off: licence terms | [virustotal](virustotal.md) |
+| Daily public vulnerability feeds: OSV, GitHub advisories, the CVE List, Exploit-DB, Metasploit | `vuln_feeds` | `GITHUB_DEPENDABOT_TOKEN` (optional) | on | [vuln-feeds](vuln-feeds.md) |

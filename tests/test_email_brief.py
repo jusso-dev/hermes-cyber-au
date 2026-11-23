@@ -123,6 +123,91 @@ def test_render_escapes_text_and_keeps_only_https_links(tmp_path):
     assert "192.0.2.7" not in text
 
 
+def test_vulnerability_digest_groups_come_first_with_merged_feed_names(tmp_path):
+    brief, _hits = _files(tmp_path)
+    digest = {
+        "data": {
+            "hits": [
+                {**HITS["data"]["hits"][0]},
+                {
+                    "id": "vuln-1",
+                    "kind": "advisory digest",
+                    "value": "CVE-2026-1111: Path traversal [exploited, CISA KEV; EPSS 0.91]",
+                    "seen": "2026-10-23T00:00:00Z",
+                    "published": "2026-10-22T20:00:00Z",
+                    "source": "ghsa+nvd",
+                    "url": "https://github.com/advisories/GHSA-1",
+                    "watch": "Critical and high vulnerabilities",
+                },
+                {
+                    "id": "vuln-2",
+                    "kind": "advisory digest",
+                    "value": "EDB-1: Example exploit",
+                    "seen": "2026-10-23T00:00:00Z",
+                    "published": "2026-10-22T00:00:00Z",
+                    "source": "exploit-db",
+                    "url": "https://www.exploit-db.com/exploits/1",
+                    "watch": "Public exploits",
+                },
+            ]
+        }
+    }
+    path = tmp_path / "digest.json"
+    path.write_text(json.dumps(digest), encoding="utf-8")
+    html_out, text_out = tmp_path / "d.html", tmp_path / "d.txt"
+    argv = ["render", str(brief), "--date-label", "x", "--watches", str(path)]
+    assert email.main([*argv, "--html", str(html_out), "--text", str(text_out)]) == 0
+    text = text_out.read_text(encoding="utf-8")
+    order = [
+        text.index(name)
+        for name in (
+            "PUBLIC EXPLOITS",
+            "CRITICAL AND HIGH VULNERABILITIES",
+            "MICROSOFT SECURITY CHANGES",
+        )
+    ]
+    assert order == sorted(order)
+    assert "(GitHub Advisory Database, NVD, 2026-10-22)" in text
+    page = html_out.read_text(encoding="utf-8")
+    assert "New in the public vulnerability feeds since the last briefing." in page
+    assert "Matched by a watch over public feeds." in page
+
+
+def test_digest_rows_follow_their_rank_not_their_date(tmp_path):
+    brief, _hits = _files(tmp_path)
+
+    def row(ident, value, published, rank, source="ghsa"):
+        return {
+            "id": ident,
+            "kind": "advisory digest",
+            "value": value,
+            "seen": "2026-10-23T00:00:00Z",
+            "published": published,
+            "source": source,
+            "url": "",
+            "watch": "Critical and high vulnerabilities",
+            "rank": rank,
+        }
+
+    digest = {
+        "data": {
+            "hits": [
+                row("a", "Newest but ranked last", "2026-10-22T20:00:00Z", 2),
+                row("b", "Oldest but ranked first", "2026-10-20T20:00:00Z", 1),
+                row("c", "3 more new items not shown", None, 3, "intel-store"),
+            ]
+        }
+    }
+    path = tmp_path / "rank.json"
+    path.write_text(json.dumps(digest), encoding="utf-8")
+    text_out = tmp_path / "r.txt"
+    argv = ["render", str(brief), "--date-label", "x", "--watches", str(path)]
+    assert email.main([*argv, "--html", str(tmp_path / "r.html"), "--text", str(text_out)]) == 0
+    text = text_out.read_text(encoding="utf-8")
+    order = [text.index(x) for x in ("Oldest but ranked first", "Newest but ranked last", "3 more")]
+    assert order == sorted(order)
+
+
 def test_watches_file_is_optional():
     assert email.load_watches(None) == []
     assert email.load_watches("/nonexistent/file.json") == []

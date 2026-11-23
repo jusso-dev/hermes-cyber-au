@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://api.github.com/advisories?type=malware&published=%3E%3D2026-10-22&sort=published&direction=desc&per_page=100
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: '[{"ghsa_id":"GHSA-xvgg-qjjh-gq34","cve_id":null,"html_url":"https://github.com/advisories/GHSA-xvgg-qjjh-gq34","summary":"Malware in example-pai","type":"malware","severity":"critical","published_at":"2026-10-23T00:56:39Z","withdrawn_at":null,"vulnerabilities":[{"package":{"ecosystem":"npm","name":"example-pai"}}]}]'

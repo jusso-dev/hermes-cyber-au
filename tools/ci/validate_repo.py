@@ -106,6 +106,9 @@ _REFERENCE_LINK_HOSTS: dict[str, frozenset[str]] = {
     "cve-program": frozenset({"www.cve.org"}),
     "github-advisories": frozenset({"github.com"}),
     "mitre-attack": frozenset({"attack.mitre.org"}),
+    "vuln-feeds": frozenset(
+        {"github.com", "osv.dev", "www.cve.org", "www.exploit-db.com", "www.rapid7.com"}
+    ),
 }
 _SKILL_LIST_FIELDS = (
     "tags",

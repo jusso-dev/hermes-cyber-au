@@ -21,6 +21,7 @@ import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from cyberau_common.secrets import redact
@@ -30,7 +31,7 @@ from .canonical import utc_now
 from .expiry import reconcile_indicators, reconcile_kev
 
 # Cache states that mean the payload came from upstream within its lifetime.
-_LIVE = {"miss", "hit"}
+_LIVE = {"miss", "hit", "direct", "http11"}
 _EPSS_BATCH = 100
 
 
@@ -242,16 +243,32 @@ def _auscert(result: Result, run: _Run) -> None:
 
 def _custom(result: Result, run: _Run) -> None:
     """The RSS and Atom feeds turned on in watchlists.yaml."""
-    from cyberau_custom_feeds import source
     from cyberau_custom_feeds.config import load_config
 
     config = load_config()
     if not config.feeds:
         result.detail = "no custom feeds configured"
         return
+    _ingest_feeds(result, run, config.feeds)
+
+
+def _vulnfeeds(result: Result, run: _Run) -> None:
+    """cve.now critical entries and pwn.watch incidents, from the shipped vuln-feeds pack."""
+    from cyberau_custom_feeds.config import shipped_pack_feeds
+
+    feeds, warnings = shipped_pack_feeds("vuln-feeds")
+    if not feeds:
+        result.fail("; ".join(warnings) or "the vuln-feeds pack has no feeds")
+        return
+    _ingest_feeds(result, run, feeds)
+
+
+def _ingest_feeds(result: Result, run: _Run, feeds) -> None:
+    from cyberau_custom_feeds import source
+
     problems = []
     stored = 0
-    for feed in config.feeds:
+    for feed in feeds:
         items, _cache, warning = source.fetch_items(feed)
         if warning:
             problems.append(warning)
@@ -273,7 +290,7 @@ def _custom(result: Result, run: _Run) -> None:
     result.items = len(result.rows)
     if run.store:
         result.stored = stored
-    if problems and len(problems) == len(config.feeds):
+    if problems and len(problems) == len(feeds):
         result.fail("; ".join(problems))
     elif problems:
         # One flaky blog must not fail the rest. The run names what it skipped.
@@ -285,6 +302,200 @@ def _feed_summary(item: dict) -> str | None:
     if item["categories"]:
         parts.append("Categories: " + ", ".join(item["categories"][:10]))
     return " ".join(parts) or None
+
+
+# Daily vulnerability feeds: OSV, GitHub advisories, the CVE List, NVD, Exploit-DB, Metasploit
+
+
+def _lookback() -> datetime:
+    """How far back the daily feeds look. Overlap is safe: advisory ids are stable."""
+    try:
+        hours = int(os.environ.get("CYBERAU_FEED_LOOKBACK_HOURS") or 48)
+    except ValueError:
+        hours = 48
+    return datetime.now(UTC) - timedelta(hours=min(max(hours, 1), 336))
+
+
+def _finish_feed(result: Result, run: _Run, fetched, *, label: str) -> None:
+    """Record a ``vuln-feeds`` fetch. Only a complete live answer is success."""
+    result.rows = fetched.rows
+    result.items = len(fetched.rows)
+    problems = list(fetched.problems)
+    if not fetched.live:
+        problems.append(f"{label} was answered from a stale cache")
+    if problems and not (fetched.rows and fetched.live):
+        result.fail("; ".join(problems))
+        return
+    if problems:  # a partial answer still counts, and the run names what it skipped
+        result.detail = "partial: " + "; ".join(problems)
+    if run.store:
+        result.stored = _store_vuln_rows(fetched.rows)
+
+
+def _store_vuln_rows(rows: list[dict]) -> int:
+    by_source: dict[str, list[dict]] = {}
+    for item in rows:
+        by_source.setdefault(item["source"], []).append(item)
+    return sum(_store_advisories(source_id, group) for source_id, group in by_source.items())
+
+
+def _osv(result: Result, run: _Run) -> None:
+    """MAL- malicious package alerts, and the OSV-Scanner style scan of the asset purls."""
+    from cyberau_vuln_feeds import source
+
+    fetched = source.fetch_osv_malicious(_lookback())
+    packages = _inventory_packages()
+    if packages:
+        scan = source.fetch_osv_scan(packages)
+        fetched.rows.extend(scan.rows)
+        fetched.problems.extend(scan.problems)
+        fetched.live = fetched.live and scan.live
+    _finish_feed(result, run, fetched, label="OSV")
+
+
+def _inventory_packages() -> list[dict]:
+    """The asset inventory's package URLs. A missing or unreadable inventory is no packages."""
+    try:
+        from . import assets
+
+        path = assets.default_path()
+        found = assets.read_inventory(path) if path is not None and path.is_file() else []
+    except Exception:  # the scan is optional, a bad inventory must not stop the feed
+        return []
+    return [
+        {"asset": asset.name, "purl": asset.get("purl")} for asset in found if asset.get("purl")
+    ]
+
+
+def _ghsa(result: Result, run: _Run) -> None:
+    from cyberau_vuln_feeds import source
+
+    _finish_feed(result, run, source.fetch_ghsa(_lookback()), label="GitHub advisories")
+
+
+def _cvelist(result: Result, run: _Run) -> None:
+    from cyberau_vuln_feeds import source
+
+    _finish_feed(result, run, source.fetch_cvelist(_lookback()), label="cvelistV5")
+
+
+def _exploitdb(result: Result, run: _Run) -> None:
+    from cyberau_vuln_feeds import source
+
+    _finish_feed(result, run, source.fetch_exploitdb(_lookback()), label="Exploit-DB")
+
+
+def _metasploit(result: Result, run: _Run) -> None:
+    from cyberau_vuln_feeds import source
+
+    _finish_feed(result, run, source.fetch_metasploit(_lookback()), label="Metasploit")
+
+
+def _nvd(result: Result, run: _Run) -> None:
+    """CVEs published since the window opened that NVD scores Critical or High."""
+    from cyberau_nvd import source
+
+    day = _lookback().strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")  # NVD needs both ends of a date range
+    rows: list[dict] = []
+    problems = []
+    for severity in ("CRITICAL", "HIGH"):
+        envelope = source.nvd_search(
+            published_from=day, published_to=today, cvss_v3_severity=severity, limit=200
+        )
+        # An empty answer with a warning is a failed call, not a quiet day.
+        if envelope["cache"] not in _LIVE or envelope.get("warnings"):
+            problems.append("; ".join(envelope.get("warnings") or []) or "NVD was not live")
+            continue
+        rows.extend(envelope["data"] or [])
+    result.rows = rows
+    result.items = len(rows)
+    if problems:
+        result.fail("; ".join(problems))
+        return
+    if run.store:
+        result.stored = _store_nvd(rows)
+
+
+def _store_nvd(rows: list[dict]) -> int:
+    from .text import unwrap_untrusted
+
+    advisories = []
+    with db.open_store().transaction():
+        for cve in rows:
+            cve_id = cve["cve_id"]
+            cvss = cve.get("cvss") or {}
+            fields: dict = {}
+            if isinstance(cvss.get("score"), int | float):
+                key = "cvss_v4" if cvss.get("version") == "cvssMetricV40" else "cvss_v3"
+                fields[key] = float(cvss["score"])
+            if cve.get("cwes"):
+                fields["cwe"] = str(cve["cwes"][0])
+            if fields:
+                api.upsert_vulnerability(cve_id, **fields)
+            text = unwrap_untrusted(cve.get("description") or "") or ""
+            severity = str(cvss.get("severity") or "").lower()
+            lead = f"Severity: {severity}. " if severity else ""
+            score = f"CVSS {cvss['score']}. " if cvss.get("score") is not None else ""
+            advisories.append(
+                {
+                    "id": f"nvd:{cve_id}",
+                    "title": f"{cve_id}: {text[:160]}".strip(),
+                    "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
+                    "published_at": None,
+                    "summary": f"{lead}{score}{text}".strip() or None,
+                }
+            )
+    return _store_advisories("nvd", advisories)
+
+
+def _dependabot(result: Result, run: _Run) -> None:
+    """Open critical and high Dependabot alerts on the owner's repositories. Needs a token."""
+    from cyberau_vuln_feeds import source
+
+    config = _dependabot_config()
+    if config is None:
+        result.detail = "no dependabot.yaml with repos in the profile data directory"
+        return
+    repos, token = config
+    fetched = source.fetch_dependabot(repos, token)
+    _finish_feed(result, run, fetched, label="Dependabot")
+
+
+def _dependabot_config() -> tuple[list[str], str] | None:
+    import re
+    import stat
+
+    import yaml
+    from cyberau_custom_feeds.config import data_dir
+
+    path = data_dir() / "dependabot.yaml"
+    if not path.is_file():
+        return None
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        raise RuntimeError("dependabot.yaml is not valid YAML") from None
+    repos = [
+        str(repo).strip()
+        for repo in (data.get("repos") or [])
+        if re.fullmatch(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}", str(repo).strip())
+    ]
+    if not repos:
+        return None
+    token = os.environ.get("GITHUB_DEPENDABOT_TOKEN", "").strip()
+    token_file = data.get("token_file")
+    if not token and token_file:
+        key = Path(str(token_file)).expanduser()
+        try:
+            if key.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+                raise RuntimeError("the Dependabot token file must be chmod 600")
+            token = key.read_text(encoding="utf-8").strip()
+        except OSError:
+            raise RuntimeError("the Dependabot token file is not readable") from None
+    if not token:
+        raise RuntimeError("no Dependabot token: set token_file in dependabot.yaml")
+    return repos, token
 
 
 def _feodo(result: Result, run: _Run) -> None:
@@ -337,8 +548,19 @@ _ADAPTERS: dict[str, Callable[[Result, _Run], None]] = {
     "auscert": _auscert,
     "feodo": _feodo,
     "custom": _custom,
+    "osv": _osv,
+    "ghsa": _ghsa,
+    "cvelist": _cvelist,
+    "nvd": _nvd,
+    "exploitdb": _exploitdb,
+    "metasploit": _metasploit,
+    "vulnfeeds": _vulnfeeds,
+    "dependabot": _dependabot,
 }
-SUPPORTED = tuple(_ADAPTERS)
+# Sources that need a credential. They can be named in --sources, but the keyless ingest
+# scripts never run them and the feed catalogue gives them no refresh key.
+KEYED = ("dependabot",)
+SUPPORTED = tuple(key for key in _ADAPTERS if key not in KEYED)
 
 
 def _store_advisories(source_id: str, rows) -> int:
