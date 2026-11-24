@@ -252,7 +252,9 @@ def test_tool_schemas_match_the_ticket():
 
 def test_shipped_snapshot():
     maturity = DATA / "e8-maturity-v2026.09.4.json"
-    essentials = DATA / "essentials-2026-10-17.json"
+    shipped_essentials = sorted(DATA.glob("essentials-*.json"))
+    assert len(shipped_essentials) == 1, shipped_essentials
+    essentials = shipped_essentials[0]
     document = json.loads(maturity.read_text(encoding="utf-8"))
     assigned = {(row["control_id"], row["strategy"]) for row in document["controls"]}
     assert ("ism-0843", "application_control") in assigned
