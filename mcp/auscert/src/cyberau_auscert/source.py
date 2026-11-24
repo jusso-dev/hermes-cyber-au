@@ -55,6 +55,13 @@ _Since = Annotated[
         description="YYYY-MM-DD, interpreted in Australia/Sydney",
     ),
 ]
+_Before = Annotated[
+    str,
+    Field(
+        min_length=16,
+        description="ISO 8601 date and time with an offset; only bulletins published before it",
+    ),
+]
 _Limit = Annotated[int, Field(ge=1, le=100)]
 
 
@@ -71,11 +78,12 @@ def auscert_bulletins(
     since: _Since | None = None,
     query: str | None = None,
     limit: _Limit = 20,
+    before: _Before | None = None,
 ) -> dict:
-    problem = _validate(since, limit)
+    problem = _validate(since, limit, before)
     if problem:
         return _envelope([], "snapshot", warnings=(problem,))
-    return _collect(since, query, limit)
+    return _collect(since, query, limit, before=_cutoff(before))
 
 
 def connector() -> Connector:
@@ -136,6 +144,7 @@ def _collect(
     limit: int,
     *,
     force_live: bool = False,
+    before: datetime | None = None,
 ) -> dict:
     feed = _fetch(force_live=force_live)
     warnings = list(feed.warnings)
@@ -156,7 +165,20 @@ def _collect(
             warnings.append(f"could not record bulletins locally: {redact(str(exc))}")
     if feed.override:
         warnings.append(_OVERRIDE_NOTE)
-    chosen = _select(records, since, query)[:limit]
+    if since and not feed.override:
+        records, added = _with_stored(records, since)
+        if added:
+            warnings.append(
+                f"{added} bulletins older than the live feed's newest 100 came from the "
+                "local record of earlier polls"
+            )
+    matched = _select(records, since, query, before)
+    chosen = matched[:limit]
+    if len(matched) > limit and not force_live:
+        warnings.append(
+            f"{len(matched)} bulletins matched and only the newest {limit} were returned; "
+            "narrow since or before to see the rest"
+        )
     return _envelope(
         [_public(row) for row in chosen],
         feed.cache,
@@ -319,11 +341,15 @@ def _records(root: ET.Element) -> tuple[list[dict], int]:
     return ordered, skipped
 
 
-def _select(records: list[dict], since: str | None, query: str | None) -> list[dict]:
+def _select(
+    records: list[dict], since: str | None, query: str | None, before: datetime | None = None
+) -> list[dict]:
     needle = (query or "").strip()
     chosen = []
     for row in records:
         if since and row["stamp"].astimezone(_SYDNEY).date().isoformat() < since:
+            continue
+        if before is not None and row["stamp"] >= before:
             continue
         if needle and not _matches(row, needle):
             continue
@@ -383,7 +409,17 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
-def _validate(since: str | None, limit: int) -> str:
+def _cutoff(before: str | None) -> datetime | None:
+    if not before:
+        return None
+    try:
+        stamp = datetime.fromisoformat(before)
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo is not None else None
+
+
+def _validate(since: str | None, limit: int, before: str | None = None) -> str:
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100:
         return "limit must be between 1 and 100"
     if since:
@@ -393,7 +429,64 @@ def _validate(since: str | None, limit: int) -> str:
             date.fromisoformat(since)
         except ValueError:
             return "since must be a real calendar date"
+    if before and _cutoff(before) is None:
+        return (
+            "before must be an ISO 8601 date and time with an offset, "
+            "such as 2026-11-24T07:30:00+11:00"
+        )
     return ""
+
+
+def _with_stored(records: list[dict], since: str) -> tuple[list[dict], int]:
+    """Add bulletins from earlier polls that the rolling feed has dropped.
+
+    The feed holds only the newest 100 bulletins, which a busy day passes before midday,
+    so a briefing run later reads the start of its window from the record the ingest job
+    keeps. Only rows published on or after ``since`` (Sydney) and absent from the feed
+    are added. A missing or unreadable record adds nothing.
+    """
+    path = runtime.data_dir("auscert") / "auscert_bulletins.sqlite"
+    if not path.is_file():
+        return records, 0
+    start = datetime.combine(date.fromisoformat(since), datetime.min.time(), _SYDNEY)
+    seen = {row["bulletin_id"] for row in records}
+    try:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)) as conn:
+            stored = conn.execute(
+                "SELECT id, kind, title, link, published, summary, cves FROM bulletins"
+            ).fetchall()
+    except sqlite3.Error:
+        return records, 0
+    added = []
+    for bulletin_id, kind, title, link, published, summary, cves in stored:
+        if bulletin_id in seen:
+            continue
+        try:
+            stamp = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
+            found = json.loads(cves or "[]")
+        except (TypeError, ValueError):
+            continue
+        if stamp.tzinfo is None or stamp < start:
+            continue
+        cvss = _CVSS.search(title or "")
+        added.append(
+            {
+                "bulletin_id": bulletin_id,
+                "kind": kind,
+                "title": title,
+                "link": _link(link or "", bulletin_id),
+                "stamp": stamp,
+                "summary": summary or "",
+                "cvss_max": min(float(cvss.group(1)), 10.0) if cvss else None,
+                "cves": [str(item) for item in found if isinstance(item, str)],
+            }
+        )
+    if not added:
+        return records, 0
+    merged = sorted(
+        [*records, *added], key=lambda row: (row["stamp"], row["bulletin_id"]), reverse=True
+    )
+    return merged, len(added)
 
 
 def _persist(records: list[dict]) -> None:

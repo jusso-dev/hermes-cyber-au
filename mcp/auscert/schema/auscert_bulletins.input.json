@@ -16,6 +16,11 @@
       "minimum": 1,
       "maximum": 100,
       "default": 20
+    },
+    "before": {
+      "type": "string",
+      "minLength": 16,
+      "description": "ISO 8601 date and time with an offset; only bulletins published before it"
     }
   },
   "required": []

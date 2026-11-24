@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -321,6 +322,32 @@ def test_script_reports_missing_settings_and_never_prints_the_key(tmp_path):
     assert result.stdout.startswith("morning email failed:")
     assert "chmod 600" in result.stdout
     assert KEY not in result.stdout + result.stderr
+
+
+@pytest.mark.skipif(
+    subprocess.run(["date", "-u", "-d", "-1 hours"], capture_output=True).returncode != 0,
+    reason="needs GNU date, as in the Hermes container",
+)
+def test_script_gives_the_model_a_fixed_morning_window(tmp_path):
+    # The fake hermes saves the prompt it was given, so the substitution can be checked.
+    saved = tmp_path / "prompt-seen.txt"
+    hermes = (
+        "#!/bin/sh\n"
+        'while [ $# -gt 0 ]; do [ "$1" = --query-file ] && cp "$2" "'
+        + str(saved)
+        + '"; shift; done\n'
+        "printf '%s' '" + json.dumps(BRIEF) + "'\n"
+    )
+    profile, env = _profile(tmp_path, hermes)
+    _settings(Path(env["CYBERAU_DATA_DIR"]))
+    env["CYBERAU_EMAIL_DRY_RUN"] = "1"
+    result = _run(profile, env)
+    assert result.returncode == 0, result.stdout + result.stderr
+    prompt = saved.read_text(encoding="utf-8")
+    assert "WINDOW_" not in prompt and "DATE_LABEL" not in prompt
+    ends = re.findall(r'before "(\d{4}-\d{2}-\d{2}T07:30:00\+1[01]:00)"', prompt)
+    assert len(ends) == 1
+    assert re.search(r'since "\d{4}-\d{2}-\d{2}"', prompt)
 
 
 def test_script_needs_the_connector_venv(tmp_path):

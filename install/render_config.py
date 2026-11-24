@@ -9,6 +9,11 @@ unknown keys does not forget which entries we own.
 Credential values are never written. Keyed servers get ${VAR} placeholders.
 A required variable that is missing or blank in the profile .env sets
 enabled: false.
+
+Each stdio server gets CYBERAU_DATA_DIR from the profile .env when it sets an
+absolute path (an org profile sharing one store), else
+<profile>/plugin-data/cyber-au. The cron scripts follow the same rule, so a
+briefing reads the store the ingest jobs write.
 """
 
 from __future__ import annotations
@@ -69,11 +74,11 @@ def _load_yaml(path: Path) -> dict:
     return loaded
 
 
-def _read_set_names(env_file: Path) -> set[str]:
-    """Names with a non-empty value. The values themselves are discarded."""
+def _env_values(env_file: Path) -> dict[str, str]:
+    """Non-empty assignments in the profile .env. Callers keep only what they need."""
     if not env_file.is_file():
-        return set()
-    names: set[str] = set()
+        return {}
+    values: dict[str, str] = {}
     for raw in env_file.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -90,8 +95,25 @@ def _read_set_names(env_file: Path) -> set[str]:
             # An unquoted value ends at " #". KEY=  # todo is still unset.
             value = re.split(r"\s#", " " + value, maxsplit=1)[0]
         if value.strip():
-            names.add(key)
-    return names
+            values[key] = value.strip()
+    return values
+
+
+def _read_set_names(env_file: Path) -> set[str]:
+    """Names with a non-empty value. The values themselves are discarded."""
+    return set(_env_values(env_file))
+
+
+def _read_data_dir(env_file: Path) -> Path | None:
+    """CYBERAU_DATA_DIR from the profile .env, when it is an absolute path.
+
+    The cron scripts read the same line through _cyberau_lib.sh, so servers rendered
+    with it share one store, HTTP cache and rate limiter with the ingest jobs.
+    """
+    value = _env_values(env_file).get("CYBERAU_DATA_DIR")
+    if not value or not Path(value).is_absolute():
+        return None
+    return Path(value)
 
 
 def _placeholder(raw: str, server: str) -> tuple[str, str]:
@@ -119,14 +141,19 @@ def _enabled(spec: dict, previous: dict | None, present: set[str]) -> bool | Non
 
 
 def _server_entry(
-    name: str, spec: dict, home: Path, previous: dict | None, present: set[str]
+    name: str,
+    spec: dict,
+    home: Path,
+    previous: dict | None,
+    present: set[str],
+    data_dir: Path | None = None,
 ) -> dict:
     if not isinstance(spec, dict):
         raise SystemExit(f"Server {name} in servers.yaml must be a mapping")
     if isinstance(spec.get("url"), str):
         entry = _remote_entry(name, spec, present)
     else:
-        entry = _stdio_entry(name, spec, home)
+        entry = _stdio_entry(name, spec, home, data_dir)
     if "timeout" in spec:
         entry["timeout"] = spec["timeout"]
     if "lazy" in spec:
@@ -149,14 +176,14 @@ def _server_entry(
     return _ordered_entry(entry)
 
 
-def _stdio_entry(name: str, spec: dict, home: Path) -> dict:
+def _stdio_entry(name: str, spec: dict, home: Path, data_dir: Path | None = None) -> dict:
     command = home / "mcp" / ".venv" / "bin" / "cyberau-mcp"
     args = spec.get("args")
     if not isinstance(args, list) or not args:
         connector = spec.get("connector") or name
         args = ["serve", str(connector)]
     env: dict[str, str] = {
-        "CYBERAU_DATA_DIR": str(home / "plugin-data" / "cyber-au"),
+        "CYBERAU_DATA_DIR": str(data_dir or home / "plugin-data" / "cyber-au"),
         "CYBERAU_EGRESS_ALLOWLIST": str(home / "mcp" / "egress-allowlist.yaml"),
     }
     for item in spec.get("env") or []:
@@ -243,6 +270,7 @@ def render_config(
     config: dict,
     present: set[str],
     managed_names: set[str],
+    data_dir: Path | None = None,
 ) -> tuple[dict, list[dict[str, str]], list[str]]:
     specs = servers_doc.get("servers")
     if not isinstance(specs, dict):
@@ -268,7 +296,7 @@ def render_config(
             # A server the person added themselves under a shipped name.
             skipped.append(str(name))
             continue
-        rendered[str(name)] = _server_entry(str(name), spec, home, previous, present)
+        rendered[str(name)] = _server_entry(str(name), spec, home, previous, present, data_dir)
         required = []
         if isinstance(spec, dict):
             required = [str(item) for item in spec.get("required_env") or []]
@@ -419,6 +447,7 @@ def main(argv: list[str] | None = None) -> int:
         config=config,
         present=present,
         managed_names=managed_names,
+        data_dir=_read_data_dir(args.env_file),
     )
     original = args.config.read_text(encoding="utf-8") if args.config.is_file() else ""
     spliced = _splice(original, updated) if original.strip() else None

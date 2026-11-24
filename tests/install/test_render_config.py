@@ -346,6 +346,26 @@ def test_a_commented_blank_key_is_still_unset(tmp_path: Path) -> None:
     assert loaded["mcp_servers"]["abusech"]["enabled"] is True
 
 
+def test_servers_use_the_data_dir_the_profile_env_sets(tmp_path: Path) -> None:
+    # Org profiles share one store. The cron scripts read CYBERAU_DATA_DIR from .env,
+    # so the servers must too, or a briefing reads a store no ingest job writes.
+    home = tmp_path / "profile"
+    shared = tmp_path / "shared"
+    config = home / "config.yaml"
+    env_file = home / ".env"
+    _write(env_file, f'CYBERAU_DATA_DIR="{shared}"\n')
+    assert _run(home, SERVERS, config, env_file).returncode == 0
+    loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert loaded["mcp_servers"]["asd"]["env"]["CYBERAU_DATA_DIR"] == str(shared)
+    assert loaded["mcp_servers"]["kev"]["env"]["CYBERAU_DATA_DIR"] == str(shared)
+    _write(env_file, "CYBERAU_DATA_DIR=relative/dir\n")
+    assert _run(home, SERVERS, config, env_file).returncode == 0
+    loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert loaded["mcp_servers"]["asd"]["env"]["CYBERAU_DATA_DIR"] == str(
+        home.resolve() / "plugin-data" / "cyber-au"
+    )
+
+
 REMOTE_SERVERS = """
 servers:
   remote_demo:

@@ -32,7 +32,20 @@ trap 'rm -rf "$work"' EXIT
 
 day=$(TZ=Australia/Sydney date +%F)
 label=$(TZ=Australia/Sydney date "+%A %-d %B %Y")
-sed "s/DATE_LABEL/$label/" "$prompt" > "$work/prompt.txt"
+# The briefing window ends at 07:30 Sydney today and starts 24 hours earlier (72 on a
+# Monday). Given to the model as fixed values, so a late or manual run still covers
+# the morning window and later items cannot fill a tool's limit.
+read -r window_start window_day window_end < <("$py" -I -c '
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
+now = datetime.now(ZoneInfo("Australia/Sydney"))
+end = datetime.combine(now.date(), time(7, 30), now.tzinfo)
+start = end - timedelta(hours=72 if end.weekday() == 0 else 24)
+print(start.isoformat(), start.date().isoformat(), end.isoformat())
+')
+sed -e "s/DATE_LABEL/$label/" -e "s/WINDOW_START_DAY/$window_day/g" \
+  -e "s/WINDOW_START/$window_start/g" -e "s/WINDOW_END/$window_end/g" \
+  "$prompt" > "$work/prompt.txt"
 
 failed=""
 if [[ -z $hermes_bin ]]; then

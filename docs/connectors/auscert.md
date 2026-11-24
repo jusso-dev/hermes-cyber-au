@@ -60,6 +60,7 @@ Input schema (`schema/auscert_bulletins.input.json`):
 | `since` | string | no | pattern `^\d{4}-\d{2}-\d{2}$`; format `date`; YYYY-MM-DD, interpreted in Australia/Sydney |
 | `query` | string | no |  |
 | `limit` | integer | no | minimum 1, maximum 100; default `20` |
+| `before` | string | no | min length 16; ISO 8601 date and time with an offset; only bulletins published before it |
 
 Additional properties are rejected.
 
@@ -82,6 +83,11 @@ Additional properties are rejected.
       "minimum": 1,
       "maximum": 100,
       "default": 20
+    },
+    "before": {
+      "type": "string",
+      "minLength": 16,
+      "description": "ISO 8601 date and time with an offset; only bulletins published before it"
     }
   },
   "required": []

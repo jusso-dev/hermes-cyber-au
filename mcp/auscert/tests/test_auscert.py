@@ -115,11 +115,29 @@ def test_filters():
     assert len(auscert_bulletins(limit=1)["data"]) == 1
 
 
+def test_before_cuts_off_later_bulletins():
+    # A morning briefing run late must not let bulletins after its window fill the limit.
+    everything = auscert_bulletins(since="2026-10-13")["data"]
+    newest = everything[0]["published"]
+    earlier = auscert_bulletins(since="2026-10-13", before=newest)
+    assert newest not in [row["published"] for row in earlier["data"]]
+    assert len(earlier["data"]) == len(everything) - 1
+    assert not any("only the newest" in w for w in earlier["warnings"])
+
+
+def test_a_truncated_answer_says_so():
+    result = auscert_bulletins(limit=1)
+    assert len(result["data"]) == 1
+    assert any("only the newest 1 were returned" in w for w in result["warnings"])
+
+
 def test_bad_arguments_warn():
     assert auscert_bulletins(limit=0)["warnings"]
     assert auscert_bulletins(limit=101)["warnings"]
     assert auscert_bulletins(since="16/10/2026")["warnings"]
     assert auscert_bulletins(since="2026-02-31")["warnings"]
+    assert auscert_bulletins(before="2026-11-24T07:30:00")["warnings"]
+    assert auscert_bulletins(before="tomorrow morning")["warnings"]
 
 
 def test_advertised_schema_matches_the_ticket():
@@ -246,6 +264,51 @@ def test_live_fetch_caches_records_and_is_etag_aware(monkeypatch, tmp_path):
         rows = conn.execute("SELECT id, cves FROM bulletins ORDER BY id").fetchall()
     assert [row[0] for row in rows] == ["ESB-2026.9001", "ESB-2026.9002", "ESB-2026.9003"]
     assert json.loads(rows[2][1]) == ["CVE-2024-3400", "CVE-2026-0001"]
+
+
+def test_since_adds_stored_bulletins_the_rolling_feed_dropped(monkeypatch, tmp_path):
+    live(monkeypatch, serve())
+    auscert_bulletins()  # records the three feed bulletins
+    with sqlite3.connect(tmp_path / "auscert_bulletins.sqlite") as conn:
+        conn.execute(
+            "INSERT INTO bulletins VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "ESB-2026.8999",
+                "ESB",
+                "Older bulletin no longer in the feed",
+                "https://portal.auscert.org.au/bulletins/ESB-2026.8999/",
+                "2026-10-14T01:00:00Z",
+                "",
+                '["CVE-2026-0002"]',
+                "2026-10-14T01:05:00Z",
+                "2026-10-14T01:05:00Z",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO bulletins VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "ESB-2026.8000",
+                "ESB",
+                "Before the window",
+                "https://portal.auscert.org.au/bulletins/ESB-2026.8000/",
+                "2026-09-01T01:00:00Z",
+                "",
+                "[]",
+                "2026-09-01T01:05:00Z",
+                "2026-09-01T01:05:00Z",
+            ),
+        )
+    result = auscert_bulletins(since="2026-10-13", limit=100)
+    ids = [row["bulletin_id"] for row in result["data"]]
+    assert "ESB-2026.8999" in ids
+    assert "ESB-2026.8000" not in ids
+    assert len(ids) == 4
+    assert any("local record of earlier polls" in w for w in result["warnings"])
+    older = next(row for row in result["data"] if row["bulletin_id"] == "ESB-2026.8999")
+    assert older["cves"] == ["CVE-2026-0002"]
+    assert older["title"].startswith("<<untrusted source=auscert>>")
+    # Without since nothing is added, so the plain feed view is unchanged.
+    assert len(auscert_bulletins(limit=100)["data"]) == 3
 
 
 def test_offline_answers_from_cache_when_present(monkeypatch, tmp_path):
