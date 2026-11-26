@@ -3,11 +3,11 @@
   "files": [
     {
       "path": "mcp/asd-essentials/data/e8-maturity-v2026.09.4.json",
-      "sha256": "be73f691f45f3c8499ad3026bf41f2373d630e7f98860c62ab91c76b6d52d461"
+      "sha256": "ed73395f0feab38acf0f790b80414ca6878cb267361c7441075f681d8bc0c59b"
     },
     {
-      "path": "mcp/asd-essentials/data/essentials-2026-11-20.json",
-      "sha256": "2b1ca2d45f00bdd18ae7c2b6d6e4be002f0aeea5adaaf556ea67c23a05b470ba"
+      "path": "mcp/asd-essentials/data/essentials-2026-11-26.json",
+      "sha256": "98d4547c4ed12c2f3ac0294a8d9c67035f2bdbbfd18e293e25d68ce613fe6025"
     }
   ],
   "source": "e8"
