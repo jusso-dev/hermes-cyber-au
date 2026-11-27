@@ -8,6 +8,13 @@ tools/hermes_pin.txt is the single source. ``get`` prints that tag and
 - distribution.yaml ``hermes_requires`` (lower bound, without the leading v)
 - docker/Dockerfile ``HERMES_VERSION``
 
+A new release also moves the immutable pins: the Docker image index digest
+(docker/Dockerfile ``HERMES_DIGEST`` and the .devcontainer base image) and the
+upstream installer commit and checksum in install/install.sh. Pass them with
+``--digest``, ``--commit`` and ``--installer-sha256`` (``resolve`` prints them
+for a tag). Without them ``set`` refuses to move the tag, so a tag can never
+drift away from its digest.
+
 A missing consumer is an error, and nothing is written until every consumer
 can be updated. That keeps the pins from drifting apart.
 
@@ -47,6 +54,29 @@ DOCKER_RE = re.compile(
     r"(?P<tag>\S+)(?P<suffix>[ \t]*(?:#.*)?)$",
     re.MULTILINE,
 )
+DEVCONTAINER_REL = Path(".devcontainer/Dockerfile")
+INSTALL_REL = Path("install/install.sh")
+DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
+COMMIT_RE = re.compile(r"[0-9a-f]{40}")
+SHA256_RE = re.compile(r"[0-9a-f]{64}")
+DOCKER_DIGEST_RE = re.compile(
+    r"^(?P<prefix>ARG[ \t]+HERMES_DIGEST=)sha256:[0-9a-f]{64}(?P<suffix>[ \t]*)$", re.MULTILINE
+)
+DOCKER_DIGEST_NOTE_RE = re.compile(
+    r"^(?P<prefix>#[ \t]*HERMES_DIGEST version:[ \t]*)v\S+$", re.MULTILINE
+)
+DEVCONTAINER_RE = re.compile(
+    r"^(?P<prefix>FROM[ \t]+nousresearch/hermes-agent:)v\S+?@sha256:[0-9a-f]{64}(?P<suffix>.*)$",
+    re.MULTILINE,
+)
+INSTALL_VERSION_RE = re.compile(r"^(?P<prefix>HERMES_PIN_VERSION=)v\S+$", re.MULTILINE)
+INSTALL_COMMIT_RE = re.compile(r"^(?P<prefix>HERMES_PIN_COMMIT=)[0-9a-f]{40}$", re.MULTILINE)
+INSTALL_SHA_RE = re.compile(r"^(?P<prefix>HERMES_PIN_SHA256=)[0-9a-f]{64}$", re.MULTILINE)
+# Comments that name the release next to a digest or installer pin.
+DOCKER_COMMENT_RE = re.compile(
+    r"(?P<prefix># nousresearch/hermes-agent:)v[0-9]+\.[0-9]+\.[0-9]+(?P<suffix>\. When)"
+)
+INSTALL_COMMENT_RE = re.compile(r"(?P<prefix># )v[0-9]+\.[0-9]+\.[0-9]+(?P<suffix> tag points to)")
 _SECRET = re.compile(r"(?:ghp_|gho_|ghu_|ghs_|github_pat_)[A-Za-z0-9_]+")
 
 
@@ -126,6 +156,58 @@ def _render_pin(root: Path, tag: str) -> str:
     return "\n".join([*comments, tag]) + "\n"
 
 
+def _sub(pattern: re.Pattern[str], value: str):
+    def repl(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{value}{match.groupdict().get('suffix') or ''}"
+
+    return repl
+
+
+def _apply_immutable(
+    root: Path,
+    planned: dict[Path, str],
+    tag: str,
+    digest: str,
+    commit: str,
+    installer_sha256: str,
+) -> None:
+    """Move the image digest and installer pins to ``tag`` inside ``planned``."""
+    if not DIGEST_RE.fullmatch(digest):
+        raise PinError(f"Refusing digest {shown(digest)!r}. Expected sha256:<64 hex>.")
+    if not COMMIT_RE.fullmatch(commit):
+        raise PinError(f"Refusing commit {shown(commit)!r}. Expected 40 hex characters.")
+    if not SHA256_RE.fullmatch(installer_sha256):
+        raise PinError(f"Refusing checksum {shown(installer_sha256)!r}. Expected 64 hex.")
+
+    text = planned[DOCKER_REL]
+    if "HERMES_DIGEST=" in text:
+        text = _replace_exact(text, DOCKER_DIGEST_RE, _sub(DOCKER_DIGEST_RE, digest), DOCKER_REL)
+        text = DOCKER_DIGEST_NOTE_RE.sub(_sub(DOCKER_DIGEST_NOTE_RE, tag), text)
+        text = DOCKER_COMMENT_RE.sub(_sub(DOCKER_COMMENT_RE, tag), text)
+        planned[DOCKER_REL] = text
+
+    dev = _inside(root, DEVCONTAINER_REL)
+    if dev.is_file():
+        text = dev.read_text(encoding="utf-8")
+        if "@sha256:" in text:
+            planned[DEVCONTAINER_REL] = _replace_exact(
+                text, DEVCONTAINER_RE, _sub(DEVCONTAINER_RE, f"{tag}@{digest}"), DEVCONTAINER_REL
+            )
+
+    install = _inside(root, INSTALL_REL)
+    if install.is_file():
+        text = install.read_text(encoding="utf-8")
+        if "HERMES_PIN_COMMIT=" in text:
+            for pattern, value in (
+                (INSTALL_VERSION_RE, tag),
+                (INSTALL_COMMIT_RE, commit),
+                (INSTALL_SHA_RE, installer_sha256),
+            ):
+                text = _replace_exact(text, pattern, _sub(pattern, value), INSTALL_REL)
+            text = INSTALL_COMMENT_RE.sub(_sub(INSTALL_COMMENT_RE, tag), text)
+            planned[INSTALL_REL] = text
+
+
 def _plan(root: Path, tag: str) -> list[tuple[Path, str]]:
     version = floor_version(tag)
     planned: list[tuple[Path, str]] = [(PIN_REL, _render_pin(root, tag))]
@@ -178,27 +260,102 @@ def check_ci(root: Path) -> None:
             )
 
 
-def set_pin(root: Path, tag: str) -> None:
-    """Write ``tag`` to the pin file and every consumer. All writes happen, or none."""
+def set_pin(
+    root: Path,
+    tag: str,
+    *,
+    digest: str | None = None,
+    commit: str | None = None,
+    installer_sha256: str | None = None,
+) -> None:
+    """Write ``tag`` to the pin file and every consumer. All writes happen, or none.
+
+    ``digest``, ``commit`` and ``installer_sha256`` move the image digest and the
+    installer pins in the same write. They are required when the tag changes and
+    any of those pins exist.
+    """
     release = validate_tag(tag)
-    if release != read_pin(root):
+    immutable = (digest, commit, installer_sha256)
+    if any(immutable) and not all(immutable):
+        raise PinError("Pass --digest, --commit and --installer-sha256 together.")
+    if release != read_pin(root) and not all(immutable):
         # Changing a tag alone would leave the image digest or installer commit
         # on the old release. These pins must be reviewed and changed together.
         for rel, marker in (
             (DOCKER_REL, "HERMES_DIGEST="),
-            (Path(".devcontainer/Dockerfile"), "@sha256:"),
-            (Path("install/install.sh"), "HERMES_PIN_COMMIT="),
+            (DEVCONTAINER_REL, "@sha256:"),
+            (INSTALL_REL, "HERMES_PIN_COMMIT="),
         ):
             path = _inside(root, rel)
             if path.is_file() and marker in path.read_text(encoding="utf-8"):
                 raise PinError(
                     f"Hermes upgrade requires a manual pin update: {rel} pins a digest or "
-                    "installer commit. Update every image digest, installer commit and "
-                    "checksum together with tools/hermes_pin.txt and hermes_requires."
+                    "installer commit. Pass --digest, --commit and --installer-sha256 "
+                    "(see tools/hermes_pin.py resolve) so every pin moves together."
                 )
-    planned = _plan(root, release)
-    for rel, text in planned:
+    planned = dict(_plan(root, release))
+    if all(immutable):
+        _apply_immutable(root, planned, release, digest, commit, installer_sha256)
+    for rel, text in planned.items():
         _atomic_write(_inside(root, rel), text)
+
+
+def _http_get(url: str, headers: dict[str, str] | None = None, *, head: bool = False):
+    import urllib.request
+
+    request = urllib.request.Request(url, headers=headers or {}, method="HEAD" if head else "GET")
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 (fixed hosts)
+        return response.headers, (b"" if head else response.read())
+
+
+def resolve(tag: str, *, get=_http_get) -> dict[str, str]:
+    """Look up the image digest, commit and installer checksum for a release tag.
+
+    Reads three fixed public hosts: api.github.com, raw.githubusercontent.com and
+    Docker Hub. ``GH_TOKEN`` or ``GITHUB_TOKEN``, when set, avoids the anonymous
+    GitHub rate limit.
+    """
+    import hashlib
+    import json
+    import os
+
+    release = validate_tag(tag)
+    gh_headers = {"Accept": "application/vnd.github+json"}
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        gh_headers["Authorization"] = f"Bearer {token}"
+    _, body = get(
+        f"https://api.github.com/repos/NousResearch/hermes-agent/commits/{release}", gh_headers
+    )
+    commit = str(json.loads(body)["sha"])
+    if not COMMIT_RE.fullmatch(commit):
+        raise PinError("GitHub returned an unexpected commit id")
+    _, script = get(
+        f"https://raw.githubusercontent.com/NousResearch/hermes-agent/{commit}/scripts/install.sh"
+    )
+    installer_sha256 = hashlib.sha256(script).hexdigest()
+    _, body = get(
+        f"https://auth.docker.io/token?service=registry.docker.io&scope=repository:{IMAGE}:pull"
+    )
+    registry_token = str(json.loads(body)["token"])
+    headers, _ = get(
+        f"https://registry-1.docker.io/v2/{IMAGE}/manifests/{release}",
+        {
+            "Authorization": f"Bearer {registry_token}",
+            "Accept": "application/vnd.oci.image.index.v1+json, "
+            "application/vnd.docker.distribution.manifest.list.v2+json",
+        },
+        head=True,
+    )
+    digest = str(headers.get("Docker-Content-Digest", ""))
+    if not DIGEST_RE.fullmatch(digest):
+        raise PinError(f"Docker Hub returned no index digest for {IMAGE}:{release}")
+    return {
+        "tag": release,
+        "digest": digest,
+        "commit": commit,
+        "installer_sha256": installer_sha256,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -208,8 +365,18 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("get", help="Print the pinned release tag")
     sub.add_parser("image", help="Print the pinned Hermes Docker image")
     sub.add_parser("check", help="Fail if ci.yml hardcodes a different Hermes tag")
+    resolve_parser = sub.add_parser(
+        "resolve", help="Print the digest, commit and installer checksum for a tag"
+    )
+    resolve_parser.add_argument("tag")
+    resolve_parser.add_argument(
+        "--github-output", action="store_true", help="Print key=value lines for GITHUB_OUTPUT"
+    )
     set_parser = sub.add_parser("set", help="Write a release tag through every pin")
     set_parser.add_argument("tag")
+    set_parser.add_argument("--digest", help="Image index digest, sha256:<hex>")
+    set_parser.add_argument("--commit", help="Upstream commit the tag points to")
+    set_parser.add_argument("--installer-sha256", help="sha256 of scripts/install.sh at --commit")
     args = parser.parse_args(argv)
     try:
         if args.command == "get":
@@ -218,11 +385,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "image":
             print(image(args.root))
             return 0
+        if args.command == "resolve":
+            pins = resolve(args.tag)
+            for key, value in pins.items():
+                print(f"{key}={value}" if args.github_output else f"{key}: {value}")
+            return 0
         if args.command == "check":
             check_ci(args.root)
             return 0
-        set_pin(args.root, args.tag)
-    except PinError as exc:
+        set_pin(
+            args.root,
+            args.tag,
+            digest=args.digest,
+            commit=args.commit,
+            installer_sha256=args.installer_sha256,
+        )
+    except (PinError, OSError, KeyError, ValueError) as exc:
         print(redact(str(exc)), file=sys.stderr)
         return 1
     return 0

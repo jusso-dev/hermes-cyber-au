@@ -25,6 +25,8 @@ CARRIED = (
     "mcp/uv.lock",
     "distribution.yaml",
     "docker/Dockerfile",
+    ".devcontainer/Dockerfile",
+    "install/install.sh",
     "tools/hermes_pin.txt",
     "PR_BODY.md",
 )
@@ -293,3 +295,130 @@ def test_no_change_guard_ignores_the_pr_body_so_a_quiet_week_exits_cleanly():
     script = (ROOT / "tools" / "ci" / "data_update_pr.py").read_text(encoding="utf-8")
     assert "if path != body_rel" in script
     assert "print(NO_CHANGE)" in script
+
+
+DIGEST = "sha256:" + "b" * 64
+COMMIT = "c" * 40
+INSTALLER = "d" * 64
+
+
+def _immutable_fixture(tmp_path: Path) -> Path:
+    root = _fixture(tmp_path)
+    _write(
+        root / "docker" / "Dockerfile",
+        "# nousresearch/hermes-agent:v0.22.2. When HERMES_VERSION changes, update\n"
+        "# HERMES_DIGEST version: v0.22.2\n"
+        "ARG HERMES_VERSION=v0.22.2\n"
+        "ARG HERMES_DIGEST=sha256:" + "a" * 64 + "\n"
+        "FROM nousresearch/hermes-agent:${HERMES_VERSION}@${HERMES_DIGEST}\n",
+    )
+    _write(
+        root / ".devcontainer" / "Dockerfile",
+        "FROM nousresearch/hermes-agent:v0.22.2@sha256:" + "a" * 64 + "\n",
+    )
+    _write(
+        root / "install" / "install.sh",
+        "# v0.22.2 tag points to, checked against this SHA-256\n"
+        "HERMES_PIN_VERSION=v0.22.2\n"
+        "HERMES_PIN_COMMIT=" + "a" * 40 + "\n"
+        "HERMES_PIN_SHA256=" + "a" * 64 + "\n",
+    )
+    return root
+
+
+def test_set_with_resolved_pins_moves_every_immutable_pin(tmp_path: Path):
+    root = _immutable_fixture(tmp_path)
+    code = pin.main(
+        [
+            "--root",
+            str(root),
+            "set",
+            "v9.9.9",
+            "--digest",
+            DIGEST,
+            "--commit",
+            COMMIT,
+            "--installer-sha256",
+            INSTALLER,
+        ]
+    )
+    assert code == 0
+    docker = (root / "docker" / "Dockerfile").read_text()
+    assert "ARG HERMES_VERSION=v9.9.9" in docker
+    assert f"ARG HERMES_DIGEST={DIGEST}" in docker
+    assert "# HERMES_DIGEST version: v9.9.9" in docker
+    assert "# nousresearch/hermes-agent:v9.9.9. When" in docker
+    assert "v0.22.2" not in docker
+    dev = (root / ".devcontainer" / "Dockerfile").read_text()
+    assert dev == f"FROM nousresearch/hermes-agent:v9.9.9@{DIGEST}\n"
+    install = (root / "install" / "install.sh").read_text()
+    assert "HERMES_PIN_VERSION=v9.9.9" in install
+    assert f"HERMES_PIN_COMMIT={COMMIT}" in install
+    assert f"HERMES_PIN_SHA256={INSTALLER}" in install
+    assert "# v9.9.9 tag points to" in install
+    assert pin.read_pin(root) == "v9.9.9"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--digest", DIGEST],
+        ["--digest", "sha256:short", "--commit", COMMIT, "--installer-sha256", INSTALLER],
+        ["--digest", DIGEST, "--commit", "main", "--installer-sha256", INSTALLER],
+        ["--digest", DIGEST, "--commit", COMMIT, "--installer-sha256", "x" * 64],
+    ],
+)
+def test_set_refuses_partial_or_malformed_immutable_pins(tmp_path: Path, extra):
+    root = _immutable_fixture(tmp_path)
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    assert pin.main(["--root", str(root), "set", "v9.9.9", *extra]) == 1
+    assert {path: path.read_bytes() for path in before} == before
+
+
+def test_resolve_reads_commit_installer_and_digest():
+    import hashlib
+    import json
+
+    calls = []
+
+    def fake_get(url, headers=None, *, head=False):
+        calls.append(url)
+        if "api.github.com" in url:
+            return {}, json.dumps({"sha": COMMIT}).encode()
+        if "raw.githubusercontent.com" in url:
+            assert COMMIT in url
+            return {}, b"#!/bin/sh\n"
+        if "auth.docker.io" in url:
+            return {}, json.dumps({"token": "registry-token"}).encode()
+        assert head
+        return {"Docker-Content-Digest": DIGEST}, b""
+
+    pins = pin.resolve("v9.9.9", get=fake_get)
+    assert pins == {
+        "tag": "v9.9.9",
+        "digest": DIGEST,
+        "commit": COMMIT,
+        "installer_sha256": hashlib.sha256(b"#!/bin/sh\n").hexdigest(),
+    }
+    assert len(calls) == 4
+
+
+def test_resolve_refuses_a_missing_digest():
+    import json
+
+    def fake_get(url, headers=None, *, head=False):
+        if "api.github.com" in url:
+            return {}, json.dumps({"sha": COMMIT}).encode()
+        if "auth.docker.io" in url:
+            return {}, json.dumps({"token": "t"}).encode()
+        return {}, b"x"
+
+    with pytest.raises(pin.PinError, match="no index digest"):
+        pin.resolve("v9.9.9", get=fake_get)
+
+
+def test_workflow_resolves_and_passes_every_immutable_pin():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "tools/hermes_pin.py resolve" in text
+    assert "--digest" in text and "--commit" in text and "--installer-sha256" in text
+    assert "include-hidden-files: true" in text

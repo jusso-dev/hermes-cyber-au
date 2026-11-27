@@ -45,7 +45,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 tools/hermes_pin.py set "${{ steps.hermes.outputs.latest }}"
+          tag="${{ steps.hermes.outputs.latest }}"
+          # Resolve the image digest, installer commit and checksum for the new tag
+          # so every immutable pin moves with it. The PR shows them for review.
+          python3 tools/hermes_pin.py resolve "$tag" --github-output > pins.env
+          cat pins.env
+          digest=$(sed -n 's/^digest=//p' pins.env)
+          commit=$(sed -n 's/^commit=//p' pins.env)
+          installer=$(sed -n 's/^installer_sha256=//p' pins.env)
+          python3 tools/hermes_pin.py set "$tag" --digest "$digest" --commit "$commit" --installer-sha256 "$installer"
+          {
+            echo "### Resolved pins"
+            echo
+            echo '```'
+            cat pins.env
+            echo '```'
+          } > hermes-pins.md
           # Re-check every fact in docs/research/hermes-structure.md against the new tag.
           uv run --project mcp python tools/ci/verify_hermes_facts.py --tag "${{ steps.hermes.outputs.latest }}" --report hermes-facts.md
       - name: Write PR body
@@ -59,6 +74,9 @@ jobs:
             echo '```'
             git diff --stat
             echo '```'
+            if [ -f hermes-pins.md ]; then
+              cat hermes-pins.md
+            fi
             if [ -f hermes-facts.md ]; then
               cat hermes-facts.md
             fi
@@ -66,10 +84,14 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deps-bump
+          # .devcontainer/Dockerfile is a hidden path; upload-artifact skips those by default.
+          include-hidden-files: true
           path: |
             mcp/uv.lock
             distribution.yaml
             docker/Dockerfile
+            .devcontainer/Dockerfile
+            install/install.sh
             tools/hermes_pin.txt
             PR_BODY.md
 
@@ -87,7 +109,7 @@ jobs:
       body_file: PR_BODY.md
       labels: "type:task,area:ci,area:release"
       # changed.txt is the scratch list data-update-pr.yml writes before it filters paths.
-      allowed_paths: '^(mcp/uv\.lock|distribution\.yaml|docker/Dockerfile|tools/hermes_pin\.txt|PR_BODY\.md|changed\.txt)$'
+      allowed_paths: '^(mcp/uv\.lock|distribution\.yaml|docker/Dockerfile|\.devcontainer/Dockerfile|install/install\.sh|tools/hermes_pin\.txt|PR_BODY\.md|changed\.txt)$'
     secrets: inherit
     permissions:
       contents: write
