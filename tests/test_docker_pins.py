@@ -79,3 +79,16 @@ def test_install_sh_pins_the_hermes_installer():
     runner = text.split("run_hermes_installer() {", 1)[1].split("\n}\n", 1)[0]
     assert 'verify_sha256 "$HERMES_SCRIPT_DIR/install.sh" "$HERMES_PIN_SHA256"' in runner
     assert '--commit "$HERMES_PIN_COMMIT"' in runner
+
+
+def test_install_sh_is_executable_in_git():
+    import subprocess
+
+    mode = subprocess.run(
+        ["git", "ls-files", "-s", "install/install.sh"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()[0]
+    assert mode == "100755", "install/install.sh lost its executable bit"
