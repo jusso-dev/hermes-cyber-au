@@ -10,6 +10,9 @@ setup_file() {
   fi
   CYBERAU_REAL_PYTHON="$(uv run --project "$REPO/mcp" python -c 'import sys; print(sys.executable)')"
   export CYBERAU_REAL_PYTHON
+  HERMES_REQUIRED="$("$CYBERAU_REAL_PYTHON" "$REPO/tools/hermes_pin.py" get)"
+  HERMES_REQUIRED="${HERMES_REQUIRED#v}"
+  export HERMES_REQUIRED
 }
 
 setup() {
@@ -53,7 +56,7 @@ for arg in "$@"; do
   prev=$arg
   case $arg in
     --version|-V)
-      printf '%s\n' "Hermes Agent ${HERMES_FAKE_VERSION:-0.22.2}"
+      printf '%s\n' "Hermes Agent ${HERMES_FAKE_VERSION:-${HERMES_REQUIRED:?}}"
       exit 0
       ;;
   esac
@@ -233,15 +236,15 @@ EOF
   export HERMES_FAKE_VERSION=0.22.1
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 1 ]
-  [[ "$output" == *"requires Hermes >=0.22.2, but you have 0.22.1"* ]]
+  [[ "$output" == *"requires Hermes >=${HERMES_REQUIRED}, but you have 0.22.1"* ]]
   ! grep -q "profile install" "$HERMES_FAKE_LOG"
 }
 
 @test "version gate accepts the required Hermes version" {
-  export HERMES_FAKE_VERSION=0.22.2
+  export HERMES_FAKE_VERSION="$HERMES_REQUIRED"
   run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
   [ "$status" -eq 0 ]
-  [[ "$output" == *"satisfies >=0.22.2"* ]]
+  [[ "$output" == *"satisfies >=${HERMES_REQUIRED}"* ]]
   grep -q "profile install" "$HERMES_FAKE_LOG"
 }
 
