@@ -282,7 +282,12 @@ class HttpClient:
                 self._sleep(self._backoff(attempt))
                 attempt += 1
                 continue
-            if response.status_code in (429, 503) and attempt < self.retries:
+            # GitHub's secondary rate limit answers 403 with Retry-After. A 403
+            # without it is a refusal and is returned at once.
+            retryable = response.status_code in (429, 503) or (
+                response.status_code == 403 and "retry-after" in response.headers
+            )
+            if retryable and attempt < self.retries:
                 delay = self._retry_delay(response, attempt)
                 # A Retry-After longer than max_retry_wait is returned, not slept through,
                 # so the caller can stay inside its own tool timeout.

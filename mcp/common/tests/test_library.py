@@ -599,6 +599,33 @@ class TestHttp:
         assert any(item > 0 for item in delays)
         client.close()
 
+    def test_403_with_retry_after_is_retried_but_plain_403_is_not(self, tmp_path: Path):
+        delays: list[float] = []
+        calls = {"n": 0}
+
+        def limited(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(403, headers={"retry-after": "2"})
+            return httpx.Response(200, content=b"ok")
+
+        client = _client(tmp_path, limited, sleeper=delays.append)
+        assert client.get("https://example.com/a", ttl=5).body == b"ok"
+        assert delays == [2.0] and calls["n"] == 2
+        client.close()
+
+        refused = {"n": 0}
+
+        def denied(request: httpx.Request) -> httpx.Response:
+            refused["n"] += 1
+            return httpx.Response(403)
+
+        (tmp_path / "b").mkdir()
+        client = _client(tmp_path / "b", denied, sleeper=delays.append)
+        assert client.get("https://example.com/b", ttl=5).status == 403
+        assert refused["n"] == 1
+        client.close()
+
     def test_retry_after_seconds_date_and_garbage(self, tmp_path: Path):
         import email.utils
         import time as _time
