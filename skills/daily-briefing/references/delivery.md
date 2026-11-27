@@ -16,7 +16,7 @@ Hermes v0.22.2 (commit `43faacf`) gateway targets include:
 hermes -p cyber-au cron edit cyberau-morning-brief --deliver slack
 ```
 
-Microsoft Teams is not a delivery target in that Hermes version. This repository does not invent a Teams target.
+Microsoft Teams is not a delivery target in that Hermes version. To post to a Teams or Slack webhook, or to an SMTP server, use `cyberau-mcp deliver` (see below).
 
 A Telegram or Slack chat id, when you need one, belongs in the profile you edit locally. The Hermes form is `telegram:<chat>` and `slack` for the home channel. Do not commit the id.
 
@@ -46,3 +46,7 @@ hermes -p cyber-au cron create "30 7 * * *" --name "Morning cyber briefing email
 ```
 
 `email.yaml` holds `api_url` (https), `from`, `to` (one address or a list) and `key_file`. Optional: `reply_to`, and `protective_marking` (`UNOFFICIAL`, `OFFICIAL` or `OFFICIAL:Sensitive`) for Australian Government recipients. A marking adds the EPMS 2025.1 subject suffix and `X-Protective-Marking` header, and shows the marking at the top and bottom of the body. PROTECTED and above are refused. The key file must be readable by its owner only, or the send is refused. The key is sent once in a header and never printed. Keep the shipped `cyberau-morning-brief` agent job paused when this job delivers the briefing, so it does not run twice.
+
+## Teams, Slack or SMTP with `cyberau-mcp deliver`
+
+`cyberau-mcp deliver <briefing file>` posts a rendered briefing to a Teams workflow webhook, a Slack incoming webhook or an SMTP server. Destinations are in `delivery.yaml` in the profile data directory, which names `.env` variables and never holds a URL or password. With no destinations it does nothing. The default run is a dry run: it writes a draft per destination and prints the full message and where it would go. `--send` delivers only to destinations marked `approved: true`. A destination without `owner: true` only accepts a briefing rendered with `--channel external`. See `docs/operations/briefing-delivery.md`.

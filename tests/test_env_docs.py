@@ -79,3 +79,21 @@ def test_approval_key_creation_is_documented():
     template = (ROOT / ".env.template").read_text(encoding="utf-8")
     assert "# CYBERAU_APPROVAL_KEY=" in template
     assert "secrets.token_hex(32)" in template
+
+
+def test_briefing_delivery_names_are_documented():
+    template = (ROOT / ".env.template").read_text(encoding="utf-8")
+    dist = (ROOT / "distribution.yaml").read_text(encoding="utf-8")
+    for name in (
+        "CYBERAU_SLACK_WEBHOOK",
+        "CYBERAU_TEAMS_WEBHOOK",
+        "CYBERAU_SMTP_USERNAME",
+        "CYBERAU_SMTP_PASSWORD",
+    ):
+        assert f"# {name}=" in template, name
+        assert f"name: {name}\n" in dist, name
+    # The default names are declared, so the shared redactor treats their values as secrets.
+    from cyberau_common.secrets import is_plain_config_name
+
+    assert not is_plain_config_name("CYBERAU_SLACK_WEBHOOK")
+    assert not is_plain_config_name("CYBERAU_TEAMS_WEBHOOK")

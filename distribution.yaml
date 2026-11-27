@@ -42,6 +42,18 @@ env_requires:
   - name: ABR_GUID
     description: "Optional ABN Lookup web services GUID. Expands watchlist ABNs to registered names. The ABN is not sent to vendors."
     required: false
+  - name: CYBERAU_SLACK_WEBHOOK
+    description: "Optional Slack incoming webhook URL for briefing delivery. Used only when delivery.yaml names it and approves the destination."
+    required: false
+  - name: CYBERAU_TEAMS_WEBHOOK
+    description: "Optional Microsoft Teams workflow webhook URL for briefing delivery. Used only when delivery.yaml names it and approves the destination."
+    required: false
+  - name: CYBERAU_SMTP_USERNAME
+    description: "Optional SMTP username for briefing delivery by email."
+    required: false
+  - name: CYBERAU_SMTP_PASSWORD
+    description: "Optional SMTP password for briefing delivery by email."
+    required: false
   - name: ABUSEIPDB_API_KEY
     description: "AbuseIPDB API key. Needed for IP and network reputation checks."
     required: false
