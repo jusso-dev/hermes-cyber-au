@@ -548,3 +548,257 @@ def test_packs_without_the_connector_warn(store_path, monkeypatch):
     _write(store_path, "packs: [microsoft-security]\n")
     summary = run_watchlist(store=store_path, now="2026-10-20T04:00:00Z")
     assert any("custom-feeds connector" in item for item in summary["warnings"])
+
+
+# Cloudflare Radar BGP events for watched ASNs.
+
+RADAR_TOKEN = "test-only-radar-token-not-a-secret"
+_HIJACKS = {
+    "success": True,
+    "errors": [],
+    "result": {
+        "asn_info": [{"asn": 64511, "org_name": "Synthetic Hijacker", "country_code": "AU"}],
+        "events": [
+            {
+                "id": 7001,
+                "hijacker_asn": 64511,
+                "hijacker_country": "AU",
+                "victim_asns": [64496],
+                "victim_countries": ["AU"],
+                "prefixes": ["192.0.2.0/24"],
+                "min_hijack_ts": "2026-10-16T01:00:00",
+                "max_hijack_ts": "2026-10-16T01:05:00",
+                "duration": 300,
+                "confidence_score": 9,
+                "is_stale": False,
+            },
+            {
+                "id": 7002,
+                "hijacker_asn": 64500,
+                "victim_asns": [64501],
+                "prefixes": ["198.51.100.0/24"],
+            },
+        ],
+    },
+}
+_LEAKS = {
+    "success": True,
+    "errors": [],
+    "result": {
+        "asn_info": [],
+        "events": [
+            {
+                "id": 8001,
+                "leak_asn": 64496,
+                "leak_seg": [64510, 64496, 64512],
+                "leak_type": 1,
+                "countries": ["AU"],
+                "detected_ts": "2026-10-16T02:00:00",
+                "prefix_count": 4,
+            }
+        ],
+    },
+}
+RADAR_CONFIG = "mcp_servers:\n  crtsh:\n    enabled: true\n  cloudflare_radar:\n    enabled: true\n"
+
+
+@pytest.fixture
+def radar(monkeypatch):
+    from cyberau_cloudflare_radar import source
+
+    monkeypatch.delenv("CYBERAU_OFFLINE", raising=False)
+    monkeypatch.delenv("CYBERAU_AUDIT_LOG_PATH", raising=False)
+    monkeypatch.delenv("CYBERAU_EGRESS_ALLOWLIST", raising=False)
+    monkeypatch.setenv(source.TOKEN_ENV, RADAR_TOKEN)
+    requests: list[httpx.Request] = []
+    state = {"status": 200}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if state["status"] != 200:
+            return httpx.Response(state["status"], json={"success": False})
+        body = _HIJACKS if request.url.path.endswith("/bgp/hijacks/events") else _LEAKS
+        return httpx.Response(200, json=body)
+
+    monkeypatch.setattr(egress, "_resolve", lambda host: [ipaddress.ip_address("1.2.3.4")])
+    source._TRANSPORT = httpx.MockTransport(handler)
+    source._SLEEP = lambda _seconds: None
+    source._LIMIT_SLEEP = lambda _seconds: None
+    yield requests, state
+    source._TRANSPORT = None
+    source._SLEEP = time.sleep
+    source._LIMIT_SLEEP = time.sleep
+
+
+def test_radar_bgp_events_for_watched_asns_are_matched_and_audited(store_path, radar):
+    requests, _state = radar
+    _write(store_path)
+    summary = run_watchlist(store=store_path, radar=True, now="2026-10-17T10:00:00Z")
+    assert summary["radar"] == {"enabled": True, "queried": 2, "failed": 0, "matches": 2}
+    found = {
+        row["ref"]: (row["kind"], row["value"], row["detail"])
+        for row in list_matches(store=store_path)
+        if row["ref_kind"] == "radar"
+    }
+    assert found == {
+        "hijack:7001": (
+            "bgp_hijack",
+            "AS64496",
+            "Radar BGP hijack, watched ASN is the victim, confidence 9,"
+            " started 2026-10-16T01:00:00",
+        ),
+        "leak:8001": (
+            "bgp_leak",
+            "AS64496",
+            "Radar route leak, watched ASN is the leaker, detected 2026-10-16T02:00:00",
+        ),
+    }
+    assert {request.url.host for request in requests} == {"api.cloudflare.com"}
+    assert sorted(request.url.params["involvedAsn"] for request in requests) == ["64496"] * 2
+    records = [
+        record
+        for record in _audit_records(store_path)
+        if record["event"] == "tool_call" and "radar" in record.get("flags", [])
+    ]
+    assert sorted(record["tool"] for record in records) == [
+        "get_radar_bgp_hijacks_events",
+        "get_radar_bgp_leaks_events",
+    ]
+    assert all(record["args_redacted"]["involved_asn"] == 64496 for record in records)
+    assert all(RADAR_TOKEN not in json.dumps(record) for record in _audit_records(store_path))
+
+    payload = hits(store=store_path, since="2026-10-17T00:00:00Z")["data"]["hits"]
+    kinds = sorted(hit["kind"] for hit in payload if hit.get("asset") == "AS64496")
+    assert kinds == ["bgp_hijack", "bgp_leak"]
+
+
+def test_radar_without_a_token_or_asns_is_skipped(store_path, radar, monkeypatch):
+    requests, _state = radar
+    _write(store_path, "domains: [example.com]\n")
+    summary = run_watchlist(store=store_path, radar=True, now="2026-10-17T10:00:00Z")
+    assert summary["radar"]["skipped"] == "no watched ASNs"
+    _write(store_path)
+    monkeypatch.delenv("CLOUDFLARE_RADAR_API_TOKEN")
+    summary = run_watchlist(store=store_path, radar=True, now="2026-10-17T10:00:00Z")
+    assert summary["status"] == "ok"
+    assert "CLOUDFLARE_RADAR_API_TOKEN is not set" in summary["radar"]["skipped"]
+    assert requests == []
+    assert _audit_records(store_path) == []
+
+
+def test_radar_failure_keeps_recent_matches_then_ages_them_out(store_path, radar, monkeypatch):
+    _write(store_path)
+    run_watchlist(store=store_path, radar=True, now="2026-10-17T10:00:00Z")
+    assert len(list_matches(store=store_path, lists=["asns"])) == 2
+    # A repeat within 15 minutes is served from the connector cache, so fail the call itself.
+    from cyberau_cloudflare_radar import source
+
+    failed = {"data": None, "warnings": ["upstream status 503"], "cache": "snapshot"}
+    monkeypatch.setattr(source, "get_radar_bgp_hijacks_events", lambda **kwargs: failed)
+    monkeypatch.setattr(source, "get_radar_bgp_leaks_events", lambda **kwargs: failed)
+    summary = run_watchlist(store=store_path, radar=True, now="2026-10-18T10:00:00Z")
+    assert summary["status"] == "ok"
+    assert summary["radar"]["failed"] == 1
+    assert any("Radar query failed" in item for item in summary["warnings"])
+    assert len(list_matches(store=store_path, lists=["asns"])) == 2
+    summary = run_watchlist(store=store_path, now="2026-10-30T10:00:00Z")
+    assert summary["removed"] == 2
+    assert list_matches(store=store_path, lists=["asns"]) == []
+
+
+def test_lookups_follow_the_profile_config(store_path, crtsh, radar, tmp_path):
+    crt_requests, _ = crtsh
+    radar_requests, _ = radar
+    _write(store_path)
+    config = tmp_path / "config.yaml"
+    config.write_text("mcp_servers:\n  crtsh: {enabled: false}\n", encoding="utf-8")
+    summary = run_watchlist(
+        store=store_path,
+        crtsh=True,
+        radar=True,
+        profile_config=config,
+        now="2026-10-17T10:00:00Z",
+    )
+    assert summary["crtsh"]["skipped"] == "crt.sh connector is off in config.yaml"
+    assert summary["radar"]["skipped"] == "Cloudflare Radar connector is off in config.yaml"
+    assert crt_requests == [] and radar_requests == []
+    assert _audit_records(store_path) == []
+
+
+def test_no_outbound_call_carries_watched_values_except_to_its_connector(
+    store_path, crtsh, radar, tmp_path, capsys
+):
+    """Issue 62: domains go only to crt.sh, ASNs only to Radar, checked against the audit log."""
+    crt_requests, _ = crtsh
+    radar_requests, _ = radar
+    _write(store_path)
+    _indicator("ipv4", "192.0.2.10")
+    _advisory("adv-1", "FortiOS flaw hits Example Brand")
+    config = tmp_path / "config.yaml"
+    config.write_text(RADAR_CONFIG, encoding="utf-8")
+    code, payload = _cli(
+        [
+            "watchlist",
+            "run",
+            "--crtsh",
+            "--radar",
+            "--profile-config",
+            str(config),
+            "--path",
+            str(store_path),
+        ],
+        capsys,
+    )
+    assert code == 0, payload
+    assert payload["crtsh"]["queried"] == 1 and payload["radar"]["queried"] == 2
+
+    watched = {
+        "domains": ["example.com"],
+        "asns": ["64496"],
+        "others": [
+            "Example Brand",
+            "Example Vendor",
+            "ExampleOS",
+            "192.0.2",
+            "2001:db8",
+            "Fortinet",
+        ],
+    }
+    seen = [(request, "crtsh") for request in crt_requests]
+    seen += [(request, "radar") for request in radar_requests]
+    assert {request.url.host for request, _ in seen} == {"crt.sh", "api.cloudflare.com"}
+    for request, label in seen:
+        sent = (
+            str(request.url) + request.content.decode() + json.dumps(dict(request.headers))
+        ).lower()
+        assert not any(value.lower() in sent for value in watched["others"]), label
+        if label == "crtsh":
+            assert request.url.host == "crt.sh"
+            assert "64496" not in sent
+        else:
+            assert request.url.host == "api.cloudflare.com"
+            assert "example.com" not in sent
+
+    # Every outbound call is in the audit log, and each logged call names only the
+    # watched value meant for that connector.
+    calls = [record for record in _audit_records(store_path) if record["event"] == "tool_call"]
+    by_tool: dict[str, list[dict]] = {}
+    for record in calls:
+        by_tool.setdefault(record["tool"], []).append(record)
+    assert set(by_tool) == {
+        "crtsh_certs",
+        "get_radar_bgp_hijacks_events",
+        "get_radar_bgp_leaks_events",
+    }
+    assert len(by_tool["crtsh_certs"]) == len(crt_requests)
+    radar_calls = by_tool["get_radar_bgp_hijacks_events"] + by_tool["get_radar_bgp_leaks_events"]
+    assert len(radar_calls) == len(radar_requests)
+    for record in calls:
+        args = json.dumps(record["args_redacted"]).lower()
+        assert not any(value.lower() in args for value in watched["others"])
+        if record["tool"] == "crtsh_certs":
+            assert record["args_redacted"]["domain"] == "example.com"
+            assert "64496" not in args
+        else:
+            assert record["args_redacted"]["involved_asn"] == 64496
+            assert "example.com" not in args

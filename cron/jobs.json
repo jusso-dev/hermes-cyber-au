@@ -185,15 +185,28 @@
     },
     {
       "id": "cyberau-watchlist",
-      "name": "Nightly watchlist matches",
+      "name": "Hourly watchlist matches",
       "script": "cyberau_watchlist.sh",
       "no_agent": true,
       "schedule": {
-        "kind": "cron",
-        "expr": "0 4 * * *",
-        "display": "0 4 * * *"
+        "kind": "interval",
+        "minutes": 60,
+        "display": "every 60m"
       },
-      "schedule_display": "0 4 * * *",
+      "schedule_display": "every 60m",
+      "deliver": "local"
+    },
+    {
+      "id": "cyberau-watchlist-lookups",
+      "name": "Daily watchlist lookalike and BGP lookups",
+      "script": "cyberau_watchlist_lookups.sh",
+      "no_agent": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "15 5 * * *",
+        "display": "15 5 * * *"
+      },
+      "schedule_display": "15 5 * * *",
       "deliver": "local"
     },
     {

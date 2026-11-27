@@ -248,12 +248,24 @@ def _add_watchlist(sub, common: argparse.ArgumentParser) -> None:
     run = commands.add_parser(
         "run",
         parents=[common, watch_file],
-        help="Recompute all matches and drop any that no longer hold (nightly)",
+        help="Recompute all matches and drop any that no longer hold (hourly)",
     )
     run.add_argument(
         "--crtsh",
         action="store_true",
         help="Also send each watched domain to crt.sh to find lookalike certificates",
+    )
+    run.add_argument(
+        "--radar",
+        action="store_true",
+        help="Also send each watched ASN to Cloudflare Radar for BGP hijack and leak events",
+    )
+    run.add_argument(
+        "--profile-config",
+        help=(
+            "Profile config.yaml. When given, --crtsh and --radar run only if that"
+            " connector is enabled there"
+        ),
     )
     run.set_defaults(func=_cmd_watchlist_run)
 
@@ -452,7 +464,13 @@ def _cmd_vacuum(args: argparse.Namespace) -> int:
 
 def _cmd_watchlist_run(args: argparse.Namespace) -> int:
     try:
-        summary = run_watchlist(store=args.path, watchlist=args.watchlist, crtsh=args.crtsh)
+        summary = run_watchlist(
+            store=args.path,
+            watchlist=args.watchlist,
+            crtsh=args.crtsh,
+            radar=args.radar,
+            profile_config=args.profile_config,
+        )
     except WatchlistFileError as exc:
         _emit({"status": "error", "routine": "watchlist", "error": str(exc)})
         return 1

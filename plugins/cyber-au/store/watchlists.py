@@ -9,9 +9,11 @@ shipped. Each run recomputes ``watchlist_matches`` from what is in the store now
 matches are kept (with their first match time) and every other row is deleted, so a match
 never refers to an indicator or advisory that has expired or been removed.
 
-Watched values stay local. The only outbound call is the optional crt.sh query
-(``run_watchlist(crtsh=True)``), which sends each watched domain to crt.sh and is recorded
-in the audit log.
+Watched values stay local. The only outbound calls are opt-in: the crt.sh query
+(``run_watchlist(crtsh=True)``) sends each watched domain to crt.sh, and the Cloudflare
+Radar query (``run_watchlist(radar=True)``) sends each watched ASN to Radar's BGP hijack
+and route leak endpoints. Every query is recorded in the audit log before its result is
+used.
 """
 
 from __future__ import annotations
@@ -43,8 +45,16 @@ WATCH_LIST = "watches"
 STORE_REFS = ("indicator", "advisory")
 CRTSH_REF = "crtsh"
 # A crt.sh match is replaced only by a successful query for its domain. When queries keep
-# failing, or the nightly run stops passing --crtsh, the match ages out after this long.
+# failing, or the daily run stops passing --crtsh, the match ages out after this long.
 CRTSH_KEEP_SECONDS = 7 * 24 * 3600
+RADAR_REF = "radar"
+# Same rule for Radar BGP events: replaced by a successful query for the ASN, else aged out.
+RADAR_KEEP_SECONDS = 7 * 24 * 3600
+RADAR_DATE_RANGE = "7d"
+RADAR_LIMIT = 50
+# Profile config.yaml server names that gate the two lookups (see --profile-config).
+CRTSH_SERVER = "crtsh"
+RADAR_SERVER = "cloudflare_radar"
 
 _MULTI_SUFFIXES = frozenset(
     {
@@ -170,6 +180,11 @@ class CrtshResult:
     matches: list[Match] = field(default_factory=list)
     # Watched domains whose query succeeded, so their old crt.sh rows can be replaced.
     refreshed: set[str] = field(default_factory=set)
+
+
+@dataclass
+class RadarResult(CrtshResult):
+    """Result of the Radar BGP lookup. ``refreshed`` holds ``AS<number>`` values."""
 
 
 # Paths and the template.
@@ -810,6 +825,178 @@ def _certificate_names(rows: list) -> list[str]:
     return names
 
 
+# Cloudflare Radar BGP hijack and route leak events for watched ASNs.
+
+_RADAR_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?$")
+
+
+def radar_bgp_events(watch: Watchlist, *, audit=None) -> RadarResult:
+    """Query Radar BGP hijack and leak events for each watched ASN.
+
+    Only watched ASNs are sent, only to Cloudflare Radar through the cloudflare-radar
+    connector, and each query is written to the audit log. Any failure is a warning.
+    """
+    result = RadarResult(enabled=True)
+    if not watch.asns:
+        result.skipped = "no watched ASNs"
+        return result
+    try:
+        from cyberau_cloudflare_radar import source as radar
+        from cyberau_common.secrets import lookup
+    except ImportError:
+        result.skipped = "Cloudflare Radar connector is not installed"
+        return result
+    if lookup(radar.TOKEN_ENV) is None:
+        result.skipped = f"{radar.TOKEN_ENV} is not set, Radar was not queried"
+        return result
+    try:
+        if audit is None:
+            from cyberau_common.audit import AuditLog
+
+            audit = AuditLog()
+        audit.probe()
+    except Exception:
+        result.skipped = "audit log is not writable, Radar was not queried"
+        return result
+    tools = (
+        ("get_radar_bgp_hijacks_events", radar.get_radar_bgp_hijacks_events, _hijack_match),
+        ("get_radar_bgp_leaks_events", radar.get_radar_bgp_leaks_events, _leak_match),
+    )
+    for asn in watch.asns:
+        value = f"AS{asn}"
+        ok_all = True
+        for tool, call, convert in tools:
+            args = {"involved_asn": asn, "date_range": RADAR_DATE_RANGE, "limit": RADAR_LIMIT}
+            started = time.monotonic()
+            try:
+                envelope = call(**args)
+            except Exception:
+                envelope = None
+            elapsed = int((time.monotonic() - started) * 1000)
+            result.queried += 1
+            data = envelope.get("data") if isinstance(envelope, dict) else None
+            ok = isinstance(data, dict) and isinstance(data.get("events"), list)
+            flags = ["watchlist", "radar"]
+            if isinstance(envelope, dict) and envelope.get("cache"):
+                flags.append(f"cache:{envelope['cache']}")
+            if not ok:
+                flags.append("failed")
+            try:
+                audit.record(
+                    "tool_call",
+                    tool=tool,
+                    args=args,
+                    result=envelope,
+                    duration_ms=elapsed,
+                    flags=flags,
+                )
+            except Exception:
+                result.skipped = "audit log write failed, Radar queries stopped"
+                return result
+            if not ok:
+                ok_all = False
+                continue
+            for event in data["events"]:
+                match = convert(asn, value, event) if isinstance(event, dict) else None
+                if match is not None:
+                    result.matches.append(match)
+        if ok_all:
+            result.refreshed.add(value)
+        else:
+            result.failed.append(value)
+    return result
+
+
+def _hijack_match(asn: int, value: str, event: dict) -> Match | None:
+    ident = _radar_int(event.get("id"))
+    hijacker = _radar_int(event.get("hijacker_asn"))
+    victims = [n for n in map(_radar_int, _radar_list(event.get("victim_asns"))) if n]
+    if ident is None or hijacker is None:
+        return None
+    if asn == hijacker:
+        role = "hijacker"
+    elif asn in victims:
+        role = "victim"
+    else:
+        return None
+    prefixes = _radar_prefixes(event.get("prefixes"))
+    matched = f"AS{hijacker} announced {', '.join(prefixes) or 'prefixes'}"
+    parts = [f"Radar BGP hijack, watched ASN is the {role}"]
+    score = _radar_int(event.get("confidence_score"))
+    if score is not None:
+        parts.append(f"confidence {score}")
+    start = _radar_ts(event.get("min_hijack_ts"))
+    if start:
+        parts.append(f"started {start}")
+    return Match(
+        "asns", "bgp_hijack", value, RADAR_REF, f"hijack:{ident}", matched, ", ".join(parts)
+    )
+
+
+def _leak_match(asn: int, value: str, event: dict) -> Match | None:
+    ident = _radar_int(event.get("id"))
+    leaker = _radar_int(event.get("leak_asn"))
+    path = [n for n in map(_radar_int, _radar_list(event.get("leak_seg"))) if n]
+    if ident is None or leaker is None:
+        return None
+    if asn == leaker:
+        role = "the leaker"
+    elif asn in path:
+        role = "on the leak path"
+    else:
+        return None
+    count = _radar_int(event.get("prefix_count"))
+    matched = f"AS{leaker} leaked {count if count is not None else 'some'} prefixes"
+    parts = [f"Radar route leak, watched ASN is {role}"]
+    detected = _radar_ts(event.get("detected_ts"))
+    if detected:
+        parts.append(f"detected {detected}")
+    return Match("asns", "bgp_leak", value, RADAR_REF, f"leak:{ident}", matched, ", ".join(parts))
+
+
+def _radar_int(value) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _radar_list(value) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _radar_prefixes(value) -> list[str]:
+    found: list[str] = []
+    for item in _radar_list(value)[:3]:
+        if not isinstance(item, str):
+            continue
+        try:
+            found.append(str(ipaddress.ip_network(item, strict=False)))
+        except ValueError:
+            continue
+    return found
+
+
+def _radar_ts(value) -> str | None:
+    return value if isinstance(value, str) and _RADAR_TS.fullmatch(value) else None
+
+
+def server_enabled(config: str | Path, server: str) -> bool:
+    """True when the profile ``config.yaml`` sets ``mcp_servers.<server>.enabled: true``.
+
+    crt.sh and Cloudflare Radar ship off for licence terms, so a missing, unreadable or
+    absent entry counts as off.
+    """
+    import yaml
+
+    try:
+        data = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return False
+    servers = data.get("mcp_servers") if isinstance(data, dict) else None
+    spec = servers.get(server) if isinstance(servers, dict) else None
+    return isinstance(spec, dict) and spec.get("enabled") is True
+
+
 # One run.
 
 
@@ -818,10 +1005,16 @@ def run_watchlist(
     store: str | Path | None = None,
     watchlist: str | Path | None = None,
     crtsh: bool = False,
+    radar: bool = False,
+    profile_config: str | Path | None = None,
     audit=None,
     now: str | None = None,
 ) -> dict:
-    """Recompute watchlist matches. Returns a JSON-ready summary without watched values."""
+    """Recompute watchlist matches. Returns a JSON-ready summary without watched values.
+
+    ``crtsh`` and ``radar`` turn on the two outbound lookups. With ``profile_config``, each
+    lookup also needs its connector enabled in that ``config.yaml``.
+    """
     file = watchlist_path(watchlist)
     run_at = canonical_timestamp(now) if now else utc_now()
     summary: dict = {
@@ -835,6 +1028,7 @@ def run_watchlist(
         "removed": 0,
         "by_kind": {},
         "crtsh": {"enabled": crtsh},
+        "radar": {"enabled": radar},
         "warnings": [],
     }
     store_file = resolve_db_path(store)
@@ -851,8 +1045,11 @@ def run_watchlist(
     summary["warnings"].extend(watch.warnings)
 
     found_crtsh = CrtshResult()
-    if crtsh:
+    if crtsh and profile_config is not None and not server_enabled(profile_config, CRTSH_SERVER):
+        found_crtsh = CrtshResult(enabled=True, skipped="crt.sh connector is off in config.yaml")
+    elif crtsh:
         found_crtsh = crtsh_lookalikes(watch, audit=audit)
+    if crtsh:
         summary["crtsh"] = {
             "enabled": True,
             "queried": found_crtsh.queried,
@@ -867,11 +1064,34 @@ def run_watchlist(
                 f"crt.sh query failed for {len(found_crtsh.failed)} watched domain(s)"
             )
 
+    found_radar = RadarResult()
+    if radar and profile_config is not None and not server_enabled(profile_config, RADAR_SERVER):
+        found_radar = RadarResult(
+            enabled=True, skipped="Cloudflare Radar connector is off in config.yaml"
+        )
+    elif radar:
+        found_radar = radar_bgp_events(watch, audit=audit)
+    if radar:
+        summary["radar"] = {
+            "enabled": True,
+            "queried": found_radar.queried,
+            "failed": len(found_radar.failed),
+            "matches": len(found_radar.matches),
+        }
+        if found_radar.skipped:
+            summary["radar"]["skipped"] = found_radar.skipped
+            summary["warnings"].append(f"Radar skipped: {found_radar.skipped}")
+        if found_radar.failed:
+            summary["warnings"].append(
+                f"Radar query failed for {len(found_radar.failed)} watched ASN(s)"
+            )
+
     handle = open_store(store_file)
     with handle.transaction() as conn:
         current = compute_matches(conn, watch, now=run_at)
         current.extend(found_crtsh.matches)
-        new, removed = _store_matches(conn, watch, current, found_crtsh, run_at)
+        current.extend(found_radar.matches)
+        new, removed = _store_matches(conn, watch, current, found_crtsh, run_at, found_radar)
         _touch_routine(conn, run_at)
     by_kind: dict[str, int] = {}
     for item in current:
@@ -882,7 +1102,15 @@ def run_watchlist(
     return summary
 
 
-def _store_matches(conn, watch, current, crtsh: CrtshResult, run_at: str) -> tuple[int, int]:
+def _store_matches(
+    conn,
+    watch,
+    current,
+    crtsh: CrtshResult,
+    run_at: str,
+    radar: RadarResult | None = None,
+) -> tuple[int, int]:
+    radar = radar or RadarResult()
     existing = {
         (row["list"], row["value"], row["ref_kind"], row["ref"]): row["last_matched"]
         for row in conn.execute(
@@ -918,7 +1146,9 @@ def _store_matches(conn, watch, current, crtsh: CrtshResult, run_at: str) -> tup
             ),
         )
     watched_domains = set(watch.domains)
+    watched_asns = {f"AS{number}" for number in watch.asns}
     cutoff = _shift(run_at, -CRTSH_KEEP_SECONDS)
+    radar_cutoff = _shift(run_at, -RADAR_KEEP_SECONDS)
     removed = 0
     for key, last in existing.items():
         if key in keys:
@@ -928,6 +1158,11 @@ def _store_matches(conn, watch, current, crtsh: CrtshResult, run_at: str) -> tup
             # Kept only while the domain is watched, its query did not succeed this run,
             # and the match is recent.
             keep = value in watched_domains and value not in crtsh.refreshed and last >= cutoff
+            if keep:
+                continue
+        if ref_kind == RADAR_REF:
+            # The same rule for Radar BGP events, keyed by the watched ASN.
+            keep = value in watched_asns and value not in radar.refreshed and last >= radar_cutoff
             if keep:
                 continue
         conn.execute(
@@ -971,6 +1206,7 @@ _LIVE = """
     (m.ref_kind = 'indicator' AND EXISTS (SELECT 1 FROM indicators i WHERE i.id = m.ref))
     OR (m.ref_kind = 'advisory' AND EXISTS (SELECT 1 FROM advisories a WHERE a.id = m.ref))
     OR m.ref_kind = 'crtsh'
+    OR m.ref_kind = 'radar'
 """
 
 
