@@ -32,6 +32,11 @@ jobs:
       - name: Validate skills, manifests and catalogue
         run: uv run --project mcp python tools/ci/validate_repo.py
       - name: House style (Australian English, no em dashes, no emojis, no private names)
+        # Banned names come from the masked CYBERAU_PRIVATE_NAMES secret (newline separated)
+        # and the hash file. Secrets are not passed to pull requests from forks; the check
+        # still runs there with the hash file only.
+        env:
+          CYBERAU_PRIVATE_NAMES: ${{ secrets.CYBERAU_PRIVATE_NAMES }}
         run: uv run --project mcp python tools/ci/style_check.py
 
   test:

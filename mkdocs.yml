@@ -1,5 +1,6 @@
 site_name: hermes-cyber-au
 site_description: Documentation for the hermes-cyber-au Hermes profile distribution.
+site_url: https://jusso-dev.github.io/hermes-cyber-au/
 repo_url: https://github.com/jusso-dev/hermes-cyber-au
 repo_name: jusso-dev/hermes-cyber-au
 docs_dir: docs

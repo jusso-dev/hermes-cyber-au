@@ -211,3 +211,28 @@ class _TempTree:
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_env_secret_names_fail_the_check_without_a_hash_file(self):
+        import contextlib
+        import io
+        import os
+        from unittest import mock
+
+        with _TempTree() as root:
+            names = root / "tools" / "ci" / "private_names.sha256"
+            names.parent.mkdir(parents=True)
+            names.write_text("# no hashes\n", encoding="utf-8")
+            (root / "notes.md").write_text("Ask Quartz Heron first.\n", encoding="utf-8")
+            env = {k: v for k, v in os.environ.items() if not k.startswith("CYBERAU_")}
+            env["CYBERAU_PRIVATE_NAMES"] = "unused name\nquartz heron\n"
+            out = io.StringIO()
+            with mock.patch.dict(os.environ, env, clear=True), contextlib.redirect_stdout(out):
+                code = self.mod.main(["--root", str(root), "--require-names"])
+            self.assertEqual(code, 1)
+            self.assertNotIn("quartz", out.getvalue().lower())
+
+    def test_ci_passes_the_private_names_secret_to_the_style_step(self):
+        text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        step = text.split("House style", 1)[1].split("\n\n", 1)[0]
+        self.assertIn("CYBERAU_PRIVATE_NAMES: ${{ secrets.CYBERAU_PRIVATE_NAMES }}", step)
+        self.assertIn("tools/ci/style_check.py", step)

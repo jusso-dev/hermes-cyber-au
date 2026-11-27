@@ -9,8 +9,8 @@ Recorded 18 October 2026 for [review epic #174](https://github.com/jusso-dev/her
 
 ## Checks and publication
 
-- **#156:** The private-name checker warns when its hash list is empty, and supports an explicit strict check and hidden-input name registration. No private names were supplied for this review. Do not invent names or claim the empty list protects them. Provisioning the list remains open.
-- **#157:** Strict documentation builds and a downloadable CI artefact are the deliverable here. Public Pages publication remains open until its hosting and publication are configured. A successful local build does not mean the site is published.
+- **#156:** The private-name checker warns when its hash list is empty, and supports an explicit strict check and hidden-input name registration. No private names were supplied for this review. Do not invent names or claim the empty list protects them. Since 28 November 2026 the CI style step reads the masked `CYBERAU_PRIVATE_NAMES` repository secret (newline separated), and a test proves a listed name fails the check. The check protects only once the maintainer sets that secret or adds hashes.
+- **#157:** The `docs` workflow runs the strict build on every push and pull request. Since 28 November 2026 GitHub Pages is enabled with workflow builds, and pushes to `main` deploy the built site to https://jusso-dev.github.io/hermes-cyber-au/.
 - **#159 item 4:** Keep truthful pre-release wording until the first release exists. Update the repository description, README and roadmap together at that release.
 - **#159 item 7:** Keep `tickets/`, `tools/tickets/` and `tools/issues/` as development planning provenance. They describe plans, not implemented capabilities. The application image excludes the ticket tree.
 - **#159 item 8:** Keep the distribution-owned `playbooks/` placeholder so later profile updates have a defined location. Content remains tracked by #167; no playbooks are claimed to ship yet.
