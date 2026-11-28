@@ -178,6 +178,19 @@ These are Hermes v0.22.2 controls. The distribution uses them as they ship. Each
 | LLM09:2025 | Misinformation | T7. Issue 44, with the ISM, NDB, and SOCI skills as the workflows where a wrong fact does harm. |
 | LLM10:2025 | Unbounded Consumption | Residual. The shared client already caps response size (`TestHttp.test_size_cap`) and rate-limits (`TestLimiter` in [mcp/common/tests/test_library.py](https://github.com/jusso-dev/hermes-cyber-au/blob/main/mcp/common/tests/test_library.py)). Issue 66 caps the length of an untrusted field. No ticket yet sets a provider-spend limit. The impact is a run that spends the team's model quota or delays the briefing. |
 
+## November 2026 feature review
+
+Reviewed on 28 November 2026 against T1 to T7 for the features added that day.
+
+| Feature | Threats | Controls in the code | Residual |
+|---|---|---|---|
+| Briefing delivery (`cyberau-mcp deliver`, #173) | T2, T3, T5, LLM05 | Off unless `delivery.yaml` exists. Drafts by default; sending needs `--send` and `approved: true` per destination. URLs and passwords are read from `.env` by variable name only and never printed. Webhook hosts are fixed per channel and pass the egress deny floor. Slack text is escaped so feed text cannot mention a channel. A briefing without sources is refused. | Choosing a channel wider than a briefing's TLP marking stays an operator decision (see Residuals). Teams host rules are untested against a live tenant. |
+| Signed data packs (`cyberau-mcp datapack`, #172) | T4 | Ed25519 signature over a manifest of file hashes. Import refuses unsigned, re-signed, tampered, older, traversing, linked or out-of-scope files, and writes only under `mcp/<connector>/data/` and `intel/snapshots/`. | The private key lives with the maintainer. Until the public key is committed, import needs `--public-key`. |
+| Offline bundle (#172) | T4 | Wheels are hash-pinned from `uv.lock`, `SHA256SUMS` is shipped, and the release attests the bundle with Sigstore provenance. | Hermes itself is not bundled and must already be trusted on the host. |
+| Guidance pack dependency (#19) | T4 | Installed by full commit SHA from `install/guidance-pack/pin.yaml`; skipped offline; a CI test blocks skill and tool name collisions. | The pack runs as a separate plugin with its own tools. Its review happens in its own repository. |
+| Guided setup, sector packs, obligations, playbooks, hunt queries (#165 to #171) | T1, T5, T7 | Setup refuses key values in answers and writes `org.yaml` at mode 600. Pack text that tells a skill to submit or send is rejected by the loader. Obligation and playbook output says nothing was submitted and records approvals only for people. Hunt queries escape IOC values per language and are marked untested drafts; nothing runs against a SIEM. | Legal and regulatory rules are reviewed reference data with review-by dates, not legal advice. |
+| Live evals workflow (#164) | T2, LLM10 | Uses a repository secret on GitHub-hosted runners, never on pull requests. Model output never reaches the scorecard or issue text. | Provider spend is bounded by the key's own limit. |
+
 ## Residuals
 
 These stay accepted until a later ticket takes them.
