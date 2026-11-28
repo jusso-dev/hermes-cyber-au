@@ -44,7 +44,7 @@ jobs:
       - name: ISM OSCAL catalogues (latest release plus the one before)
         id: ism
         continue-on-error: true
-        # The release lookup goes through api.github.com. The job token lifts it off the
+        # The release lookup uses the GitHub API. The job token lifts it off the
         # shared anonymous rate limit that made scheduled runs fail with 403 (#290).
         env:
           GITHUB_TOKEN: ${{ github.token }}

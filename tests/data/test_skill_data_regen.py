@@ -275,7 +275,11 @@ def test_workflow_skips_missing_sources_and_pins_actions():
     assert "parser-check" not in text
     assert "tools/build_skill_references.py --write PR_BODY.md" in text
     assert "uv run --project mcp pytest -q tests/skills tests/data --block-network" in text
-    assert "${{ github.token }}" not in text
+    # Only the ISM release lookup gets the job token, to stay off the anonymous
+    # api.github.com rate limit (#290). No other step needs it.
+    assert text.count("${{ github.token }}") == 1
+    ism_step = text.split("id: ism", 1)[1].split("- name:", 1)[0]
+    assert "GITHUB_TOKEN: ${{ github.token }}" in ism_step
     for banned in (
         "ghp_",
         "github_pat_",
