@@ -73,3 +73,7 @@ Defang once. Official titles stay as published in the citation name. In prose, w
 ## Verification
 
 The draft is one page, at most 450 words, and was not sent. The audience and period are on it. Three to five points cover what happened, what it means, what we are doing, and what we need. The risk table has risk, likelihood, impact, owner, and due. Asks that need a person are proposals. Every sourced fact has a citation with a `YYYY-MM-DD` retrieval date. Victim names are absent. Exposure detail is one counts-only line, or absent. Disabled sources are named. Radar figures, if any, attribute Cloudflare Radar. No em dash, no emoji, no fear language. The guidance line is present. DOCX is offered only when that skill is already installed, and the file is not sent.
+
+## Exposure trend
+
+When the period includes the last 7 days and `cyber_au_exposure_trend` is available, call it once and copy its `line` as the single exposure line on the page, with `Source: org exposure (exposures table), none, retrieved YYYY-MM-DD`. It is counts only: findings this week against last week, by kind. When its `show` is false (no premium vendor on and nothing from the free tracker), leave exposure off the page entirely. When the tool is missing, do not mention exposure unless the analyst supplied the figures. Do not add subjects, domains, names or credential values.

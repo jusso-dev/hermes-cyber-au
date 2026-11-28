@@ -136,3 +136,13 @@ Every OAIC fact has a `Source:` citation with a `YYYY-MM-DD` retrieval date. Ema
 Scheme notes, including the short OAIC quotations and the form URL: [references/oaic-ndb-scheme.md](references/oaic-ndb-scheme.md).
 
 Prefer a fresh `aureg_obligation` or `aureg_deadline` envelope over that note when the tool runs. The note is the fallback.
+
+## Start from an exposure finding
+
+An analyst can start the assessment from an exposure finding id instead of an incident description.
+
+1. Call `cyber_au_exposure_finding` with `finding_id`. It reads one stored finding from the local exposures table and contacts no one. If the tool is missing or the id is not found, write `Missing source: org exposure finding <id>.` and ask the analyst for the facts.
+2. Prefill the assessment record from the finding and label each prefilled line `from exposure finding <id>`: the kinds of information (`data_classes`), the counts (for example `employees`, `users`, `records`), the first seen date, the vendor and the confidence label. A leak site claim or an `unverified_claim` is not proof that information was accessed.
+3. Mark everything the finding does not say as `Unknown:`. That always includes who is affected, whether the information is held by the entity, the likelihood of serious harm, and the remedial action taken. The draft decision stays `assessment incomplete` until a person supplies those facts.
+4. Start the 30 day assessment clock: use the time the entity became aware of the finding as `aware_at` (if the analyst gives none, the finding's first seen date at 12:00:00 Sydney time, labelled as an assumption), and run step 1 of the Procedure. Write `Reminder: finish the assessment by <deadline date>.` This is a line in the draft. The skill does not schedule, send or post anything.
+5. Never print a credential value. The finding does not contain one, and the draft must not ask for one.

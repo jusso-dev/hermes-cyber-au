@@ -128,6 +128,7 @@ nav:
       - Automatic cleanup: operations/cleanup.md
       - Overview: operations/index.md
       - Shipped routines: operations/routines.md
+      - Briefing delivery: operations/briefing-delivery.md
       - Updating: operations/updating.md
       - Supply chain: operations/supply-chain.md
   - Contributing: contributing/index.md

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .store.paths import data_dir
 
-__all__ = ["data_dir", "main", "org_exposure", "register"]
+__all__ = ["data_dir", "exposure_finding", "exposure_trend", "main", "org_exposure", "register"]
 
 
 def _profile_homes() -> list[Path]:
@@ -60,10 +60,24 @@ def org_exposure(args: dict | None = None, **_host) -> str:
     return handle(**(args or {}))
 
 
+def exposure_finding(args: dict | None = None, **_host) -> str:
+    """One stored exposure finding by id, for an NDB draft. Reads the local store only."""
+    from cyberau_org_exposure.tool import handle_finding
+
+    return handle_finding(**(args or {}))
+
+
+def exposure_trend(args: dict | None = None, **_host) -> str:
+    """Exposure trend counts for the executive page. Reads the local store only."""
+    from cyberau_org_exposure.tool import handle_trend
+
+    return handle_trend(**(args or {}))
+
+
 def register(ctx) -> None:
     """Register tools, hooks, middleware, and commands."""
     _connector_packages()
-    from cyberau_org_exposure.tool import SCHEMA
+    from cyberau_org_exposure.tool import FINDING_SCHEMA, SCHEMA, TREND_SCHEMA
 
     from .cli import register as register_doctor
     from .hooks.audit import register as register_audit
@@ -80,5 +94,17 @@ def register(ctx) -> None:
         toolset="cyber-au",
         schema=SCHEMA,
         handler=org_exposure,
+    )
+    ctx.register_tool(
+        name="cyber_au_exposure_finding",
+        toolset="cyber-au",
+        schema=FINDING_SCHEMA,
+        handler=exposure_finding,
+    )
+    ctx.register_tool(
+        name="cyber_au_exposure_trend",
+        toolset="cyber-au",
+        schema=TREND_SCHEMA,
+        handler=exposure_trend,
     )
     register_doctor(ctx)

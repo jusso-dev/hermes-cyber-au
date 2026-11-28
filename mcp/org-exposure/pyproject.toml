@@ -3,13 +3,14 @@ name = "cyberau-org-exposure"
 version = "0.1.0"
 description = "Query whether the user's own organisation is exposed, and alert once on new watchlist matches."
 requires-python = ">=3.11"
-dependencies = ["cyberau-common"]
+dependencies = ["cyberau-common", "cyberau-premium"]
 
 [project.scripts]
 cyberau = "cyberau_org_exposure.cli:main"
 
 [tool.uv.sources]
 cyberau-common = { workspace = true }
+cyberau-premium = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

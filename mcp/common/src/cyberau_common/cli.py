@@ -30,6 +30,10 @@ def main(argv: list[str] | None = None) -> int:
         from cyberau_common.provenance import main as provenance_main
 
         return provenance_main(argv[1:])
+    if argv and argv[0] == "deliver":
+        from cyberau_common.delivery import main as deliver_main
+
+        return deliver_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="cyberau-mcp")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -64,6 +68,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("store", help="Query and update the local intel store")
     sub.add_parser("assets", help="Import, list and match the local asset inventory")
     sub.add_parser("provenance", help="Print the provenance footer for connector results")
+    sub.add_parser(
+        "deliver",
+        help="Draft the daily briefing for delivery.yaml destinations; --send to deliver",
+    )
 
     sub.add_parser("refresh", help="Refresh public feeds and optionally load the intel store")
 
