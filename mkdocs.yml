@@ -117,6 +117,7 @@ nav:
       - Daily vulnerability digest: intel/vulnerability-digest.md
       - DuckDB export: intel/duckdb.md
       - Essentials evidence register: intel/evidence-register.md
+      - Executive reports: intel/executive-reports.md
   - Security:
       - Overview: security/index.md
       - Threat model: security/threat-model.md

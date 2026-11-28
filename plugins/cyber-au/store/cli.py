@@ -218,6 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     _add_watchlist(sub, common)
     _add_evidence(sub, common)
+    _add_report(sub, common)
 
     compact = sub.add_parser(
         "compact",
@@ -331,6 +332,110 @@ def _add_evidence(sub, common: argparse.ArgumentParser) -> None:
     export.add_argument("--chapter", action="append", dest="chapters", choices=CHAPTERS)
     export.add_argument("--as-of", type=_date_arg, help="Date for freshness checks")
     export.set_defaults(func=_cmd_evidence_export)
+
+
+def _add_report(sub, common: argparse.ArgumentParser) -> None:
+    report = sub.add_parser(
+        "report",
+        help="Executive reports from the store: monthly summary or incident summary",
+    )
+    kinds = report.add_subparsers(dest="report_command", required=True)
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument("--format", choices=("markdown", "json", "docx"), default="markdown")
+    shared.add_argument("--output", help="docx: file name under plugin-data/cyber-au/exports/")
+    shared.add_argument(
+        "--obligations",
+        help="Optional obligations JSON (an au-regulatory envelope or obligations checker output)",
+    )
+    shared.add_argument("--as-of", type=_date_arg, help="Report date. Default today (Sydney)")
+
+    monthly = kinds.add_parser(
+        "monthly", parents=[common, shared], help="One-page monthly cyber summary"
+    )
+    monthly.add_argument("--month", help="YYYY-MM. Default the last full month")
+    monthly.add_argument("--start", type=_date_arg, help="Period start, YYYY-MM-DD")
+    monthly.add_argument("--end", type=_date_arg, help="Period end, YYYY-MM-DD")
+    monthly.set_defaults(func=_cmd_report_monthly)
+
+    incident = kinds.add_parser(
+        "incident", parents=[common, shared], help="One-page incident summary"
+    )
+    incident.add_argument(
+        "--incident",
+        required=True,
+        help="Incident JSON, such as the output of cyber-au demo triage --json",
+    )
+    incident.set_defaults(func=_cmd_report_incident)
+
+
+def _month_period(args: argparse.Namespace, today: date) -> tuple[date, date]:
+    from datetime import timedelta
+
+    if args.month:
+        if args.start or args.end:
+            raise ValueError("use --month or --start and --end, not both")
+        try:
+            first = date.fromisoformat(f"{args.month}-01")
+        except ValueError as exc:
+            raise ValueError("--month must be YYYY-MM") from exc
+        following = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return first, following - timedelta(days=1)
+    if args.start or args.end:
+        if not (args.start and args.end):
+            raise ValueError("--start and --end go together")
+        return args.start, args.end
+    last = today.replace(day=1) - timedelta(days=1)
+    return last.replace(day=1), last
+
+
+def _print_report(result: object) -> None:
+    if isinstance(result, str):
+        sys.stdout.write(result)
+    else:
+        _emit(result)
+
+
+def _cmd_report_monthly(args: argparse.Namespace) -> int:
+    from .evidence import today
+    from .reports import render
+
+    start, end = _month_period(args, args.as_of or today())
+    try:
+        result = render(
+            "monthly",
+            fmt=args.format,
+            output=args.output,
+            store=args.path,
+            start=start,
+            end=end,
+            obligations=args.obligations,
+            on=args.as_of,
+        )
+    except DocumentsUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _print_report(result)
+    return 0
+
+
+def _cmd_report_incident(args: argparse.Namespace) -> int:
+    from .reports import load_incident, render
+
+    try:
+        result = render(
+            "incident",
+            fmt=args.format,
+            output=args.output,
+            store=args.path,
+            incident=load_incident(args.incident),
+            obligations=args.obligations,
+            on=args.as_of,
+        )
+    except DocumentsUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _print_report(result)
+    return 0
 
 
 def _cmd_evidence_actions(args: argparse.Namespace) -> int:

@@ -1,0 +1,145 @@
+{
+  "demo": true,
+  "label": "DEMO DATA: synthetic report inputs, not real threat intelligence or a real assessment",
+  "vulnerabilities": [
+    {
+      "cve_id": "CVE-2099-0101",
+      "kev_date_added": "2026-10-06",
+      "kev_due_date": "2026-10-27",
+      "kev_ransomware": "Known",
+      "updated_at": "2026-10-31T00:00:00Z",
+      "note": "DEMO: synthetic CVE id for a fictional DemoGateway flaw."
+    },
+    {
+      "cve_id": "CVE-2099-0102",
+      "kev_date_added": "2026-10-14",
+      "kev_due_date": "2026-11-04",
+      "kev_ransomware": "Unknown",
+      "updated_at": "2026-10-31T00:00:00Z",
+      "note": "DEMO: synthetic CVE id for a fictional DemoMail flaw."
+    },
+    {
+      "cve_id": "CVE-2099-0103",
+      "kev_date_added": "2026-10-22",
+      "kev_due_date": "2026-11-12",
+      "kev_ransomware": "Unknown",
+      "updated_at": "2026-10-31T00:00:00Z",
+      "note": "DEMO: synthetic CVE id for a fictional DemoVPN flaw."
+    }
+  ],
+  "advisories": [
+    {
+      "id": "demo-adv-002",
+      "title": "DEMO advisory: synthetic DemoVPN appliance flaw (CVE-2099-0103)",
+      "url": "https://example.com/demo/advisory-002",
+      "published_at": "2026-10-23",
+      "summary": "DEMO: a made-up advisory about a fictional VPN appliance."
+    },
+    {
+      "id": "demo-adv-003",
+      "title": "DEMO advisory: synthetic payroll phishing wave against Australian businesses",
+      "url": "https://example.com/demo/advisory-003",
+      "published_at": "2026-10-28",
+      "summary": "DEMO: a made-up advisory about payroll-themed phishing."
+    }
+  ],
+  "evidence": [
+    {
+      "framework": "essentials",
+      "chapter": "enterprise-it",
+      "action_id": "GOV-01.1",
+      "status": "met",
+      "evidence": "DEMO: board cyber charter, https://example.com/demo/board-charter",
+      "owner": "DEMO Chief Executive",
+      "review_date": "2027-03-31",
+      "source": "DEMO board minutes",
+      "evidence_date": "2026-09-15"
+    },
+    {
+      "framework": "essentials",
+      "chapter": "enterprise-it",
+      "action_id": "PRO-13.4",
+      "status": "partial",
+      "evidence": "DEMO: phishing-resistant MFA for administrators only",
+      "owner": "DEMO IT Operations",
+      "review_date": "2026-12-15",
+      "source": "DEMO identity provider report",
+      "evidence_date": "2026-10-02"
+    },
+    {
+      "framework": "essentials",
+      "chapter": "enterprise-it",
+      "action_id": "PRO-06.2",
+      "status": "partial",
+      "evidence": "DEMO: patch report shows servers inside 14 days, laptops at 30 days",
+      "owner": "DEMO IT Operations",
+      "review_date": "2026-10-20",
+      "source": "DEMO patch dashboard export",
+      "evidence_date": "2026-08-30"
+    },
+    {
+      "framework": "essentials",
+      "chapter": "enterprise-it",
+      "action_id": "PRO-10.3",
+      "status": "not met",
+      "evidence": "DEMO: no restore test recorded this year",
+      "owner": "DEMO Infrastructure",
+      "review_date": "2026-12-01",
+      "source": "DEMO backup system log",
+      "evidence_date": "2026-10-05"
+    },
+    {
+      "framework": "essentials",
+      "chapter": "enterprise-it",
+      "action_id": "PRO-10.1",
+      "status": "met",
+      "evidence": "DEMO: nightly backups, https://example.com/demo/backup-policy",
+      "owner": "DEMO Infrastructure",
+      "review_date": "2027-04-30",
+      "source": "DEMO backup system log",
+      "evidence_date": "2026-10-05"
+    },
+    {
+      "framework": "essentials",
+      "chapter": "enterprise-it",
+      "action_id": "RES-03.1",
+      "status": "met",
+      "evidence": "DEMO: incident response plan v3, tested 2026-09-10",
+      "owner": "DEMO Security Lead",
+      "review_date": "2027-09-10",
+      "source": "DEMO tabletop exercise report",
+      "evidence_date": "2026-09-10"
+    },
+    {
+      "framework": "essential-eight",
+      "chapter": "multi_factor_authentication",
+      "action_id": "ism-1504",
+      "status": "met",
+      "evidence": "DEMO: MFA enforced for all users on the fictional remote access portal",
+      "owner": "DEMO IT Operations",
+      "review_date": "2027-03-31",
+      "source": "DEMO identity provider report",
+      "evidence_date": "2026-10-02"
+    }
+  ],
+  "obligations": {
+    "demo": true,
+    "label": "DEMO DATA: a sample obligations input in the au-regulatory envelope shape",
+    "source": "au-regulatory",
+    "retrieved_at": "2026-10-17T00:00:00Z",
+    "data_as_of": "2026-10-17",
+    "data": [
+      {
+        "regime": "ndb",
+        "trigger": "suspected_breach",
+        "citation": "Privacy Act 1988 (Cth) s 26WH(2)",
+        "deadlines": [
+          {
+            "name": "assessment",
+            "due_at": "2026-11-16T09:30:00+11:00"
+          }
+        ]
+      }
+    ]
+  }
+}
