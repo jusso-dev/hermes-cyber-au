@@ -1,0 +1,19 @@
+# Synthetic replay of the member URL feed. The host is a reserved example name and the
+# credential header value is redacted. No member data.
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://feeds.example.com/auscert/malurl.txt
+      body: ""
+      headers:
+        Authorization: "[REDACTED]"
+    response:
+      status:
+        code: 200
+        message: OK
+      headers:
+        Content-Type:
+          - text/plain
+      body:
+        string: "# Synthetic AusCERT-style malicious URL feed for tests. Not member data.\n# Every host is under example.com, example.net or example.org.\nhttps://login.bank-example.example.com/secure/verify\nhttp://parcel-tracking.example.net/au/redelivery?id=00001\nhxxps://mygov-refund[.]example.org/claim\nhttps://cdn.example.net/payload.js   # inline comment is ignored\nhttps://login.bank-example.example.com/secure/verify/\n"

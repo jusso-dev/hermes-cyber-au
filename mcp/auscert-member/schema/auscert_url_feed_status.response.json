@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "auscert_url_feed_status data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["configured", "entries", "fetched_at", "cache", "format"],
+  "properties": {
+    "configured": {"type": "boolean"},
+    "entries": {"type": "integer", "minimum": 0},
+    "fetched_at": {"type": ["string", "null"]},
+    "cache": {"enum": ["hit", "miss", "stale", "snapshot"]},
+    "format": {"enum": ["text", "csv", null]}
+  }
+}

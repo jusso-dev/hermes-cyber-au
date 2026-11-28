@@ -86,6 +86,7 @@ Connectors with a `SOURCE.md` in this checkout. Planned sources without a connec
 | Information Security Manual OSCAL catalogue | `ism` | `GITHUB_TOKEN` (optional) | on | [docs/connectors/asd-ism.md](docs/connectors/asd-ism.md) |
 | Australian reporting obligations | `aureg` | none | on | [docs/connectors/au-regulatory.md](docs/connectors/au-regulatory.md) |
 | AusCERT public security bulletins | `auscert` | none | off: licence terms | [docs/connectors/auscert.md](docs/connectors/auscert.md) |
+| AusCERT member malicious URL feed: check a URL or domain against it | `auscertm` | `AUSCERT_URL_FEED`, `AUSCERT_FEED_TOKEN` | off: licence terms | [docs/connectors/auscert-member.md](docs/connectors/auscert-member.md) |
 | CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [docs/connectors/cisa-kev.md](docs/connectors/cisa-kev.md) |
 | Cloudflare Radar telemetry through the Radar REST API | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [docs/connectors/cloudflare-radar.md](docs/connectors/cloudflare-radar.md) |
 | Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [docs/connectors/cloudflare-urlscanner.md](docs/connectors/cloudflare-urlscanner.md) |

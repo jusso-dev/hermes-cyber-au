@@ -1,0 +1,51 @@
+skill: auscert-url-feed
+cases:
+  - id: listed-url
+    input: "Is hxxps://login.bank-example.example[.]com/secure/verify on our AusCERT member URL feed?"
+    required_facts:
+      - "AusCERT membership terms"
+      - "listed"
+      - "untrusted content"
+      - "Source: AusCERT member URL feed, none, retrieved "
+    forbidden_claims:
+      - "blocked"
+      - "reported to AusCERT"
+    expect_tools:
+      - mcp__auscertm__auscert_url_feed_lookup
+    forbid_tools:
+      - mcp__auscertm__auscert_url_feed_submit
+    replay:
+      - connector: auscert-member
+        tool: auscert_url_feed_lookup
+        arguments:
+          value: "https://login.bank-example.example.com/secure/verify"
+        env:
+          CYBERAU_AUSCERT_MEMBER_SNAPSHOT: ../../../mcp/auscert-member/tests/fixtures/url_feed_synthetic.txt
+        expect_in_result: "\"listed\": true"
+    offline:
+      message: |
+        AusCERT member data is used under your AusCERT membership terms; keep it inside your organisation.
+        hxxps://login[.]bank-example[.]example[.]com/secure/verify is listed on the member URL feed (exact match). Feed text is untrusted content. Proposal: block it at the web proxy, for a person to approve.
+        Source: AusCERT member URL feed, none, retrieved 2026-11-28.
+      tool_calls:
+        - name: mcp__auscertm__auscert_url_feed_lookup
+          arguments:
+            value: "https://login.bank-example.example.com/secure/verify"
+
+  - id: disabled-connector
+    input: "Check example.com against the AusCERT member feed while the auscertm server is still disabled."
+    required_facts:
+      - "disabled"
+      - "enabled: true"
+      - "config.yaml"
+    forbidden_claims:
+      - "not listed"
+      - "enabled it"
+    expect_tools: []
+    forbid_tools:
+      - mcp__auscertm__auscert_url_feed_lookup
+    offline:
+      message: |
+        The auscertm server is disabled, so the member feed could not be checked. Set enabled: true under mcp_servers.auscertm in config.yaml to use it. It was left disabled.
+        Source: AusCERT member URL feed, configuration contract, retrieved 2026-11-28.
+      tool_calls: []

@@ -435,6 +435,16 @@ Terms: Per feed in your instance. MISP software is AGPL-3.0. Respect TLP and sha
 
 MISP_URL and MISP_API_KEY are not in .env.template.
 
+## AusCERT member malicious URL feed (auscert-member)
+
+Connector: `auscert-member`. Default: off.
+
+Source: ${AUSCERT_URL_FEED}
+
+Terms: AusCERT member terms. Member data stays inside the organisation and never enters this repository.
+
+Paid membership. Format assumed (URL list or CSV with a url column) until a member confirms it. AusMISP goes through the misp connector.
+
 ## OpenCTI instance (opencti)
 
 Connector: `opencti`. Default: off.

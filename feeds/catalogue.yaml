@@ -815,6 +815,20 @@ feeds:
     region: global
     notes: MISP_URL and MISP_API_KEY are not in .env.template.
 
+  - id: auscert-member
+    name: AusCERT member malicious URL feed
+    connector: auscert-member
+    server: auscertm
+    url: ${AUSCERT_URL_FEED}
+    format: text
+    auth: {type: bearer, env: AUSCERT_URL_FEED, env_also: [AUSCERT_FEED_TOKEN]}
+    keyed: true
+    enabled_by_default: false
+    poll: PT1H
+    licence: AusCERT member terms. Member data stays inside the organisation and never enters this repository.
+    region: AU
+    notes: Paid membership. Format assumed (URL list or CSV with a url column) until a member confirms it. AusMISP goes through the misp connector.
+
   - id: opencti
     name: OpenCTI instance
     connector: opencti
