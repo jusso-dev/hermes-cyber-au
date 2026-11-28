@@ -15,6 +15,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -130,7 +131,17 @@ def _sha(path: Path) -> str:
 def wheelhouse(tmp_path: Path) -> dict[str, Path]:
     house = tmp_path / "prebuilt"
     return {
-        "dep": _wheel(house, "offline-test-dep", "1.0", {"offline_test_dep.py": "VALUE = 1\n"}),
+        # The fake runtime dependency also carries a .pth that adds this test runner's
+        # site-packages, so render_config.py finds PyYAML without a real PyYAML wheel.
+        "dep": _wheel(
+            house,
+            "offline-test-dep",
+            "1.0",
+            {
+                "offline_test_dep.py": "VALUE = 1\n",
+                "offline_test_dep_yaml.pth": str(Path(yaml.__file__).parent.parent) + "\n",
+            },
+        ),
         "backend": _wheel(
             house, "offline-test-backend", "1.0", {"offline_test_backend.py": BACKEND}
         ),
@@ -481,3 +492,55 @@ def test_offline_install_needs_a_bundled_python_version(tmp_path, synthetic, whe
     result = _run(top, env)
     assert result.returncode != 0
     assert "wheels for Python 3.99" in result.stderr
+
+
+def test_release_workflow_builds_attests_and_tests_the_bundle():
+    text = (ROOT / ".github" / "workflows" / "weekly-release.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(text)
+    assert "tools/release/offline_bundle.py" in text
+    steps = workflow["jobs"]["package"]["steps"]
+    names = [step.get("name", "") for step in steps]
+    # The bundle is built before the checksums and the attestation that signs it.
+    build = next(i for i, step in enumerate(steps) if "offline_bundle.py" in step.get("run", ""))
+    sums = names.index("Checksums")
+    attest = names.index("Attest release files")
+    assert build < sums < attest
+    pack = next(step for step in steps if step.get("name") == "Build signed data pack")
+    assert "secrets.CYBERAU_DATAPACK_SIGNING_KEY" in pack["env"]["DATAPACK_KEY"]
+    assert 'rm -f "$key"' in pack["run"]
+    assert "BEGIN PRIVATE KEY" not in text
+    job = workflow["jobs"]["offline-install"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["continue-on-error"] is True
+    assert job["permissions"] == {"contents": "read"}
+    assert "offline_container_test.sh" in json.dumps(job)
+    assert "codebuild" not in text.lower()
+    script = (ROOT / "tools" / "ci" / "offline_container_test.sh").read_text(encoding="utf-8")
+    assert "--network none" in script
+    assert re.search(r"python:3\.12-slim@sha256:[0-9a-f]{64}", script)
+
+
+def test_datapack_build_runs_with_the_cli_flags_the_workflow_uses(tmp_path):
+    from cyberau_common import datapack
+
+    private = tmp_path / "keys" / "k.key"
+    datapack.generate_keypair(private, tmp_path / "keys" / "k.pub")
+    out = tmp_path / "dist" / "cyber-au-datapack-2026.11.28.tar.gz"
+    code = datapack.main(
+        [
+            "build",
+            "--key",
+            str(private),
+            "--out",
+            str(out),
+            "--label",
+            "2026.11.28",
+            "--root",
+            str(ROOT),
+        ]
+    )
+    assert code == 0
+    manifest = datapack.verify_pack(out, tmp_path / "keys" / "k.pub")
+    paths = {entry["path"] for entry in manifest["files"]}
+    assert "mcp/asd-ism/data/releases.json" in paths
+    assert all(path.startswith(("mcp/", "intel/snapshots/")) for path in paths)

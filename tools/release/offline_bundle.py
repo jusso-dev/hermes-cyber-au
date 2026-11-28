@@ -33,6 +33,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -175,17 +176,26 @@ def pip_download(
         raise RuntimeError(f"{platform} python {python_version}: {detail}")
 
 
+PIP_PYTHON_ENV = "CYBERAU_PIP_PYTHON"
+
+
 def _pip_python() -> str:
-    probe = subprocess.run(
-        [sys.executable, "-m", "pip", "--version"], capture_output=True, check=False
-    )
-    if probe.returncode == 0:
-        return sys.executable
-    for name in ("python3", "python"):
-        found = shutil.which(name)
-        if found:
-            return found
-    raise RuntimeError("no Python with pip is available for pip download")
+    """A Python that has pip. ``uv run`` puts the pip-less workspace venv first on PATH,
+    so every python3 on PATH is tried, not only the first."""
+    override = os.environ.get(PIP_PYTHON_ENV, "").strip()
+    candidates = [override] if override else [sys.executable]
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        for name in ("python3", "python"):
+            path = Path(directory) / name
+            if path.is_file() and os.access(path, os.X_OK):
+                candidates.append(str(path))
+    for candidate in candidates:
+        probe = subprocess.run(
+            [candidate, "-m", "pip", "--version"], capture_output=True, check=False
+        )
+        if probe.returncode == 0:
+            return candidate
+    raise RuntimeError(f"no Python with pip is available. Set {PIP_PYTHON_ENV}.")
 
 
 # Build

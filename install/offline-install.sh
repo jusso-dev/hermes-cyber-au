@@ -306,7 +306,9 @@ boot=
 [ "$YES" -eq 1 ] && boot="$boot --yes"
 set -f
 # shellcheck disable=SC2086
-sh "$PROFILE_HOME/install/bootstrap.sh" --profile "$PROFILE" --profile-home "$PROFILE_HOME" \
+# bootstrap.sh runs render_config.py with CYBERAU_PYTHON, which needs PyYAML: use the venv.
+CYBERAU_PYTHON=$PROFILE_HOME/mcp/.venv/bin/python \
+  sh "$PROFILE_HOME/install/bootstrap.sh" --profile "$PROFILE" --profile-home "$PROFILE_HOME" \
   --offline --venv-ready $boot
 set +f
 
