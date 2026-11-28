@@ -1,6 +1,6 @@
 # Proposed: .github/workflows/weekly-release.yml
 # Weekly release packaging: CalVer tag, release notes, distribution tarball, SBOM,
-# checksums, and a Docker image pushed to GHCR. Friday 23:00 UTC is Saturday 10:00 AEDT.
+# offline install bundle, checksums, and a Docker image pushed to GHCR. Friday 23:00 UTC is Saturday 10:00 AEDT.
 name: weekly-release
 
 on:
@@ -46,17 +46,49 @@ jobs:
         if: steps.changes.outputs.skip != 'true'
         id: ver
         run: echo "version=$(TZ=Australia/Sydney date +%Y.%m.%d)" >> "$GITHUB_OUTPUT"
-      - name: Build distribution tarball, SBOM and checksums
+      - name: Build distribution tarball, SBOM and offline bundle
         if: steps.changes.outputs.skip != 'true'
         run: |
           uv run --project mcp --frozen python tools/release/package.py --version "${{ steps.ver.outputs.version }}" --out dist/
-          sha256sum dist/* > dist/SHA256SUMS
-      # Attest the tarball, SBOM, notes and checksums this job has written.
+          # Downloads linux x86_64 and aarch64 wheels for the locked workspace.
+          uv run --project mcp --frozen python tools/release/offline_bundle.py --version "${{ steps.ver.outputs.version }}" --out dist/
+      # Optional: a data pack signed with the maintainer's Ed25519 key. Skipped until
+      # the CYBERAU_DATAPACK_SIGNING_KEY secret exists. The key is written to the
+      # runner's temp directory and removed straight after use.
+      - name: Build signed data pack
+        if: steps.changes.outputs.skip != 'true'
+        env:
+          DATAPACK_KEY: ${{ secrets.CYBERAU_DATAPACK_SIGNING_KEY }}
+          CYBERAU_DATAPACK_KEY_PASSPHRASE: ${{ secrets.CYBERAU_DATAPACK_KEY_PASSPHRASE }}
+        run: |
+          if [ -z "$DATAPACK_KEY" ]; then
+            echo "CYBERAU_DATAPACK_SIGNING_KEY is not set; no data pack this release."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/datapack.key"
+          trap 'rm -f "$key"' EXIT
+          (umask 077 && printf '%s\n' "$DATAPACK_KEY" > "$key")
+          uv run --project mcp --frozen cyberau-mcp datapack build --key "$key" \
+            --out "dist/cyber-au-datapack-${{ steps.ver.outputs.version }}.tar.gz" \
+            --label "${{ steps.ver.outputs.version }}"
+      - name: Checksums
+        if: steps.changes.outputs.skip != 'true'
+        run: |
+          (cd dist && sha256sum -- * > SHA256SUMS)
+      # Attest the tarball, offline bundle, SBOM, notes and checksums this job has
+      # written. This is the bundle's Sigstore keyless signature.
       - name: Attest release files
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         if: steps.changes.outputs.skip != 'true'
         with:
           subject-path: dist/*
+      - name: Keep the offline bundle for the no-network test
+        if: steps.changes.outputs.skip != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: offline-bundle
+          path: dist/cyber-au-offline-*.tar.gz
+          retention-days: 7
       - name: Build and push image
         id: image
         if: steps.changes.outputs.skip != 'true' && inputs.dry_run != true && hashFiles('docker/Dockerfile') != ''
@@ -96,3 +128,24 @@ jobs:
         run: |
           v="v${{ steps.ver.outputs.version }}"
           gh release create "$v" dist/* --title "$v" --notes-file dist/RELEASE_NOTES.md --target "${{ github.sha }}"
+
+  # Install the offline bundle in a container with no network. Informational: a
+  # failure is reported on the run but does not block or undo the release.
+  offline-install:
+    needs: package
+    if: ${{ !cancelled() && needs.package.result == 'success' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - id: bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: offline-bundle
+          path: bundle
+      - name: Install with --network none
+        if: steps.bundle.outcome == 'success'
+        run: bash tools/ci/offline_container_test.sh bundle
