@@ -64,7 +64,13 @@ KNOWN_MANIFEST_FIELDS = {
     "requires_auth",
 }
 STORE_TOOLS = ["intel_search", "intel_get", "intel_add_observation", "intel_export_stix"]
-TOOLS = [*STORE_TOOLS, "evidence_import", "cyber_au_org_exposure"]
+TOOLS = [
+    *STORE_TOOLS,
+    "evidence_import",
+    "cyber_au_org_exposure",
+    "cyber_au_exposure_finding",
+    "cyber_au_exposure_trend",
+]
 M365_REPORT = ROOT / "mcp" / "m365-secure" / "tests" / "fixtures" / "m365_secure_report_sample.json"
 HOOKS = ["pre_tool_call", "post_tool_call", "pre_llm_call", "on_session_start", "on_session_end"]
 SECRET = "fixture-secret-value"

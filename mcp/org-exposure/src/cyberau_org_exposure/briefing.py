@@ -25,6 +25,8 @@ from cyberau_org_exposure.abn import data_dir
 SYDNEY = ZoneInfo("Australia/Sydney")
 STORE_FILES = ("exposures.sqlite", "intel.sqlite")
 STATE_FILE = "exposure-brief-state.json"
+# The free ransomware tracker. Every other vendor is premium and counts only while enabled.
+FREE_VENDORS = frozenset({"ransomlive"})
 DEFAULT_LOOKBACK_DAYS = 7
 TREND_DAYS = 7
 ATTRIBUTION = (
@@ -122,11 +124,15 @@ def brief_payload(
         if observed is None or not start <= observed <= moment:
             continue
         findings.append(_public(row, share))
+    visible = [row for row in rows if row["vendor"] in FREE_VENDORS or row["vendor"] in premium]
+    counted = trend(visible, now=moment)
+    # Nothing to report when no premium vendor is on and the free tracker is quiet.
+    counted["show"] = bool(premium) or bool(counted["current"] or counted["previous"])
     data = {
         "premium_enabled": premium,
         "since": start.isoformat(timespec="seconds"),
         "findings": findings,
-        "trend": trend(rows, now=moment),
+        "trend": counted,
     }
     if record:
         present = {row["finding_id"] for row in rows}

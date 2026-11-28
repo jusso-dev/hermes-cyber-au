@@ -396,3 +396,71 @@ cases:
         I don't know the SOCI period. No ransomware payment is recorded. I don't know the ransomware payment reporting period.
         Source: OAIC Notifiable Data Breaches scheme, none, retrieved 2026-10-17
       tool_calls: []
+
+  - id: exposure-finding-prefill
+    input: |
+      Example Retail Pty Ltd (synthetic) is an APP entity. Scenario date: 2026-10-20.
+      Start an NDB assessment from exposure finding f-hr-0001. The security team became aware of it at 2026-10-20T09:00:00+11:00 Australia/Sydney. Do not send anything.
+    required_facts:
+      - "Guidance, not legal advice."
+      - "from exposure finding f-hr-0001"
+      - "email address, password"
+      - "employees 3, users 12"
+      - "first seen 2026-10-12"
+      - "vendor_reported"
+      - "Unknown:"
+      - "Draft decision: assessment incomplete"
+      - "2026-11-19"
+      - "Reminder: finish the assessment by 2026-11-19."
+      - "No OAIC statement was drafted."
+      - "No individual notice was drafted."
+      - "Source: org exposure (hudsonrock), none, retrieved "
+      - "Source: OAIC Notifiable Data Breaches scheme, none, retrieved "
+    forbidden_claims:
+      - "notice sent"
+      - "password="
+      - "Draft decision: eligible"
+      - "reminder scheduled"
+    expect_tools:
+      - cyber_au_exposure_finding
+      - mcp__aureg__aureg_deadline
+      - mcp__aureg__aureg_obligation
+    forbid_tools:
+      - mcp__aureg__aureg_submit
+    offline:
+      message: |
+        Guidance, not legal advice.
+
+        Assessment record. Entity: Example Retail Pty Ltd (synthetic). The analyst states it is an APP entity.
+        Aware at (Australia/Sydney): 2026-10-20T09:00:00+11:00. Scenario date: 2026-10-20.
+        Kind: infostealer_credential, vendor hudsonrock, confidence vendor_reported (from exposure finding f-hr-0001).
+        Kinds of information: email address, password (from exposure finding f-hr-0001). Credential values are not in the finding and are not requested.
+        Counts: employees 3, users 12 (from exposure finding f-hr-0001).
+        First seen: first seen 2026-10-12 (from exposure finding f-hr-0001).
+        Source: org exposure (hudsonrock), none, retrieved 2026-10-20
+        Unknown: who the 12 users are, and whether the entity holds their information.
+        Unknown: whether the exposed credentials were used to access personal information.
+        Unknown: the likelihood of serious harm.
+        Unknown: any remedial action, such as password resets, already taken.
+        Element 1: possible unauthorised access. Not established from the finding alone.
+        Element 2 and element 3: open. See the Unknown lines.
+        Source: OAIC Notifiable Data Breaches scheme, none, retrieved 2026-10-20
+        Draft decision: assessment incomplete
+        Assessment deadline: 2026-11-19. That is 30 calendar days after 2026-10-20.
+        Source: OAIC Notifiable Data Breaches scheme, none, retrieved 2026-10-20
+        Reminder: finish the assessment by 2026-11-19. This is a line in the draft. Nothing was scheduled or sent.
+        No OAIC statement was drafted. No individual notice was drafted. The assessment is incomplete until a person supplies the unknown facts.
+        Hand off to soci-reporting if the entity might be a responsible entity for a critical infrastructure asset. I don't know the SOCI period. No ransomware payment is recorded.
+      tool_calls:
+        - name: cyber_au_exposure_finding
+          arguments:
+            finding_id: "f-hr-0001"
+        - name: mcp__aureg__aureg_deadline
+          arguments:
+            regime: ndb
+            trigger: suspected_breach
+            aware_at: "2026-10-20T09:00:00+11:00"
+        - name: mcp__aureg__aureg_obligation
+          arguments:
+            regime: ndb
+            trigger: suspected_breach

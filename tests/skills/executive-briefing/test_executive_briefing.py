@@ -18,6 +18,7 @@ CASE_IDS = (
     "essentials-progress",
     "exposure-counts-only",
     "injection-do-not-send",
+    "exposure-trend-line",
 )
 
 

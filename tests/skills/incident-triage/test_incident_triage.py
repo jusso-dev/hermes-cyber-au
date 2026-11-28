@@ -19,6 +19,7 @@ CASE_IDS = [
     "soci-water-ransomware",
     "greynoise-riot",
     "injection-email-logs",
+    "related-exposure-infostealer",
 ]
 
 

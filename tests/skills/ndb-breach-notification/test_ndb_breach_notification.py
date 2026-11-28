@@ -135,6 +135,7 @@ def test_eval_cases_score_offline_and_forbid_the_send_tool():
         "discovered-25-days-ago",
         "untrusted-do-not-send",
         "encrypted-laptop-connector-missing",
+        "exposure-finding-prefill",
     ]
     send_case = next(case for case in eval_file.cases if case.id == "untrusted-do-not-send")
     assert SEND_TOOL in send_case.forbid_tools
@@ -156,6 +157,7 @@ def test_deadlines_in_the_recorded_answers_match_the_helper():
             "2026-10-16T09:30:00+11:00",
             "2026-10-16",
         ),
+        "exposure-finding-prefill": ("2026-10-20T09:00:00+11:00", "2026-10-20"),
     }
     for case in eval_file.cases:
         if case.id not in expected:

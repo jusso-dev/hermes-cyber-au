@@ -163,3 +163,38 @@ def test_cli_exposure_brief_prints_an_envelope(data, capsys):
     assert payload["source"] == "org-exposure"
     assert payload["data"]["findings"][0]["kind"] == "infostealer_credential"
     assert main(["exposure-brief", "--since", "yesterday"]) == 2
+
+
+def test_trend_line_is_hidden_when_every_premium_vendor_is_off(data):
+    store_findings([_finding("hudsonrock", "infostealer_credential", "a", "2026-10-19T12:00:00Z")])
+    off = brief_payload(now=NOW, config={})
+    assert off["data"]["trend"]["show"] is False
+    assert off["data"]["trend"]["current"] == 0
+    on = brief_payload(now=NOW, config=_enabled("hudsonrock"))
+    assert on["data"]["trend"]["show"] is True
+    assert on["data"]["trend"]["current"] == 1
+    store_findings([_finding("ransomlive", "leak_site_claim", "b", "2026-10-19T10:00:00Z")])
+    free = brief_payload(now=NOW, config={})
+    assert free["data"]["trend"]["show"] is True
+    assert free["data"]["trend"]["by_kind"] == {"leak_site_claim": 1}
+
+
+def test_plugin_tools_read_the_store_only(data):
+    from cyberau_org_exposure.tool import (
+        FINDING_SCHEMA,
+        TREND_SCHEMA,
+        handle_finding,
+        handle_trend,
+    )
+
+    store_findings([_finding("hudsonrock", "infostealer_credential", "a", "2026-10-19T12:00:00Z")])
+    assert FINDING_SCHEMA["parameters"]["required"] == ["finding_id"]
+    assert TREND_SCHEMA["parameters"]["properties"] == {}
+    found = json.loads(handle_finding(finding_id="hudsonrock-infostealer_credential-a"))
+    assert found["untrusted"] is True
+    assert found["data"]["finding"]["kind"] == "infostealer_credential"
+    missing = json.loads(handle_finding(finding_id=""))
+    assert missing["data"]["found"] is False
+    counted = json.loads(handle_trend())
+    assert "Counts only." in counted["data"]["line"]
+    assert DOMAIN not in json.dumps(counted)

@@ -15,6 +15,8 @@ provides_tools:
   - intel_export_stix
   - evidence_import
   - cyber_au_org_exposure
+  - cyber_au_exposure_finding
+  - cyber_au_exposure_trend
 provides_hooks:
   - pre_tool_call
   - post_tool_call
