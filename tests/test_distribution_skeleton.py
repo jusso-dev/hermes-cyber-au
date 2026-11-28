@@ -21,6 +21,7 @@ OWNED = [
     "mcp",
     "feeds",
     "playbooks",
+    "packs",
     "profiles",
 ]
 

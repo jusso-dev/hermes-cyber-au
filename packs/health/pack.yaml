@@ -1,0 +1,100 @@
+# Health sector pack (lighter first cut). Switched on when org.yaml has sector: health, or when
+# sector_packs lists health. Format: docs/reference/sector-packs.md.
+#
+# Every rule was read against the cited version on its reviewed date. Re-read the source by
+# review_by; cyber-au doctor warns once a rule passes that date. Guidance, not legal advice.
+name: health
+version: 0.1.0
+title: Health
+description: >-
+  My Health Record breach notification, the health service exception to the small business
+  exemption, and SOCI risk management rules for designated hospitals.
+sectors: [health]
+reviewed: 2026-11-28
+review_by: 2027-05-28
+sources:
+  - id: mhr-act
+    title: My Health Records Act 2012
+    version: Compilation No. 18
+    url: https://www.legislation.gov.au/C2012A00063/latest/text
+    retrieved: 2026-11-28
+    note: Register id C2026C00277, in force from 2026-07-01.
+  - id: privacy-act
+    title: Privacy Act 1988
+    version: Compilation No. 104 (C2026C00227)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+    retrieved: 2026-11-28
+  - id: cirmp-rules
+    title: Security of Critical Infrastructure (Critical infrastructure risk management program) Rules (LIN 23/006) 2023
+    version: Compilation No. 2
+    url: https://www.legislation.gov.au/F2023L00112/latest/text
+    retrieved: 2026-11-28
+    note: Register id F2026C00562, in force from 2026-06-10.
+connectors:
+  - key: aureg
+    why: NDB scheme obligation text and the 30 day assessment deadline.
+rules:
+  - id: mhr-data-breach
+    title: My Health Record data breach notification
+    kind: obligation
+    skills: [incident-triage, ndb-breach-notification]
+    summary: >-
+      A registered healthcare provider organisation that becomes aware of a possible
+      unauthorised collection, use or disclosure of health information in a My Health Record,
+      or of a possible compromise of the system's security or integrity, must notify as soon as
+      practicable: the System Operator only if it is a State or Territory authority, otherwise
+      both the System Operator and the Information Commissioner (s 75(2)). It must also contain
+      the event and evaluate the risks (s 75(5)). Ask whether the organisation is registered.
+    source: mhr-act
+    section: s 75
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: health-service-not-small-business
+    title: Health service providers are not exempt as small businesses
+    kind: obligation
+    skills: [ndb-breach-notification]
+    summary: >-
+      An entity that provides a health service and holds health information (other than in an
+      employee record) is not a small business operator whatever its turnover (s 6D(4)(b)), so
+      the NDB scheme can apply to a small practice.
+    source: privacy-act
+    section: s 6D(4)(b)
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: health-information-sensitive
+    title: Health information is sensitive information
+    kind: guidance
+    skills: [ndb-breach-notification, incident-triage]
+    summary: >-
+      Health information is sensitive information under the Act. Record the kinds of health
+      information involved when weighing serious harm.
+    source: privacy-act
+    section: s 6(1), definition of sensitive information
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: designated-hospital-cirmp
+    title: Designated hospitals need a risk management program
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [soci-reporting]
+    summary: >-
+      A designated hospital (a critical hospital listed in Schedule 1 of the Rules) is an asset
+      to which Part 2A applies (CIRMP Rules s 4(1)(g)). It is not on the enhanced list in
+      s 4A(1). Confirm the hospital is listed before applying this rule.
+    source: cirmp-rules
+    section: s 4(1)(g) and Schedule 1
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+prompts:
+  incident-triage:
+    - >-
+      Ask whether the organisation is registered for the My Health Record system and whether
+      My Health Record data or access could be involved. If so, hand off to
+      ndb-breach-notification and mention My Health Records Act s 75.
+  ndb-breach-notification:
+    - >-
+      For a health service provider, do not drop the NDB scheme because turnover is small:
+      s 6D(4)(b) removes the small business exemption. If My Health Record data is involved,
+      flag s 75 as a separate notification a person makes.
+playbooks: []

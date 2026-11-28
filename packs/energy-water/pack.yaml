@@ -1,0 +1,229 @@
+# Energy and water sector pack. Switched on when org.yaml has sector: energy-water, or when
+# sector_packs lists energy-water. Format: docs/reference/sector-packs.md.
+#
+# Every rule was read against the cited version on its reviewed date. Re-read the source by
+# review_by; cyber-au doctor warns once a rule passes that date. Guidance, not legal advice.
+name: energy-water
+version: 0.1.0
+title: Energy and water
+description: >-
+  SOCI risk management program and incident reporting rules for electricity, gas, liquid fuel,
+  energy market and water assets, the AESCSF and other frameworks the CIRMP Rules accept,
+  and ASD guidance for operational technology.
+sectors: [energy-water]
+reviewed: 2026-11-28
+review_by: 2027-05-28
+sources:
+  - id: soci-act
+    title: Security of Critical Infrastructure Act 2018
+    version: Compilation No. 9
+    url: https://www.legislation.gov.au/C2018A00029/latest/text
+    retrieved: 2026-11-28
+    note: Register id C2026C00213, compilation date 2026-06-04.
+  - id: cirmp-rules
+    title: Security of Critical Infrastructure (Critical infrastructure risk management program) Rules (LIN 23/006) 2023
+    version: Compilation No. 2
+    url: https://www.legislation.gov.au/F2023L00112/latest/text
+    retrieved: 2026-11-28
+    note: Register id F2026C00562, in force from 2026-06-10. Includes the enhanced CIRMP requirements from LIN 26/075.
+  - id: aescsf
+    title: AEMO Australian Energy Sector Cyber Security Framework
+    version: 2023 Framework Core
+    url: https://www.aemo.com.au/initiatives/major-programs/cyber-security/aescsf-framework-and-resources
+    retrieved: 2026-11-28
+    note: >-
+      The AEMO page blocked automated retrieval on 2026-11-28. The framework name, edition and
+      security profiles are quoted from CIRMP Rules s 8 and s 8A, not from the AEMO page.
+  - id: asd-ot-principles
+    title: ASD Principles of operational technology cyber security
+    version: published 2024-10-02
+    url: https://www.cyber.gov.au/business-government/secure-design/operational-technology-environments/principles-operational-technology-cyber-security
+    retrieved: 2026-11-28
+  - id: asd-essentials-ot
+    title: ASD Essentials for OT
+    version: published 2026-10-15
+    url: https://www.cyber.gov.au/publication/essentials-for-ot
+    retrieved: 2026-11-28
+connectors:
+  - key: attack
+    why: ATT&CK for ICS techniques (domain ics) when an incident touches control systems.
+  - key: asd
+    why: ASD ACSC alerts and advisories, including OT and critical infrastructure notices.
+  - key: aureg
+    why: SOCI Part 2B obligation text and deadline arithmetic.
+  - key: e8
+    why: >-
+      The Essentials for OT chapter and Essential Eight requirement text. Off by default for
+      licence terms; switch it on yourself after reading docs/connectors/asd-essentials.md.
+rules:
+  - id: cirmp-assets
+    title: Energy and water assets that need a risk management program
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [soci-reporting, essentials-assessment]
+    summary: >-
+      Part 2A (risk management program) applies to critical electricity, gas, liquid fuel,
+      energy market operator and water assets, among others (CIRMP Rules s 4(1)). A responsible
+      entity must adopt and maintain a program (Act s 30AC) and comply with it (s 30AD).
+    source: cirmp-rules
+    section: Rules s 4(1); Act s 30AC and s 30AD
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: cirmp-enhanced
+    title: Enhanced CIRMP requirements for energy and water
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [soci-reporting, essentials-assessment]
+    summary: >-
+      Critical electricity, gas, liquid fuel, energy market operator and water assets are
+      subject to the enhanced requirements in s 6A, s 8A to s 8C, s 9A, s 10A and s 11A
+      (Rules s 4A(1) and (5)), with grace periods of 12 or 24 months in s 4A(6). Where a
+      baseline and an enhanced requirement conflict, the enhanced one applies (s 4A(4)).
+    source: cirmp-rules
+    section: s 4A
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: cyber-framework-baseline
+    title: Cyber framework the program must follow (baseline)
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [essentials-assessment, soci-reporting]
+    summary: >-
+      The program must comply with one listed framework and its condition, or an equivalent:
+      AS ISO/IEC 27001:2015; the Essential Eight at maturity level one; the NIST framework for
+      improving critical infrastructure cybersecurity; the US Department of Energy C2M2 at
+      Maturity Indicator Level 1; or the 2020-21 AESCSF Framework Core at Security Profile 1.
+    source: cirmp-rules
+    section: s 8(4) and (5)
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: cyber-framework-enhanced
+    title: Cyber framework the program must follow (enhanced)
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [essentials-assessment, soci-reporting]
+    summary: >-
+      For enhanced assets the bar is higher: AS ISO/IEC 27001:2023; the Essential Eight at
+      maturity level two; NIST CSF 2.0; C2M2 version 2.1 at Maturity Indicator Level 2; or the
+      2023 AESCSF Framework Core at Security Profile 2, or an equivalent framework for items 2,
+      4 or 5. In an Essential Eight assessment, report the gap to maturity level two.
+    source: cirmp-rules
+    section: s 8A(3) and (4)
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: aescsf-profile
+    title: AESCSF security profile
+    kind: guidance
+    applies_when:
+      environments: [ot]
+    skills: [essentials-assessment]
+    summary: >-
+      If the organisation reports against the AESCSF, the CIRMP Rules accept Security Profile 1
+      of the 2020-21 core (baseline) or Security Profile 2 of the 2023 core (enhanced). This
+      distribution has no AESCSF connector: say the AESCSF source is not loaded and do not
+      score AESCSF practices from memory.
+    source: aescsf
+    section: AESCSF Framework Core, security profiles 1 and 2
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: phishing-resistant-mfa
+    title: Phishing resistant MFA for enhanced assets
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [essentials-assessment, incident-triage]
+    summary: >-
+      Where the chosen framework does not already require phishing resistant MFA, the program
+      must name the systems that need it, implement it there, and centrally log and review
+      successful and failed MFA attempts (s 8B(3) and (5)). A compromised credential on those
+      systems is a finding to record.
+    source: cirmp-rules
+    section: s 8B
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: ot-material-risks
+    title: OT and remote access are material risks
+    kind: obligation
+    applies_when:
+      environments: [ot]
+    skills: [incident-triage, soci-reporting]
+    summary: >-
+      Material risks include interference with operational technology essential to the asset,
+      such as SCADA, and remote access to operational control or monitoring systems (s 6(c) and
+      (e)). Enhanced assets add offshore or remote access to critical components and business
+      critical data (s 6A(2)). Record OT impact and remote access paths in the triage record.
+    source: cirmp-rules
+    section: s 6 and s 6A
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: soci-annual-report
+    title: SOCI annual report
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [soci-reporting]
+    summary: >-
+      Within 90 days after the end of the financial year the entity gives the relevant
+      Commonwealth regulator (or the Secretary) a board-approved report in the approved form,
+      stating whether the program was up to date and, for each hazard that had a significant
+      relevant impact, how well the program mitigated it (s 30AG). A significant incident
+      reported under Part 2B will usually need a line in that report.
+    source: soci-act
+    section: s 30AG
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: ot-principles
+    title: ASD OT principles for triage decisions
+    kind: guidance
+    applies_when:
+      environments: [ot]
+    skills: [incident-triage]
+    summary: >-
+      Weigh any containment proposal for an OT system against ASD's six principles: safety is
+      paramount; knowledge of the business is crucial; OT data is extremely valuable and needs
+      to be protected; segment and segregate OT from all other networks; the supply chain must
+      be secure; people are essential. A proposal that would stop a safety or control function
+      needs the plant operator's sign-off.
+    source: asd-ot-principles
+    section: the six principles
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: essentials-ot
+    title: Assess the Essentials for OT chapter
+    kind: guidance
+    applies_when:
+      environments: [ot]
+    skills: [essentials-assessment]
+    summary: >-
+      For an energy or water OT environment, offer the ot chapter of the ASD Essentials
+      (Essentials for OT) as well as enterprise-it, and use mcp__e8__essentials_chapter with
+      chapter ot when the e8 connector is on.
+    source: asd-essentials-ot
+    section: Essentials for OT
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+prompts:
+  incident-triage:
+    - >-
+      Ask whether any affected host is OT (SCADA, DCS, PLC, HMI, historian or engineering
+      workstation) and whether operational control or monitoring was reached remotely. Search
+      ATT&CK with domain ics when OT is involved.
+    - >-
+      A loss of supply of electricity, gas, fuel or water is the availability impact that can
+      make an incident critical under SOCI s 30BC. Hand off to soci-reporting with the
+      awareness time.
+  soci-reporting:
+    - >-
+      For an energy or water asset, ask whether supply to customers was materially disrupted,
+      and for how long. Also note the s 30AG annual report: a significant incident needs a
+      statement about how the risk management program performed.
+  essentials-assessment:
+    - >-
+      For an enhanced energy or water asset, the CIRMP Rules accept the Essential Eight at
+      maturity level two (s 8A(3)). Report the gap to that level, and offer the Essentials for
+      OT chapter.
+playbooks: []
