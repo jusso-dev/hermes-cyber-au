@@ -781,6 +781,7 @@ name = "cyberau-common"
 version = "0.1.0"
 source = { editable = "common" }
 dependencies = [
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "idna" },
     { name = "jsonschema" },
@@ -791,6 +792,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=44,<51" },
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "idna", specifier = ">=3,<4" },
     { name = "jsonschema", specifier = ">=4,<5" },
