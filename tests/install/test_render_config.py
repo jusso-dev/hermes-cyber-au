@@ -455,3 +455,21 @@ def test_radar_renders_as_a_local_server_that_needs_its_token(tmp_path: Path) ->
     assert "url" not in radar
     assert radar["enabled"] is False
     assert MARKER not in text
+
+
+def test_offline_profile_renders_cyberau_offline_on_every_stdio_server(tmp_path: Path) -> None:
+    home = tmp_path / "profile"
+    config = home / "config.yaml"
+    env_file = home / ".env"
+    _write(env_file, "CYBERAU_OFFLINE=1\n")
+    assert _run(home, SERVERS, config, env_file).returncode == 0
+    loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
+    stdio = {name: entry for name, entry in loaded["mcp_servers"].items() if "command" in entry}
+    assert stdio
+    assert all(entry["env"].get("CYBERAU_OFFLINE") == "1" for entry in stdio.values())
+    _write(env_file, "# CYBERAU_OFFLINE=1\n")
+    assert _run(home, SERVERS, config, env_file).returncode == 0
+    loaded = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert not any(
+        "CYBERAU_OFFLINE" in (entry.get("env") or {}) for entry in loaded["mcp_servers"].values()
+    )

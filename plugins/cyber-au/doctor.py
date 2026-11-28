@@ -177,6 +177,9 @@ def collect_checks(ctx: Context) -> list[Check]:
         check_venv(ctx),
     ]
     checks.extend(check_connectors(ctx))
+    offline = check_offline_mode(ctx)
+    if offline is not None:
+        checks.append(offline)
     checks.extend(check_store(ctx))
     checks.extend(check_snapshots(ctx))
     checks.append(check_cron(ctx))
@@ -398,6 +401,68 @@ def check_connectors(ctx: Context) -> list[Check]:
             _connector_check(ctx, name, base, from_config=bool(rendered), external=external)
         )
     return checks
+
+
+def offline_mode(ctx: Context) -> bool:
+    """CYBERAU_OFFLINE=1 in the environment or on any rendered cyber-au server."""
+    if ctx.environ.get("CYBERAU_OFFLINE") == "1":
+        return True
+    config, problem = _load_mapping(_config_path(ctx))
+    if problem or not isinstance(config, dict):
+        return False
+    servers = config.get("mcp_servers") or {}
+    if not isinstance(servers, dict):
+        return False
+    for entry in servers.values():
+        env = entry.get("env") if isinstance(entry, dict) else None
+        if isinstance(env, dict) and str(env.get("CYBERAU_OFFLINE", "")) == "1":
+            return True
+    return False
+
+
+def check_offline_mode(ctx: Context) -> Check | None:
+    """In offline mode, name the enabled sources that can only answer from cache."""
+    if not offline_mode(ctx):
+        return None
+    live_only = sorted(
+        name
+        for name, (spec, external) in _enabled_servers(ctx).items()
+        if external or not _has_shipped_data(ctx.root, _connector_key(spec, name))
+    )
+    if not live_only:
+        return _item("mode.offline", "ok", "offline mode (CYBERAU_OFFLINE=1); no live-only sources")
+    return _item(
+        "mode.offline",
+        "warn",
+        "offline mode (CYBERAU_OFFLINE=1); live-only sources answer from cache or report "
+        f"unavailable: {', '.join(live_only)}",
+        "Expected on an air-gapped host. Import a signed data pack to refresh shipped data.",
+    )
+
+
+def _enabled_servers(ctx: Context) -> dict[str, tuple[dict, bool]]:
+    catalogue, _ = _server_catalogue(ctx.root)
+    config, _ = _load_mapping(_config_path(ctx))
+    rendered = (config or {}).get("mcp_servers") if isinstance(config, dict) else None
+    rendered = rendered if isinstance(rendered, dict) else {}
+    found: dict[str, tuple[dict, bool]] = {}
+    for name in list(rendered) or list(catalogue):
+        if not isinstance(name, str):
+            continue
+        shipped = catalogue.get(name)
+        base = dict(shipped) if isinstance(shipped, dict) else {}
+        external = _is_external(base) if base else _is_external(rendered.get(name) or {})
+        overlay = rendered.get(name)
+        if isinstance(overlay, dict):
+            base.update(overlay)
+        if _is_enabled(base):
+            found[name] = (base, external)
+    return found
+
+
+def _has_shipped_data(root: Path, key: str) -> bool:
+    data = root / "mcp" / key / "data"
+    return data.is_dir() and any(item.is_file() for item in data.rglob("*"))
 
 
 def check_store(ctx: Context) -> list[Check]:
@@ -732,6 +797,8 @@ def _probe(ctx: Context, target: str) -> tuple[str, str]:
         return "fail", f"offline probe failed: {detail}"
     if ctx.offline:
         return "ok", "offline probe passed; live probe skipped (doctor --offline)"
+    if offline_mode(ctx):
+        return "ok", "offline probe passed; live probe skipped (CYBERAU_OFFLINE=1)"
     live_code, live_output = ctx.health(target, True)
     if live_code != 0:
         detail = _short(live_output) or "live probe failed"
@@ -739,9 +806,10 @@ def _probe(ctx: Context, target: str) -> tuple[str, str]:
     return "ok", "offline probe passed; live probe passed"
 
 
-# Paths install/render_config.py writes into every server entry. They are not
-# secrets, so a literal value is expected; every other key must be a ${VAR}.
-_INSTALL_PATH_ENV = frozenset({"CYBERAU_DATA_DIR", "CYBERAU_EGRESS_ALLOWLIST"})
+# Settings install/render_config.py writes into every server entry (paths, and
+# CYBERAU_OFFLINE on an offline install). They are not secrets, so a literal value
+# is expected; every other key must be a ${VAR}.
+_INSTALL_PATH_ENV = frozenset({"CYBERAU_DATA_DIR", "CYBERAU_EGRESS_ALLOWLIST", "CYBERAU_OFFLINE"})
 
 
 def _env_findings(spec: dict, environ: Mapping[str, str]) -> list[tuple[str, str]]:

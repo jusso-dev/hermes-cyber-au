@@ -138,6 +138,7 @@ nav:
       - Briefing delivery: operations/briefing-delivery.md
       - Updating: operations/updating.md
       - Supply chain: operations/supply-chain.md
+      - Offline install: operations/offline.md
   - Contributing: contributing/index.md
   - Reference:
       - Overview: reference/index.md

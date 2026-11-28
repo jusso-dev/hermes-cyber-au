@@ -34,6 +34,10 @@ def main(argv: list[str] | None = None) -> int:
         from cyberau_common.delivery import main as deliver_main
 
         return deliver_main(argv[1:])
+    if argv and argv[0] == "datapack":
+        from cyberau_common.datapack import main as datapack_main
+
+        return datapack_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="cyberau-mcp")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -73,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         "deliver",
         help="Draft the daily briefing for delivery.yaml destinations; --send to deliver",
     )
+    sub.add_parser("datapack", help="Build, verify and import signed offline data packs")
 
     sub.add_parser("refresh", help="Refresh public feeds and optionally load the intel store")
 

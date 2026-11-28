@@ -792,3 +792,82 @@ def test_disabled_connector_skips_keys_installation_and_probes(tmp_path, install
     item = ids(run(root, health=unexpected_probe))["connector.kev"]
     assert item.status == "warn"
     assert "off: licence terms" in item.detail
+
+
+def _offline_tree(tmp_path: Path) -> Path:
+    root = healthy(tmp_path)
+    servers = (root / "mcp" / "servers.yaml").read_text(encoding="utf-8")
+    servers += (
+        "  greynoise:\n"
+        "    connector: greynoise\n"
+        "    args: [serve, greynoise]\n"
+        "    env: []\n"
+        "    enabled_by_default: true\n"
+        "    required_env: []\n"
+    )
+    _write(root / "mcp" / "servers.yaml", servers)
+    _write(
+        root / "mcp" / "greynoise" / "pyproject.toml",
+        "[project]\nname = 'cyberau-greynoise'\nversion = '0.1.0'\n",
+    )
+    _write(
+        root / "mcp" / "egress-allowlist.yaml",
+        "connectors:\n  cisa-kev:\n    hosts: [www.cisa.gov]\n"
+        "  greynoise:\n    hosts: [api.greynoise.io]\n",
+    )
+    return root
+
+
+def test_offline_mode_names_live_only_sources(tmp_path: Path):
+    root = _offline_tree(tmp_path)
+    assert "mode.offline" not in ids(run(root))
+
+    report = run(root, environ={"CYBERAU_OFFLINE": "1"}, offline=False)
+    item = ids(report)["mode.offline"]
+    assert item.status == "warn"
+    assert "CYBERAU_OFFLINE=1" in item.detail
+    assert "greynoise" in item.detail
+    # kev ships a snapshot under mcp/cisa-kev/data, so it is not live-only.
+    assert "kev" not in item.detail.split("unavailable: ", 1)[1].split(", ")
+    assert "data pack" in item.fix
+    # Offline mode never runs a live probe, even without --offline.
+    probes: list[tuple[str, bool]] = []
+
+    def health(name: str, live: bool):
+        probes.append((name, live))
+        return 0, "ok"
+
+    report = run(root, environ={"CYBERAU_OFFLINE": "1"}, offline=False, health=health)
+    assert probes and not any(live for _name, live in probes)
+    assert "CYBERAU_OFFLINE=1" in ids(report)["connector.kev"].detail
+    failed = [(c.id, c.detail) for c in report.checks if c.status == "fail"]
+    assert failed == []
+
+
+def test_offline_mode_is_read_from_the_rendered_servers(tmp_path: Path):
+    root = _offline_tree(tmp_path)
+    config = (
+        (root / "config.yaml")
+        .read_text(encoding="utf-8")
+        .replace(
+            "mcp_servers: {}\n",
+            "mcp_servers:\n"
+            "  kev:\n"
+            "    command: /x/cyberau-mcp\n"
+            "    args: [serve, cisa-kev]\n"
+            "    env:\n"
+            "      CYBERAU_DATA_DIR: /x/plugin-data/cyber-au\n"
+            "      CYBERAU_OFFLINE: '1'\n"
+            "  greynoise:\n"
+            "    command: /x/cyberau-mcp\n"
+            "    args: [serve, greynoise]\n"
+            "    env:\n"
+            "      CYBERAU_OFFLINE: '1'\n",
+        )
+    )
+    _write(root / "config.yaml", config)
+    found = ids(run(root))
+    assert found["mode.offline"].status == "warn"
+    assert "greynoise" in found["mode.offline"].detail
+    assert "literal" not in found["connector.kev"].detail
+    assert found["connector.kev"].status == "ok"

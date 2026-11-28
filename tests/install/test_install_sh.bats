@@ -427,3 +427,37 @@ PY
   ! grep -q "plugins install" "$HERMES_FAKE_LOG"
   [[ "$output" == *"Offline: skipped the guidance pack"* ]]
 }
+
+@test "--skip-bootstrap installs the profile without running bootstrap" {
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes --skip-bootstrap
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Skipping bootstrap"* ]]
+  grep -q "profile install" "$HERMES_FAKE_LOG"
+  [ ! -s "$UV_LOG" ]
+  [ ! -d "$HOME/.hermes/profiles/cyber-au/mcp/.venv" ]
+}
+
+@test "--venv-ready uses the prebuilt venv and never calls uv" {
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes --skip-bootstrap
+  [ "$status" -eq 0 ]
+  home="$HOME/.hermes/profiles/cyber-au"
+  mkdir -p "$home/mcp/.venv/bin"
+  ln -sf "$CYBERAU_REAL_PYTHON" "$home/mcp/.venv/bin/python"
+  printf '#!/bin/sh\nexit 0\n' >"$home/mcp/.venv/bin/cyberau-mcp"
+  chmod +x "$home/mcp/.venv/bin/cyberau-mcp"
+  printf '%s\n' 'CYBERAU_OFFLINE=1' >"$home/.env"
+  run "$REPO/install/bootstrap.sh" --profile cyber-au --offline --venv-ready --non-interactive
+  [ "$status" -eq 0 ]
+  [ ! -s "$UV_LOG" ]
+  [[ "$output" == *"already built"* ]]
+  grep -q "CYBERAU_OFFLINE" "$home/config.yaml"
+  [ -s "$home/mcp/.venv/.cyberau-lock-sha256" ]
+}
+
+@test "--venv-ready without a venv fails clearly" {
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes --skip-bootstrap
+  [ "$status" -eq 0 ]
+  run "$REPO/install/bootstrap.sh" --profile cyber-au --offline --venv-ready --non-interactive
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--venv-ready was given"* ]]
+}
