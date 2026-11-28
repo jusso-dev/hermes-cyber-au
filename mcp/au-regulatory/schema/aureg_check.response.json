@@ -1,0 +1,479 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "disclaimer",
+    "submitted",
+    "timezone",
+    "discovered_at",
+    "now",
+    "organisation",
+    "applicable",
+    "possible",
+    "not_applicable",
+    "limited_use",
+    "questions",
+    "timeline",
+    "notes",
+    "snapshot_date",
+    "unknown_rule_links"
+  ],
+  "properties": {
+    "disclaimer": {
+      "type": "string"
+    },
+    "submitted": {
+      "const": false
+    },
+    "timezone": {
+      "const": "Australia/Sydney"
+    },
+    "discovered_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "now": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "organisation": {
+      "type": "object"
+    },
+    "applicable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "regime",
+          "trigger",
+          "title",
+          "kind",
+          "status",
+          "why",
+          "questions",
+          "recipient",
+          "channel",
+          "citation",
+          "source_url",
+          "guidance_url",
+          "related_sources",
+          "last_reviewed",
+          "verification",
+          "deadlines",
+          "draft",
+          "warnings"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "regime": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mandatory",
+              "voluntary"
+            ]
+          },
+          "status": {
+            "enum": [
+              "applies",
+              "may apply"
+            ]
+          },
+          "why": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "guidance_url": {
+            "type": "string"
+          },
+          "related_sources": {
+            "type": "array"
+          },
+          "last_reviewed": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "object"
+          },
+          "deadlines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "span",
+                "from",
+                "starts_at",
+                "due_at",
+                "basis"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "span": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "starts_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "due_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "draft": {
+            "type": "object",
+            "required": [
+              "label",
+              "fields",
+              "note"
+            ],
+            "properties": {
+              "label": {
+                "const": "DRAFT. Not submitted."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "value",
+                    "status"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "enum": [
+                        "prefilled draft",
+                        "to complete"
+                      ]
+                    }
+                  }
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "possible": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "regime",
+          "trigger",
+          "title",
+          "kind",
+          "status",
+          "why",
+          "questions",
+          "recipient",
+          "channel",
+          "citation",
+          "source_url",
+          "guidance_url",
+          "related_sources",
+          "last_reviewed",
+          "verification",
+          "deadlines",
+          "draft",
+          "warnings"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "regime": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mandatory",
+              "voluntary"
+            ]
+          },
+          "status": {
+            "enum": [
+              "applies",
+              "may apply"
+            ]
+          },
+          "why": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "guidance_url": {
+            "type": "string"
+          },
+          "related_sources": {
+            "type": "array"
+          },
+          "last_reviewed": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "object"
+          },
+          "deadlines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "span",
+                "from",
+                "starts_at",
+                "due_at",
+                "basis"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "span": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "starts_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "due_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "draft": {
+            "type": "object",
+            "required": [
+              "label",
+              "fields",
+              "note"
+            ],
+            "properties": {
+              "label": {
+                "const": "DRAFT. Not submitted."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "value",
+                    "status"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "enum": [
+                        "prefilled draft",
+                        "to complete"
+                      ]
+                    }
+                  }
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "not_applicable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "why_not",
+          "watch_for"
+        ]
+      }
+    },
+    "limited_use": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "citation",
+          "source_url",
+          "last_reviewed",
+          "verification"
+        ]
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "obligation",
+          "title",
+          "deadline",
+          "status",
+          "due_at",
+          "span",
+          "from",
+          "remaining",
+          "overdue"
+        ]
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "snapshot_date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unknown_rule_links": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

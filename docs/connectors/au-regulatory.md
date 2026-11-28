@@ -7,7 +7,7 @@ Read-only Australian reporting obligations.
 - Key: `au-regulatory`
 - Server: `aureg`
 - Default: on
-- Upstream: https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches and the OAIC NDB scheme guide, https://www.cyber.gov.au/report-a-cyber-security-incident, https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf, and the Federal Register of Legislation for the Privacy Act 1988, the Security of Critical Infrastructure Act 2018 and the Cyber Security Act 2024.
+- Upstream: https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches and the OAIC NDB scheme guide, https://www.cyber.gov.au/report-a-cyber-security-incident, https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf, and the Federal Register of Legislation for the Privacy Act 1988, the Security of Critical Infrastructure Act 2018, the Cyber Security Act 2024, the Cyber Security (Ransomware Payment Reporting) Rules 2025 and APRA Prudential Standard CPS 234.
 - Source: `mcp/au-regulatory/src/cyberau_au_regulatory/source.py`
 
 ## Authentication
@@ -21,7 +21,7 @@ No credential variable is declared for this connector.
 | Variable | Kind | Server `env` | `required_env` | Read in connector |
 |---|---|---|---|---|
 | `CYBERAU_AUREG_SNAPSHOT` | runtime | no | no | `os.environ.get` |
-| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.data_dir` |
+| `CYBERAU_DATA_DIR` | runtime | no | no | `runtime.configured_data_dir, runtime.data_dir` |
 | `CYBERAU_EGRESS_ALLOWLIST` | runtime | no | no | `runtime.allowlist_path` |
 | `CYBERAU_OFFLINE` | runtime | no | no | `runtime.offline` |
 | `CYBERAU_TODAY` | runtime | no | no | `runtime.pinned_day` |
@@ -55,7 +55,7 @@ Input schema (`schema/aureg_obligation.input.json`):
 
 | Field | Type | Required | Constraints |
 |---|---|---|---|
-| `regime` | enum | yes | one of `ndb`, `soci`, `ransomware_payment` |
+| `regime` | enum | yes | one of `ndb`, `soci`, `ransomware_payment`, `apra_cps234`, `asd_voluntary`, `csa_significant_incident`, `limited_use` |
 | `trigger` | string | no | For example 'critical_incident', 'other_incident', 'suspected_breach' |
 
 Additional properties are rejected.
@@ -69,7 +69,11 @@ Additional properties are rejected.
       "enum": [
         "ndb",
         "soci",
-        "ransomware_payment"
+        "ransomware_payment",
+        "apra_cps234",
+        "asd_voluntary",
+        "csa_significant_incident",
+        "limited_use"
       ]
     },
     "trigger": {
@@ -97,6 +101,11 @@ Response schema (`schema/aureg_obligation.response.json`):
 | `retrieved_at` | string | yes |  |
 | `sha256` | string | yes |  |
 | `deadlines` | array of object | yes |  |
+| `id` | string | yes |  |
+| `title` | string | yes |  |
+| `kind` | string | yes |  |
+| `recipient` | string | yes |  |
+| `last_reviewed` | string | yes |  |
 
 Additional properties are rejected.
 
@@ -105,8 +114,13 @@ Additional properties are rejected.
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "id",
     "regime",
     "trigger",
+    "title",
+    "kind",
+    "recipient",
+    "last_reviewed",
     "rule",
     "citation",
     "quote",
@@ -154,6 +168,7 @@ Additional properties are rejected.
           "from",
           "hours",
           "days",
+          "business_days",
           "basis"
         ],
         "properties": {
@@ -175,11 +190,32 @@ Additional properties are rejected.
               "null"
             ]
           },
+          "business_days": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "basis": {
             "type": "string"
           }
         }
       }
+    },
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "recipient": {
+      "type": "string"
+    },
+    "last_reviewed": {
+      "type": "string"
     }
   }
 }
@@ -193,7 +229,7 @@ Input schema (`schema/aureg_deadline.input.json`):
 
 | Field | Type | Required | Constraints |
 |---|---|---|---|
-| `regime` | enum | yes | one of `ndb`, `soci`, `ransomware_payment` |
+| `regime` | enum | yes | one of `ndb`, `soci`, `ransomware_payment`, `apra_cps234`, `asd_voluntary`, `csa_significant_incident`, `limited_use` |
 | `trigger` | string | yes |  |
 | `aware_at` | string | yes | format `date-time` |
 
@@ -208,7 +244,11 @@ Additional properties are rejected.
       "enum": [
         "ndb",
         "soci",
-        "ransomware_payment"
+        "ransomware_payment",
+        "apra_cps234",
+        "asd_voluntary",
+        "csa_significant_incident",
+        "limited_use"
       ]
     },
     "trigger": {
@@ -243,6 +283,11 @@ Response schema (`schema/aureg_deadline.response.json`):
 | `aware_at` | string | yes |  |
 | `timezone` | string | yes |  |
 | `deadlines` | array of object | yes |  |
+| `id` | string | yes |  |
+| `title` | string | yes |  |
+| `kind` | string | yes |  |
+| `recipient` | string | yes |  |
+| `last_reviewed` | string | yes |  |
 
 Additional properties are rejected.
 
@@ -251,8 +296,13 @@ Additional properties are rejected.
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "id",
     "regime",
     "trigger",
+    "title",
+    "kind",
+    "recipient",
+    "last_reviewed",
     "rule",
     "citation",
     "quote",
@@ -323,6 +373,570 @@ Additional properties are rejected.
           }
         }
       }
+    },
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "recipient": {
+      "type": "string"
+    },
+    "last_reviewed": {
+      "type": "string"
+    }
+  }
+}
+```
+
+### `aureg_check`
+
+Which Australian incident reports may apply, deadlines in Australia/Sydney, recipients, sources and draft fields. Never submits anything.
+
+Input schema (`schema/aureg_check.input.json`):
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `discovered_at` | string | yes | format `date-time`; When the organisation became aware of the incident, ISO 8601. A value with no offset is read as Australia/Sydney. |
+| `facts` | object | no | Incident facts. Booleans such as cyber_security_incident, personal_information_involved, serious_harm_ruled_out, eligible_breach_believed, soci_part_2b_applies, significant_availability_impact, relevant_impact, ransomware_payment_made, apra_material_incident, apra_control_weakness, notified_other_regulator, significant_cyber_security_incident. Times payment_at and oral_report_at. Text such as summary, impact and systems_affected for the draft fields. Leave a fact out when it is not known. |
+| `org` | object | no | org.yaml fields (sector, turnover, regulators, critical_infrastructure, holds_personal_information, name). Leave out to read org.yaml from the profile. |
+| `now` | string | no | format `date-time`; Time to count down from. Leave out for no countdown. |
+
+Additional properties are rejected.
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "discovered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the organisation became aware of the incident, ISO 8601. A value with no offset is read as Australia/Sydney."
+    },
+    "facts": {
+      "type": "object",
+      "description": "Incident facts. Booleans such as cyber_security_incident, personal_information_involved, serious_harm_ruled_out, eligible_breach_believed, soci_part_2b_applies, significant_availability_impact, relevant_impact, ransomware_payment_made, apra_material_incident, apra_control_weakness, notified_other_regulator, significant_cyber_security_incident. Times payment_at and oral_report_at. Text such as summary, impact and systems_affected for the draft fields. Leave a fact out when it is not known."
+    },
+    "org": {
+      "type": "object",
+      "description": "org.yaml fields (sector, turnover, regulators, critical_infrastructure, holds_personal_information, name). Leave out to read org.yaml from the profile."
+    },
+    "now": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time to count down from. Leave out for no countdown."
+    }
+  },
+  "required": [
+    "discovered_at"
+  ]
+}
+```
+
+Response schema (`schema/aureg_check.response.json`):
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `disclaimer` | string | yes |  |
+| `submitted` | value | yes |  |
+| `timezone` | value | yes |  |
+| `discovered_at` | ['string', 'null'] | yes |  |
+| `now` | ['string', 'null'] | yes |  |
+| `organisation` | object | yes |  |
+| `applicable` | array of object | yes |  |
+| `possible` | array of object | yes |  |
+| `not_applicable` | array of object | yes |  |
+| `limited_use` | array of object | yes |  |
+| `questions` | array of string | yes |  |
+| `timeline` | array of object | yes |  |
+| `notes` | array of string | yes |  |
+| `snapshot_date` | ['string', 'null'] | yes |  |
+| `unknown_rule_links` | array of string | yes |  |
+
+Additional properties are rejected.
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "disclaimer",
+    "submitted",
+    "timezone",
+    "discovered_at",
+    "now",
+    "organisation",
+    "applicable",
+    "possible",
+    "not_applicable",
+    "limited_use",
+    "questions",
+    "timeline",
+    "notes",
+    "snapshot_date",
+    "unknown_rule_links"
+  ],
+  "properties": {
+    "disclaimer": {
+      "type": "string"
+    },
+    "submitted": {
+      "const": false
+    },
+    "timezone": {
+      "const": "Australia/Sydney"
+    },
+    "discovered_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "now": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "organisation": {
+      "type": "object"
+    },
+    "applicable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "regime",
+          "trigger",
+          "title",
+          "kind",
+          "status",
+          "why",
+          "questions",
+          "recipient",
+          "channel",
+          "citation",
+          "source_url",
+          "guidance_url",
+          "related_sources",
+          "last_reviewed",
+          "verification",
+          "deadlines",
+          "draft",
+          "warnings"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "regime": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mandatory",
+              "voluntary"
+            ]
+          },
+          "status": {
+            "enum": [
+              "applies",
+              "may apply"
+            ]
+          },
+          "why": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "guidance_url": {
+            "type": "string"
+          },
+          "related_sources": {
+            "type": "array"
+          },
+          "last_reviewed": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "object"
+          },
+          "deadlines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "span",
+                "from",
+                "starts_at",
+                "due_at",
+                "basis"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "span": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "starts_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "due_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "draft": {
+            "type": "object",
+            "required": [
+              "label",
+              "fields",
+              "note"
+            ],
+            "properties": {
+              "label": {
+                "const": "DRAFT. Not submitted."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "value",
+                    "status"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "enum": [
+                        "prefilled draft",
+                        "to complete"
+                      ]
+                    }
+                  }
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "possible": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "regime",
+          "trigger",
+          "title",
+          "kind",
+          "status",
+          "why",
+          "questions",
+          "recipient",
+          "channel",
+          "citation",
+          "source_url",
+          "guidance_url",
+          "related_sources",
+          "last_reviewed",
+          "verification",
+          "deadlines",
+          "draft",
+          "warnings"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "regime": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mandatory",
+              "voluntary"
+            ]
+          },
+          "status": {
+            "enum": [
+              "applies",
+              "may apply"
+            ]
+          },
+          "why": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "guidance_url": {
+            "type": "string"
+          },
+          "related_sources": {
+            "type": "array"
+          },
+          "last_reviewed": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "object"
+          },
+          "deadlines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "span",
+                "from",
+                "starts_at",
+                "due_at",
+                "basis"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "span": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "starts_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "due_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "draft": {
+            "type": "object",
+            "required": [
+              "label",
+              "fields",
+              "note"
+            ],
+            "properties": {
+              "label": {
+                "const": "DRAFT. Not submitted."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "value",
+                    "status"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "enum": [
+                        "prefilled draft",
+                        "to complete"
+                      ]
+                    }
+                  }
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "not_applicable": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "why_not",
+          "watch_for"
+        ]
+      }
+    },
+    "limited_use": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "citation",
+          "source_url",
+          "last_reviewed",
+          "verification"
+        ]
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "obligation",
+          "title",
+          "deadline",
+          "status",
+          "due_at",
+          "span",
+          "from",
+          "remaining",
+          "overdue"
+        ]
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "snapshot_date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unknown_rule_links": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   }
 }
@@ -346,7 +960,7 @@ Attribution returned with each result:
 
 - Live health uses the Register's published HTML for the Act as made, rather than its JavaScript viewer. It checks source availability and snapshot schema; it does not verify subsequent amendments.
 - Terms: Commonwealth legislation and government guidance. Short quotes are stored with the source URL, the retrieval date and the SHA-256 of the quoted sentence. This is guidance, not legal advice. The connector is not endorsed by the OAIC, ASD, the ACSC or the Cyber and Infrastructure Security Centre.
-- Verified: 2026-10-17
+- Verified: 2026-11-28
 - Egress hosts: www.oaic.gov.au, www.cyber.gov.au, www.cisc.gov.au, www.legislation.gov.au
 
 Section numbers checked against the register, not by submitting anything to a regulator:
@@ -354,8 +968,12 @@ Section numbers checked against the register, not by submitting anything to a re
 - Privacy Act 1988 (Cth) s 26WH(2): all reasonable steps to finish the suspected-breach assessment within 30 days. Sections 26WK(2) and 26WL(3): statement to the Commissioner, and notice to individuals, as soon as practicable.
 - Security of Critical Infrastructure Act 2018 (Cth) ss 30BC and 30BD, compilation dated 4 June 2026: critical incidents within 12 hours (written record within 84 hours after an oral report); other incidents within 72 hours (written record within 48 hours after an oral report). Significant impact is s 30BEA. Relevant impact is s 8G.
 - Cyber Security Act 2024 (Cth) s 27(1), from the Act as made on 29 November 2024: a reporting business entity must give the designated Commonwealth body a ransomware payment report within 72 hours of making the payment or of becoming aware that it was made. Who must report is s 26. The turnover threshold is the amount prescribed by the rules, not a figure in the Act. The latest register contents still place this duty in Part 3.
+- Cyber Security (Ransomware Payment Reporting) Rules 2025 (F2025L00278) s 6(1): the turnover threshold is $3 million, pro rata under s 6(2) for a business carried on for part of the year. Section 7 lists the report contents, which `aureg_check` uses as the draft field list. The Act says turnover must exceed the threshold. The ASD reporting form says "equal to or exceeds". The checker treats the org.yaml band `3m-or-more` as in scope and tells the user to get advice near the line.
+- Cyber Security Act 2024 (Cth) ss 29 to 32 (limited use, privilege and admissibility for ransomware payment reports), s 34 (significant cyber security incident), s 35 (voluntary information to the National Cyber Security Coordinator), s 38 (the Coordinator's limited use) and s 44 (sharing under Part 4 does not affect any other requirement to report).
+- Prudential Standard CPS 234 Information Security (F2018L01745) paragraphs 35 and 36: notify APRA no later than 72 hours after becoming aware of a material information security incident, or one notified to another regulator, and no later than 10 business days after becoming aware of a material control weakness the entity expects it cannot remediate in time.
+- ASD guidance pages for the voluntary report (ReportCyber) and the ASD limited use obligation. The limited use rule is marked `partial`: the Intelligence Services Act 2001 Division 1A text was not fetched in this review, so only ASD's description is quoted.
 
-The shipped snapshot is `data/obligations-2026-10-17.json`. Each answer is also appended to `$CYBERAU_DATA_DIR/aureg-obligations.jsonl` as a local source observation.
+The shipped snapshot is `data/obligations-2026-11-28.json`. Each answer is also appended to `$CYBERAU_DATA_DIR/aureg-obligations.jsonl` as a local source observation.
 
 ## Operator guide
 
@@ -365,8 +983,11 @@ Read-only deadlines and source quotes for the OAIC Notifiable Data Breaches sche
 |---|---|
 | `aureg_obligation` | The encoded rule, deadline and quoted source sentence for a regime and trigger |
 | `aureg_deadline` | Those deadlines calculated in Australia/Sydney from an awareness time |
+| `aureg_check` | Which reports may apply to an incident given `org.yaml`, with deadlines, recipients, sources, draft report fields and a countdown timeline |
 
-Regimes are `ndb`, `soci` and `ransomware_payment`. Triggers are `suspected_breach`, `eligible_breach`, `critical_incident`, `other_incident` and `payment`. Leave the trigger out of `aureg_obligation` to see every rule for that regime.
+Regimes are `ndb`, `soci`, `ransomware_payment`, `apra_cps234`, `asd_voluntary`, `csa_significant_incident` and `limited_use`. Each rule has an `id` of the form `<regime>.<trigger>`, a recipient, conditions keyed to `org.yaml` fields and incident facts (`applies_when`), the deadline clocks, the report fields to prefill, the source URL and a `last_reviewed` date. Leave the trigger out of `aureg_obligation` to see every rule for that regime.
+
+`aureg_check` runs a pure function, `cyberau_au_regulatory.engine.check`. It sorts each rule into applies, may apply (with the questions to ask) or does not apply (with the reason). Hours are elapsed time, added in UTC and shown in Australia/Sydney. Days keep the Sydney wall clock time. Business days skip weekends but not public holidays, so the date shown is never later than the true deadline. A ransomware payment clock runs from `payment_at` when it is given. Prefilled draft values come only from the facts and `org.yaml`, and are wrapped as untrusted text. The result always says it is not legal advice and that nothing was submitted. Nothing in this connector submits, sends or lodges anything.
 
 Quotes are short passages from Commonwealth legislation, with the URL, retrieval date and SHA-256 of the quoted sentence. The 30 day NDB assessment, the 12 hour and 72 hour SOCI reports, and the 72 hour ransomware payment report are fixed in the shipped snapshot. A written record after an oral SOCI report is timed from the oral report, not from awareness. Notice to the Commissioner and to individuals under the NDB scheme is as soon as practicable, so those clocks do not invent a fixed hour.
 
@@ -375,7 +996,7 @@ This is guidance, not legal advice. It is not endorsed by the OAIC, the Australi
 
 ## Snapshot maintenance
 
-The obligations snapshot contains reviewed quotes and deadline rules. It is not
+The obligations snapshot contains reviewed quotes, deadline rules and applicability conditions. It is not
 automatically refreshed from web pages. The data workflow checks its file hashes
 without changing retrieval dates. Review the cited legislation and guidance
 before changing a quote, deadline or retrieval date. `regen aureg --fetch` is not

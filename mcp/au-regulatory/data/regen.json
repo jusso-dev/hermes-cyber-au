@@ -2,8 +2,8 @@
   "data_dir": "mcp/au-regulatory/data",
   "files": [
     {
-      "path": "mcp/au-regulatory/data/obligations-2026-10-17.json",
-      "sha256": "f3bdb0c1cd03cf8bebdd1e7dfcfe1705b8172d173187c44868bf4389f36065b0"
+      "path": "mcp/au-regulatory/data/obligations-2026-11-28.json",
+      "sha256": "d44228eb323289b96731501fc97ad64693b3be1b255091d41c8dee73be2b979a"
     }
   ],
   "source": "aureg"
