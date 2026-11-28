@@ -19,6 +19,7 @@ MIGRATIONS = (
     (_MIGRATION_DIR / "0001_init.sql", 1),
     (_MIGRATION_DIR / "0002_retention.sql", 2),
     (_MIGRATION_DIR / "0003_watchlist_matches.sql", 3),
+    (_MIGRATION_DIR / "0004_essentials_evidence.sql", 4),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][1]
 _LOCK = threading.Lock()
