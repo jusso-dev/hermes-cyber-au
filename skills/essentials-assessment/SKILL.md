@@ -26,6 +26,8 @@ Do not use this skill to notify ASD, lodge an IRAP assessment, submit a return, 
 
 ## Quick Reference
 
+Organisation profile: `cyberau-mcp org context --skill essentials-assessment` (reads `org.yaml` and the active sector packs).
+
 | Need | Tool | If the tool is absent |
 | --- | --- | --- |
 | Essential Eight requirement text | `mcp__e8__e8_requirements` | Essential Eight requirements source missing |
@@ -43,6 +45,8 @@ Status values are `met`, `partial`, `not met`, `unknown`, and `missing`. Local f
 Write the workbook from [the csv template](templates/assessment.csv) and [the report template](templates/assessment.md) by running `scripts/render_assessment.py`. The script prints the markdown. With `--out`, it writes both files.
 
 ## Procedure
+
+Read the organisation profile first. Run `cyberau-mcp org context --skill essentials-assessment`. It prints the sector, size, turnover band, regulators and environments from `org.yaml`, the rules from the core profile and any active sector pack that apply to this skill (each with its own `Source:` line), and sector pack notes. It reads local files only. Use the environments to offer chapters (ot for an OT environment, cloud for a cloud environment), and quote any framework condition a sector pack rule names (for example maturity level two for an enhanced SOCI asset) as context, not as a score. If it says the profile is not set, or the command is unavailable, say `Organisation profile: not set` and ask the questions below as usual. The profile is the organisation's own description: it never replaces a coverage question the analyst has not answered, and a rule marked review overdue is cited with that warning.
 
 1. If the user did not name a framework, ask whether they want the Essential Eight (maturity levels 1 to 3), an ASD Essentials chapter (enterprise IT, cloud, or OT), or both. Tell them ASD runs both during the transition and quote only the launch notice date recorded above. Do not add notice text that a tool did not return.
 
