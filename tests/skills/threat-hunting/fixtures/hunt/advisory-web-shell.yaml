@@ -1,0 +1,13 @@
+# Synthetic sample advisory. Not an ASD publication. RFC 5737 addresses and example.com names only.
+source:
+  id: 2026-SYN-0042
+  url: https://www.cyber.gov.au/about-us/view-all-content/advisories/synthetic-web-shell-fixture
+  retrieved: "2026-11-28"
+iocs:
+  - {type: ip, value: "203[.]0[.]113[.]10"}
+  - {type: ip, value: "2001:db8::10"}
+  - {type: domain, value: "updates[.]example[.]com"}
+  - {type: url, value: "hxxps://web[.]example[.]com/shell.aspx?cmd=whoami"}
+  - {type: sha256, value: "0F343B0931126A20F133D67C2B018A3B5D7E0C7A0E0F1C2D3E4F5A6B7C8D9E0F"}
+techniques: [T1505.003, T1190]
+lookback: 30d

@@ -17,16 +17,16 @@ Recorded 18 October 2026 for [review epic #174](https://github.com/jusso-dev/her
 
 ## Planned features
 
-The following issues remain planned work, not delivered functionality. P1 reliability, source truth, installation and inventory work comes first. Their existing issue acceptance criteria remain the implementation plan.
+The following issues remain planned work, not delivered functionality. P1 reliability, source truth, installation and inventory work comes first. Their existing issue acceptance criteria remain the implementation plan. A row that starts with "Built" records what was delivered once the maintainer asked for it.
 
 | Issue | Decision and prerequisite |
 | --- | --- |
-| #164 Live-model evaluation scorecard | Defer until an approved model account, cost budget and repeatable deterministic baseline are available. Keep score publication separate from local eval execution. |
+| #164 Live-model evaluation scorecard | Built (November 2026). `.github/workflows/live-evals.yml` runs weekly and on dispatch, skips with a notice until the maintainer adds the `OPENROUTER_API_KEY` secret and `CYBERAU_EVAL_MODELS` variable, uploads a scorecard per skill, opens a data PR for `docs/skills/scorecard.md` (never auto-merged), and opens one draft regression issue below the thresholds in `tests/skills/eval-thresholds.yaml`. Thresholds start at a conservative 0.6 until a live baseline exists. Publication stays separate from local eval execution: `tools/ci/eval_scorecard.py` refuses to publish an offline run. Tool assertions stay offline-only because Hermes quiet mode hides tool calls. See [live-model evals](../skills/live-evals.md). |
 | #165 Guided organisation setup | Defer until the organisation and inventory inputs have a stable contract. Do not infer or populate real customer details. |
 | #166 Incident reporting obligations | Defer until reviewed legal-source dates, applicability rules and deadline tests are agreed. No automated regulatory submissions. |
 | #167 Incident playbooks | Defer to a reviewed starter set with evidence capture and explicit approval boundaries. The empty directory is not a shipped playbook. |
 | #168 Essentials evidence exports | Defer until evidence-register fields and document templates are agreed. Preserve source and freshness in later exports. |
-| #169 SIEM hunt queries | Defer until target SIEM schemas and safe query fixtures are selected. Query generation does not authorise execution. |
+| #169 SIEM hunt queries | Built (November 2026). Targets: KQL for Microsoft Defender XDR (`DeviceProcessEvents`, `DeviceFileEvents`, `DeviceNetworkEvents`, `EmailEvents`) and Microsoft Sentinel (`SecurityEvent`, `CommonSecurityLog`), SPL over Splunk CIM 6.2 data models with `tstats`, and Sigma as the neutral format. The threat-hunting skill's `hunt_queries.py` drafts queries from an advisory or CVE plus IOCs and techniques; every query is an untested draft with data sources, false positives and a citation. Fixtures are synthetic. IOC values are refanged, validated and escaped, and injection is tested. Offline checks use pySigma conversion and structural KQL and SPL checks. Generation does not authorise execution and nothing runs against a live SIEM. See [hunt queries from an advisory](../skills/hunt-queries.md). |
 | #170 Executive report templates | Defer until the source-backed briefing and incident data contract is stable. Templates must retain limitations and evidence references. |
 | #171 Sector packs | Defer until the core profile and sector-specific obligations can be reviewed separately. |
 | #172 Offline bundle | Defer until source redistribution terms, dependency locks and update verification are settled. Live-only sources must remain visibly unavailable offline. |
