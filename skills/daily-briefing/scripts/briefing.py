@@ -94,6 +94,25 @@ _SECRET = re.compile(
 _BEARER = re.compile(r"(?i)\bbearer\s+\S+")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069\u200b-\u200f]")
 _WORDS = re.compile(r"[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?")
+# Org exposure findings, in the order the section lists them.
+EXPOSURE_KINDS = (
+    "infostealer_credential",
+    "breach_credential",
+    "leak_site_claim",
+    "data_leak_disclosure",
+    "dark_web_mention",
+    "typosquat_domain",
+    "brand_impersonation",
+    "attack_surface_issue",
+)
+EXPOSURE_CONFIDENCE = ("vendor_confirmed", "vendor_reported", "unverified_claim")
+EXPOSURE_KEY = "org-exposure"
+# The free ransomware tracker. Every other vendor is premium and shows only while enabled.
+EXPOSURE_FREE = frozenset({"ransomlive"})
+EXPOSURE_HELD_BACK = (
+    "Findings whose licence keeps them inside the profile are left out of this channel."
+)
+_COUNT_NAME = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
 
 @dataclass(frozen=True)
@@ -237,6 +256,12 @@ def _compose(
     )
     internet = _internet(connectors, start, end, limit)
     sources, missing = _sources(connectors)
+    exposure = _exposure(pack, channel, limit)
+    exposure_part: list[str] = []
+    if exposure is not None:
+        lines, retrieved = exposure
+        exposure_part = ["## Exposure of our organisation", "", _body(lines, week_cap), ""]
+        sources = [*sources, f"Org exposure (exposures table), retrieved {retrieved}."]
 
     act_lines = _cap(act, act_cap)
     if not inventory_configured:
@@ -266,6 +291,7 @@ def _compose(
         "",
         _body(_cap(week, week_cap)),
         "",
+        *exposure_part,
         "## Australian internet picture",
         "",
         _body(internet),
@@ -832,6 +858,111 @@ def _watch_bullets(watched: dict[str, list[dict]], channel: str, limit: int | No
     return bullets
 
 
+def _exposure(pack: dict, channel: str, limit: int | None) -> tuple[list[str], str] | None:
+    """The org exposure section, or None when it is left out.
+
+    It is left out when the connector is absent, or when no premium vendor is enabled
+    and the free tracker has nothing new. ``cyberau exposure-brief`` decides which
+    findings are new since the last briefing. A finding without
+    ``share_outside_profile: true`` is shown on the owner channel only, and the external
+    channel gets counts only.
+    """
+    raw = (pack.get("connectors") or {}).get(EXPOSURE_KEY)
+    if not isinstance(raw, dict) or raw.get("status") != "ok":
+        return None
+    data = _data(raw)
+    enabled = data.get("premium_enabled")
+    premium = (
+        sorted({_flatten(item, 40) for item in enabled or [] if item})
+        if isinstance(enabled, list)
+        else []
+    )
+    findings = []
+    for row in _rows(raw, "findings"):
+        finding = _exposure_row(row, limit)
+        if finding is not None and (
+            finding["vendor"] in premium or finding["vendor"] in EXPOSURE_FREE
+        ):
+            findings.append(finding)
+    if not premium and not findings:
+        return None
+    retrieved = _retrieved(raw)
+    scope = "New findings since the last briefing. Premium vendors on: "
+    scope += (", ".join(premium) if premium else "none") + "."
+    lines = [scope]
+    shown = findings if channel == "owner" else [f for f in findings if f["shareable"]]
+    by_kind: dict[str, list[dict]] = {}
+    for finding in shown:
+        by_kind.setdefault(finding["kind"], []).append(finding)
+    for kind in EXPOSURE_KINDS:
+        rows = by_kind.get(kind)
+        if not rows:
+            continue
+        rows.sort(key=lambda item: (item["observed"], item["id"]), reverse=True)
+        label = kind.replace("_", " ").capitalize()
+        if channel == "owner":
+            for row in rows:
+                lines.append(f"{label}: {_exposure_text(row)}")
+            continue
+        tally = ", ".join(
+            f"{sum(1 for row in rows if row['confidence'] == level)} {level}"
+            for level in EXPOSURE_CONFIDENCE
+            if any(row["confidence"] == level for row in rows)
+        )
+        noun = "finding" if len(rows) == 1 else "findings"
+        lines.append(f"{label}: {len(rows)} new {noun} ({tally}).")
+    if len(lines) == 1:
+        lines.append("No new findings to show on this channel." if findings else "No new findings.")
+    if channel != "owner" and len(shown) < len(findings):
+        lines.append(EXPOSURE_HELD_BACK)
+    return lines, retrieved
+
+
+def _exposure_row(row: dict, limit: int | None) -> dict | None:
+    kind = row.get("kind")
+    confidence = row.get("confidence")
+    observed = str(row.get("observed_at") or "")
+    subject = row.get("subject") if isinstance(row.get("subject"), dict) else {}
+    value = subject.get("value") if subject else row.get("subject_value")
+    if kind not in EXPOSURE_KINDS or confidence not in EXPOSURE_CONFIDENCE:
+        return None
+    if not observed or "T" not in observed or not isinstance(value, str):
+        return None
+    if kind == "leak_site_claim":
+        confidence = "unverified_claim"
+    first = str(row.get("first_seen") or observed)
+    counts = row.get("counts") if isinstance(row.get("counts"), dict) else {}
+    plain = {
+        name: number
+        for name, number in sorted(counts.items())
+        if isinstance(name, str)
+        and _COUNT_NAME.match(name)
+        and isinstance(number, int)
+        and not isinstance(number, bool)
+    }
+    return {
+        "id": _flatten(row.get("finding_id"), 80),
+        "kind": kind,
+        "vendor": _flatten(row.get("vendor"), 40),
+        "subject": _flatten(value, limit),
+        "confidence": confidence,
+        "first": _parse(first).astimezone(SYDNEY).date().isoformat(),
+        "observed": _display(observed),
+        "counts": plain,
+        "shareable": row.get("share_outside_profile") is True,
+    }
+
+
+def _exposure_text(row: dict) -> str:
+    text = f"{row['subject']}, {row['vendor']}, confidence {row['confidence']}"
+    if row["kind"] == "leak_site_claim":
+        text += ", claimed, not confirmed"
+    text += f", first seen {row['first']}"
+    if row["counts"]:
+        text += ", " + ", ".join(f"{name} {number}" for name, number in row["counts"].items())
+    return text + "."
+
+
 def _is_au(location: str) -> bool:
     return location.casefold().strip() in {"au", "australia"}
 
@@ -884,7 +1015,12 @@ def _cap(bullets: list[Bullet], limit: int | None) -> list[str]:
     return shown
 
 
-def _body(lines: list[str]) -> str:
+def _body(lines: list[str], limit: int | None = None) -> str:
+    if limit is not None and len(lines) > limit + 1:
+        # The first exposure line is the scope line, so it is not counted.
+        extra = len(lines) - limit - 1
+        noun = "item" if extra == 1 else "items"
+        lines = [*lines[: limit + 1], f"{extra} more {noun} are in the full briefing."]
     if not lines:
         return "None in this window."
     return "\n".join(f"- {line}" if not line.startswith("- ") else line for line in lines)

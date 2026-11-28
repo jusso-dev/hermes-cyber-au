@@ -1102,10 +1102,14 @@ version = "0.1.0"
 source = { editable = "org-exposure" }
 dependencies = [
     { name = "cyberau-common" },
+    { name = "cyberau-premium" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "cyberau-common", editable = "common" }]
+requires-dist = [
+    { name = "cyberau-common", editable = "common" },
+    { name = "cyberau-premium", editable = "premium" },
+]
 
 [[package]]
 name = "cyberau-osv"

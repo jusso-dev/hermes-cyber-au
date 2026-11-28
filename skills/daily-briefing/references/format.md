@@ -20,14 +20,26 @@ Any other target, including a mix such as `origin` plus another platform, uses `
 
 ## Sections
 
-The briefing always has these headings, in this order:
+The briefing has these headings, in this order. Every heading except Exposure of our organisation is always present:
 
 1. Headline. One sentence: the Sydney date, how many items need action, and the first item's label. If none do, it says nothing needs action today.
 2. Act today. ASD ACSC alerts in the window. New KEV entries that match the asset inventory. Tier 1 vulnerabilities that match the inventory and became Tier 1 in the window. Tier 1 means in KEV, named by an ASD ACSC alert in the window, or an EPSS score of at least 0.7 that was below 0.7 before. The match rule is `matching.md`.
 3. This week. ASD ACSC advisories, AusCERT bulletins, EPSS movers (a rise of at least 0.1) that are not already in Act today, and ATT&CK techniques with at least two mentions in the window.
-4. Australian internet picture. Cloudflare Radar outages and attack summaries for AU when that connector returned data, attributed to Cloudflare Radar. When it did not, the section says the picture is not available. It does not report an error.
-5. Watchlist hits from the intel store. A hit is tied to an inventoried asset only when its asset name matches a name in the inventory. Those hits are named on the owner channel and counted on an external channel. Any other hit is listed as an indicator, with no asset name. That includes every hit when the inventory is missing or empty.
-6. Sources, each with its retrieval time in Australia/Sydney.
+4. Exposure of our organisation, only when it applies (see below). It is the one optional heading.
+5. Australian internet picture. Cloudflare Radar outages and attack summaries for AU when that connector returned data, attributed to Cloudflare Radar. When it did not, the section says the picture is not available. It does not report an error.
+6. Watchlist hits from the intel store. A hit is tied to an inventoried asset only when its asset name matches a name in the inventory. Those hits are named on the owner channel and counted on an external channel. Any other hit is listed as an indicator, with no asset name. That includes every hit when the inventory is missing or empty.
+7. Sources, each with its retrieval time in Australia/Sydney.
+
+## Exposure of our organisation
+
+The pack entry `org-exposure` comes from `cyberau exposure-brief --record`, which reads the `exposures` table in the profile data directory and lists findings not already briefed, observed since the last briefing (seven days back on the first run). Each finding carries `share_outside_profile` from its vendor's terms. `premium_enabled` lists the paid vendors switched on in `config.yaml`.
+
+- The section is left out entirely when the entry is missing, or when no premium vendor is enabled and the free tracker (`ransomlive`) has no new finding. Findings from a premium vendor that is now off are not shown. With every premium vendor off, the briefing is the same as without this section.
+- The first line says the findings are new since the last briefing and names the premium vendors that are on.
+- Findings are grouped by kind (infostealer credential, breach credential, leak site claim, data leak disclosure, dark web mention, typosquat domain, brand impersonation, attack surface issue), newest first, each with its confidence label (`vendor_confirmed`, `vendor_reported`, `unverified_claim`). A leak site claim is always `unverified_claim` and says `claimed, not confirmed`.
+- Owner channel: subject, vendor, confidence, first seen date and counts. No credential value, data class or person is ever in the pack.
+- External channel: counts per kind and confidence only, and only for findings with `share_outside_profile: true`. When any finding was held back, the last line says so.
+- The brief caps the list like This week. Sources gets `Org exposure (exposures table), retrieved ...`.
 
 ## Missing connectors
 
