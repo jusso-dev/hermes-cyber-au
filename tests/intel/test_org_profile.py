@@ -60,3 +60,12 @@ def test_write_round_trip_and_mode(tmp_path):
     with pytest.raises(OrgFileError):
         write_org(original, target)
     write_org(original, target, force=True)
+
+
+def test_sector_packs_accept_local_names_and_none():
+    local = parse_org({"sector": "retail", "sector_packs": ["Example-Pack", "bad name!"]})
+    assert local.sector_packs == ("example-pack",)
+    assert local.packs == ("example-pack",)
+    assert any("bad name!" in w for w in local.warnings)
+    off = parse_org({"sector": "health", "sector_packs": ["none"]})
+    assert off.packs == ()

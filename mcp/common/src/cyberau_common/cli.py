@@ -63,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("store", help="Query and update the local intel store")
     sub.add_parser("assets", help="Import, list and match the local asset inventory")
+    sub.add_parser("org", help="Show org.yaml and the sector packs it switches on")
     sub.add_parser("provenance", help="Print the provenance footer for connector results")
 
     sub.add_parser("refresh", help="Refresh public feeds and optionally load the intel store")
@@ -130,7 +131,7 @@ def _health_all(args) -> int:
 
 
 # Subcommands parsed by a ``store.<module>.main`` in the cyber-au plugin.
-_PLUGIN_COMMANDS = {"store": "cli", "assets": "assets", "refresh": "refresh"}
+_PLUGIN_COMMANDS = {"store": "cli", "assets": "assets", "refresh": "refresh", "org": "org_context"}
 
 
 def _plugin_command(module: str, argv: list[str]) -> int:
