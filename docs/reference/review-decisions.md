@@ -17,7 +17,7 @@ Recorded 18 October 2026 for [review epic #174](https://github.com/jusso-dev/her
 
 ## Planned features
 
-The following issues remain planned work, not delivered functionality. P1 reliability, source truth, installation and inventory work comes first. Their existing issue acceptance criteria remain the implementation plan.
+The following issues remain planned work, not delivered functionality, unless the row says delivered. P1 reliability, source truth, installation and inventory work comes first. Their existing issue acceptance criteria remain the implementation plan.
 
 | Issue | Decision and prerequisite |
 | --- | --- |
@@ -29,7 +29,7 @@ The following issues remain planned work, not delivered functionality. P1 reliab
 | #169 SIEM hunt queries | Defer until target SIEM schemas and safe query fixtures are selected. Query generation does not authorise execution. |
 | #170 Executive report templates | Defer until the source-backed briefing and incident data contract is stable. Templates must retain limitations and evidence references. |
 | #171 Sector packs | Defer until the core profile and sector-specific obligations can be reviewed separately. |
-| #172 Offline bundle | Defer until source redistribution terms, dependency locks and update verification are settled. Live-only sources must remain visibly unavailable offline. |
+| #172 Offline bundle | Delivered. The weekly release builds `cyber-au-offline-<version>.tar.gz` (profile, shipped snapshots, hashed wheels from `mcp/uv.lock` for Linux x86_64 and aarch64 on Python 3.12, `SHA256SUMS`) and attests it with Sigstore keyless provenance. `cyberau-mcp datapack import` refuses unsigned, tampered or path-escaping packs (Ed25519; the maintainer holds the private key). The bundle carries only snapshots the release tarball already ships. Offline mode is reported by doctor with the live-only sources named. See [offline install](../operations/offline.md). |
 | #173 Briefing delivery | Defer until an explicit channel and recipient configuration is supplied. Delivery remains opt-in and draft-first. |
 
 ## Software monitoring scope
