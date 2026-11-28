@@ -756,6 +756,22 @@ def test_live_only_snapshot_absence_warns_but_corruption_fails(
         assert "no local snapshot" in item.detail
 
 
+def test_disabled_connector_links_its_terms_page(tmp_path):
+    root = healthy(tmp_path)
+    config = yaml.safe_load((root / "config.yaml").read_text())
+    config["mcp_servers"] = {"kev": {"enabled": False}}
+    (root / "config.yaml").write_text(yaml.safe_dump(config))
+    catalogue = yaml.safe_load((root / "mcp/servers.yaml").read_text())
+    catalogue["servers"]["kev"].update(
+        {"off_reason": "licence terms", "docs": "docs/connectors/auscert-member.md"}
+    )
+    (root / "mcp/servers.yaml").write_text(yaml.safe_dump(catalogue))
+    item = ids(run(root))["connector.kev"]
+    assert item.status == "warn"
+    assert "off: licence terms" in item.detail
+    assert "see docs/connectors/auscert-member.md" in item.detail
+
+
 @pytest.mark.parametrize("installed", [False, True])
 def test_disabled_connector_skips_keys_installation_and_probes(tmp_path, installed):
     root = healthy(tmp_path)
