@@ -121,16 +121,16 @@ def parse_time(value: object, label: str) -> tuple[datetime | None, str]:
         return parsed.astimezone(SYDNEY), ""
     early = parsed.replace(tzinfo=SYDNEY, fold=0)
     late = parsed.replace(tzinfo=SYDNEY, fold=1)
-    if early.utcoffset() != late.utcoffset():
-        return None, (
-            f"{label} {parsed.isoformat()} is ambiguous or does not exist in Australia/Sydney "
-            "because of a daylight saving change. Give a UTC offset."
-        )
     round_trip = early.astimezone(UTC).astimezone(SYDNEY).replace(tzinfo=None)
     if round_trip != parsed:
         return None, (
             f"{label} {parsed.isoformat()} does not exist in Australia/Sydney "
             "because the clocks went forward. Give a UTC offset."
+        )
+    if early.utcoffset() != late.utcoffset():
+        return None, (
+            f"{label} {parsed.isoformat()} is ambiguous in Australia/Sydney "
+            "because the clocks went back. Give a UTC offset."
         )
     return early, f"{label} had no offset and was read as Australia/Sydney"
 

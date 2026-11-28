@@ -165,9 +165,9 @@ def test_naive_time_is_sydney_and_gap_or_overlap_is_refused():
     assert engine.fmt(parsed) == "2026-07-01T08:00:00+10:00"
     assert "Australia/Sydney" in note
     gap, note = engine.parse_time("2026-10-04T02:30:00", "discovered_at")
-    assert gap is None and "UTC offset" in note
+    assert gap is None and "does not exist" in note and "UTC offset" in note
     overlap, note = engine.parse_time("2026-04-05T02:30:00", "discovered_at")
-    assert overlap is None and "UTC offset" in note
+    assert overlap is None and "ambiguous" in note and "UTC offset" in note
     utc, note = engine.parse_time("2026-06-30T22:00:00Z", "discovered_at")
     assert engine.fmt(utc) == "2026-07-01T08:00:00+10:00" and note == ""
     bad, note = engine.parse_time("yesterday", "discovered_at")
