@@ -3,12 +3,22 @@
   "additionalProperties": false,
   "properties": {
     "regime": {
-      "enum": ["ndb", "soci", "ransomware_payment"]
+      "enum": [
+        "ndb",
+        "soci",
+        "ransomware_payment",
+        "apra_cps234",
+        "asd_voluntary",
+        "csa_significant_incident",
+        "limited_use"
+      ]
     },
     "trigger": {
       "type": "string",
       "description": "For example 'critical_incident', 'other_incident', 'suspected_breach'"
     }
   },
-  "required": ["regime"]
+  "required": [
+    "regime"
+  ]
 }

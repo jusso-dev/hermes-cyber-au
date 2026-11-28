@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "discovered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the organisation became aware of the incident, ISO 8601. A value with no offset is read as Australia/Sydney."
+    },
+    "facts": {
+      "type": "object",
+      "description": "Incident facts. Booleans such as cyber_security_incident, personal_information_involved, serious_harm_ruled_out, eligible_breach_believed, soci_part_2b_applies, significant_availability_impact, relevant_impact, ransomware_payment_made, apra_material_incident, apra_control_weakness, notified_other_regulator, significant_cyber_security_incident. Times payment_at and oral_report_at. Text such as summary, impact and systems_affected for the draft fields. Leave a fact out when it is not known."
+    },
+    "org": {
+      "type": "object",
+      "description": "org.yaml fields (sector, turnover, regulators, critical_infrastructure, holds_personal_information, name). Leave out to read org.yaml from the profile."
+    },
+    "now": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time to count down from. Leave out for no countdown."
+    }
+  },
+  "required": [
+    "discovered_at"
+  ]
+}

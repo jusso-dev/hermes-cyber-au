@@ -1,0 +1,14 @@
+version: 1
+interactions:
+  - request:
+      method: GET
+      uri: https://www.legislation.gov.au/F2018L01745/latest/text
+      body: ""
+      headers: {}
+    response:
+      status:
+        code: 200
+        message: OK
+      headers: {}
+      body:
+        string: "<html><p>Synthetic cassette. Notify APRA no later than 72 hours, or no later than 10 business days.</p></html>"

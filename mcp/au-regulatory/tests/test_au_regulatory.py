@@ -336,7 +336,7 @@ def test_synthetic_shipped_snapshot_is_refused(monkeypatch, tmp_path):
     (package / "data").mkdir(parents=True)
     document = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
     document["note"] = "Synthetic obligations invented for tests"
-    (package / "data" / "obligations-2026-10-17.json").write_text(
+    (package / "data" / "obligations-2026-11-28.json").write_text(
         json.dumps(document), encoding="utf-8"
     )
     monkeypatch.setattr(source, "_PACKAGE", package)

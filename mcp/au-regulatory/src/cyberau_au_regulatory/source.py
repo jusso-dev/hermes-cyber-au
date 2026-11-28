@@ -5,7 +5,7 @@ import json
 import os
 import re
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from html import unescape
 from pathlib import Path
 from typing import Annotated, Literal
@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import jsonschema
+import yaml
 from cyberau_common import GOV_AU_USER_AGENT as USER_AGENT
 from cyberau_common import runtime
 from cyberau_common.cache import HttpCache
@@ -24,6 +25,8 @@ from cyberau_common.secrets import redact
 from cyberau_common.server import Connector, Probe, ToolSpec, register_connector
 from cyberau_common.snapshot import check_shipped, parse_day, snapshot_note, unavailable
 from pydantic import Field
+
+from . import engine
 
 OAIC_QUICK = (
     "https://www.oaic.gov.au/privacy/notifiable-data-breaches/"
@@ -49,10 +52,25 @@ ATTRIBUTION = (
     "Signals Directorate, the Australian Cyber Security Centre or the Cyber and "
     "Infrastructure Security Centre."
 )
-REGIMES = ("ndb", "soci", "ransomware_payment")
-_Regime = Literal["ndb", "soci", "ransomware_payment"]
+REGIMES = (
+    "ndb",
+    "soci",
+    "ransomware_payment",
+    "apra_cps234",
+    "asd_voluntary",
+    "csa_significant_incident",
+    "limited_use",
+)
+_Regime = Literal[
+    "ndb",
+    "soci",
+    "ransomware_payment",
+    "apra_cps234",
+    "asd_voluntary",
+    "csa_significant_incident",
+    "limited_use",
+]
 _FIELDS = ("regime", "trigger", "rule", "quote", "source_url", "retrieved_at", "sha256")
-_FROM_AWARENESS = {"awareness", "belief", "payment_or_awareness"}
 _SYDNEY = ZoneInfo("Australia/Sydney")
 _WEEK = 7 * 24 * 3600
 _PACKAGE = Path(__file__).resolve().parents[2]
@@ -139,6 +157,49 @@ def aureg_deadline(regime: _Regime, trigger: str, aware_at: str) -> dict:
     return _envelope(public, cache, _urls(rows), _as_of(payload), tuple(warnings))
 
 
+def aureg_check(
+    discovered_at: Annotated[
+        str,
+        Field(description="When the organisation became aware, ISO 8601. No offset means Sydney."),
+    ],
+    facts: Annotated[
+        dict | None,
+        Field(description="Incident facts, for example ransomware_payment_made, payment_at"),
+    ] = None,
+    org: Annotated[
+        dict | None,
+        Field(description="org.yaml fields. Leave out to read org.yaml from the profile."),
+    ] = None,
+    now: Annotated[
+        str | None,
+        Field(description="Time to count down from, ISO 8601. Leave out for no countdown."),
+    ] = None,
+) -> dict:
+    """Which reports may apply, by when, to whom, with draft fields. Nothing is submitted."""
+    warnings: list[str] = []
+    payload, cache, warning, note = _load()
+    if warning:
+        return _envelope([], cache, warnings=(warning,))
+    profile, org_notes = _org(org)
+    warnings.extend(org_notes)
+    result = engine.check(
+        payload or {},
+        org=profile,
+        facts=facts if isinstance(facts, dict) else None,
+        discovered_at=discovered_at,
+        now=now,
+    )
+    if facts is not None and not isinstance(facts, dict):
+        result["notes"].append("facts was not an object and was ignored")
+    if result["discovered_at"] is None:
+        warnings.append("discovered_at is required to calculate deadlines")
+    _wrap_incident_text(result)
+    rows = [r for r in (payload or {}).get("obligations") or [] if isinstance(r, dict)]
+    warnings.extend(_warn_hashes(rows))
+    warnings.extend(note)
+    return _envelope(result, cache, _urls(rows), _as_of(payload), tuple(warnings))
+
+
 def refresh_sources(
     urls: list[str] | None = None,
     *,
@@ -198,6 +259,13 @@ class _RegulatoryConnector(Connector):
                     "Deadlines in Australia/Sydney from an awareness time.",
                     aureg_deadline,
                 ),
+                ToolSpec(
+                    "aureg_check",
+                    "Which Australian incident reports may apply, deadlines in Australia/Sydney, "
+                    "recipients, sources and draft fields. Never submits anything.",
+                    aureg_check,
+                    open_world=False,
+                ),
             ],
         )
 
@@ -250,8 +318,36 @@ def schema_drift(payload: dict) -> str | None:
 
 def _regime_problem(regime: str) -> str:
     if regime not in REGIMES:
-        return "regime is not ndb, soci or ransomware_payment"
+        return "regime is not one of " + ", ".join(REGIMES)
     return ""
+
+
+def _org(org: object) -> tuple[object, list[str]]:
+    """The organisation profile: the argument, else org.yaml in the profile, else defaults."""
+    if isinstance(org, dict):
+        return org, ["organisation profile came from the tool argument, not org.yaml"]
+    base = runtime.configured_data_dir()
+    if base is None:
+        return None, ["CYBERAU_DATA_DIR is not set, so org.yaml was not read; using defaults"]
+    path = base / "org.yaml"
+    if not path.is_file():
+        return None, ["org.yaml not found; using a sector-neutral default profile"]
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None, ["org.yaml could not be read; using a sector-neutral default profile"]
+    if not isinstance(data, dict):
+        return None, ["org.yaml is not a mapping; using a sector-neutral default profile"]
+    return data, []
+
+
+def _wrap_incident_text(result: dict) -> None:
+    """Prefilled values come from the incident summary, which can hold attacker text."""
+    for group in ("applicable", "possible"):
+        for item in result.get(group) or []:
+            for field in item["draft"]["fields"]:
+                if isinstance(field.get("value"), str) and field["value"]:
+                    field["value"] = untrusted_text(field["value"], "incident", 1000)
 
 
 def _trigger(value: str | None) -> str | None:
@@ -354,8 +450,13 @@ def _match(payload: dict | None, regime: str, trigger: str | None) -> list[dict]
 def _public_obligation(row: dict) -> dict:
     quote = str(row.get("quote") or "")
     return {
+        "id": row.get("id") or "",
         "regime": row.get("regime") or "",
         "trigger": row.get("trigger") or "",
+        "title": row.get("title") or "",
+        "kind": row.get("kind") or "",
+        "recipient": row.get("recipient") or "",
+        "last_reviewed": row.get("last_reviewed") or row.get("retrieved_at") or "",
         "rule": untrusted_text(str(row.get("rule") or ""), "aureg"),
         "citation": untrusted_text(str(row.get("citation") or ""), "aureg"),
         "quote": untrusted_text(quote, "aureg"),
@@ -381,22 +482,17 @@ def _clock_view(item: dict) -> dict:
         "from": item.get("from") or "",
         "hours": item.get("hours"),
         "days": item.get("days"),
+        "business_days": item.get("business_days"),
         "basis": untrusted_text(str(item.get("basis") or ""), "aureg"),
     }
 
 
 def _due(item: dict, aware: datetime) -> dict:
-    origin = item.get("from") or ""
-    due_at = None
-    if origin in _FROM_AWARENESS:
-        if item.get("days"):
-            due_at = (aware + timedelta(days=int(item["days"]))).isoformat(timespec="seconds")
-        elif item.get("hours"):
-            elapsed = aware.astimezone(UTC) + timedelta(hours=int(item["hours"]))
-            due_at = elapsed.astimezone(_SYDNEY).isoformat(timespec="seconds")
+    # Clocks that start at an oral report or a payment are timed by aureg_check.
+    due = engine._deadline(item, aware, None, None)
     return {
         "name": item.get("name") or "",
-        "due_at": due_at,
+        "due_at": due["due_at"],
         "basis": untrusted_text(str(item.get("basis") or ""), "aureg"),
     }
 

@@ -2,8 +2,13 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "id",
     "regime",
     "trigger",
+    "title",
+    "kind",
+    "recipient",
+    "last_reviewed",
     "rule",
     "citation",
     "quote",
@@ -14,29 +19,91 @@
     "deadlines"
   ],
   "properties": {
-    "regime": {"type": "string"},
-    "trigger": {"type": "string"},
-    "rule": {"type": "string"},
-    "citation": {"type": "string"},
-    "quote": {"type": "string"},
-    "source_url": {"type": "string"},
-    "guidance_url": {"type": "string"},
-    "retrieved_at": {"type": "string"},
-    "sha256": {"type": "string"},
+    "regime": {
+      "type": "string"
+    },
+    "trigger": {
+      "type": "string"
+    },
+    "rule": {
+      "type": "string"
+    },
+    "citation": {
+      "type": "string"
+    },
+    "quote": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "guidance_url": {
+      "type": "string"
+    },
+    "retrieved_at": {
+      "type": "string"
+    },
+    "sha256": {
+      "type": "string"
+    },
     "deadlines": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "from", "hours", "days", "basis"],
+        "required": [
+          "name",
+          "from",
+          "hours",
+          "days",
+          "business_days",
+          "basis"
+        ],
         "properties": {
-          "name": {"type": "string"},
-          "from": {"type": "string"},
-          "hours": {"type": ["integer", "null"]},
-          "days": {"type": ["integer", "null"]},
-          "basis": {"type": "string"}
+          "name": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "hours": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "days": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "business_days": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "basis": {
+            "type": "string"
+          }
         }
       }
+    },
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "recipient": {
+      "type": "string"
+    },
+    "last_reviewed": {
+      "type": "string"
     }
   }
 }

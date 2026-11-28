@@ -1,0 +1,974 @@
+{
+  "retrieved_at": "2026-11-28",
+  "reviewed": "Each rule was checked against the cited source on the date in last_reviewed. Rules marked partial say what was not checked.",
+  "obligations": [
+    {
+      "id": "ndb.suspected_breach",
+      "regime": "ndb",
+      "trigger": "suspected_breach",
+      "title": "Notifiable Data Breaches: assess a suspected eligible data breach",
+      "kind": "mandatory",
+      "citation": "Privacy Act 1988 (Cth) s 26WH(2)",
+      "rule": "An entity that is aware of reasonable grounds to suspect an eligible data breach, and is not yet aware of reasonable grounds to believe that one has occurred, must carry out a reasonable and expeditious assessment. It must take all reasonable steps to complete that assessment within 30 days after it becomes aware of the suspicion. The Act frames the 30 days as the period for those reasonable steps, not as a hard stop.",
+      "quote": "take all reasonable steps to ensure that the assessment is completed within 30 days after the entity becomes aware as mentioned in paragraph (1)(a).",
+      "source_url": "https://www.legislation.gov.au/C2004A03712/latest/text",
+      "guidance_url": "https://www.oaic.gov.au/privacy/notifiable-data-breaches/quick-reference-guide-for-responding-to-data-breaches",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "4f60f6f50f8016f65c5202452a2361315529de56923692b913460362d057a4c2",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "No external recipient. This is an internal assessment duty.",
+      "channel": "Internal assessment record.",
+      "clocks": [
+        {
+          "name": "assessment",
+          "hours": null,
+          "days": 30,
+          "from": "awareness",
+          "basis": "All reasonable steps to complete the assessment within 30 days after awareness (Privacy Act 1988 (Cth) s 26WH(2)).",
+          "business_days": null
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "all": [
+              {
+                "org": "sector",
+                "not_in": [
+                  "state-government",
+                  "local-government"
+                ],
+                "label": "the organisation is not a State, Territory or local government body (a state or territory privacy law may apply to those instead)"
+              },
+              {
+                "any": [
+                  {
+                    "org": "regulators",
+                    "contains": "oaic",
+                    "label": "org.yaml lists the OAIC as a regulator"
+                  },
+                  {
+                    "org": "sector",
+                    "in": [
+                      "federal-government",
+                      "health"
+                    ],
+                    "label": "the sector is a Commonwealth agency or a health service provider"
+                  },
+                  {
+                    "org": "turnover",
+                    "equals": "3m-or-more",
+                    "unknown_values": [
+                      "under-3m",
+                      "unknown"
+                    ],
+                    "label": "annual turnover is above AUD 3 million (Privacy Act s 6D)",
+                    "ask": "Turnover is under AUD 3 million or unknown. Does the small business exemption apply, or does an exception in Privacy Act s 6D(4) bring the organisation in (for example a health service, trading in personal information, a Commonwealth contract, or a credit reporting body)?"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "fact": "personal_information_involved",
+            "equals": true,
+            "org_false_means_no": "holds_personal_information",
+            "label": "personal information was, or may have been, accessed, disclosed or lost",
+            "ask": "Was personal information accessed, disclosed or lost, or could it have been?"
+          },
+          {
+            "fact": "serious_harm_ruled_out",
+            "equals": false,
+            "missing": "true",
+            "label": "serious harm to individuals has not been ruled out",
+            "ask": "Has serious harm to the individuals concerned been ruled out?"
+          },
+          {
+            "fact": "eligible_breach_believed",
+            "equals": false,
+            "missing": "true",
+            "label": "the organisation does not yet believe an eligible data breach has happened (s 26WH(1)(b)); once it does, the statement duty applies instead"
+          }
+        ]
+      },
+      "not_applicable_note": "If personal information turns out to be involved, start the 30 day assessment clock from the time the organisation became aware of the suspicion.",
+      "report_fields": [
+        {
+          "field": "What happened and when",
+          "prefill": "fact.summary"
+        },
+        {
+          "field": "Kinds of personal information involved",
+          "prefill": "fact.information_kinds"
+        },
+        {
+          "field": "Number of individuals affected, or an estimate",
+          "prefill": "fact.individuals_affected"
+        },
+        {
+          "field": "Likelihood of serious harm and why",
+          "prefill": null
+        },
+        {
+          "field": "Remedial action taken to reduce the risk of harm",
+          "prefill": null
+        }
+      ],
+      "field_note": "Suggested assessment record fields from hermes-cyber-au. The Act does not prescribe a form for the assessment."
+    },
+    {
+      "id": "ndb.eligible_breach",
+      "regime": "ndb",
+      "trigger": "eligible_breach",
+      "title": "Notifiable Data Breaches: statement to the Commissioner and notice to individuals",
+      "kind": "mandatory",
+      "citation": "Privacy Act 1988 (Cth) ss 26WK(2) and 26WL(3)",
+      "rule": "Once the entity is aware of reasonable grounds to believe there has been an eligible data breach, it must prepare a statement and give a copy to the Commissioner as soon as practicable. It must notify the individuals to whom the information relates, or if that is not practicable the individuals at risk, as soon as practicable after the statement is prepared. If neither is practicable, it must publish the statement and take reasonable steps to publicise it. Section 26WL(3) requires compliance with the notification duty as soon as practicable after the preparation of the statement is completed.",
+      "quote": "do so as soon as practicable after the entity becomes so aware.",
+      "source_url": "https://www.legislation.gov.au/C2004A03712/latest/text",
+      "guidance_url": "https://www.oaic.gov.au/privacy/notifiable-data-breaches/preventing-preparing-for-and-responding-to-data-breaches/data-breach-preparation-and-response/part-4-notifiable-data-breach-ndb-scheme",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "a6a56d65bac235ae5e69ef2b1d95a8648f7215601c058f1bdfb044704fe870d1",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "Office of the Australian Information Commissioner (statement), then the individuals concerned or at risk (notice).",
+      "channel": "The OAIC notifiable data breach form, then notice to individuals. A person lodges and sends them.",
+      "clocks": [
+        {
+          "name": "commissioner_statement",
+          "hours": null,
+          "days": null,
+          "from": "belief",
+          "basis": "As soon as practicable after awareness of reasonable grounds to believe there has been an eligible data breach. No fixed hour count (Privacy Act 1988 (Cth) s 26WK(2)).",
+          "business_days": null
+        },
+        {
+          "name": "individual_notice",
+          "hours": null,
+          "days": null,
+          "from": "statement_prepared",
+          "basis": "As soon as practicable after the statement is prepared, not from the original awareness time (Privacy Act 1988 (Cth) s 26WL(3)).",
+          "business_days": null
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "all": [
+              {
+                "org": "sector",
+                "not_in": [
+                  "state-government",
+                  "local-government"
+                ],
+                "label": "the organisation is not a State, Territory or local government body (a state or territory privacy law may apply to those instead)"
+              },
+              {
+                "any": [
+                  {
+                    "org": "regulators",
+                    "contains": "oaic",
+                    "label": "org.yaml lists the OAIC as a regulator"
+                  },
+                  {
+                    "org": "sector",
+                    "in": [
+                      "federal-government",
+                      "health"
+                    ],
+                    "label": "the sector is a Commonwealth agency or a health service provider"
+                  },
+                  {
+                    "org": "turnover",
+                    "equals": "3m-or-more",
+                    "unknown_values": [
+                      "under-3m",
+                      "unknown"
+                    ],
+                    "label": "annual turnover is above AUD 3 million (Privacy Act s 6D)",
+                    "ask": "Turnover is under AUD 3 million or unknown. Does the small business exemption apply, or does an exception in Privacy Act s 6D(4) bring the organisation in (for example a health service, trading in personal information, a Commonwealth contract, or a credit reporting body)?"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "fact": "personal_information_involved",
+            "equals": true,
+            "org_false_means_no": "holds_personal_information",
+            "label": "personal information was, or may have been, accessed, disclosed or lost",
+            "ask": "Was personal information accessed, disclosed or lost, or could it have been?"
+          },
+          {
+            "fact": "eligible_breach_believed",
+            "equals": true,
+            "label": "there are reasonable grounds to believe an eligible data breach has happened",
+            "ask": "Are there reasonable grounds to believe there has been an eligible data breach (serious harm is likely and remedial action has not prevented it)?"
+          }
+        ]
+      },
+      "not_applicable_note": "If the assessment finds reasonable grounds to believe an eligible data breach happened, the statement is due as soon as practicable.",
+      "report_fields": [
+        {
+          "field": "Identity and contact details of the entity",
+          "prefill": "org.name"
+        },
+        {
+          "field": "Description of the eligible data breach",
+          "prefill": "fact.summary"
+        },
+        {
+          "field": "Kind or kinds of information concerned",
+          "prefill": "fact.information_kinds"
+        },
+        {
+          "field": "Recommended steps individuals should take in response",
+          "prefill": null
+        }
+      ],
+      "field_note": "These four items are the statement contents in Privacy Act 1988 s 26WK(3). The OAIC form asks for more."
+    },
+    {
+      "id": "soci.critical_incident",
+      "regime": "soci",
+      "trigger": "critical_incident",
+      "title": "SOCI Act: critical cyber security incident report",
+      "kind": "mandatory",
+      "citation": "Security of Critical Infrastructure Act 2018 (Cth) s 30BC",
+      "rule": "A responsible entity for a critical infrastructure asset that becomes aware a cyber security incident has occurred or is occurring, and that the incident has had or is having a significant impact on the availability of the asset, must give the relevant Commonwealth body a report as soon as practicable and within 12 hours. Section 30BEA says a significant impact requires material disruption to the availability of essential goods or services the asset is used to provide, unless the rules specify another circumstance. The report may be oral or in writing. If it is oral, a written record in the approved form is due within 84 hours after the oral report.",
+      "quote": "do so as soon as practicable, and in any event within 12 hours, after the entity becomes so aware.",
+      "source_url": "https://www.legislation.gov.au/C2018A00029/2026-06-04/text",
+      "guidance_url": "https://www.cyber.gov.au/report-a-cyber-security-incident",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "b24927d3fe5980aac800ae3bccb4fe4bac0208004eb2170c6fe90a429aeafc14",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "The relevant Commonwealth body under SOCI Act s 30BF. That is ASD's ACSC unless rules name another body.",
+      "channel": "ASD reporting page or the Australian Cyber Security Hotline 1300 CYBER1 (1300 292 371). A person reports.",
+      "clocks": [
+        {
+          "name": "notification",
+          "hours": 12,
+          "days": null,
+          "from": "awareness",
+          "basis": "As soon as practicable, and in any event within 12 hours after awareness (SOCI Act 2018 (Cth) s 30BC).",
+          "business_days": null
+        },
+        {
+          "name": "written_record",
+          "hours": 84,
+          "days": null,
+          "from": "oral_report",
+          "basis": "If the report is oral, within 84 hours after the oral report is given. This clock does not start at awareness (SOCI Act 2018 (Cth) s 30BC(3)).",
+          "business_days": null
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "any": [
+              {
+                "org": "critical_infrastructure",
+                "equals": true,
+                "label": "org.yaml marks the organisation as critical infrastructure"
+              },
+              {
+                "org": "regulators",
+                "contains": "soci",
+                "label": "org.yaml lists SOCI as a regulatory regime"
+              },
+              {
+                "fact": "soci_part_2b_applies",
+                "equals": true,
+                "missing": "false",
+                "label": "the affected asset is covered by SOCI Part 2B"
+              }
+            ]
+          },
+          {
+            "fact": "soci_part_2b_applies",
+            "equals": true,
+            "label": "the organisation is the responsible entity for the affected asset and Part 2B applies to it (s 30BB)",
+            "ask": "Is the affected asset a critical infrastructure asset for which the organisation is the responsible entity, and does Part 2B apply to it (SOCI Act s 30BB)?"
+          },
+          {
+            "fact": "significant_availability_impact",
+            "equals": true,
+            "label": "the incident has had, or is having, a significant impact on the availability of the asset (s 30BEA)",
+            "ask": "Has the incident had, or is it having, a significant impact on the availability of the asset, meaning material disruption of the essential goods or services it provides (SOCI Act s 30BEA)?"
+          }
+        ]
+      },
+      "not_applicable_note": "The 12 hour clock starts when the entity becomes aware of a significant impact on availability.",
+      "report_fields": [
+        {
+          "field": "Reporting entity name",
+          "prefill": "org.name"
+        },
+        {
+          "field": "Critical infrastructure asset affected",
+          "prefill": "fact.asset"
+        },
+        {
+          "field": "Time the entity became aware",
+          "prefill": "discovered_at"
+        },
+        {
+          "field": "What happened",
+          "prefill": "fact.summary"
+        },
+        {
+          "field": "Impact on the availability, integrity, reliability or confidentiality of the asset",
+          "prefill": "fact.impact"
+        },
+        {
+          "field": "Systems affected",
+          "prefill": "fact.systems_affected"
+        },
+        {
+          "field": "Current status and containment",
+          "prefill": "fact.status"
+        },
+        {
+          "field": "Contact person",
+          "prefill": null
+        }
+      ],
+      "field_note": "Suggested by hermes-cyber-au, not copied from the approved form. Copy the field labels from the form on the ASD reporting page before a person lodges anything."
+    },
+    {
+      "id": "soci.other_incident",
+      "regime": "soci",
+      "trigger": "other_incident",
+      "title": "SOCI Act: other cyber security incident report",
+      "kind": "mandatory",
+      "citation": "Security of Critical Infrastructure Act 2018 (Cth) s 30BD",
+      "rule": "A responsible entity that becomes aware a cyber security incident has occurred, is occurring or is imminent, and that it has had, is having or is likely to have a relevant impact on the asset, must report within 72 hours. Section 30BD does not exempt an incident that section 30BC also covers, so the earlier 12 hour clock is the one to meet when both apply. Section 8G treats a relevant impact as an impact on availability, integrity, reliability or confidentiality. The report may be oral or in writing. If it is oral, a written record is due within 48 hours after the oral report.",
+      "quote": "do so as soon as practicable, and in any event within 72 hours, after the entity becomes so aware.",
+      "source_url": "https://www.legislation.gov.au/C2018A00029/2026-06-04/text",
+      "guidance_url": "https://www.cisc.gov.au/resources-subsite/Documents/ncsi-guidance.pdf",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "c2549d5cc314f326ab021e3effee0bac66e4968b9aa026c41d68dd3600b35444",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "The relevant Commonwealth body under SOCI Act s 30BF. That is ASD's ACSC unless rules name another body.",
+      "channel": "ASD reporting page or the Australian Cyber Security Hotline 1300 CYBER1 (1300 292 371). A person reports.",
+      "clocks": [
+        {
+          "name": "notification",
+          "hours": 72,
+          "days": null,
+          "from": "awareness",
+          "basis": "As soon as practicable, and in any event within 72 hours after awareness (SOCI Act 2018 (Cth) s 30BD).",
+          "business_days": null
+        },
+        {
+          "name": "written_record",
+          "hours": 48,
+          "days": null,
+          "from": "oral_report",
+          "basis": "If the report is oral, within 48 hours after the oral report is given. This clock does not start at awareness (SOCI Act 2018 (Cth) s 30BD(3)).",
+          "business_days": null
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "any": [
+              {
+                "org": "critical_infrastructure",
+                "equals": true,
+                "label": "org.yaml marks the organisation as critical infrastructure"
+              },
+              {
+                "org": "regulators",
+                "contains": "soci",
+                "label": "org.yaml lists SOCI as a regulatory regime"
+              },
+              {
+                "fact": "soci_part_2b_applies",
+                "equals": true,
+                "missing": "false",
+                "label": "the affected asset is covered by SOCI Part 2B"
+              }
+            ]
+          },
+          {
+            "fact": "soci_part_2b_applies",
+            "equals": true,
+            "label": "the organisation is the responsible entity for the affected asset and Part 2B applies to it (s 30BB)",
+            "ask": "Is the affected asset a critical infrastructure asset for which the organisation is the responsible entity, and does Part 2B apply to it (SOCI Act s 30BB)?"
+          },
+          {
+            "fact": "relevant_impact",
+            "equals": true,
+            "label": "the incident has had, is having or is likely to have a relevant impact on the asset (s 8G)",
+            "ask": "Has the incident had, or is it likely to have, a relevant impact on the asset: its availability, integrity, reliability or confidentiality (SOCI Act s 8G)?"
+          }
+        ]
+      },
+      "not_applicable_note": "",
+      "report_fields": [
+        {
+          "field": "Reporting entity name",
+          "prefill": "org.name"
+        },
+        {
+          "field": "Critical infrastructure asset affected",
+          "prefill": "fact.asset"
+        },
+        {
+          "field": "Time the entity became aware",
+          "prefill": "discovered_at"
+        },
+        {
+          "field": "What happened",
+          "prefill": "fact.summary"
+        },
+        {
+          "field": "Impact on the availability, integrity, reliability or confidentiality of the asset",
+          "prefill": "fact.impact"
+        },
+        {
+          "field": "Systems affected",
+          "prefill": "fact.systems_affected"
+        },
+        {
+          "field": "Current status and containment",
+          "prefill": "fact.status"
+        },
+        {
+          "field": "Contact person",
+          "prefill": null
+        }
+      ],
+      "field_note": "Suggested by hermes-cyber-au, not copied from the approved form. Copy the field labels from the form on the ASD reporting page before a person lodges anything."
+    },
+    {
+      "id": "ransomware_payment.payment",
+      "regime": "ransomware_payment",
+      "trigger": "payment",
+      "title": "Ransomware payment report",
+      "kind": "mandatory",
+      "citation": "Cyber Security Act 2024 (Cth) s 27(1)",
+      "rule": "A reporting business entity that makes a ransomware payment, or becomes aware that another entity provided one on its behalf, must give the designated Commonwealth body a ransomware payment report within 72 hours of the payment or of that awareness, whichever applies. Section 26(2) defines a reporting business entity as a business carried on in Australia whose turnover for the previous financial year is above the threshold prescribed by the rules, excluding Commonwealth bodies, State bodies and responsible entities for critical infrastructure assets, or as a responsible entity for a critical infrastructure asset to which SOCI Act Part 2B applies. Section 8 says that if the rules do not name another body, the designated Commonwealth body is the Department and ASD. The report must be in the form approved by the Secretary and in the manner prescribed by the rules. The Cyber Security (Ransomware Payment Reporting) Rules 2025 s 6 set the turnover threshold at AUD 3 million (pro rata for a business carried on for only part of the year). The Act says turnover must exceed the threshold; the ASD form says equal to or exceeds. Get advice if turnover is close to AUD 3 million.",
+      "quote": "The reporting business entity must give the designated Commonwealth body a report (a ransomware payment report) that complies with the requirements of this section within 72 hours of making the ransomware payment or becoming aware that the ransomware payment has been made (whichever is applicable).",
+      "source_url": "https://www.legislation.gov.au/C2024A00098/latest/text",
+      "guidance_url": "https://www.cyber.gov.au/report-and-recover/report/ransomware-payment-and-cyber-extortion-payment-reporting",
+      "related_sources": [
+        {
+          "citation": "Cyber Security (Ransomware Payment Reporting) Rules 2025 (Cth) ss 6 and 7",
+          "url": "https://www.legislation.gov.au/F2025L00278/asmade/text"
+        },
+        {
+          "citation": "ASD ransomware and cyber extortion payment reporting form",
+          "url": "https://www.cyber.gov.au/report-and-recover/report/ransomware-payment-and-cyber-extortion-payment-reporting"
+        }
+      ],
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "c52466012a07fc902bb6485064f5cdee9e70606e011dd457c7ca7d0c779eb12d",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "The designated Commonwealth body (Cyber Security Act 2024 s 8): the Department of Home Affairs and ASD unless rules name another body.",
+      "channel": "ASD ransomware and cyber extortion payment reporting form. A person lodges it.",
+      "clocks": [
+        {
+          "name": "report",
+          "hours": 72,
+          "days": null,
+          "from": "payment_or_awareness",
+          "basis": "Within 72 hours of making the ransomware payment or of becoming aware that it was made, whichever applies (Cyber Security Act 2024 (Cth) s 27(1)).",
+          "business_days": null
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "fact": "ransomware_payment_made",
+            "equals": true,
+            "missing": "false",
+            "label": "a ransomware or extortion payment has been made by, or on behalf of, the organisation"
+          },
+          {
+            "any": [
+              {
+                "all": [
+                  {
+                    "org": "turnover",
+                    "equals": "3m-or-more",
+                    "unknown_values": [
+                      "unknown"
+                    ],
+                    "label": "annual turnover for the previous financial year is at or above the AUD 3 million threshold in the Rules",
+                    "ask": "What was the organisation's annual turnover for the previous financial year? The Rules set the threshold at AUD 3 million."
+                  },
+                  {
+                    "org": "sector",
+                    "not_in": [
+                      "federal-government",
+                      "state-government"
+                    ],
+                    "unknown_values": [
+                      "local-government"
+                    ],
+                    "label": "the organisation is not a Commonwealth body or a State body",
+                    "ask": "Is the organisation a Commonwealth body or a State body under the Cyber Security Act 2024 s 8? Local government status is not settled by this checker."
+                  },
+                  {
+                    "org": "critical_infrastructure",
+                    "equals": false,
+                    "label": "the organisation is not a responsible entity for a critical infrastructure asset (that case is the second limb of s 26(2))"
+                  }
+                ]
+              },
+              {
+                "all": [
+                  {
+                    "org": "critical_infrastructure",
+                    "equals": true,
+                    "label": "org.yaml marks the organisation as critical infrastructure"
+                  },
+                  {
+                    "fact": "soci_part_2b_applies",
+                    "equals": true,
+                    "label": "the organisation is the responsible entity for the affected asset and Part 2B applies to it (s 30BB)",
+                    "ask": "Is the affected asset a critical infrastructure asset for which the organisation is the responsible entity, and does Part 2B apply to it (SOCI Act s 30BB)?"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "not_applicable_note": "No payment is recorded, so the 72 hour clock has not started. If a payment is made later, the clock starts at the payment or at awareness of it. This checker never proposes making a payment.",
+      "report_fields": [
+        {
+          "field": "Reporting entity ABN (if any) and address",
+          "prefill": "org.name"
+        },
+        {
+          "field": "If another entity paid on your behalf: its ABN (if any) and address",
+          "prefill": "fact.paid_by"
+        },
+        {
+          "field": "Time the incident occurred, actual or estimated",
+          "prefill": "fact.incident_started_at"
+        },
+        {
+          "field": "Time the entity became aware of the incident",
+          "prefill": "discovered_at"
+        },
+        {
+          "field": "Impact on the entity's infrastructure",
+          "prefill": "fact.impact"
+        },
+        {
+          "field": "Impact on the entity's customers",
+          "prefill": "fact.customer_impact"
+        },
+        {
+          "field": "Ransomware or other malware variants",
+          "prefill": "fact.malware_variant"
+        },
+        {
+          "field": "Vulnerabilities exploited",
+          "prefill": "fact.vulnerabilities"
+        },
+        {
+          "field": "Information that may help a Commonwealth or State body respond",
+          "prefill": null
+        },
+        {
+          "field": "Amount demanded, or a description of a non-monetary demand",
+          "prefill": "fact.demand_amount"
+        },
+        {
+          "field": "Payment method demanded",
+          "prefill": "fact.demand_method"
+        },
+        {
+          "field": "Amount paid, or a description of a non-monetary payment",
+          "prefill": "fact.payment_amount"
+        },
+        {
+          "field": "Payment method used",
+          "prefill": "fact.payment_method"
+        },
+        {
+          "field": "Nature and timing of communications with the extorting entity",
+          "prefill": null
+        },
+        {
+          "field": "Brief description of those communications",
+          "prefill": null
+        },
+        {
+          "field": "Brief description of pre-payment negotiations",
+          "prefill": null
+        }
+      ],
+      "field_note": "Field list from Cyber Security (Ransomware Payment Reporting) Rules 2025 s 7. Only information the entity knows, or can find by reasonable search or enquiry, is required."
+    },
+    {
+      "id": "apra_cps234.material_incident",
+      "regime": "apra_cps234",
+      "trigger": "material_incident",
+      "title": "APRA CPS 234: material information security incident",
+      "kind": "mandatory",
+      "citation": "Prudential Standard CPS 234 Information Security, paragraph 35",
+      "rule": "An APRA-regulated entity must notify APRA as soon as possible, and no later than 72 hours, after becoming aware of an information security incident that materially affected, or had the potential to materially affect, financially or non-financially, the entity or the interests of depositors, policyholders, beneficiaries or other customers, or that has been notified to other regulators in Australia or other jurisdictions. A statement to the OAIC under the NDB scheme is a notification to another regulator.",
+      "quote": "An APRA-regulated entity must notify APRA as soon as possible and, in any case, no later than 72 hours, after becoming aware of an information security incident that:",
+      "source_url": "https://www.legislation.gov.au/F2018L01745/latest/text",
+      "guidance_url": "https://www.apra.gov.au/standards/cps-234",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "d44377f826aeeca3d134134bd009d71b236895d6a919d28d83318604a536e579",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "APRA.",
+      "channel": "APRA's notification channel for the entity. Check current APRA guidance for the method. A person notifies.",
+      "clocks": [
+        {
+          "name": "notification",
+          "hours": 72,
+          "days": null,
+          "business_days": null,
+          "from": "awareness",
+          "basis": "As soon as possible, and no later than 72 hours after becoming aware of the incident (CPS 234 paragraph 35)."
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "any": [
+              {
+                "org": "regulators",
+                "contains": "apra",
+                "label": "org.yaml lists APRA as a regulator"
+              },
+              {
+                "org": "sector",
+                "in": [],
+                "unknown_values": [
+                  "financial-services"
+                ],
+                "label": "the organisation is an APRA-regulated entity",
+                "ask": "Is the organisation an APRA-regulated entity (for example an ADI, general or life insurer, private health insurer or RSE licensee)?"
+              }
+            ]
+          },
+          {
+            "any": [
+              {
+                "fact": "apra_material_incident",
+                "equals": true,
+                "label": "the incident materially affected, or could have materially affected, the entity or its customers",
+                "ask": "Did the incident materially affect, or could it have materially affected, the entity or the interests of depositors, policyholders, beneficiaries or other customers (CPS 234 paragraph 35(a))?"
+              },
+              {
+                "fact": "notified_other_regulator",
+                "equals": true,
+                "missing": "false",
+                "label": "the incident has been notified to another regulator"
+              }
+            ]
+          }
+        ]
+      },
+      "not_applicable_note": "",
+      "report_fields": [
+        {
+          "field": "Entity name",
+          "prefill": "org.name"
+        },
+        {
+          "field": "Time the entity became aware",
+          "prefill": "discovered_at"
+        },
+        {
+          "field": "What happened",
+          "prefill": "fact.summary"
+        },
+        {
+          "field": "Why the incident is material, or could be",
+          "prefill": "fact.impact"
+        },
+        {
+          "field": "Other regulators notified",
+          "prefill": "fact.other_regulators"
+        },
+        {
+          "field": "Current status and containment",
+          "prefill": "fact.status"
+        }
+      ],
+      "field_note": "Suggested by hermes-cyber-au. CPS 234 does not list notification fields."
+    },
+    {
+      "id": "apra_cps234.control_weakness",
+      "regime": "apra_cps234",
+      "trigger": "control_weakness",
+      "title": "APRA CPS 234: material control weakness that cannot be fixed in time",
+      "kind": "mandatory",
+      "citation": "Prudential Standard CPS 234 Information Security, paragraph 36",
+      "rule": "An APRA-regulated entity must notify APRA as soon as possible, and no later than 10 business days, after it becomes aware of a material information security control weakness which the entity expects it will not be able to remediate in a timely manner.",
+      "quote": "An APRA-regulated entity must notify APRA as soon as possible and, in any case, no later than 10 business days, after it becomes aware of a material information security control weakness which the entity expects it will not be able to remediate in a timely manner.",
+      "source_url": "https://www.legislation.gov.au/F2018L01745/latest/text",
+      "guidance_url": "https://www.apra.gov.au/standards/cps-234",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "53983bd68aa467092829cb21867812d1522e7c93f6fc547b9e64d3e0a5a1bdcf",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "APRA.",
+      "channel": "APRA's notification channel for the entity. Check current APRA guidance for the method. A person notifies.",
+      "clocks": [
+        {
+          "name": "notification",
+          "hours": null,
+          "days": null,
+          "business_days": 10,
+          "from": "awareness",
+          "basis": "As soon as possible, and no later than 10 business days after becoming aware of the weakness (CPS 234 paragraph 36). This calculator skips weekends but not public holidays, so its date can be earlier than the true deadline, never later."
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "any": [
+              {
+                "org": "regulators",
+                "contains": "apra",
+                "label": "org.yaml lists APRA as a regulator"
+              },
+              {
+                "org": "sector",
+                "in": [],
+                "unknown_values": [
+                  "financial-services"
+                ],
+                "label": "the organisation is an APRA-regulated entity",
+                "ask": "Is the organisation an APRA-regulated entity (for example an ADI, general or life insurer, private health insurer or RSE licensee)?"
+              }
+            ]
+          },
+          {
+            "fact": "apra_control_weakness",
+            "equals": true,
+            "label": "the incident revealed a material control weakness the entity expects it cannot remediate in a timely manner",
+            "ask": "Has the incident revealed a material information security control weakness that the entity expects it will not be able to remediate in a timely manner (CPS 234 paragraph 36)?"
+          }
+        ]
+      },
+      "not_applicable_note": "",
+      "report_fields": [
+        {
+          "field": "Entity name",
+          "prefill": "org.name"
+        },
+        {
+          "field": "Description of the control weakness",
+          "prefill": "fact.control_weakness"
+        },
+        {
+          "field": "Why it cannot be remediated in a timely manner",
+          "prefill": null
+        },
+        {
+          "field": "Compensating controls and remediation plan",
+          "prefill": null
+        }
+      ],
+      "field_note": "Suggested by hermes-cyber-au. CPS 234 does not list notification fields."
+    },
+    {
+      "id": "asd_voluntary.cyber_incident",
+      "regime": "asd_voluntary",
+      "trigger": "cyber_incident",
+      "title": "Voluntary report to ASD's ACSC (ReportCyber)",
+      "kind": "voluntary",
+      "citation": "ASD, Report a cyber security incident",
+      "rule": "Any organisation can report a cyber security incident to ASD's ACSC. ASD asks for a report as soon as possible after becoming aware of an incident. This is guidance, not a statutory duty, and it does not replace any mandatory report.",
+      "quote": "Submit a report as soon as possible after becoming aware of an incident.",
+      "source_url": "https://www.cyber.gov.au/report-a-cyber-security-incident",
+      "guidance_url": "https://www.cyber.gov.au/report-a-cyber-security-incident",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "f239653426683670b6be5334520ba0986a2677cce2c775a971050229157f89e6",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "ASD's Australian Cyber Security Centre.",
+      "channel": "ReportCyber on cyber.gov.au, or the Australian Cyber Security Hotline 1300 CYBER1 (1300 292 371), 24 hours a day. A person reports.",
+      "clocks": [
+        {
+          "name": "report",
+          "hours": null,
+          "days": null,
+          "business_days": null,
+          "from": "awareness",
+          "basis": "As soon as possible after becoming aware. ASD guidance, not a statutory deadline."
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "fact": "cyber_security_incident",
+            "equals": true,
+            "missing": "true",
+            "label": "a cyber security incident has happened or is suspected"
+          }
+        ]
+      },
+      "not_applicable_note": "",
+      "report_fields": [
+        {
+          "field": "Organisation name",
+          "prefill": "org.name"
+        },
+        {
+          "field": "Contact person",
+          "prefill": null
+        },
+        {
+          "field": "When the incident was discovered",
+          "prefill": "discovered_at"
+        },
+        {
+          "field": "What happened",
+          "prefill": "fact.summary"
+        },
+        {
+          "field": "Systems affected",
+          "prefill": "fact.systems_affected"
+        },
+        {
+          "field": "Indicators of compromise, defanged",
+          "prefill": "fact.indicators"
+        }
+      ],
+      "field_note": "Suggested by hermes-cyber-au. Copy the live labels from ReportCyber."
+    },
+    {
+      "id": "csa_significant_incident.voluntary_information",
+      "regime": "csa_significant_incident",
+      "trigger": "voluntary_information",
+      "title": "Voluntary information to the National Cyber Security Coordinator (significant incident)",
+      "kind": "voluntary",
+      "citation": "Cyber Security Act 2024 (Cth) ss 34, 35, 38 and 44",
+      "rule": "If an incident is, or could reasonably be expected to be, a significant cyber security incident (s 34), the impacted entity may give information about it to the National Cyber Security Coordinator at any time during the response (s 35). There is no obligation to do so. Section 38 limits how the Coordinator may record, use or disclose that information, including a bar on using it to investigate or enforce most contraventions by the entity. Section 44 says giving information under this Part does not affect any other requirement to provide it, such as a SOCI Part 2B report or a ransomware payment report.",
+      "quote": "Information provided by an entity under this Part does not affect any other requirement of the entity to provide that information under this Act or another law of the Commonwealth.",
+      "source_url": "https://www.legislation.gov.au/C2024A00098/latest/text",
+      "guidance_url": "https://www.legislation.gov.au/C2024A00098/latest/text",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "2471eefdc36456ed5177d535815ee01166b020959acbcff87e2f21ba431ff191",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "The National Cyber Security Coordinator.",
+      "channel": "Through the Coordinator's office or ASD. A person decides whether to share.",
+      "clocks": [
+        {
+          "name": "share",
+          "hours": null,
+          "days": null,
+          "business_days": null,
+          "from": "awareness",
+          "basis": "At any time during the response to the incident (Cyber Security Act 2024 s 35(3)). Voluntary."
+        }
+      ],
+      "applies_when": {
+        "all": [
+          {
+            "fact": "significant_cyber_security_incident",
+            "equals": true,
+            "missing": "false",
+            "label": "the incident is, or could reasonably be expected to be, a significant cyber security incident (s 34)"
+          }
+        ]
+      },
+      "not_applicable_note": "If the incident could seriously prejudice Australia's social or economic stability, defence or national security, or is of serious concern to the Australian people (s 34), the organisation may share information with the National Cyber Security Coordinator under s 35.",
+      "report_fields": [],
+      "field_note": ""
+    },
+    {
+      "id": "limited_use.ransomware_payment_report",
+      "regime": "limited_use",
+      "trigger": "ransomware_payment_report",
+      "title": "Limited use of information in a ransomware payment report",
+      "kind": "note",
+      "applies_with": [
+        "ransomware_payment.payment"
+      ],
+      "citation": "Cyber Security Act 2024 (Cth) ss 29 to 32",
+      "rule": "Information in a ransomware payment report may be recorded, used or disclosed only for the permitted purposes in s 29(1). The designated Commonwealth body must not use it to investigate or enforce a contravention by the entity of a Commonwealth, State or Territory law, other than Part 3 itself or a criminal offence (s 29(2)). Secondary recipients are bound the same way (s 30). Giving the report does not otherwise affect a claim of legal professional privilege (s 31). The report is generally not admissible in evidence against the entity (s 32). These limits do not cover information already given to meet SOCI Part 2B or the Telecommunications Act, or information already lawfully public (s 29(4)).",
+      "quote": "the designated Commonwealth body must not make a record of, use or disclose the information for the purposes of investigating or enforcing, or assisting in the investigation or enforcement of, any contravention by the reporting business entity of a Commonwealth, State or Territory law other than:",
+      "source_url": "https://www.legislation.gov.au/C2024A00098/latest/text",
+      "guidance_url": "https://www.cyber.gov.au/report-and-recover/report/ransomware-payment-and-cyber-extortion-payment-reporting",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "f9e1fae7d5fdfa2ae914ec990cd3cd06fbbcc3daa3f704777ba37965dd1dcd85",
+      "verification": {
+        "status": "verified",
+        "note": "Quote and deadline checked against the source text on 2026-11-28."
+      },
+      "recipient": "",
+      "channel": "",
+      "clocks": [],
+      "not_applicable_note": "",
+      "report_fields": [],
+      "field_note": ""
+    },
+    {
+      "id": "limited_use.asd_voluntary_information",
+      "regime": "limited_use",
+      "trigger": "asd_voluntary_information",
+      "title": "ASD's limited use obligation for voluntarily shared information",
+      "kind": "note",
+      "applies_with": [
+        "asd_voluntary.cyber_incident"
+      ],
+      "citation": "Intelligence Services Act 2001 (Cth) Part 6 Division 1A, as described by ASD",
+      "rule": "Information an organisation voluntarily gives ASD about a cyber security incident cannot be used by ASD for regulatory purposes, and ASD staff cannot be compelled to give it in most proceedings. The protection does not expire, but it stops applying to information the organisation makes lawfully public. It does not satisfy any mandatory reporting obligation, and it does not stop regulators or police using their own powers to obtain information.",
+      "quote": "ASD is not a regulator and providing information under limited use does not acquit your regulatory reporting responsibilities.",
+      "source_url": "https://www.cyber.gov.au/guidance/how-asd-protects-your-privacy-limited-use-obligation",
+      "guidance_url": "https://www.cyber.gov.au/guidance/how-asd-protects-your-privacy-limited-use-obligation",
+      "retrieved_at": "2026-11-28",
+      "last_reviewed": "2026-11-28",
+      "sha256": "e3dc694ffc8b6d6fd69dd5ff892f3ccfefc77aa86d69a0a47f88106d75d40f33",
+      "verification": {
+        "status": "partial",
+        "note": "Checked against ASD's limited use guidance page on 2026-11-28. The Intelligence Services Act 2001 Division 1A text was not fetched for this review, so the section numbers are not quoted here."
+      },
+      "recipient": "",
+      "channel": "",
+      "clocks": [],
+      "not_applicable_note": "",
+      "report_fields": [],
+      "field_note": ""
+    }
+  ]
+}

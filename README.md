@@ -20,6 +20,8 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 - **Hunt with Sigma and KQL** for Microsoft Sentinel and Defender, with offline query checks.
 - **Walk through an OAIC Notifiable Data Breach assessment** and draft the statement. A person submits it.
 - **Decide SOCI Act reportability** and compute the 12 and 72 hour deadlines in Sydney time.
+- **Check every Australian incident report that may apply** (ransomware payment, SOCI, APRA CPS 234, NDB, voluntary ASD) from your `org.yaml` and the incident facts, with Sydney deadlines, recipients, sources and draft fields. Nothing is submitted.
+- **Follow an incident playbook** for business email compromise, ransomware, phishing, a lost device, a data breach, a compromised cloud admin or a third-party breach, with a timeline and explicit approval points.
 - **Run PSPF threat and risk assessments and draft security risk management plans** (SRMPs) for an entity, a system, the internet-facing estate (Technology Security Risk Management Plan), a facility or a project. Threats come from the intel connectors with sources, ratings come from your risk matrix (or a labelled default), and the plan is checked against the PSPF Release 2026 security plan elements, risk tolerance, risk stewards and review dates. Acceptance and approval stay with the Accountable Authority or Authorising Officer.
 - **Write executive and board briefings** in plain Australian English.
 - **Run routines**: hourly feed ingest, a 07:30 Sydney briefing, a KEV watch against your assets, and a weekly executive summary. All arrive paused so you choose what runs.
@@ -29,7 +31,8 @@ Install it once and you get an analyst assistant that knows the ISM, the Essenti
 | Piece | Where | What it is |
 |---|---|---|
 | Profile distribution | `distribution.yaml`, `SOUL.md`, `config.yaml` | Installed with `hermes profile install`, updated with `hermes profile update` |
-| Skills | `skills/<name>/SKILL.md` | Triage, enrichment, essentials, ISM lookup, vulnerability priority, ACSC digest, phishing, hunting, NDB, SOCI, PSPF risk assessment and SRMP, executive briefing, daily briefing, and AU org exposure |
+| Skills | `skills/<name>/SKILL.md` | Triage, enrichment, essentials, ISM lookup, vulnerability priority, ACSC digest, phishing, hunting, NDB, SOCI, reporting obligations, incident playbooks, PSPF risk assessment and SRMP, executive briefing, daily briefing, and AU org exposure |
+| Playbooks | `playbooks/` | Seven incident playbooks with phases, evidence, approval boundaries and links to the reporting obligations checker |
 | Connectors | `mcp/<source>/` | Read-only stdio MCP servers on a shared HTTP client with an egress allowlist, caching and rate limiting |
 | Plugin | `plugins/cyber-au/` | Intel store tools, audit log hooks, untrusted-content guards, `cyber-au doctor`, update, and migrate |
 | Intel store | `plugin-data/cyber-au/intel.sqlite` | SQLite with canonical dedupe, retention, and STIX 2.1 export |

@@ -1,0 +1,37 @@
+# Private-name check with the masked CYBERAU_PRIVATE_NAMES secret (issue #156).
+# It runs only on main and by hand, never on pull_request, so code from a pull
+# request never runs with the secret in its environment. ci.yml checks the hash
+# file on every pull request.
+name: private-names
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-names-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - name: Banned private names (secret list plus hash file)
+        env:
+          CYBERAU_PRIVATE_NAMES: ${{ secrets.CYBERAU_PRIVATE_NAMES }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CYBERAU_PRIVATE_NAMES}" ]; then
+            echo "::warning title=Private name secret not set::Add the CYBERAU_PRIVATE_NAMES repository secret (one name per line) to enable this check."
+            python tools/ci/style_check.py
+          else
+            python tools/ci/style_check.py --require-names
+          fi

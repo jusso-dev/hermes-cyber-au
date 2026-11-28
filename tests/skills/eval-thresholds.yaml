@@ -13,11 +13,13 @@
 skills:
   acsc-advisory-digest: 0.6
   au-org-exposure: 0.6
+  auscert-url-feed: 0.6
   daily-briefing: 0.6
   essentials-assessment: 0.6
   executive-briefing: 0.6
   google-ti-dtm: 0.6
   harness-sample: 0.6
+  incident-playbook: 0.6
   incident-triage: 0.6
   ioc-enrichment: 0.6
   ism-control-lookup: 0.6
@@ -27,6 +29,7 @@ skills:
   phishing-analysis: 0.6
   pspf-risk-assessment: 0.6
   radar-au: 0.6
+  reporting-obligations: 0.6
   soci-reporting: 0.6
   taxii-ctis: 0.6
   threat-hunting: 0.6

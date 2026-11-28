@@ -7,7 +7,7 @@ license: Apache-2.0
 metadata:
   hermes:
     tags: [Security, Australia, incident-triage]
-    related_skills: [ioc-enrichment, ndb-breach-notification, soci-reporting, executive-briefing]
+    related_skills: [ioc-enrichment, ndb-breach-notification, soci-reporting, executive-briefing, reporting-obligations, incident-playbook]
     requires_tools: []
 ---
 
@@ -23,7 +23,7 @@ Load this skill when an analyst has a security alert or a reported incident and 
 
 Do not load this skill to send an email, page someone, isolate a host, block an indicator, submit a regulator form, or post a status update. Those are decisions for a person.
 
-Hand the finished record to `ndb-breach-notification`, `soci-reporting`, or `executive-briefing` when the matching trigger below is open. Enrich observables through `ioc-enrichment` before you treat a feed hit as confirmed.
+Hand the finished record to `ndb-breach-notification`, `soci-reporting`, or `executive-briefing` when the matching trigger below is open. To see every Australian report that may apply, with Sydney deadlines, hand off to `reporting-obligations`. To run the response phase by phase with a timeline, hand off to `incident-playbook`. Enrich observables through `ioc-enrichment` before you treat a feed hit as confirmed.
 
 ## Quick Reference
 

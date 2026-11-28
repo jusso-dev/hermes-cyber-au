@@ -231,8 +231,12 @@ if __name__ == "__main__":
             self.assertEqual(code, 1)
             self.assertNotIn("quartz", out.getvalue().lower())
 
-    def test_ci_passes_the_private_names_secret_to_the_style_step(self):
-        text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        step = text.split("House style", 1)[1].split("\n\n", 1)[0]
-        self.assertIn("CYBERAU_PRIVATE_NAMES: ${{ secrets.CYBERAU_PRIVATE_NAMES }}", step)
-        self.assertIn("tools/ci/style_check.py", step)
+    def test_private_names_secret_only_reaches_the_main_branch_workflow(self):
+        workflows = ROOT / ".github" / "workflows"
+        ci = (workflows / "ci.yml").read_text(encoding="utf-8")
+        self.assertNotIn("CYBERAU_PRIVATE_NAMES", ci)
+        text = (workflows / "private-names.yml").read_text(encoding="utf-8")
+        self.assertIn("CYBERAU_PRIVATE_NAMES: ${{ secrets.CYBERAU_PRIVATE_NAMES }}", text)
+        self.assertIn("tools/ci/style_check.py --require-names", text)
+        on = text.split("on:", 1)[1].split("permissions:", 1)[0]
+        self.assertNotIn("pull_request", on)
