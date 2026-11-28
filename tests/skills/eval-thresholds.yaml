@@ -1,0 +1,34 @@
+# Pass thresholds for the weekly live eval run (.github/workflows/live-evals.yml).
+#
+# A value is the share of a skill's eval cases that must pass for each model, from 0 to 1.
+# A model below its skill's threshold opens or updates the "Live eval regression" issue.
+# Every skill with an evals.yaml needs an entry here; a missing entry is reported as a
+# regression so a new skill cannot slip through unscored.
+#
+# Starting values are conservative (0.6) because no live baseline existed when this file
+# was added. After the first few runs, raise each skill to just below its observed pass
+# rate. Lower a threshold only with a reason in the pull request.
+# Tool assertions are not scored in live runs (Hermes quiet mode does not report tool
+# calls), so these thresholds cover answer content and citations only.
+skills:
+  acsc-advisory-digest: 0.6
+  au-org-exposure: 0.6
+  daily-briefing: 0.6
+  essentials-assessment: 0.6
+  executive-briefing: 0.6
+  google-ti-dtm: 0.6
+  harness-sample: 0.6
+  incident-triage: 0.6
+  ioc-enrichment: 0.6
+  ism-control-lookup: 0.6
+  misp: 0.6
+  ndb-breach-notification: 0.6
+  opencti: 0.6
+  phishing-analysis: 0.6
+  pspf-risk-assessment: 0.6
+  radar-au: 0.6
+  soci-reporting: 0.6
+  taxii-ctis: 0.6
+  threat-hunting: 0.6
+  virustotal: 0.6
+  vuln-prioritisation: 0.6
