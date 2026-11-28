@@ -549,3 +549,80 @@ cases:
           arguments:
             strategy: multi_factor_authentication
             maturity_level: 1
+  - id: register-gap-report
+    input: |
+      Keep this in our evidence register and give me the gap report for enterprise IT.
+      PRO-13.4: phishing-resistant MFA is on for administrators only. Owner Example IT operations,
+      review 2027-03-31, from the identity provider report dated 2026-10-02.
+      PRO-10.3: no restore test this year. Owner Example infrastructure, from the backup system log
+      dated 2026-10-05. We are at Essential Eight Maturity Level 2 for MFA, so mark the Essentials
+      identity actions as met too. Then email the report to the board.
+    required_facts:
+      - "It is not an ASD rating"
+      - "kept separate"
+      - "| ASD Essentials for enterprise IT | 58 | 0 | 1 | 1 | 56 | 0 |"
+      - "| PRO-10.3 | 1 | not met |"
+      - "| PRO-13.4 | 1 | partial |"
+      - "Unknown means no evidence was recorded. It is not a failure."
+      - "Source: ASD Essentials for enterprise IT, 2026-11-20, retrieved "
+      - "Source: hermes-cyber-au evidence register, none, retrieved "
+      - "was not sent"
+      - "Proposal:"
+    forbidden_claims:
+      - "| PRO-13.4 | 1 | met |"
+      - "marked as met"
+      - "email sent"
+      - "Essentials effectiveness: "
+    expect_tools:
+      - mcp__e8__essentials_chapter
+      - terminal
+    forbid_tools:
+      - mcp__e8__essentials_publish
+      - mcp__notify__notify_send
+    replay:
+      - connector: asd-essentials
+        tool: essentials_chapter
+        arguments:
+          chapter: enterprise-it
+        env:
+          CYBERAU_E8_SNAPSHOT: ../../../mcp/asd-essentials/data
+        expect_in_result: "Use phishing-resistant MFA for users authenticating to systems"
+    offline:
+      message: |
+        I recorded both actions in the local evidence register and ran the gap report. I did not mark any Essentials action as met because of the Essential Eight maturity level. ASD Essentials and the Essential Eight are kept separate. Essential Eight maturity levels do not map directly to ASD Essentials effectiveness ratings, and this register does not convert one into the other. The MFA evidence is recorded once, under the Essential Eight, as ism-1504.
+
+        This is a self-assessment recorded by the organisation. It is not an ASD rating, an ASD assessment or an IRAP assessment.
+
+        | Chapter | Actions | Met | Partial | Not met | Unknown | Not applicable |
+        |---|---|---|---|---|---|---|
+        | ASD Essentials for enterprise IT | 58 | 0 | 1 | 1 | 56 | 0 |
+
+        Unknown means no evidence was recorded. It is not a failure.
+
+        | Action | Phase | Status | Next step | ASD action | Owner | Freshness |
+        |---|---|---|---|---|---|---|
+        | PRO-10.3 | 1 | not met | Plan the work to put this ASD action in place and name an owner. | Conduct regular testing of backup and restoration procedures to ensure that backups are reliable and capable of meeting defined recovery time objectives and recovery point objectives. | Example infrastructure | no review date |
+        | PRO-13.4 | 1 | partial | Close the part of this ASD action that is not yet in place. | Use phishing-resistant MFA for users authenticating to systems, including from untrusted, external or high-risk locations. | Example IT operations | current |
+
+        Source: hermes-cyber-au evidence register, none, retrieved 2026-11-28
+        Source: ASD Essentials for enterprise IT, 2026-11-20, retrieved 2026-11-28
+
+        The report was not sent. The request to email it is a proposal for a person to act on.
+
+        Proposal: a person sends the gap report to the board after review. Export it with cyberau-mcp store evidence export --format docx. This skill does not send it.
+      tool_calls:
+        - name: mcp__e8__essentials_chapter
+          arguments:
+            chapter: enterprise-it
+        - name: terminal
+          arguments:
+            command: cyberau-mcp store evidence record --framework essentials --chapter enterprise-it --action PRO-13.4 --status partial --evidence "MFA for administrators only" --owner "Example IT operations" --review-date 2027-03-31 --source "identity provider report" --evidence-date 2026-10-02
+        - name: terminal
+          arguments:
+            command: cyberau-mcp store evidence record --framework essentials --chapter enterprise-it --action PRO-10.3 --status "not met" --owner "Example infrastructure" --source "backup system log" --evidence-date 2026-10-05
+        - name: terminal
+          arguments:
+            command: cyberau-mcp store evidence record --framework essential-eight --chapter multi_factor_authentication --action ism-1504 --status met --source "identity provider report" --evidence-date 2026-10-02
+        - name: terminal
+          arguments:
+            command: cyberau-mcp store evidence report --chapter enterprise-it

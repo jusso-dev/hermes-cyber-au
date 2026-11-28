@@ -23,6 +23,7 @@ from .api import (
 )
 from .canonical import EXPORT_DEFAULT_TLP
 from .db import open_store, resolve_db_path
+from .documents import DocumentsUnavailable
 from .expiry import expire_by_age
 from .maintenance import (
     apply_retention,
@@ -223,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     vacuum.set_defaults(func=_cmd_vacuum)
 
     _add_watchlist(sub, common)
+    _add_evidence(sub, common)
+    _add_report(sub, common)
 
     compact = sub.add_parser(
         "compact",
@@ -286,6 +289,243 @@ def _add_watchlist(sub, common: argparse.ArgumentParser) -> None:
         "init", parents=[watch_file], help="Write the example watchlist if none exists"
     )
     init.set_defaults(func=_cmd_watchlist_init)
+
+
+def _add_evidence(sub, common: argparse.ArgumentParser) -> None:
+    from .evidence import CHAPTERS, FRAMEWORKS, STATUSES
+
+    evidence = sub.add_parser(
+        "evidence",
+        help="Essentials evidence register and gap report (a self-assessment, not an ASD rating)",
+    )
+    commands = evidence.add_subparsers(dest="evidence_command", required=True)
+
+    actions = commands.add_parser("actions", help="List ASD Essentials action ids for a chapter")
+    actions.add_argument("--chapter", required=True, choices=CHAPTERS)
+    actions.set_defaults(func=_cmd_evidence_actions)
+
+    record = commands.add_parser("record", parents=[common], help="Add or replace one row")
+    record.add_argument("--framework", required=True, choices=FRAMEWORKS)
+    record.add_argument(
+        "--chapter",
+        required=True,
+        help="Essentials: enterprise-it, cloud or ot. Essential Eight: the strategy key",
+    )
+    record.add_argument(
+        "--action", required=True, help="Essentials action id (GOV-01.1) or ISM id (ism-1504)"
+    )
+    record.add_argument("--status", required=True, choices=STATUSES)
+    record.add_argument("--evidence", help="Link or short note. Do not paste secrets")
+    record.add_argument("--owner")
+    record.add_argument("--review-date", help="YYYY-MM-DD, when the evidence is next reviewed")
+    record.add_argument("--source", help="Where the evidence came from. Default analyst")
+    record.add_argument("--evidence-date", help="YYYY-MM-DD the evidence was gathered")
+    record.set_defaults(func=_cmd_evidence_record)
+
+    imported = commands.add_parser(
+        "import", parents=[common], help="Load rows from a CSV (all rows or none)"
+    )
+    imported.add_argument("file")
+    imported.set_defaults(func=_cmd_evidence_import)
+
+    listed = commands.add_parser("list", parents=[common], help="Print recorded rows as JSON")
+    listed.add_argument("--framework", choices=FRAMEWORKS)
+    listed.add_argument("--chapter")
+    listed.set_defaults(func=_cmd_evidence_list)
+
+    report = commands.add_parser(
+        "report", parents=[common], help="Gap report by chapter (markdown or JSON)"
+    )
+    report.add_argument("--chapter", action="append", dest="chapters", choices=CHAPTERS)
+    report.add_argument("--json", action="store_true")
+    report.add_argument("--as-of", type=_date_arg, help="Date for freshness checks")
+    report.set_defaults(func=_cmd_evidence_report)
+
+    export = commands.add_parser(
+        "export",
+        parents=[common],
+        help="xlsx register or docx gap report under plugin-data/cyber-au/exports/",
+    )
+    export.add_argument("--format", required=True, choices=("xlsx", "docx"))
+    export.add_argument("--output", help="File name under exports/")
+    export.add_argument("--chapter", action="append", dest="chapters", choices=CHAPTERS)
+    export.add_argument("--as-of", type=_date_arg, help="Date for freshness checks")
+    export.set_defaults(func=_cmd_evidence_export)
+
+
+def _add_report(sub, common: argparse.ArgumentParser) -> None:
+    report = sub.add_parser(
+        "report",
+        help="Executive reports from the store: monthly summary or incident summary",
+    )
+    kinds = report.add_subparsers(dest="report_command", required=True)
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument("--format", choices=("markdown", "json", "docx"), default="markdown")
+    shared.add_argument("--output", help="docx: file name under plugin-data/cyber-au/exports/")
+    shared.add_argument(
+        "--obligations",
+        help="Optional obligations JSON (an au-regulatory envelope or obligations checker output)",
+    )
+    shared.add_argument("--as-of", type=_date_arg, help="Report date. Default today (Sydney)")
+
+    monthly = kinds.add_parser(
+        "monthly", parents=[common, shared], help="One-page monthly cyber summary"
+    )
+    monthly.add_argument("--month", help="YYYY-MM. Default the last full month")
+    monthly.add_argument("--start", type=_date_arg, help="Period start, YYYY-MM-DD")
+    monthly.add_argument("--end", type=_date_arg, help="Period end, YYYY-MM-DD")
+    monthly.set_defaults(func=_cmd_report_monthly)
+
+    incident = kinds.add_parser(
+        "incident", parents=[common, shared], help="One-page incident summary"
+    )
+    incident.add_argument(
+        "--incident",
+        required=True,
+        help="Incident JSON, such as the output of cyber-au demo triage --json",
+    )
+    incident.set_defaults(func=_cmd_report_incident)
+
+
+def _month_period(args: argparse.Namespace, today: date) -> tuple[date, date]:
+    from datetime import timedelta
+
+    if args.month:
+        if args.start or args.end:
+            raise ValueError("use --month or --start and --end, not both")
+        try:
+            first = date.fromisoformat(f"{args.month}-01")
+        except ValueError as exc:
+            raise ValueError("--month must be YYYY-MM") from exc
+        following = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return first, following - timedelta(days=1)
+    if args.start or args.end:
+        if not (args.start and args.end):
+            raise ValueError("--start and --end go together")
+        return args.start, args.end
+    last = today.replace(day=1) - timedelta(days=1)
+    return last.replace(day=1), last
+
+
+def _print_report(result: object) -> None:
+    if isinstance(result, str):
+        sys.stdout.write(result)
+    else:
+        _emit(result)
+
+
+def _cmd_report_monthly(args: argparse.Namespace) -> int:
+    from .evidence import today
+    from .reports import render
+
+    start, end = _month_period(args, args.as_of or today())
+    try:
+        result = render(
+            "monthly",
+            fmt=args.format,
+            output=args.output,
+            store=args.path,
+            start=start,
+            end=end,
+            obligations=args.obligations,
+            on=args.as_of,
+        )
+    except DocumentsUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _print_report(result)
+    return 0
+
+
+def _cmd_report_incident(args: argparse.Namespace) -> int:
+    from .reports import load_incident, render
+
+    try:
+        result = render(
+            "incident",
+            fmt=args.format,
+            output=args.output,
+            store=args.path,
+            incident=load_incident(args.incident),
+            obligations=args.obligations,
+            on=args.as_of,
+        )
+    except DocumentsUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _print_report(result)
+    return 0
+
+
+def _cmd_evidence_actions(args: argparse.Namespace) -> int:
+    from .evidence import chapter_actions
+
+    _emit(chapter_actions(args.chapter))
+    return 0
+
+
+def _cmd_evidence_record(args: argparse.Namespace) -> int:
+    from .evidence import NOTICE, record_evidence
+
+    row = record_evidence(
+        args.framework,
+        args.chapter,
+        args.action,
+        args.status,
+        evidence=args.evidence,
+        owner=args.owner,
+        review_date=args.review_date,
+        source=args.source,
+        evidence_date=args.evidence_date,
+        path=args.path,
+    )
+    _emit({"recorded": row, "notice": NOTICE})
+    return 0
+
+
+def _cmd_evidence_import(args: argparse.Namespace) -> int:
+    from .evidence import import_csv
+
+    _emit(import_csv(args.file, path=args.path))
+    return 0
+
+
+def _cmd_evidence_list(args: argparse.Namespace) -> int:
+    from .evidence import NOTICE, list_evidence
+
+    rows = list_evidence(framework=args.framework, chapter=args.chapter, path=args.path)
+    _emit({"untrusted": True, "notice": NOTICE, "rows": rows})
+    return 0
+
+
+def _cmd_evidence_report(args: argparse.Namespace) -> int:
+    from .documents import to_markdown
+    from .evidence import build_report, gap_document
+
+    report = build_report(chapters=args.chapters, path=args.path, on=args.as_of)
+    if args.json:
+        _emit(report.to_json())
+    else:
+        sys.stdout.write(to_markdown(gap_document(report)))
+    return 0
+
+
+def _cmd_evidence_export(args: argparse.Namespace) -> int:
+    from .evidence import export
+
+    try:
+        result = export(
+            args.format,
+            output=args.output,
+            chapters=args.chapters,
+            path=args.path,
+            on=args.as_of,
+        )
+    except DocumentsUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _emit(result)
+    return 0
 
 
 def _cmd_init(args: argparse.Namespace) -> int:

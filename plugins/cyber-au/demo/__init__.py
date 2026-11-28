@@ -23,6 +23,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DATASET = HERE / "dataset.json"
+REPORT_INPUTS = HERE / "reports.json"
 PROMPTS = HERE / "prompts.json"
 EXAMPLES = HERE.parents[2] / "examples"
 DEMO_ALERT = EXAMPLES / "edr-alert.json"
@@ -347,11 +348,58 @@ def load(target: Path | None = None) -> dict:
             content_sha256=None,
             path=db,
         )
+    extra = _load_report_inputs(api, source["id"], db)
     return {
         "demo": True,
         "path": str(db),
         "indicators": len(dataset["indicators"]),
-        "advisories": len(dataset.get("advisories", [])),
+        "advisories": len(dataset.get("advisories", [])) + extra["advisories"],
+        "vulnerabilities": extra["vulnerabilities"],
+        "evidence": extra["evidence"],
+        "obligations": extra["obligations"],
+    }
+
+
+def load_report_inputs(path: Path = REPORT_INPUTS) -> dict:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("demo") is not True:
+        raise DemoError(f"{path} is not marked as demo data")
+    return data
+
+
+def _load_report_inputs(api, source_id: str, db: Path) -> dict:
+    """Synthetic KEV rows, advisories, evidence and obligations for the report templates."""
+    data = load_report_inputs()
+    for row in data.get("vulnerabilities", []):
+        fields = {k: v for k, v in row.items() if k not in ("cve_id", "note")}
+        api.upsert_vulnerability(row["cve_id"], path=db, **fields)
+    for row in data.get("advisories", []):
+        api.upsert_advisory(
+            row["id"],
+            source=source_id,
+            title=row["title"],
+            url=row["url"],
+            published_at=row.get("published_at"),
+            summary=row.get("summary"),
+            content_sha256=None,
+            path=db,
+        )
+    recorded = 0
+    try:
+        evidence = _store_module("evidence")
+        for row in data.get("evidence", []):
+            evidence.record_evidence(path=db, **row)
+            recorded += 1
+    except (ImportError, ValueError):
+        # The ASD snapshot or connector is not installed here; the register stays empty.
+        recorded = 0
+    obligations = db.parent / "obligations-demo.json"
+    obligations.write_text(json.dumps(data["obligations"], indent=2) + "\n", encoding="utf-8")
+    return {
+        "vulnerabilities": len(data.get("vulnerabilities", [])),
+        "advisories": len(data.get("advisories", [])),
+        "evidence": recorded,
+        "obligations": str(obligations),
     }
 
 
@@ -461,10 +509,15 @@ def dispatch(args, out=None, err=None) -> int:
         if command == "load":
             summary = load(args.data_dir)
             out.write(
-                f"{BANNER}\nLoaded {summary['indicators']} DEMO indicators and "
-                f"{summary['advisories']} DEMO advisory into {summary['path']}.\n"
+                f"{BANNER}\nLoaded {summary['indicators']} DEMO indicators, "
+                f"{summary['advisories']} DEMO advisories, {summary['vulnerabilities']} DEMO "
+                f"KEV rows and {summary['evidence']} DEMO evidence rows into "
+                f"{summary['path']}.\n"
                 "Your real intel store was not touched. Browse the demo store with:\n"
                 f"  cyberau-mcp store search demo --path {summary['path']}\n"
+                "Draft the DEMO monthly report with:\n"
+                f"  cyberau-mcp store report monthly --month 2026-10 --path {summary['path']} "
+                f"--obligations {summary['obligations']}\n"
                 "Remove it with: cyber-au demo clear\n"
             )
             return 0

@@ -51,6 +51,7 @@ Demo mode gives you a sourced answer with no keys, no model and no network. It i
 | `hermes -p cyber-au cyber-au demo triage --json` | The same record as JSON, with `"demo": true`. |
 | `hermes -p cyber-au cyber-au demo prompts` | Prints the ten prompts above. |
 | `hermes -p cyber-au cyber-au demo load` | Writes the synthetic intel set to a separate demo store, `plugin-data/cyber-au/demo/intel-demo.sqlite`. |
+| `cyberau-mcp store report monthly --month 2026-10 --path <demo store>` | Drafts the DEMO monthly cyber summary from that store. See [executive reports](../intel/executive-reports.md). |
 | `hermes -p cyber-au cyber-au demo clear` | Deletes that demo store. |
 
 From a checkout with only Python 3.11 or newer, before anything is installed, `python3 plugins/cyber-au/demo triage` and `python3 plugins/cyber-au/demo prompts` work too.

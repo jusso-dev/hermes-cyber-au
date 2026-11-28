@@ -19,6 +19,7 @@ CASE_IDS = (
     "exposure-counts-only",
     "injection-do-not-send",
     "exposure-trend-line",
+    "monthly-report-demo",
 )
 
 
@@ -38,4 +39,49 @@ def test_send_tool_is_forbidden_in_every_case():
 
 def test_offline_pages_fit_one_page():
     for case in harness.load_eval_file(EVAL).cases:
-        assert len(case.offline.message.split()) <= 450, case.id
+        # A report template's appendices (sources, limitations, evidence) follow the page.
+        page = case.offline.message.split("## Appendix A", 1)[0]
+        assert len(page.split()) <= 450, case.id
+
+
+def test_monthly_report_case_is_the_real_demo_report(tmp_path, monkeypatch, capsys):
+    """The offline answer is exactly what the report command prints on demo data."""
+    import importlib.util
+
+    from cyberau_common.cli import main
+
+    plugin = ROOT / "plugins" / "cyber-au"
+    monkeypatch.syspath_prepend(str(plugin))
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_E8_SNAPSHOT", str(ROOT / "mcp" / "asd-essentials" / "data"))
+    monkeypatch.setenv("CYBERAU_TODAY", "2026-11-03")
+    spec = importlib.util.spec_from_file_location(
+        "cyberau_demo_eval",
+        plugin / "demo" / "__init__.py",
+        submodule_search_locations=[str(plugin / "demo")],
+    )
+    demo = importlib.util.module_from_spec(spec)
+    sys.modules["cyberau_demo_eval"] = demo
+    spec.loader.exec_module(demo)
+    summary = demo.load(tmp_path / "demo")
+    case = next(c for c in harness.load_eval_file(EVAL).cases if c.id == "monthly-report-demo")
+    argv = [
+        "store",
+        "report",
+        "monthly",
+        "--month",
+        "2026-10",
+        "--path",
+        summary["path"],
+        "--obligations",
+        summary["obligations"],
+        "--as-of",
+        "2026-11-03",
+    ]
+    try:
+        assert main(argv) == 0
+    finally:
+        from store.db import close_store
+
+        close_store(summary["path"])
+    assert capsys.readouterr().out.strip() == case.offline.message.strip()
