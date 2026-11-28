@@ -651,9 +651,7 @@ def gap_document(report: Report) -> Document:
         )
     doc.table(header, table)
     doc.para("Unknown means no evidence was recorded. It is not a failure.")
-    doc.para(
-        f"Source: hermes-cyber-au evidence register, none, retrieved {report.on.isoformat()}"
-    )
+    doc.para(f"Source: hermes-cyber-au evidence register, none, retrieved {report.on.isoformat()}")
     for reference in report.references:
         doc.para(reference.citation())
     for reference in report.references:

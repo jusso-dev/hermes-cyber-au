@@ -245,7 +245,7 @@ def test_chapters_follow_the_org_profile_when_empty(store_path, tmp_path):
 def test_xlsx_export_opens_with_openpyxl(store_path):
     openpyxl = pytest.importorskip("openpyxl")
     _row(store_path)
-    _row(store_path, action="PRO-10.3", status="not met", evidence="=HYPERLINK(\"x\")")
+    _row(store_path, action="PRO-10.3", status="not met", evidence='=HYPERLINK("x")')
     evidence.record_evidence(
         "essential-eight", "regular_backups", "ism-1511", "partial", path=store_path
     )

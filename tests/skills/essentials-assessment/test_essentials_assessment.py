@@ -56,6 +56,8 @@ def _base(**overrides: object) -> dict:
 def test_offline_messages_match_the_renderer():
     eval_file = harness.load_eval_file(EVALS)
     for case in eval_file.cases:
+        if case.id.startswith("register-"):
+            continue  # scored against the evidence register in test_register_case_matches_cli
         document = _load(f"{case.id}.json")
         assert case.offline is not None
         assert case.offline.message.strip() == RENDER.render(document).markdown.strip()
@@ -384,3 +386,35 @@ def test_every_reference_is_linked_from_the_skill():
     body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     for path in sorted((SKILL / "references").glob("*.md")):
         assert f"references/{path.name}" in body
+
+
+def test_register_case_matches_cli(tmp_path, monkeypatch, capsys):
+    """The offline answer quotes rows the evidence register CLI really prints."""
+    import shlex
+
+    from cyberau_common.cli import main
+
+    monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CYBERAU_E8_SNAPSHOT", str(ROOT / "mcp" / "asd-essentials" / "data"))
+    monkeypatch.setenv("CYBERAU_TODAY", "2026-11-28")
+    case = next(
+        item for item in harness.load_eval_file(EVALS).cases if item.id == "register-gap-report"
+    )
+    output = ""
+    try:
+        for call in case.offline.tool_calls:
+            if call.name != "terminal":
+                continue
+            argv = shlex.split(call.arguments["command"])
+            assert argv[:3] == ["cyberau-mcp", "store", "evidence"]
+            assert main(argv[1:]) == 0
+            output = capsys.readouterr().out
+    finally:
+        from store.db import close_store
+
+        close_store()
+    message = case.offline.message
+    for line in message.splitlines():
+        if line.startswith("| ") or line.startswith("Source: ") or line.startswith("Unknown"):
+            assert line in output, line
+    assert "This is a self-assessment recorded by the organisation." in output
