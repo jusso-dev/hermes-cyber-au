@@ -64,6 +64,20 @@ The store keeps a finding for 90 days (`expires_at`), then the retention job del
 
 Leak site claims are allegations made by criminals. They are labelled `unverified_claim`. Do not download leaked files or follow leak site links. Findings about organisations that are not on your watchlist (the store requires a watchlist on every write) are not stored and are not mentioned in briefings unless you ask. Nothing in this distribution contacts the OAIC, ASD, affected individuals, the victim organisation or a vendor. A skill can draft. A person sends. A finding about your own organisation may start the clock for assessing a suspected eligible data breach under the NDB scheme. Hand that to the breach notification skill.
 
+## Where findings show up
+
+These read only the local `exposures` table (`exposures.sqlite` or `intel.sqlite` in the profile data directory). None calls a vendor or sends anything.
+
+| Output | How | Rule |
+|---|---|---|
+| Daily briefing | `cyberau exposure-brief --record` builds the `org-exposure` pack entry; the renderer adds "Exposure of our organisation" after This week | New findings since the last briefing, grouped by kind, with confidence labels. Left out when no premium vendor is on and the free tracker has nothing. External channels get counts for findings with `share_outside_profile: true` only. |
+| Incident triage | `cyber_au_org_exposure` for the watchlist subject, last 30 days | "Related exposure" evidence. A recent infostealer finding for affected users raises the suggested local severity by one level. |
+| NDB assessment | `cyber_au_exposure_finding` with a finding id | Prefills data classes, counts, first seen and confidence; marks the rest unknown; starts the 30 day assessment clock as a line in the draft. |
+| Executive page | `cyber_au_exposure_trend` | One counts-only line: this week against last week, by kind. |
+| STIX export | `cyberau_premium.stix.export_stix` | Exports only findings with `stix_exportable: true`, and reports how many it skipped. |
+
+With every premium vendor off and nothing from the free tracker, the briefing and the executive page are unchanged.
+
 ## Vendor notes
 
 Generated from `mcp/premium/vendors.yaml`:
