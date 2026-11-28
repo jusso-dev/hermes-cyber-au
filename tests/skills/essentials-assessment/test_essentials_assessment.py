@@ -394,6 +394,7 @@ def test_register_case_matches_cli(tmp_path, monkeypatch, capsys):
 
     from cyberau_common.cli import main
 
+    monkeypatch.syspath_prepend(str(ROOT / "plugins" / "cyber-au"))
     monkeypatch.setenv("CYBERAU_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CYBERAU_E8_SNAPSHOT", str(ROOT / "mcp" / "asd-essentials" / "data"))
     monkeypatch.setenv("CYBERAU_TODAY", "2026-11-28")
