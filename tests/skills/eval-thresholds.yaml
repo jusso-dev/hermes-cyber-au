@@ -22,7 +22,7 @@ skills:
   incident-playbook: 0.6
   incident-triage: 0.6
   ioc-enrichment: 0.6
-  ism-control-lookup: 0.6
+  ism-controls-oscal: 0.6
   misp: 0.6
   ndb-breach-notification: 0.6
   opencti: 0.6

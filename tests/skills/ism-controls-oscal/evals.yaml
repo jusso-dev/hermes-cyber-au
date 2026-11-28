@@ -1,4 +1,4 @@
-skill: ism-control-lookup
+skill: ism-controls-oscal
 cases:
   - id: ism-1173
     input: "Explain ISM-1173."

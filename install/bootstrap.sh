@@ -7,6 +7,7 @@ set -eu
 PROFILE=${CYBERAU_PROFILE:-cyber-au}
 PROFILE_HOME=""
 OFFLINE=0
+GUIDANCE_PACK=1
 NONINTERACTIVE=0
 YES=0
 # Flags install.sh and CI pass through. Bootstrap does not prompt.
@@ -23,6 +24,7 @@ Options:
   --profile <name>       Profile name (default: cyber-au)
   --profile-home <path>  Profile directory (skips hermes lookup)
   --offline              Do not contact the network (uv sync --offline)
+  --no-guidance-pack     Skip installing the pinned guidance pack plugin
   --non-interactive    Do not prompt
   --yes                Accepted for callers that pass it through
   -h, --help           Show this help
@@ -59,6 +61,10 @@ while [ $# -gt 0 ]; do
       ;;
     --offline)
       OFFLINE=1
+      shift
+      ;;
+    --no-guidance-pack)
+      GUIDANCE_PACK=0
       shift
       ;;
     --non-interactive)
@@ -144,6 +150,10 @@ script_real=$(cd -- "$SCRIPT_DIR" && pwd)
 if [ "$script_real" != "$saved_real" ]; then
   cp "$SCRIPT_DIR/bootstrap.sh" "$saved_install/bootstrap.sh"
   cp "$SCRIPT_DIR/render_config.py" "$saved_install/render_config.py"
+  if [ -f "$SCRIPT_DIR/guidance-pack/pin.yaml" ]; then
+    mkdir -p "$saved_install/guidance-pack"
+    cp "$SCRIPT_DIR/guidance-pack/pin.yaml" "$saved_install/guidance-pack/pin.yaml"
+  fi
   chmod +x "$saved_install/bootstrap.sh"
 fi
 
@@ -245,6 +255,40 @@ require_reference() {
 }
 
 init_store
+
+# The guidance pack (jusso-dev/hermes-skills, MIT) supplies the Sentinel, CloudWatch,
+# detection engineering and incident response guidance skills. ADR 0002 records the
+# decision to depend on it at the commit pinned in install/guidance-pack/pin.yaml.
+install_guidance_pack() {
+  [ "$GUIDANCE_PACK" -eq 1 ] || return 0
+  pin=$SCRIPT_DIR/guidance-pack/pin.yaml
+  [ -f "$pin" ] || pin=$PROFILE_HOME/install/guidance-pack/pin.yaml
+  [ -f "$pin" ] || {
+    printf '%s\n' "Guidance pack pin not found. Skipped the guidance pack." >&2
+    return 0
+  }
+  if [ "$OFFLINE" -eq 1 ]; then
+    printf '%s\n' "Offline: skipped the guidance pack. Install it later with the command in docs/adr/0002-reuse-guidance-pack.md." >&2
+    return 0
+  fi
+  spec=$("$PYTHON" -c 'import sys, yaml; d = yaml.safe_load(open(sys.argv[1])); print(d["repository"] + "/" + d["path"] + " " + d["commit"])' "$pin") || {
+    printf '%s\n' "Could not read $pin. Skipped the guidance pack." >&2
+    return 0
+  }
+  source_ref=${spec%% *}
+  commit=${spec##* }
+  case $commit in
+    *[!0-9a-f]*|'') printf '%s\n' "Guidance pack pin is not a commit SHA. Skipped." >&2; return 0 ;;
+  esac
+  [ ${#commit} -eq 40 ] || { printf '%s\n' "Guidance pack pin is not a full commit SHA. Skipped." >&2; return 0; }
+  if hermes -p "$PROFILE" plugins install "$source_ref" --force --ref "$commit"; then
+    printf '%s\n' "Installed the guidance pack at $commit."
+  else
+    printf '%s\n' "Could not install the guidance pack. Re-run bootstrap, or install it with: hermes -p $PROFILE plugins install $source_ref --force --ref $commit" >&2
+  fi
+}
+
+install_guidance_pack
 
 # Hermes seeds distribution jobs paused. Only these two local, no-agent jobs
 # are enabled automatically; subsequent operator pause choices are preserved.

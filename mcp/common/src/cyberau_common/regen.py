@@ -44,7 +44,7 @@ class Source:
 # Every directory here exists in the checkout. ATT&CK and Sigma are not shipped:
 # those connectors fetch live and keep their own cache.
 SOURCES: dict[str, Source] = {
-    "ism": Source("ISM", "mcp/asd-ism/data", "cyberau_asd_ism.source", "ism-control-lookup"),
+    "ism": Source("ISM", "mcp/asd-ism/data", "cyberau_asd_ism.source", "ism-controls-oscal"),
     "e8": Source(
         "Essential Eight",
         "mcp/asd-essentials/data",

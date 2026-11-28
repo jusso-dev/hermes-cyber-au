@@ -65,7 +65,7 @@ class DistributionSkeletonTest(unittest.TestCase):
         # bootstrap.sh copies these from the profile's install/ directory. A profile update
         # only refreshes owned paths, so an unowned helper is missing and bootstrap fails.
         manifest = (ROOT / "distribution.yaml").read_text(encoding="utf-8").splitlines()
-        for name in ("bootstrap.sh", "render_config.py"):
+        for name in ("bootstrap.sh", "render_config.py", "guidance-pack/pin.yaml"):
             self.assertIn(f"  - install/{name}", manifest)
 
     def test_manifest_declares_name_version_and_optional_keys(self):

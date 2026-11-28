@@ -7,7 +7,7 @@ license: Apache-2.0
 metadata:
   hermes:
     tags: [Security, Australia, essentials-assessment]
-    related_skills: [ism-control-lookup, executive-briefing]
+    related_skills: [ism-controls-oscal, executive-briefing]
     requires_tools: []
 ---
 

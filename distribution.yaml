@@ -15,6 +15,7 @@ distribution_owned:
   - plugins/cyber-au
   - install/bootstrap.sh
   - install/render_config.py
+  - install/guidance-pack/pin.yaml
   - mcp
   - feeds
   - playbooks

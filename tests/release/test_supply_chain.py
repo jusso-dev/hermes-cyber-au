@@ -103,7 +103,7 @@ def test_release_notes_from_a_git_ref(tmp_path: Path):
 
     git("init")
     _write(repo / "SOUL.md", "First line\n")
-    _write(repo / "skills" / "ism-control-lookup" / "SKILL.md", "Lookup\n")
+    _write(repo / "skills" / "ism-controls-oscal" / "SKILL.md", "Lookup\n")
     _write(
         repo / "cron" / "jobs.json",
         json.dumps({"jobs": [{"id": "cyberau-old", "schedule": "every 1h"}]}),

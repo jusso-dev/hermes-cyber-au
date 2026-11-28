@@ -1,12 +1,12 @@
 ---
-name: ism-control-lookup
+name: ism-controls-oscal
 description: "Look up, explain and compare ISM controls by id, keyword or baseline, with the release in force on a given date."
 version: 0.1.0
 author: Justin Middler
 license: Apache-2.0
 metadata:
   hermes:
-    tags: [Security, Australia, ism-control-lookup]
+    tags: [Security, Australia, ism-controls-oscal]
     related_skills: [essentials-assessment]
     requires_tools: []
 ---

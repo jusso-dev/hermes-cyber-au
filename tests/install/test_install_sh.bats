@@ -181,11 +181,12 @@ if [ "${1:-}" = "-C" ]; then
     mkdir -p "$dest/scripts" "$dest/cron"
     cp "$repo/scripts/cyberau_enable_maintenance.py" "$dest/scripts/"
     cp "$repo/cron/jobs.json" "$dest/cron/jobs.json"
-    mkdir -p "$dest/install" "$dest/mcp" "$dest/plugins/cyber-au"
+    mkdir -p "$dest/install/guidance-pack" "$dest/mcp" "$dest/plugins/cyber-au"
     cp "$repo/distribution.yaml" "$dest/distribution.yaml"
     cp "$repo/config.yaml" "$dest/config.yaml"
     cp "$repo/install/bootstrap.sh" "$dest/install/bootstrap.sh"
     cp "$repo/install/render_config.py" "$dest/install/render_config.py"
+    cp "$repo/install/guidance-pack/pin.yaml" "$dest/install/guidance-pack/pin.yaml"
     cp "$repo/mcp/servers.yaml" "$dest/mcp/servers.yaml"
     cp "$repo/mcp/pyproject.toml" "$dest/mcp/pyproject.toml"
     cp "$repo/mcp/uv.lock" "$dest/mcp/uv.lock"
@@ -410,4 +411,19 @@ PY
   run "$REPO/install/bootstrap.sh" --profile cyber-au --offline --non-interactive
   [ "$status" -ne 0 ]
   [[ "$output" == *"Essential Eight maturity reference files are missing"* ]]
+}
+
+@test "online bootstrap installs the guidance pack at the pinned commit" {
+  install_fake_git
+  run "$REPO/install/install.sh" --ref v0.1.0 --no-hermes-install --non-interactive --yes
+  [ "$status" -eq 0 ]
+  commit=$(sed -n 's/^commit: //p' "$REPO/install/guidance-pack/pin.yaml")
+  grep -q "plugins install jusso-dev/hermes-skills/plugins/hermes-cyber-au --force --ref $commit" "$HERMES_FAKE_LOG"
+}
+
+@test "offline bootstrap skips the guidance pack" {
+  run "$REPO/install/install.sh" --offline --no-hermes-install --non-interactive --yes
+  [ "$status" -eq 0 ]
+  ! grep -q "plugins install" "$HERMES_FAKE_LOG"
+  [[ "$output" == *"Offline: skipped the guidance pack"* ]]
 }

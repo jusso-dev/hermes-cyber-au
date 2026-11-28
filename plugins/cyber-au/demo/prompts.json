@@ -30,7 +30,7 @@
     "good_answer": "Ranks the internet-facing NetScaler and Log4j hosts first because their CVEs are in KEV, gives the Essential Eight timeframe for each, and cites KEV, EPSS and the Essential Eight source."
   },
   {
-    "skill": "ism-control-lookup",
+    "skill": "ism-controls-oscal",
     "prompt": "Which ISM controls cover multi-factor authentication for privileged users? Cite the ISM release.",
     "keys": "none",
     "good_answer": "Lists control ids and text from the bundled ISM release with its version. If a control is not in the snapshot it says it does not know."

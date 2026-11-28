@@ -14,9 +14,9 @@ sys.path.insert(0, str(HARNESS_DIR))
 import harness  # noqa: E402  (needs HARNESS_DIR on sys.path)
 
 ROOT = harness.ROOT
-SKILL = ROOT / "skills" / "ism-control-lookup"
+SKILL = ROOT / "skills" / "ism-controls-oscal"
 SCRIPT = SKILL / "scripts" / "release_in_force.py"
-EVALS = ROOT / "tests" / "skills" / "ism-control-lookup" / "evals.yaml"
+EVALS = ROOT / "tests" / "skills" / "ism-controls-oscal" / "evals.yaml"
 CONNECTOR_RELEASES = ROOT / "mcp" / "asd-ism" / "data" / "releases.json"
 
 
@@ -71,7 +71,7 @@ def test_shipped_release_list_matches_the_connector_snapshot():
 
 def test_eval_cases_cover_the_release_edge_cases():
     loaded = harness.load_eval_file(EVALS)
-    assert loaded.skill == "ism-control-lookup"
+    assert loaded.skill == "ism-controls-oscal"
     assert [case.id for case in loaded.cases] == [
         "ism-1173",
         "missing-ism-9999",

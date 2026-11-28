@@ -7,7 +7,7 @@ license: Apache-2.0
 metadata:
   hermes:
     tags: [Security, Australia, pspf-risk-assessment]
-    related_skills: [ism-control-lookup, essentials-assessment, vuln-prioritisation, executive-briefing]
+    related_skills: [ism-controls-oscal, essentials-assessment, vuln-prioritisation, executive-briefing]
     requires_tools: []
 ---
 
@@ -19,7 +19,7 @@ This skill drafts a threat and risk assessment (TRA) and a security risk managem
 
 Use this skill when someone asks for a TRA, a security risk assessment, an SRMP, a Technology Security Risk Management Plan (PSPF Requirement 0211), the risk component of an entity security plan, or a risk register for a system, facility or project, and wants it aligned to the PSPF.
 
-Do not use it to approve a plan, accept a risk on someone's behalf, authorise a system to operate, submit an annual protective security report, or send the plan to anyone. For an Essential Eight maturity score use `essentials-assessment`. For one ISM control use `ism-control-lookup`.
+Do not use it to approve a plan, accept a risk on someone's behalf, authorise a system to operate, submit an annual protective security report, or send the plan to anyone. For an Essential Eight maturity score use `essentials-assessment`. For one ISM control use `ism-controls-oscal`.
 
 ## Quick Reference
 

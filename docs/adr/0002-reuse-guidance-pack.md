@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Needs the maintainer's decision (issue #19).
+Accepted on 28 November 2026 (issue #19). Option 1, depend at a pinned commit.
 
 ## Context
 
@@ -40,9 +40,15 @@ Option 1, depend at a pinned commit:
 
 Rename this distribution's skill to `ism-controls-oscal`. It is the one with the distinct behaviour (live OSCAL). The pack's name is already in users' muscle memory.
 
-## Consequences if accepted
+## Consequences
 
-- `install/bootstrap.sh` installs the pack at the pinned SHA, and `hermes profile update` bumps the pin through the existing dependency bump workflow.
-- CI adds a check that skill names do not collide with the pinned pack's skill list. The list is recorded in the repo at the pinned SHA, so CI needs no network.
-- `essential-eight-assessor` gets a note in the pack pointing to `essentials-assessment` for ASD Essentials.
-- Until this is accepted, no code changes. This ADR only records the facts and the recommendation.
+- This distribution's ISM skill is renamed from `ism-control-lookup` to `ism-controls-oscal`, so it no longer shadows the pack's `ism-control-lookup` when both are installed. The pack keeps its name.
+- `install/guidance-pack/pin.yaml` records the pack repository, path, commit (`04b88dee67ade8c1d45797e85c5283f437937d08`, checked 28 November 2026), licence, and its skill and tool names at that commit. It is distribution-owned, so `hermes profile update` ships a new pin.
+- `install/bootstrap.sh` runs `hermes -p <profile> plugins install jusso-dev/hermes-skills/plugins/hermes-cyber-au --force --ref <commit>` from the pin. It skips the step with `--offline` or `--no-guidance-pack`, and a failed install is reported without stopping bootstrap.
+- `tests/test_guidance_pack.py` fails CI if a skill name in `skills/` or a tool in `plugins/cyber-au/plugin.yaml` matches the pinned pack's lists. It needs no network.
+- Moving the pin is a manual change: update the commit and both name lists together, then run the test. The weekly Hermes bump does not move it.
+- Still open in the pack repository: a note in `essential-eight-assessor` pointing to `essentials-assessment` for ASD Essentials.
+
+## Licence
+
+The pack is MIT and this distribution is Apache-2.0. Nothing is vendored: bootstrap installs the pack as a separate plugin from its own repository, so its MIT notice travels with it.
