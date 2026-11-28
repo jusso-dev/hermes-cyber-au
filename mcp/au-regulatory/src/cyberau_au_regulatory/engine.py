@@ -590,13 +590,15 @@ def render_text(result: dict) -> str:
                     f"  Deadline {deadline['name']}: {deadline['span']} from "
                     f"{deadline['from']}, due {due}"
                 )
+                lines.append(f"    Basis: {deadline['basis']}")
             for warning in item["warnings"]:
                 lines.append(f"  Warning: {warning}")
             for question in item["questions"]:
                 lines.append(f"  Question: {question}")
+            lines.append(f"  Citation: {item['citation']}. Link: {item['source_url']}")
             lines.append(
-                f"  Source: {item['citation']}, {item['source_url']}, "
-                f"last reviewed {item['last_reviewed']}"
+                f"  Source: {item['title']}, aureg snapshot {result.get('snapshot_date')}, "
+                f"retrieved {item['last_reviewed']}"
             )
             if item["draft"]["fields"]:
                 lines.append(f"  {item['draft']['label']} Draft fields:")
@@ -607,12 +609,17 @@ def render_text(result: dict) -> str:
         lines.append("")
         lines.append("Limited use notes:")
         for note in result["limited_use"]:
-            lines.append(f"- {note['title']}: {note['citation']}, {note['source_url']}")
+            lines.append(
+                f"- {note['title']}. Citation: {note['citation']}. Link: {note['source_url']}"
+            )
+            lines.append(f"  {note['summary']}")
     if result["not_applicable"]:
         lines.append("")
         lines.append("Does not apply on these facts:")
         for item in result["not_applicable"]:
             lines.append(f"- {item['title']}: {'; '.join(item['why_not'])}")
+            if item["watch_for"]:
+                lines.append(f"  Watch for: {item['watch_for']}")
     for note in result["notes"]:
         lines.append(f"Note: {note}")
     return "\n".join(lines) + "\n"

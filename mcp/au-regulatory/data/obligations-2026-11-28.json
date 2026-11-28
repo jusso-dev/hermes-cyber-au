@@ -86,6 +86,12 @@
             "missing": "true",
             "label": "serious harm to individuals has not been ruled out",
             "ask": "Has serious harm to the individuals concerned been ruled out?"
+          },
+          {
+            "fact": "eligible_breach_believed",
+            "equals": false,
+            "missing": "true",
+            "label": "the organisation does not yet believe an eligible data breach has happened (s 26WH(1)(b)); once it does, the statement duty applies instead"
           }
         ]
       },

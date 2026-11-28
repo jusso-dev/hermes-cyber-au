@@ -73,6 +73,8 @@ def test_every_rule_has_id_source_review_date_and_verification():
         date.fromisoformat(row["last_reviewed"])
         assert row["verification"]["status"] in {"verified", "partial"}
         assert row["kind"] in {"mandatory", "voluntary", "note"}
+        # Titles go into "Source: <title>, <version>, retrieved <date>" lines.
+        assert "," not in row["title"]
         if row["kind"] != "note":
             assert row["recipient"]
             assert row["clocks"]
@@ -327,6 +329,7 @@ def test_timeline_counts_down_and_flags_overdue():
     assert "OVERDUE by 2h 30m" in text
     assert "not legal advice" in text
     assert "DRAFT. Not submitted." in text
+    assert "Source: SOCI Act: critical cyber security incident report, aureg snapshot " in text
 
 
 def test_timeline_is_sorted_by_instant_not_text():

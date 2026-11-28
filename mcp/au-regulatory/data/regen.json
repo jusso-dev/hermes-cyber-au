@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "mcp/au-regulatory/data/obligations-2026-11-28.json",
-      "sha256": "d44228eb323289b96731501fc97ad64693b3be1b255091d41c8dee73be2b979a"
+      "sha256": "3e47fc90d18144d6d8ef06ceac83fdca1f3ad5350672fd07ddd527c53bccac25"
     }
   ],
   "source": "aureg"
