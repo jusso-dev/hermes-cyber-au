@@ -14,6 +14,7 @@ OFFLINE=0
 NONINTERACTIVE=0
 YES=0
 ALLOW_ROOT=0
+SKIP_BOOTSTRAP=0
 
 HERMES_INSTALL_URL=https://hermes-agent.nousresearch.com/install.sh
 # Pinned Hermes installer: the upstream scripts/install.sh at the commit the
@@ -44,6 +45,8 @@ Options:
   --non-interactive      Do not prompt
   --yes                  Answer yes to the Hermes installer prompt
   --allow-root           Permit root. Meant for CI images.
+  --skip-bootstrap       Install the profile only. The offline bundle installer
+                         builds the venv itself, then runs bootstrap.
   -h, --help             Show this help
 EOF
 }
@@ -103,6 +106,10 @@ while [ $# -gt 0 ]; do
       ;;
     --allow-root)
       ALLOW_ROOT=1
+      shift
+      ;;
+    --skip-bootstrap)
+      SKIP_BOOTSTRAP=1
       shift
       ;;
     -h|--help)
@@ -419,6 +426,11 @@ else
   resolve_source
   check_hermes_version "$SOURCE/distribution.yaml"
   install_profile "$SOURCE"
+fi
+
+if [ "$SKIP_BOOTSTRAP" -eq 1 ]; then
+  printf '%s\n' "Skipping bootstrap (--skip-bootstrap)."
+  exit 0
 fi
 
 BOOTSTRAP=$(bootstrap_script)

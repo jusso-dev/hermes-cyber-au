@@ -7,6 +7,7 @@ set -eu
 PROFILE=${CYBERAU_PROFILE:-cyber-au}
 PROFILE_HOME=""
 OFFLINE=0
+VENV_READY=0
 NONINTERACTIVE=0
 YES=0
 # Flags install.sh and CI pass through. Bootstrap does not prompt.
@@ -23,6 +24,8 @@ Options:
   --profile <name>       Profile name (default: cyber-au)
   --profile-home <path>  Profile directory (skips hermes lookup)
   --offline              Do not contact the network (uv sync --offline)
+  --venv-ready           mcp/.venv was already built from mcp/uv.lock (the offline
+                         bundle does this with pip --no-index). Skip uv sync.
   --non-interactive    Do not prompt
   --yes                Accepted for callers that pass it through
   -h, --help           Show this help
@@ -59,6 +62,10 @@ while [ $# -gt 0 ]; do
       ;;
     --offline)
       OFFLINE=1
+      shift
+      ;;
+    --venv-ready)
+      VENV_READY=1
       shift
       ;;
     --non-interactive)
@@ -147,14 +154,19 @@ if [ "$script_real" != "$saved_real" ]; then
   chmod +x "$saved_install/bootstrap.sh"
 fi
 
-if ! command -v uv >/dev/null 2>&1; then
-  die "uv is required to build the connector environment. Install uv, then re-run bootstrap."
-fi
-
-if [ "$OFFLINE" -eq 1 ]; then
-  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen --offline
+if [ "$VENV_READY" -eq 1 ]; then
+  [ -x "$PROFILE_HOME/mcp/.venv/bin/python" ] ||
+    die "--venv-ready was given but $PROFILE_HOME/mcp/.venv has no python. Re-run the offline installer."
+  printf '%s\n' "Using the connector environment already built in $PROFILE_HOME/mcp/.venv."
 else
-  uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen
+  if ! command -v uv >/dev/null 2>&1; then
+    die "uv is required to build the connector environment. Install uv, then re-run bootstrap."
+  fi
+  if [ "$OFFLINE" -eq 1 ]; then
+    uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen --offline
+  else
+    uv sync --project "$PROFILE_HOME/mcp" --all-packages --frozen
+  fi
 fi
 
 # cyber-au doctor compares this stamp with mcp/uv.lock to spot a stale venv.
@@ -173,6 +185,8 @@ fi
 # in plugin.yaml go into Hermes's interpreter, not the connector venv. Without
 # PyYAML there the plugin fails to register and `hermes cyber-au` is missing.
 install_plugin_dependencies() {
+  # The offline bundle installer has already installed these from its wheels.
+  [ "$VENV_READY" -eq 1 ] && return 0
   hermes_py=${HERMES_PYTHON:-}
   if [ -z "$hermes_py" ]; then
     hermes_bin=$(command -v hermes) || return 0

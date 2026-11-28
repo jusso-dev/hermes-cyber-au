@@ -14,6 +14,10 @@ Each stdio server gets CYBERAU_DATA_DIR from the profile .env when it sets an
 absolute path (an org profile sharing one store), else
 <profile>/plugin-data/cyber-au. The cron scripts follow the same rule, so a
 briefing reads the store the ingest jobs write.
+
+CYBERAU_OFFLINE=1 in the profile .env (the offline bundle installer sets it) is
+copied to every stdio server, so connectors answer from cache and shipped
+snapshots only and report live-only sources as unavailable.
 """
 
 from __future__ import annotations
@@ -116,6 +120,11 @@ def _read_data_dir(env_file: Path) -> Path | None:
     return Path(value)
 
 
+def _read_offline(env_file: Path) -> bool:
+    """True when the profile .env sets CYBERAU_OFFLINE=1."""
+    return _env_values(env_file).get("CYBERAU_OFFLINE") == "1"
+
+
 def _placeholder(raw: str, server: str) -> tuple[str, str]:
     name, sep, value = raw.partition("=")
     if sep != "=" or not name:
@@ -147,13 +156,14 @@ def _server_entry(
     previous: dict | None,
     present: set[str],
     data_dir: Path | None = None,
+    offline: bool = False,
 ) -> dict:
     if not isinstance(spec, dict):
         raise SystemExit(f"Server {name} in servers.yaml must be a mapping")
     if isinstance(spec.get("url"), str):
         entry = _remote_entry(name, spec, present)
     else:
-        entry = _stdio_entry(name, spec, home, data_dir)
+        entry = _stdio_entry(name, spec, home, data_dir, offline)
     if "timeout" in spec:
         entry["timeout"] = spec["timeout"]
     if "lazy" in spec:
@@ -176,7 +186,9 @@ def _server_entry(
     return _ordered_entry(entry)
 
 
-def _stdio_entry(name: str, spec: dict, home: Path, data_dir: Path | None = None) -> dict:
+def _stdio_entry(
+    name: str, spec: dict, home: Path, data_dir: Path | None = None, offline: bool = False
+) -> dict:
     command = home / "mcp" / ".venv" / "bin" / "cyberau-mcp"
     args = spec.get("args")
     if not isinstance(args, list) or not args:
@@ -186,6 +198,8 @@ def _stdio_entry(name: str, spec: dict, home: Path, data_dir: Path | None = None
         "CYBERAU_DATA_DIR": str(data_dir or home / "plugin-data" / "cyber-au"),
         "CYBERAU_EGRESS_ALLOWLIST": str(home / "mcp" / "egress-allowlist.yaml"),
     }
+    if offline:
+        env["CYBERAU_OFFLINE"] = "1"
     for item in spec.get("env") or []:
         if isinstance(item, str):
             key, value = _placeholder(item, name)
@@ -271,6 +285,7 @@ def render_config(
     present: set[str],
     managed_names: set[str],
     data_dir: Path | None = None,
+    offline: bool = False,
 ) -> tuple[dict, list[dict[str, str]], list[str]]:
     specs = servers_doc.get("servers")
     if not isinstance(specs, dict):
@@ -296,7 +311,9 @@ def render_config(
             # A server the person added themselves under a shipped name.
             skipped.append(str(name))
             continue
-        rendered[str(name)] = _server_entry(str(name), spec, home, previous, present, data_dir)
+        rendered[str(name)] = _server_entry(
+            str(name), spec, home, previous, present, data_dir, offline
+        )
         required = []
         if isinstance(spec, dict):
             required = [str(item) for item in spec.get("required_env") or []]
@@ -448,6 +465,7 @@ def main(argv: list[str] | None = None) -> int:
         present=present,
         managed_names=managed_names,
         data_dir=_read_data_dir(args.env_file),
+        offline=_read_offline(args.env_file),
     )
     original = args.config.read_text(encoding="utf-8") if args.config.is_file() else ""
     spliced = _splice(original, updated) if original.strip() else None
