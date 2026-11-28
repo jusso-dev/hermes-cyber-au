@@ -1,0 +1,23 @@
+# Partial extract of the Splunk Common Information Model for the offline SPL check.
+# Data model ids, root datasets and field names were read from the CIM 6.2 data
+# model pages on the retrieved date. A field that is not listed is not confirmed.
+# It is not a claim that Splunk lacks the field.
+# The Network Resolution page shows the display title only. Network_Resolution is
+# the CIM naming convention for its id; check Settings > Data models if a search fails.
+source_name: Splunk Common Information Model
+version: "6.2"
+retrieved: "2026-11-28"
+source_url: https://help.splunk.com/en/data-management/common-information-model/6.2/data-models
+partial: true
+datamodels:
+  Network_Traffic:
+    All_Traffic: [src_ip, dest_ip, dest_port, src, dest, action, app]
+  Network_Resolution:
+    DNS: [query, answer, src, dest]
+  Web:
+    Web: [url, dest, src, user, http_user_agent, status]
+  Endpoint:
+    Processes: [process, process_name, parent_process_name, process_hash, dest, user]
+    Filesystem: [file_name, file_path, file_hash, dest, action]
+  Email:
+    All_Email: [src_user, recipient, subject, src, file_hash, url]

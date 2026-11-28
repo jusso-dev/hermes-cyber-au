@@ -4,7 +4,7 @@
   "source_name": "Microsoft Learn SecurityEvent table",
   "source_url": "https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/securityevent",
   "version": "none",
-  "retrieved": "2026-10-17",
+  "retrieved": "2026-11-28",
   "partial": true,
   "time_column": "TimeGenerated",
   "columns": {
@@ -16,6 +16,13 @@
     "Activity": "string",
     "TenantId": "string",
     "ClientIPAddress": "string",
-    "ClientName": "string"
-  }
+    "ClientName": "string",
+    "EventID": "int",
+    "Computer": "string",
+    "NewProcessName": "string",
+    "ParentProcessName": "string",
+    "SubjectUserName": "string",
+    "FileHash": "string"
+  },
+  "page_updated": "2026-08-28"
 }

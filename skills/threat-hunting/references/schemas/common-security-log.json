@@ -1,0 +1,29 @@
+{
+  "table": "CommonSecurityLog",
+  "product": "Microsoft Sentinel, Azure Monitor Logs",
+  "source_name": "Microsoft Learn CommonSecurityLog table",
+  "source_url": "https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/commonsecuritylog",
+  "version": "none",
+  "retrieved": "2026-11-28",
+  "page_updated": "2026-07-28",
+  "partial": true,
+  "time_column": "TimeGenerated",
+  "columns": {
+    "TimeGenerated": "datetime",
+    "DeviceVendor": "string",
+    "DeviceProduct": "string",
+    "DeviceAction": "string",
+    "Activity": "string",
+    "SourceIP": "string",
+    "SourcePort": "int",
+    "DestinationIP": "string",
+    "DestinationPort": "int",
+    "DestinationHostName": "string",
+    "RequestURL": "string",
+    "RequestClientApplication": "string",
+    "FileHash": "string",
+    "FileName": "string",
+    "SourceUserName": "string",
+    "Computer": "string"
+  }
+}

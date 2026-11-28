@@ -1,0 +1,30 @@
+{
+  "table": "EmailEvents",
+  "product": "Microsoft Defender XDR advanced hunting",
+  "source_name": "Microsoft Learn EmailEvents table",
+  "source_url": "https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-emailevents-table",
+  "version": "none",
+  "retrieved": "2026-11-28",
+  "page_updated": "2026-10-28",
+  "partial": true,
+  "time_column": "Timestamp",
+  "columns": {
+    "Timestamp": "datetime",
+    "NetworkMessageId": "string",
+    "InternetMessageId": "string",
+    "SenderMailFromAddress": "string",
+    "SenderFromAddress": "string",
+    "SenderMailFromDomain": "string",
+    "SenderFromDomain": "string",
+    "SenderIPv4": "string",
+    "SenderIPv6": "string",
+    "RecipientEmailAddress": "string",
+    "Subject": "string",
+    "EmailDirection": "string",
+    "DeliveryAction": "string",
+    "DeliveryLocation": "string",
+    "ThreatTypes": "string",
+    "AttachmentCount": "int",
+    "UrlCount": "int"
+  }
+}

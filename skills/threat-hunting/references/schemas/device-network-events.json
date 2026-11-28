@@ -1,0 +1,31 @@
+{
+  "table": "DeviceNetworkEvents",
+  "product": "Microsoft Defender XDR advanced hunting",
+  "source_name": "Microsoft Learn DeviceNetworkEvents table",
+  "source_url": "https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-devicenetworkevents-table",
+  "version": "none",
+  "retrieved": "2026-11-28",
+  "page_updated": "2026-06-26",
+  "partial": true,
+  "time_column": "Timestamp",
+  "columns": {
+    "Timestamp": "datetime",
+    "DeviceId": "string",
+    "DeviceName": "string",
+    "ActionType": "string",
+    "RemoteIP": "string",
+    "RemotePort": "int",
+    "RemoteUrl": "string",
+    "LocalIP": "string",
+    "LocalPort": "int",
+    "Protocol": "string",
+    "RemoteIPType": "string",
+    "InitiatingProcessSHA256": "string",
+    "InitiatingProcessMD5": "string",
+    "InitiatingProcessFileName": "string",
+    "InitiatingProcessCommandLine": "string",
+    "InitiatingProcessFolderPath": "string",
+    "InitiatingProcessAccountName": "string",
+    "ReportId": "long"
+  }
+}
