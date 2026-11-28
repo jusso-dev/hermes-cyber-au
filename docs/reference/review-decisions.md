@@ -17,18 +17,18 @@ Recorded 18 October 2026 for [review epic #174](https://github.com/jusso-dev/her
 
 ## Planned features
 
-The following issues remain planned work, not delivered functionality. P1 reliability, source truth, installation and inventory work comes first. Their existing issue acceptance criteria remain the implementation plan.
+The following issues remained planned work at the October review. Rows that say "Delivered" have since been built. P1 reliability, source truth, installation and inventory work comes first. Their existing issue acceptance criteria remain the implementation plan.
 
 | Issue | Decision and prerequisite |
 | --- | --- |
 | #164 Live-model evaluation scorecard | Defer until an approved model account, cost budget and repeatable deterministic baseline are available. Keep score publication separate from local eval execution. |
-| #165 Guided organisation setup | Defer until the organisation and inventory inputs have a stable contract. Do not infer or populate real customer details. |
+| #165 Guided organisation setup | Delivered on the `org.yaml` contract (`store/org.py`). `hermes cyber-au setup` asks the questions, or reads `--from-file answers.yaml` for fleet installs, writes `org.yaml` (names of keys only, never values), keeps licence-gated, paid and local-setup connectors off and keyed ones off until their key name is present, seeds the watchlist only when none exists, renders config and runs doctor. Four skills read it through `cyberau-mcp org context`. It never infers details: every value comes from the person running setup. See [guided setup](../getting-started/setup.md). |
 | #166 Incident reporting obligations | Defer until reviewed legal-source dates, applicability rules and deadline tests are agreed. No automated regulatory submissions. |
 | #167 Incident playbooks | Defer to a reviewed starter set with evidence capture and explicit approval boundaries. The empty directory is not a shipped playbook. |
 | #168 Essentials evidence exports | Defer until evidence-register fields and document templates are agreed. Preserve source and freshness in later exports. |
 | #169 SIEM hunt queries | Defer until target SIEM schemas and safe query fixtures are selected. Query generation does not authorise execution. |
 | #170 Executive report templates | Defer until the source-backed briefing and incident data contract is stable. Templates must retain limitations and evidence references. |
-| #171 Sector packs | Defer until the core profile and sector-specific obligations can be reviewed separately. |
+| #171 Sector packs | Delivered as reviewed reference data under `packs/`: a validating loader, `energy-water` (complete, with offline evals) and a lighter `health` pack. Every rule cites a source, version and retrieval date and carries its own review date; doctor flags overdue rules. Packs switch on from `org.yaml` and local packs live on the profile, so no core file changes. Guidance only, not legal advice; nothing is submitted. See [sector packs](sector-packs.md). |
 | #172 Offline bundle | Defer until source redistribution terms, dependency locks and update verification are settled. Live-only sources must remain visibly unavailable offline. |
 | #173 Briefing delivery | Defer until an explicit channel and recipient configuration is supplied. Delivery remains opt-in and draft-first. |
 

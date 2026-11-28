@@ -49,10 +49,13 @@ git clone https://github.com/jusso-dev/hermes-cyber-au.git
 cd hermes-cyber-au
 bash install/install.sh                           # Hermes if missing, the profile, keyless connectors
 hermes -p cyber-au cyber-au doctor --offline      # public connectors show as enabled
+hermes -p cyber-au cyber-au setup                 # optional: describe the organisation, pick connectors
 hermes -p cyber-au cyber-au demo triage           # a sourced answer now: no keys, no model, DEMO data
 hermes -p cyber-au model                          # choose a model provider
 hermes -p cyber-au chat                           # then ask one of the prompts below
 ```
+
+`setup` writes `org.yaml` (sector, regulators, IT, OT or cloud, key names only) so skills tailor their answers and sector packs switch on; `--from-file answers.yaml` runs it without prompts. See [docs/getting-started/setup.md](docs/getting-started/setup.md) and [docs/reference/sector-packs.md](docs/reference/sector-packs.md).
 
 `demo triage` triages a synthetic sample alert offline and labels all of its output as demo. It never reads or writes your real intel store. The full walk-through, with output from a clean Ubuntu 24.04 container, is in [docs/getting-started/quickstart.md](docs/getting-started/quickstart.md). To try it with nothing installed, open the repository in GitHub Codespaces or a VS Code dev container: see [docs/getting-started/codespaces.md](docs/getting-started/codespaces.md).
 
