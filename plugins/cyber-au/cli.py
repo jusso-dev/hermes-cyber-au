@@ -1,4 +1,4 @@
-"""cyber-au doctor, update, store migration, audit, and demo commands."""
+"""cyber-au setup, doctor, update, store migration, audit, and demo commands."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 if __package__:
-    from . import demo, update_path
+    from . import demo, setup_wizard, update_path
     from .doctor import execute, format_json, format_text
 else:
     # install/bootstrap.sh runs this file directly, outside the plugin package.
@@ -17,6 +17,7 @@ else:
     if str(_PLUGIN_DIR) not in sys.path:
         sys.path.insert(0, str(_PLUGIN_DIR))
     import demo
+    import setup_wizard
     import update_path
     from doctor import execute, format_json, format_text
 
@@ -27,17 +28,18 @@ except ImportError:  # bootstrap can run before the connector packages are insta
     add_audit_parser = None
     audit_dispatch = None
 
-USAGE = "Usage: hermes cyber-au <doctor|update|migrate|audit|demo>"
+USAGE = "Usage: hermes cyber-au <setup|doctor|update|migrate|audit|demo>"
 
 
 def register(ctx) -> None:
     ctx.register_cli_command(
         name="cyber-au",
-        help="Check, update, migrate, audit, or demo the cyber-au profile",
+        help="Set up, check, update, migrate, audit, or demo the cyber-au profile",
         setup_fn=setup_parser,
         handler_fn=handle,
         description=(
-            "Doctor, update, store migration, audit checks, and demo mode for the cyber-au profile."
+            "Guided setup, doctor, update, store migration, audit checks, and demo mode for the "
+            "cyber-au profile."
         ),
     )
     ctx.register_command(
@@ -76,9 +78,10 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
 
     migrate = subs.add_parser("migrate", help="Apply intel store migrations")
     migrate.add_argument("--migrations", type=Path, default=None)
+    configure = setup_wizard.add_parser(subs)
     # install/bootstrap.sh and the update docs put the profile flags after the
     # subcommand. SUPPRESS keeps a value given before the subcommand.
-    for sub in (update, migrate):
+    for sub in (update, migrate, configure):
         sub.add_argument("--profile", default=argparse.SUPPRESS)
         sub.add_argument("--profile-home", type=Path, default=argparse.SUPPRESS)
     if add_audit_parser is not None:
@@ -97,6 +100,10 @@ def handle(args: argparse.Namespace) -> int:
         text = format_json(report) if getattr(args, "json", False) else format_text(report)
         sys.stdout.write(text)
         return report.exit_code()
+    if command == "setup":
+        profile = getattr(args, "profile", None) or os.environ.get("CYBERAU_PROFILE", "cyber-au")
+        home = getattr(args, "profile_home", None) or update_path.default_profile_home(profile)
+        return setup_wizard.run(args, profile_home=Path(home))
     if command == "migrate":
         return _migrate(args)
     if command == "update":

@@ -6,6 +6,7 @@
 |---|---|
 | [Quick start](quickstart.md) | Clone to a sourced answer with no keys: install, doctor, the offline demo, then a chat. |
 | [Your first hour](first-hour.md) | Ten example prompts, the skill each one uses, what a good answer looks like, and demo mode. |
+| [Guided setup](setup.md) | Describe the organisation once: `org.yaml`, connector selection, watchlist seed and sector packs. |
 | [Codespaces and dev containers](codespaces.md) | Try it with nothing installed locally. |
 
 When a connector needs a credential, it reads that value from the profile `.env`. This site does not include keys. Install and update behaviour that has been checked against Hermes source is in [Hermes structure](../research/hermes-structure.md).

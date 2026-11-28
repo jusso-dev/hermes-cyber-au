@@ -1,0 +1,105 @@
+# Offline evals for the energy-water sector pack. Each case writes a synthetic org.yaml,
+# renders `cyberau-mcp org context --skill <skill>` and checks what the skill is told.
+# Run by tests/packs/test_pack_evals.py. No network, no model.
+pack: energy-water
+cases:
+  - id: water-utility-soci
+    org:
+      name: Example Water (synthetic)
+      sector: energy-water
+      size: large
+      turnover: 3m-or-more
+      regulators: [soci, oaic]
+      environments: [it, ot]
+      critical_infrastructure: true
+    skill: soci-reporting
+    required_facts:
+      - "Active sector packs: energy-water 0.1.0 (sector energy-water)."
+      - "s 30AG"
+      - "90 days after the end of the financial year"
+      - "Enhanced CIRMP requirements for energy and water"
+      - "ask whether supply to customers was materially disrupted"
+      - "Source: Security of Critical Infrastructure (Critical infrastructure risk management program) Rules (LIN 23/006) 2023, Compilation No. 2, retrieved 2026-11-28"
+      - "Source: Security of Critical Infrastructure Act 2018, Compilation No. 9, retrieved 2026-11-28"
+    forbidden_claims:
+      - "My Health Record"
+      - "Review overdue"
+  - id: ot-triage-principles
+    org:
+      sector: energy-water
+      environments: [it, ot]
+      critical_infrastructure: true
+    skill: incident-triage
+    required_facts:
+      - "safety is paramount"
+      - "segment and segregate OT from all other networks"
+      - "Search ATT&CK with domain ics"
+      - "remote access to operational control or monitoring systems"
+      - "Source: ASD Principles of operational technology cyber security, published 2024-10-02, retrieved 2026-11-28"
+    forbidden_claims:
+      - "s 30AG"
+      - "AESCSF"
+  - id: essentials-ml2-gap
+    org:
+      sector: energy-water
+      environments: [it, ot]
+      critical_infrastructure: true
+    skill: essentials-assessment
+    required_facts:
+      - "the Essential Eight at maturity level two"
+      - "the 2023 AESCSF Framework Core at Security Profile 2"
+      - "say the AESCSF source is not loaded"
+      - "Offer the ASD Essentials OT chapter"
+      - "Source: ASD Essentials for OT, published 2026-10-15, retrieved 2026-11-28"
+    forbidden_claims:
+      - "s 30BC"
+      - "ransomware payment"
+  - id: not-critical-infrastructure
+    org:
+      sector: energy-water
+      environments: [it]
+      critical_infrastructure: false
+      regulators: [none]
+    skill: soci-reporting
+    required_facts:
+      - "Active sector packs: energy-water 0.1.0 (sector energy-water)."
+      - "critical infrastructure no"
+      - "Rules that apply to this profile for soci-reporting:\n- none"
+    forbidden_claims:
+      - "SOCI annual report"
+      - "Enhanced CIRMP"
+  - id: packs-switched-off
+    org:
+      sector: energy-water
+      environments: [it, ot]
+      critical_infrastructure: true
+      sector_packs: [none]
+    skill: incident-triage
+    required_facts:
+      - "Active sector packs: none (sector_packs: none in org.yaml)."
+      - "SOCI Part 2B incident reporting"
+    forbidden_claims:
+      - "safety is paramount"
+      - "energy-water 0.1.0"
+  - id: pack-on-for-another-sector
+    org:
+      sector: transport
+      environments: [ot]
+      critical_infrastructure: true
+      sector_packs: [energy-water]
+    skill: incident-triage
+    required_facts:
+      - "Active sector packs: energy-water 0.1.0 (sector_packs in org.yaml)."
+      - "safety is paramount"
+    forbidden_claims:
+      - "Missing sector pack"
+  - id: stale-rule-flagged
+    today: 2027-06-01
+    org:
+      sector: energy-water
+      environments: [it, ot]
+      critical_infrastructure: true
+    skill: soci-reporting
+    required_facts:
+      - "Review overdue since 2027-05-28"
+    forbidden_claims: []

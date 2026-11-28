@@ -18,6 +18,7 @@ distribution_owned:
   - mcp
   - feeds
   - playbooks
+  - packs
   - profiles
   - examples
 env_requires:

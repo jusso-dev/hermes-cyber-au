@@ -25,6 +25,8 @@ Do not use it to notify the OAIC, to email or call any person, or to decide a Se
 
 ## Quick Reference
 
+Organisation profile: `cyberau-mcp org context --skill ndb-breach-notification` (reads `org.yaml` and the active sector packs).
+
 | Need | What to do |
 |---|---|
 | Suspicion time | Record it in Australia/Sydney |
@@ -42,6 +44,8 @@ Do not use it to notify the OAIC, to email or call any person, or to decide a Se
 Leave tool arguments in their original form. Defang emails, domains, and IP addresses in text a person will read.
 
 ## Procedure
+
+Read the organisation profile first. Run `cyberau-mcp org context --skill ndb-breach-notification`. It prints the sector, size, turnover band, regulators and environments from `org.yaml`, the rules from the core profile and any active sector pack that apply to this skill (each with its own `Source:` line), and sector pack notes. It reads local files only. If `holds_personal_information` is false, say so and confirm it before stopping. Use the turnover band and the sector pack rules (for example the health service exception) to decide which small business questions to ask. If it says the profile is not set, or the command is unavailable, say `Organisation profile: not set` and ask the questions below as usual. The profile is the organisation's own description: it never replaces a coverage question the analyst has not answered, and a rule marked review overdue is cited with that warning.
 
 1. Record when the entity became aware of the suspected breach, as a clock time in Australia/Sydney. Pass that value to `mcp__aureg__aureg_deadline` as `aware_at` (ISO 8601 with a numeric offset), `regime: ndb`, and `trigger: suspected_breach`. Also call `mcp__aureg__aureg_obligation` with `regime: ndb` and `trigger: suspected_breach`.
 

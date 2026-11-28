@@ -1,0 +1,37 @@
+# Offline evals for the health sector pack. See tests/packs/test_pack_evals.py.
+pack: health
+cases:
+  - id: small-clinic-not-exempt
+    org:
+      name: Example Clinic (synthetic)
+      sector: health
+      size: small
+      turnover: under-3m
+    skill: ndb-breach-notification
+    required_facts:
+      - "Active sector packs: health 0.1.0 (sector health)."
+      - "s 6D(4)(b)"
+      - "Small business exemption needs checking"
+      - "Source: Privacy Act 1988, Compilation No. 104 (C2026C00227), retrieved 2026-11-28"
+    forbidden_claims:
+      - "Safety is paramount"
+  - id: my-health-record-triage
+    org:
+      sector: health
+    skill: incident-triage
+    required_facts:
+      - "My Health Record data breach notification"
+      - "both the System Operator and the Information Commissioner"
+      - "Source: My Health Records Act 2012, Compilation No. 18, retrieved 2026-11-28"
+    forbidden_claims:
+      - "AESCSF"
+  - id: hospital-not-enhanced
+    org:
+      sector: health
+      critical_infrastructure: true
+    skill: soci-reporting
+    required_facts:
+      - "Designated hospitals need a risk management program"
+      - "It is not on the enhanced list in s 4A(1)."
+    forbidden_claims:
+      - "Enhanced CIRMP requirements for energy and water"

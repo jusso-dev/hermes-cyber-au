@@ -45,9 +45,13 @@ SECTOR_PACKS = {
     "energy-water": "energy-water",
     "financial-services": "financial-services",
 }
+# ``sector_packs: [none]`` turns every pack off, including the sector default.
+NO_PACKS = "none"
 
 _SECRET_KEY = re.compile(r"(?i)(api[_-]?key|token|secret|password|passwd|auth)")
 _ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
+# Pack names are directory names under packs/, so a local pack needs no edit here.
+_PACK_NAME = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 
 
 class OrgFileError(ValueError):
@@ -79,7 +83,12 @@ class OrgProfile:
 
     @property
     def packs(self) -> tuple[str, ...]:
-        """Sector packs to load: explicit list, else the one matching the sector."""
+        """Sector packs to load: explicit list, else the one matching the sector.
+
+        ``none`` in the explicit list switches packs off.
+        """
+        if NO_PACKS in self.sector_packs:
+            return ()
         if self.sector_packs:
             return self.sector_packs
         pack = SECTOR_PACKS.get(self.sector)
@@ -156,6 +165,13 @@ def parse_org(data: object) -> OrgProfile:
     bad_keys = [k for k in keys if not _ENV_NAME.match(k)]
     if bad_keys:
         raise OrgFileError("keys_present lists variable names only, such as NVD_API_KEY")
+    packs = []
+    for name in _choices(data, "sector_packs", None, warnings):
+        name = name.lower()
+        if not _PACK_NAME.match(name):
+            warnings.append(f"sector_packs: {name!r} is not a pack name; skipped")
+        elif name not in packs:
+            packs.append(name)
     return OrgProfile(
         name=str(data.get("name") or "").strip(),
         sector=_choice(data, "sector", SECTORS, "general", warnings),
@@ -170,7 +186,7 @@ def parse_org(data: object) -> OrgProfile:
         domains=tuple(d.lower() for d in _choices(data, "domains", None, warnings)),
         brands=_choices(data, "brands", None, warnings),
         connectors=_choices(data, "connectors", None, warnings),
-        sector_packs=_choices(data, "sector_packs", tuple(set(SECTOR_PACKS.values())), warnings),
+        sector_packs=tuple(packs),
         keys_present=keys,
         warnings=tuple(warnings),
     )

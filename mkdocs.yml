@@ -28,6 +28,7 @@ nav:
       - Overview: getting-started/index.md
       - Quick start: getting-started/quickstart.md
       - Your first hour: getting-started/first-hour.md
+      - Guided setup: getting-started/setup.md
       - Codespaces: getting-started/codespaces.md
   - Skills:
       - Overview: skills/index.md
@@ -142,6 +143,7 @@ nav:
       - Overview: reference/index.md
       - Review decisions: reference/review-decisions.md
       - Data sources: reference/data-sources.md
+      - Sector packs: reference/sector-packs.md
       - Hermes structure: research/hermes-structure.md
       - Connector inventory: research/connectors.md
       - Decisions:

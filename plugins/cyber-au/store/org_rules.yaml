@@ -1,0 +1,176 @@
+# Sector-neutral profile rules. Same format as a sector pack (see docs/reference/sector-packs.md).
+# `cyberau-mcp store org context --skill <name>` reads this file and the active packs, and
+# prints the rules that apply to the profile in org.yaml.
+#
+# Each rule says when a skill should raise an obligation or a piece of guidance. It does not
+# decide that the obligation applies: the skill still asks the coverage questions. Not legal
+# advice. Text was checked against the cited version on the reviewed date.
+name: core
+version: 0.1.0
+title: Core profile rules
+description: >-
+  Applicability hints shared by every sector: privacy, SOCI, ransomware payment reporting,
+  APRA CPS 234 and the ASD Essentials chapters, keyed to the facts in org.yaml.
+sectors: []
+reviewed: 2026-11-28
+review_by: 2027-05-28
+sources:
+  - id: privacy-act
+    title: Privacy Act 1988
+    version: Compilation No. 104 (C2026C00227)
+    url: https://www.legislation.gov.au/C2004A03712/latest/text
+    retrieved: 2026-11-28
+  - id: soci-act
+    title: Security of Critical Infrastructure Act 2018
+    version: Compilation No. 9
+    url: https://www.legislation.gov.au/C2018A00029/latest/text
+    retrieved: 2026-11-28
+  - id: cyber-security-act
+    title: Cyber Security Act 2024
+    version: No. 98 of 2024
+    url: https://www.legislation.gov.au/C2024A00098/latest/text
+    retrieved: 2026-11-28
+  - id: ransomware-rules
+    title: Cyber Security (Ransomware Payment Reporting) Rules 2025
+    version: F2025L00278
+    url: https://www.legislation.gov.au/F2025L00278/latest/text
+    retrieved: 2026-11-28
+  - id: cps-234
+    title: APRA Prudential Standard CPS 234 Information Security
+    version: commenced 2019-07-01
+    url: https://handbook.apra.gov.au/standard/cps-234
+    retrieved: 2026-11-28
+  - id: asd-essentials
+    title: ASD Essentials chapters
+    version: published 2026-10-15
+    url: https://www.cyber.gov.au/publication/essentials-for-enterprise-it
+    retrieved: 2026-11-28
+rules:
+  - id: ndb-scheme
+    title: Notifiable Data Breaches scheme
+    kind: obligation
+    applies_when:
+      holds_personal_information: true
+    skills: [incident-triage, ndb-breach-notification]
+    summary: >-
+      The profile says the organisation holds personal information. If it is an APP entity,
+      a suspected eligible data breach starts a 30 day assessment (s 26WH) and an eligible
+      breach needs a statement to the Commissioner as soon as practicable (s 26WK).
+    source: privacy-act
+    section: Part IIIC, s 26WH and s 26WK
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: small-business-check
+    title: Small business exemption needs checking
+    kind: guidance
+    applies_when:
+      turnover: [under-3m, unknown]
+    skills: [ndb-breach-notification]
+    summary: >-
+      A business with annual turnover of $3,000,000 or less can be a small business operator
+      and outside the Act, unless an exception in s 6D(4) applies (for example it provides a
+      health service and holds health information). Ask before deciding the scheme does not
+      apply. Do not assume either way.
+    source: privacy-act
+    section: s 6D and s 6C
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: soci-part-2b
+    title: SOCI Part 2B incident reporting
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [incident-triage, soci-reporting]
+    summary: >-
+      The profile says the organisation is a responsible entity for a critical infrastructure
+      asset. Part 2B applies only if the asset is specified in the rules or a s 51 declaration
+      says so (s 30BB), so still ask. Critical incidents are 12 hours (s 30BC), other
+      incidents 72 hours (s 30BD).
+    source: soci-act
+    section: Part 2B, s 30BB to s 30BD
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: soci-regulator-listed
+    title: SOCI named as a regulator
+    kind: guidance
+    applies_when:
+      regulators: [soci]
+    skills: [incident-triage, soci-reporting]
+    summary: >-
+      org.yaml lists SOCI as a regulator. Treat Part 2B coverage as likely and confirm the
+      asset and the s 30BB answer with the analyst before computing a clock.
+    source: soci-act
+    section: s 30BB
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: ransomware-payment-turnover
+    title: Ransomware payment reporting may apply
+    kind: obligation
+    applies_when:
+      turnover: [3m-or-more]
+    skills: [incident-triage]
+    summary: >-
+      A business with annual turnover above the $3 million threshold for the previous
+      financial year is a reporting business entity (unless it is a Commonwealth or State
+      body). A ransomware payment report is due within 72 hours of making the payment or
+      becoming aware of it (s 27). Do not propose a payment.
+    source: ransomware-rules
+    section: Rules s 6; Act s 26 and s 27
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: ransomware-payment-soci
+    title: Ransomware payment reporting for SOCI entities
+    kind: obligation
+    applies_when:
+      critical_infrastructure: true
+    skills: [incident-triage, soci-reporting]
+    summary: >-
+      A responsible entity for a critical infrastructure asset to which Part 2B applies is a
+      reporting business entity whatever its turnover (s 26(2)(b)). The 72 hour ransomware
+      payment report clock starts at the payment or at awareness of it (s 27).
+    source: cyber-security-act
+    section: s 26(2)(b) and s 27
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: apra-cps-234
+    title: APRA CPS 234 notification
+    kind: obligation
+    applies_when:
+      regulators: [apra]
+    skills: [incident-triage]
+    summary: >-
+      An APRA-regulated entity notifies APRA as soon as possible and no later than 72 hours
+      after becoming aware of a material information security incident (paragraph 35), and
+      within 10 business days of a material control weakness it cannot remediate in time
+      (paragraph 36). A person sends the notice.
+    source: cps-234
+    section: paragraphs 35 and 36
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: essentials-ot-chapter
+    title: Offer the ASD Essentials OT chapter
+    kind: guidance
+    applies_when:
+      environments: [ot]
+    skills: [essentials-assessment]
+    summary: >-
+      The profile lists an OT environment. When the analyst does not name a chapter, offer
+      the ot chapter alongside enterprise-it. Do not assess a chapter the analyst did not
+      choose.
+    source: asd-essentials
+    section: Essentials for OT
+    reviewed: 2026-11-28
+    review_by: 2027-05-28
+  - id: essentials-cloud-chapter
+    title: Offer the ASD Essentials cloud chapter
+    kind: guidance
+    applies_when:
+      environments: [cloud]
+    skills: [essentials-assessment]
+    summary: >-
+      The profile lists a cloud environment. When the analyst does not name a chapter, offer
+      the cloud chapter alongside enterprise-it.
+    source: asd-essentials
+    section: Essentials for cloud
+    reviewed: 2026-11-28
+    review_by: 2027-05-28

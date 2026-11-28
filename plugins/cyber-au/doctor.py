@@ -26,8 +26,12 @@ import yaml
 
 if __package__:
     from .store.db import SCHEMA_VERSION
+    from .store.org import OrgFileError, load_org
+    from .store.packs import active_packs, pack_roots
 else:
     from store.db import SCHEMA_VERSION
+    from store.org import OrgFileError, load_org
+    from store.packs import active_packs, pack_roots
 
 SNAPSHOT_MAX_AGE_DAYS = 7
 WAL_WARN_BYTES = 64 * 1024 * 1024
@@ -176,6 +180,7 @@ def collect_checks(ctx: Context) -> list[Check]:
     checks.extend(check_store(ctx))
     checks.extend(check_snapshots(ctx))
     checks.append(check_cron(ctx))
+    checks.extend(check_org(ctx))
     checks.extend(check_security(ctx))
     return [_sealed(item, ctx.environ) for item in checks]
 
@@ -497,6 +502,59 @@ def check_cron(ctx: Context) -> Check:
     elif status == "warn":
         fix = "Record paused or enabled on each job, then resume the ones you want."
     return _item("cron.jobs", status, "; ".join(parts), fix)
+
+
+def check_org(ctx: Context) -> list[Check]:
+    """org.yaml and the sector packs it switches on. Read-only."""
+    path = ctx.data_dir / "org.yaml"
+    try:
+        profile = load_org(path)
+    except OrgFileError as exc:
+        return [
+            _item(
+                "org.profile",
+                "fail",
+                str(exc),
+                "Fix org.yaml, or run hermes cyber-au setup --force to rewrite it.",
+            )
+        ]
+    if not path.is_file():
+        org = _item(
+            "org.profile",
+            "warn",
+            "org.yaml not found; skills use a sector-neutral default",
+            "Run hermes cyber-au setup to describe the organisation.",
+        )
+    elif profile.warnings:
+        org = _item(
+            "org.profile",
+            "warn",
+            f"sector {profile.sector}; " + "; ".join(profile.warnings),
+            "Edit org.yaml, or run hermes cyber-au setup --force.",
+        )
+    else:
+        org = _item("org.profile", "ok", f"sector {profile.sector}, size {profile.size}")
+    roots = pack_roots(ctx.root, ctx.data_dir)
+    active = active_packs(profile, roots)
+    problems = active.problems
+    stale = [
+        f"{pack.name}/{rule.id}" for pack in active.packs for rule in pack.stale_rules(ctx.today)
+    ]
+    names = ", ".join(f"{pack.name} {pack.version}" for pack in active.packs) or "none"
+    detail = f"active: {names} ({active.reason})"
+    parts = [detail]
+    if active.missing:
+        parts.append("not installed: " + ", ".join(active.missing))
+    if problems:
+        parts.append(f"{len(problems)} pack(s) failed validation and were skipped")
+    if stale:
+        parts.append("review overdue: " + ", ".join(stale))
+    if active.missing or problems or stale:
+        fix = "Run cyberau-mcp org packs to see each problem."
+        if stale:
+            fix = "Re-check the cited sources and update reviewed dates, or update the profile."
+        return [org, _item("org.packs", "warn", "; ".join(parts), fix)]
+    return [org, _item("org.packs", "ok", detail)]
 
 
 def check_security(ctx: Context) -> list[Check]:
