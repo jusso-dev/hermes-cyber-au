@@ -1,0 +1,26 @@
+# The Australian cyber guidance pack this distribution depends on (ADR 0002, issue #19).
+# install/bootstrap.sh installs it at this commit with `hermes plugins install`.
+# The skill and tool lists are recorded at the same commit so CI can check for name
+# collisions without network access. Update all of these together.
+repository: jusso-dev/hermes-skills
+path: plugins/hermes-cyber-au
+commit: 04b88dee67ade8c1d45797e85c5283f437937d08
+recorded: "2026-11-28"
+license: MIT
+skills:
+  - aws-cloudwatch-expert
+  - detection-engineering
+  - essential-eight-assessor
+  - incident-response-au
+  - ism-control-lookup
+  - sentinel-expert
+  - threat-intel-check
+tools:
+  - cyber_au_search
+  - cyber_au_control
+  - cyber_au_check_query
+  - cyber_au_live_query
+  - cyber_au_osint_lookup
+  - cyber_au_log_qa
+  - cyber_au_propose_response
+  - cyber_au_source_trust
