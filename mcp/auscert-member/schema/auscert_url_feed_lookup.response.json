@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "auscert_url_feed_lookup data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query", "kind", "listed", "match_count", "matches", "entries_checked"],
+  "properties": {
+    "query": {"type": "string"},
+    "kind": {"enum": ["url", "domain"]},
+    "listed": {"type": "boolean"},
+    "match_count": {"type": "integer", "minimum": 0},
+    "entries_checked": {"type": "integer", "minimum": 0},
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "host", "match"],
+        "properties": {
+          "url": {"type": "string"},
+          "host": {"type": "string"},
+          "match": {"enum": ["exact", "subdomain"]},
+          "first_seen": {"type": ["string", "null"]},
+          "category": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

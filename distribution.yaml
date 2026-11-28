@@ -102,6 +102,12 @@ env_requires:
   - name: MISP_API_KEY
     description: "Read-only API key for MISP_URL. Never commit a value."
     required: false
+  - name: AUSCERT_URL_FEED
+    description: "AusCERT member malicious URL feed URL (members only). The auscertm server is off until enabled in config.yaml."
+    required: false
+  - name: AUSCERT_FEED_TOKEN
+    description: "Credential for AUSCERT_URL_FEED, if the feed needs one. Never commit a value."
+    required: false
   - name: RANSOMWARE_LIVE_API_KEY
     description: "Optional free ransomware.live PRO key. The connector ships disabled."
     required: false

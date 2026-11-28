@@ -223,6 +223,12 @@ connectors:
     hosts: []
     allow_ip_literals: false
     allow_http_loopback: false
+  # The member feed host is user supplied (AUSCERT_URL_FEED). The connector adds that
+  # one host at request time; nothing else, including a redirect, is allowed.
+  auscert-member:
+    hosts: []
+    allow_ip_literals: false
+    allow_http_loopback: false
   opencti:
     hosts: []
   hudson-rock:

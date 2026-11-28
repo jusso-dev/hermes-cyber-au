@@ -19,6 +19,7 @@ members = [
     "cyberau-asd-ism",
     "cyberau-au-regulatory",
     "cyberau-auscert",
+    "cyberau-auscert-member",
     "cyberau-cisa-kev",
     "cyberau-cloudflare-radar",
     "cyberau-cloudflare-urlscanner",
@@ -736,6 +737,17 @@ requires-dist = [{ name = "cyberau-common", editable = "common" }]
 name = "cyberau-auscert"
 version = "0.1.0"
 source = { editable = "auscert" }
+dependencies = [
+    { name = "cyberau-common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cyberau-common", editable = "common" }]
+
+[[package]]
+name = "cyberau-auscert-member"
+version = "0.1.0"
+source = { editable = "auscert-member" }
 dependencies = [
     { name = "cyberau-common" },
 ]

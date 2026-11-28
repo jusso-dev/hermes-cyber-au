@@ -31,6 +31,7 @@ from .maintenance import (
     snapshot_public,
     vacuum_store,
 )
+from .misp import export_misp
 from .stix import export_stix, import_stix_file
 from .tools import intel_add_observation, intel_get, intel_search
 from .watchlists import (
@@ -143,20 +144,26 @@ def build_parser() -> argparse.ArgumentParser:
     export = sub.add_parser(
         "export",
         parents=[common],
-        help="Export records, a STIX 2.1 bundle (stix21) or a DuckDB file (duckdb)",
+        help=(
+            "Export records, a STIX 2.1 bundle (stix21), a DuckDB file (duckdb)"
+            " or MISP core format events (misp)"
+        ),
     )
     export.add_argument(
         "--format",
-        choices=("records", "stix21", "duckdb"),
+        choices=("records", "stix21", "duckdb", "misp"),
         default="records",
-        help="records (default), stix21, or duckdb (needs the analytics extra)",
+        help="records (default), stix21, duckdb (needs the analytics extra), or misp",
     )
     export.add_argument("--max-tlp")
     export.add_argument("--kind", action="append", dest="kinds")
     export.add_argument("--since", help="STIX export: records on or after this date")
     export.add_argument(
         "--output",
-        help="stix21: .json file, duckdb: .duckdb file, under plugin-data/cyber-au/exports/",
+        help=(
+            "stix21: .json file, duckdb: .duckdb file, misp: directory name,"
+            " under plugin-data/cyber-au/exports/"
+        ),
     )
     export.set_defaults(func=_cmd_export)
 
@@ -241,12 +248,24 @@ def _add_watchlist(sub, common: argparse.ArgumentParser) -> None:
     run = commands.add_parser(
         "run",
         parents=[common, watch_file],
-        help="Recompute all matches and drop any that no longer hold (nightly)",
+        help="Recompute all matches and drop any that no longer hold (hourly)",
     )
     run.add_argument(
         "--crtsh",
         action="store_true",
         help="Also send each watched domain to crt.sh to find lookalike certificates",
+    )
+    run.add_argument(
+        "--radar",
+        action="store_true",
+        help="Also send each watched ASN to Cloudflare Radar for BGP hijack and leak events",
+    )
+    run.add_argument(
+        "--profile-config",
+        help=(
+            "Profile config.yaml. When given, --crtsh and --radar run only if that"
+            " connector is enabled there"
+        ),
     )
     run.set_defaults(func=_cmd_watchlist_run)
 
@@ -388,8 +407,13 @@ def _cmd_export(args: argparse.Namespace) -> int:
             return 2
         _emit(result)
         return 0
+    if args.format == "misp":
+        if args.since or args.kinds:
+            raise ValueError("--since and --kind are not valid with --format misp")
+        _emit(export_misp(output=args.output, max_tlp=args.max_tlp, store=args.path))
+        return 0
     if args.output or args.since:
-        raise ValueError("--output needs --format stix21 or duckdb, --since needs stix21")
+        raise ValueError("--output needs --format stix21, duckdb or misp, --since needs stix21")
     kinds = args.kinds if args.kinds else KINDS
     records = export_records(kinds=kinds, max_tlp=args.max_tlp, path=args.path)
     _emit(
@@ -440,7 +464,13 @@ def _cmd_vacuum(args: argparse.Namespace) -> int:
 
 def _cmd_watchlist_run(args: argparse.Namespace) -> int:
     try:
-        summary = run_watchlist(store=args.path, watchlist=args.watchlist, crtsh=args.crtsh)
+        summary = run_watchlist(
+            store=args.path,
+            watchlist=args.watchlist,
+            crtsh=args.crtsh,
+            radar=args.radar,
+            profile_config=args.profile_config,
+        )
     except WatchlistFileError as exc:
         _emit({"status": "error", "routine": "watchlist", "error": str(exc)})
         return 1

@@ -14,6 +14,7 @@ Every connector with a `SOURCE.md` in this checkout. Planned sources without a c
 | Information Security Manual OSCAL catalogue | `ism` | `GITHUB_TOKEN` (optional) | on | [asd-ism](asd-ism.md) |
 | Australian reporting obligations | `aureg` | none | on | [au-regulatory](au-regulatory.md) |
 | AusCERT public security bulletins | `auscert` | none | off: licence terms | [auscert](auscert.md) |
+| AusCERT member malicious URL feed: check a URL or domain against it | `auscertm` | `AUSCERT_URL_FEED`, `AUSCERT_FEED_TOKEN` | off: licence terms | [auscert-member](auscert-member.md) |
 | CISA Known Exploited Vulnerabilities catalogue | `kev` | none | on | [cisa-kev](cisa-kev.md) |
 | Cloudflare Radar telemetry through the Radar REST API | `cloudflare_radar` | `CLOUDFLARE_RADAR_API_TOKEN` | off: licence terms | [cloudflare-radar](cloudflare-radar.md) |
 | Cloudflare URL Scanner. Submits are Unlisted and approval-gated | `cfscan` | `CLOUDFLARE_URLSCAN_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | off: licence terms | [cloudflare-urlscanner](cloudflare-urlscanner.md) |

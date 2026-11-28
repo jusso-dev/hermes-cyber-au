@@ -1,6 +1,6 @@
 # DuckDB analytics export
 
-`cyberau-mcp store export --format duckdb` copies the local intel store into one DuckDB file so you can run analytical SQL over it without touching the live SQLite store. The record export (`--format records`) and the STIX export (`--format stix21`, see `docs/intel/stix.md`) are unchanged.
+`cyberau-mcp store export --format duckdb` copies the local intel store into one DuckDB file so you can run analytical SQL over it without touching the live SQLite store. The record export (`--format records`), the STIX export (`--format stix21`, see `docs/intel/stix.md`) and the MISP export (`--format misp`, see `docs/intel/misp-export.md`) are unchanged.
 
 ## Install
 
@@ -11,6 +11,8 @@ uv sync --project mcp --extra analytics
 ```
 
 Without the extra, the command prints one line naming that command and exits with status 2. Nothing is written.
+
+The default install is unchanged by the extra: `duckdb` is listed only under `[project.optional-dependencies] analytics` in `mcp/pyproject.toml`, no connector package depends on it, and `install/bootstrap.sh` runs `uv sync --all-packages --frozen` without `--extra`. `tests/intel/test_misp_export.py::test_duckdb_is_an_extra_and_not_a_default_dependency` checks all three, so a change that pulls DuckDB into the default install fails CI.
 
 ## Run
 
@@ -50,7 +52,23 @@ An export with a ceiling above `GREEN` is recorded as an `export` event in the h
 
 Open the file with the DuckDB CLI (`duckdb plugin-data/cyber-au/exports/weekly.duckdb`) or from Python with `duckdb.connect(path, read_only=True)`.
 
-The store does not keep vendor or product names, so vendor rollups are not possible. These queries use what the store does keep.
+The store does not keep vendor or product names. For vendor rollups, join the KEV catalogue snapshot that the KEV refresh job writes to `plugin-data/cyber-au/snapshots/kev.json`, as in the first query.
+
+Top KEV vendors this quarter, from KEV CVEs in the store joined to the snapshot for the vendor name. Run it from `plugin-data/cyber-au` or give the snapshot's full path:
+
+```sql
+WITH kev AS (
+  SELECT k.cveID AS cve_id, k.vendorProject AS vendor
+  FROM (SELECT unnest(vulnerabilities) AS k FROM read_json_auto('snapshots/kev.json'))
+)
+SELECT kev.vendor, COUNT(*) AS cves
+FROM vulnerabilities v
+JOIN kev ON kev.cve_id = v.cve_id
+WHERE TRY_CAST(v.kev_date_added AS DATE) >= date_trunc('quarter', current_date)
+GROUP BY kev.vendor
+ORDER BY cves DESC, kev.vendor
+LIMIT 10;
+```
 
 KEV CVEs with the highest EPSS score:
 

@@ -1,0 +1,7 @@
+# Synthetic AusCERT-style malicious URL feed for tests. Not member data.
+# Every host is under example.com, example.net or example.org.
+https://login.bank-example.example.com/secure/verify
+http://parcel-tracking.example.net/au/redelivery?id=00001
+hxxps://mygov-refund[.]example.org/claim
+https://cdn.example.net/payload.js   # inline comment is ignored
+https://login.bank-example.example.com/secure/verify/

@@ -1,6 +1,6 @@
 # Watchlists
 
-A watchlist names what your organisation cares about: its domains, brands, address ranges, autonomous system numbers and the vendors it runs. A nightly run matches that list against the local intel store and keeps the current matches for the daily briefing.
+A watchlist names what your organisation cares about: its domains, brands, address ranges, autonomous system numbers and the vendors it runs. An hourly run matches that list against the local intel store and keeps the current matches for the daily briefing. A daily run can also look for lookalike certificates on crt.sh and BGP hijack and route leak events on Cloudflare Radar, when those connectors are turned on.
 
 ## The file
 
@@ -48,6 +48,9 @@ The org exposure connector (`mcp/org-exposure`) also reads `domains` and `brands
 | `asns` | `asn` indicators | `asn` | The numbers are equal. |
 | `domains` | `domain`, `url` and `email` indicators | `domain` | The host equals the watched domain or is a subdomain of it. |
 | `domains` | `domain`, `url` and `email` indicators | `lookalike` | The host is not under the watched domain and its registrable name looks like it (below). |
+| `domains` | crt.sh certificate names (daily, opt-in) | `lookalike` | As above, for names on certificates crt.sh returns. |
+| `asns` | Cloudflare Radar BGP hijack events (daily, opt-in) | `bgp_hijack` | The watched ASN is the hijacker or one of the victims. |
+| `asns` | Cloudflare Radar route leak events (daily, opt-in) | `bgp_leak` | The watched ASN is the leaker or on the leak path. |
 | `brands` | advisories | `brand` | The brand's tokens appear in the title, summary or indexed text. |
 | `vendors` | advisories | `vendor` | The vendor name or one of its aliases appears in the title, summary or indexed text. |
 
@@ -112,7 +115,7 @@ Terms use the brand and vendor token rule above, so they match whole words in or
 ### How a watch runs
 
 1. `cyberau-ingest-custom` (every six hours) runs `cyberau-mcp refresh --sources custom --store`. Every configured feed is fetched through the `custom-feeds` connector and its items are stored as advisories with source `feed-<id>`. One failing feed is reported and skipped; the run fails only when every feed fails.
-2. The nightly watchlist run evaluates every watch and keeps its matches under the list `watches`, with the watch title as the value.
+2. The hourly watchlist run evaluates every watch and keeps its matches under the list `watches`, with the watch title as the value.
 3. The daily briefing lists new watch matches under "Watchlist hits", grouped by watch, with the item, its feed, its date and an https link. An external channel shows only a count per watch.
 
 ### The microsoft-security pack
@@ -127,7 +130,7 @@ The `custom-feeds` connector allows the allowlisted hosts plus the host of each 
 
 ## Stored matches
 
-Matches are kept in the `watchlist_matches` table of the intel store (migration `0003_watchlist_matches.sql`). Each row records the list, the match kind, the watchlist entry, what it points at (`indicator`, `advisory` or `crtsh`), the store value that matched, a short detail, and when it was first and last matched.
+Matches are kept in the `watchlist_matches` table of the intel store (migration `0003_watchlist_matches.sql`). Each row records the list, the match kind, the watchlist entry, what it points at (`indicator`, `advisory`, `crtsh` or `radar`), the store value that matched, a short detail, and when it was first and last matched.
 
 Every run recomputes the whole set from what the store holds at that moment:
 
@@ -142,43 +145,51 @@ Each run writes the `routine_state` row `watchlist`: the watermark and `updated_
 
 ```sh
 cyberau-mcp store watchlist init [--watchlist FILE]
-cyberau-mcp store watchlist run [--crtsh] [--path STORE] [--watchlist FILE]
+cyberau-mcp store watchlist run [--crtsh] [--radar] [--profile-config FILE] [--path STORE] [--watchlist FILE]
 cyberau-mcp store watchlist matches [--since ISO] [--list domains|brands|ip_ranges|asns|vendors] [--path STORE]
 cyberau-mcp store watchlist hits --since ISO [--path STORE]
 ```
 
-`--path` is the store file, as for every `store` command. `--watchlist` overrides the watchlist file.
+`--path` is the store file, as for every `store` command. `--watchlist` overrides the watchlist file. `--profile-config` names the profile `config.yaml`; with it, `--crtsh` runs only when `mcp_servers.crtsh.enabled` is `true` there and `--radar` only when `mcp_servers.cloudflare_radar.enabled` is `true`. A lookup that is off is reported as skipped, not as an error.
 
-`run` prints one JSON summary: `status` (`ok` or `skipped`), `run_at`, the entry count per list, the number of current, new and removed matches, the count per kind, the crt.sh result and any warnings. The summary carries counts only, never watched values. It exits 0 on success, including a missing file, and 1 on an error such as a broken file.
+`run` prints one JSON summary: `status` (`ok` or `skipped`), `run_at`, the entry count per list, the number of current, new and removed matches, the count per kind, the crt.sh and Radar results and any warnings. The summary carries counts only, never watched values. It exits 0 on success, including a missing file, and 1 on an error such as a broken file.
 
 `matches` prints the current matches as `{"matches": [...]}`, newest first. `--since` keeps matches first seen at or after that time. `--list` may be repeated.
 
 `hits` prints matches first seen at or after `--since` in the shape the daily briefing reads for its intel store section: an envelope whose `data.hits` rows have `id`, `kind`, `value` (the store value that matched), `seen` (the first match time, ISO 8601 UTC) and `asset` (the watchlist entry). The briefing ties a hit to an inventoried asset only when `asset` equals an asset name in `assets.yaml`.
 
-## Nightly run
+## Scheduled runs
 
-The nightly job calls:
+Two no-agent jobs in `cron/jobs.json` run the watchlist. Both arrive paused, like every shipped job; resume them with `hermes cron resume <id>`.
 
-```sh
-cyberau-mcp store watchlist run
-```
+| Job | When | Command | Network |
+|---|---|---|---|
+| `cyberau-watchlist` | every 60 minutes | `cyberau-mcp store watchlist run` | none |
+| `cyberau-watchlist-lookups` | 05:15 every day | `cyberau-mcp store watchlist run --crtsh --radar --profile-config <profile>/config.yaml` | crt.sh and Cloudflare Radar, each only when enabled |
 
-Add `--crtsh` to look for lookalike certificates as well. The job needs no agent and no key. On a fresh install with no watchlist it succeeds and does nothing.
+The hourly job checks every store row loaded since the last run (and every older one, since each run recomputes the whole set) and writes the `routine_state` row `watchlist`, which the daily briefing reads for its intel store section. It needs no agent, no key and no network. On a fresh install with no watchlist it succeeds and does nothing.
+
+The daily lookups job does the same recompute and adds the two outbound lookups. crt.sh and Cloudflare Radar ship off for licence terms (`docs/connectors/crtsh.md`, `docs/connectors/cloudflare-radar.md`), so each lookup runs only after you set `enabled: true` for that server in the profile `config.yaml`. Radar also needs `CLOUDFLARE_RADAR_API_TOKEN` in the job's environment. Hermes runs no-agent scripts with a sanitised environment and the script does not read the profile `.env`, so on a default install the Radar part is skipped with the warning `CLOUDFLARE_RADAR_API_TOKEN is not set`. To run it, export the token in the environment Hermes cron runs in, or run the command by hand from a shell that has it. crt.sh needs no key.
 
 ## Privacy
 
 Watched values stay on the machine. Matching reads the local store only.
 
-The one exception is `run --crtsh`. It sends each entry under `domains`, and nothing else, to crt.sh through the crt.sh connector (keyless, one request every five seconds, results cached for 24 hours). Each query is written to the audit log as a `tool_call` for `crtsh_certs` with the domain in its arguments, before the result is used. If the audit log cannot be written, crt.sh is not queried. If the connector is not installed or a query fails, the run continues with a warning.
+There are two exceptions, both opt-in.
+
+`run --crtsh` sends each entry under `domains`, and nothing else, to crt.sh through the crt.sh connector (keyless, one request every five seconds, results cached for 24 hours). Each query is written to the audit log as a `tool_call` for `crtsh_certs` with the domain in its arguments, before the result is used. If the audit log cannot be written, crt.sh is not queried. If the connector is not installed or a query fails, the run continues with a warning.
 
 crt.sh is searched for certificates on the watched domain and its subdomains. A certificate name on those certificates that is a lookalike, and not the domain or one of its subdomains, is stored with the reference kind `crtsh`. Such a match is replaced on the next successful query for its domain. If queries keep failing, or later runs leave out `--crtsh`, it is deleted after seven days.
 
+`run --radar` sends each entry under `asns`, and nothing else, to Cloudflare Radar through the cloudflare-radar connector: one `bgp/hijacks/events` and one `bgp/leaks/events` request per ASN, with `involvedAsn`, a seven day window and up to 50 events (Radar results are cached for 15 minutes, two requests a second at most). Each query is written to the audit log as a `tool_call` for `get_radar_bgp_hijacks_events` or `get_radar_bgp_leaks_events` with the ASN in its arguments. The token is never logged. If the audit log cannot be written, Radar is not queried. If the token is unset, the connector is not installed or a query fails, the run continues with a warning. An event becomes a match with the reference kind `radar` and the reference `hijack:<id>` or `leak:<id>`; the stored value names the hijacking or leaking ASN and up to three prefixes. Radar's event text is not stored. Matches follow the crt.sh rule: replaced on the next successful query for that ASN, and deleted after seven days if queries keep failing or later runs leave out `--radar`.
+
+`tests/intel/test_watchlists.py::test_no_outbound_call_carries_watched_values_except_to_its_connector` runs both lookups with a full watchlist and checks every request and every audit record: domains reach only crt.sh, ASNs reach only Radar, and brands, ranges and vendors reach neither.
+
 ## Follow-up
 
-- Cloudflare Radar BGP hijack and route leak events for watched ASNs. Radar needs a key and there is no Python client in this checkout yet, so ASN alerts come only from `asn` indicators in the store.
 - crt.sh only returns certificates that carry a watched name. Finding lookalike certificates that do not, for example by querying generated permutations, is not done.
 
 ---
 
 Owner ticket: 062
-Last verified: 18 October 2026
+Last verified: 28 November 2026

@@ -26,6 +26,7 @@ SCRIPT_JOBS = (
     "cyberau-software-watch-local",
     "cyberau-store-expire",
     "cyberau-watchlist",
+    "cyberau-watchlist-lookups",
     "cyberau-store-maintenance",
 )
 

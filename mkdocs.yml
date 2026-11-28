@@ -46,6 +46,7 @@ nav:
       - asd-ism: connectors/asd-ism.md
       - au-regulatory: connectors/au-regulatory.md
       - auscert: connectors/auscert.md
+      - auscert-member: connectors/auscert-member.md
       - cisa-kev: connectors/cisa-kev.md
       - cloudflare-radar: connectors/cloudflare-radar.md
       - cloudflare-urlscanner: connectors/cloudflare-urlscanner.md
@@ -117,6 +118,7 @@ nav:
       - Watchlists: intel/watchlists.md
       - Daily vulnerability digest: intel/vulnerability-digest.md
       - DuckDB export: intel/duckdb.md
+      - MISP export: intel/misp-export.md
   - Security:
       - Overview: security/index.md
       - Threat model: security/threat-model.md

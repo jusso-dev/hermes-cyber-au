@@ -635,6 +635,9 @@ def _connector_check(
     if not _is_enabled(spec):
         reason = str(spec.get("off_reason") or "disabled in profile")
         detail = f"off: {reason}; probes skipped"
+        docs = spec.get("docs")
+        if isinstance(docs, str) and docs.startswith("docs/") and docs.endswith(".md"):
+            detail += f"; see {docs}"
         if external:
             detail += "; external server"
         return _item(check_id, "warn", detail)

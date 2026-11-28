@@ -134,6 +134,7 @@ SCRIPTS = (
     "cyberau_asset_watch.sh",
     "cyberau_store_expire.sh",
     "cyberau_watchlist.sh",
+    "cyberau_watchlist_lookups.sh",
     "cyberau_store_maintenance.sh",
 )
 LIB = "_cyberau_lib.sh"
@@ -218,11 +219,20 @@ EXPECTED = [
     },
     {
         "id": "cyberau-watchlist",
-        "name": "Nightly watchlist matches",
+        "name": "Hourly watchlist matches",
         "script": "cyberau_watchlist.sh",
         "no_agent": True,
-        "schedule": _cron("0 4 * * *"),
-        "schedule_display": "0 4 * * *",
+        "schedule": _interval(60),
+        "schedule_display": "every 60m",
+        "deliver": "local",
+    },
+    {
+        "id": "cyberau-watchlist-lookups",
+        "name": "Daily watchlist lookalike and BGP lookups",
+        "script": "cyberau_watchlist_lookups.sh",
+        "no_agent": True,
+        "schedule": _cron("15 5 * * *"),
+        "schedule_display": "15 5 * * *",
         "deliver": "local",
     },
     {
@@ -517,7 +527,11 @@ class RoutineCronJobsTest(unittest.TestCase):
     def test_nightly_expiry_and_watchlist_scripts(self):
         cases = {
             "cyberau_store_expire.sh": ("store compact", "store expiry ok\n"),
-            "cyberau_watchlist.sh": ("store watchlist run --crtsh", "watchlist ok\n"),
+            "cyberau_watchlist.sh": ("store watchlist run", "watchlist ok\n"),
+            "cyberau_watchlist_lookups.sh": (
+                "store watchlist run --crtsh --radar --profile-config {home}/config.yaml",
+                "watchlist lookups ok\n",
+            ),
         }
         for name, (call, line) in cases.items():
             with self.subTest(script=name), tempfile.TemporaryDirectory() as tmp:
@@ -527,12 +541,16 @@ class RoutineCronJobsTest(unittest.TestCase):
                 result = _run_script(home, name)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, line)
-                self.assertEqual((home / "calls").read_text(encoding="utf-8"), call + "\n")
+                self.assertEqual(
+                    (home / "calls").read_text(encoding="utf-8"),
+                    call.format(home=home) + "\n",
+                )
 
     def test_nightly_scripts_print_one_short_line_on_failure(self):
         for name, label in (
             ("cyberau_store_expire.sh", "store expiry"),
             ("cyberau_watchlist.sh", "watchlist"),
+            ("cyberau_watchlist_lookups.sh", "watchlist lookups"),
         ):
             with self.subTest(script=name), tempfile.TemporaryDirectory() as tmp:
                 home = Path(tmp)

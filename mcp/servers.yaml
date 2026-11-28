@@ -872,3 +872,21 @@ servers:
     timeout: 120
     enabled_by_default: true
     required_env: []
+  auscertm:
+    connector: auscert-member
+    args:
+    - serve
+    - auscert-member
+    env:
+    - AUSCERT_URL_FEED=${AUSCERT_URL_FEED}
+    - AUSCERT_FEED_TOKEN=${AUSCERT_FEED_TOKEN}
+    trust: untrusted
+    lazy: true
+    timeout: 120
+    supports_parallel_tool_calls: true
+    enabled_by_default: false
+    default_enabled: false
+    off_reason: licence terms
+    required_env:
+    - AUSCERT_URL_FEED
+    docs: docs/connectors/auscert-member.md
